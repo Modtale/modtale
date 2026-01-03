@@ -171,9 +171,11 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
                                         <span className="text-sm text-slate-400 group-hover/item:text-modtale-accent truncate max-w-[70%]">
                                             {dep.modTitle || dep.modId}
                                         </span>
-                                        <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
-                                            {dep.isOptional ? 'Optional' : 'Required'}
-                                        </span>
+                                        {mod.classification !== 'MODPACK' && (
+                                            <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
+                                                {dep.isOptional ? 'Optional' : 'Required'}
+                                            </span>
+                                        )}
                                     </button>
                                 ))}
                             </div>
