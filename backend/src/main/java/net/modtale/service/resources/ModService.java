@@ -68,6 +68,8 @@ public class ModService {
     private static final Pattern STRICT_VERSION_PATTERN = Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$");
     private static final Pattern REPO_URL_PATTERN = Pattern.compile("^https:\\/\\/(github\\.com|gitlab\\.com)\\/[\\w.-]+\\/[\\w.-]+$");
 
+    private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$");
+
     @Autowired private ModRepository modRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private UserService userService;
@@ -114,6 +116,12 @@ public class ModService {
     public void validateVersionNumber(String version) {
         if (version == null || !STRICT_VERSION_PATTERN.matcher(version).matches()) {
             throw new IllegalArgumentException("Version number must follow strict X.Y.Z format (e.g., 1.0.0). No suffixes allowed.");
+        }
+    }
+
+    public void validateSlug(String slug) {
+        if (slug == null || !SLUG_PATTERN.matcher(slug).matches()) {
+            throw new IllegalArgumentException("Invalid URL Slug. Must be 3-50 characters, lowercase alphanumeric with dashes, and cannot start or end with a dash.");
         }
     }
 
@@ -256,21 +264,15 @@ public class ModService {
     public List<Mod> getAllMods() { return modRepository.findAll(); }
     public List<Mod> getPublishedMods() { return modRepository.findAllPublished(); }
 
-    public Mod getModById(String id) {
-        Optional<Mod> direct = modRepository.findById(id);
-        if (direct.isEmpty() && id != null) {
-            if (id.length() > 36) {
-                String potentialUuid = id.substring(id.length() - 36);
-                if (potentialUuid.matches("^[0-9a-fA-F-]{36}$")) {
-                    direct = modRepository.findById(potentialUuid);
-                }
-            }
-            if (direct.isEmpty() && id.length() > 24) {
-                String potentialMongoId = id.substring(id.length() - 24);
-                if (potentialMongoId.matches("^[0-9a-fA-F]{24}$")) {
-                    direct = modRepository.findById(potentialMongoId);
-                }
-            }
+    public Mod getModById(String identifier) {
+        Optional<Mod> direct = Optional.empty();
+
+        if (identifier != null) {
+            direct = modRepository.findById(identifier);
+        }
+
+        if (direct.isEmpty() && identifier != null) {
+            direct = modRepository.findBySlug(identifier.toLowerCase());
         }
 
         if (direct.isPresent()) {
@@ -300,7 +302,7 @@ public class ModService {
         return modRepository.findByAuthorIgnoreCase(username, pageable);
     }
 
-    public Mod createDraft(String title, String description, String classification, User user, String ownerName) {
+    public Mod createDraft(String title, String description, String classification, User user, String ownerName, String customSlug) {
         validateClassification(classification);
         if(isTitleTaken(title)) throw new IllegalArgumentException("Title already taken.");
 
@@ -320,12 +322,23 @@ public class ModService {
             finalAuthor = org.getUsername();
         }
 
+        if (customSlug != null && !customSlug.isEmpty()) {
+            validateSlug(customSlug);
+            if (modRepository.existsBySlug(customSlug)) {
+                throw new IllegalArgumentException("Project URL '" + customSlug + "' is already taken. Please choose another.");
+            }
+        }
+
         Mod mod = new Mod();
         mod.setId(UUID.randomUUID().toString());
         mod.setTitle(sanitizer.sanitizePlainText(title));
         mod.setDescription(sanitizer.sanitizePlainText(description));
         mod.setClassification(classification);
         mod.setAuthor(finalAuthor);
+
+        if (customSlug != null && !customSlug.isEmpty()) {
+            mod.setSlug(customSlug.toLowerCase());
+        }
 
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
@@ -337,6 +350,10 @@ public class ModService {
         mod.setAllowModpacks(true);
 
         return modRepository.save(mod);
+    }
+
+    public Mod createDraft(String title, String description, String classification, User user, String ownerName) {
+        return createDraft(title, description, classification, user, ownerName, null);
     }
 
     @CacheEvict(value = "projectSearch_v3", allEntries = true)
@@ -435,7 +452,7 @@ public class ModService {
             notifyNewProject(saved);
             User author = userRepository.findByUsername(saved.getAuthor()).orElse(null);
             if(author != null) {
-                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", "/mod/" + saved.getId(), saved.getImageUrl(), true);
+                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", "/mod/" + getLinkSlug(saved), saved.getImageUrl(), true);
             }
         }
     }
@@ -475,6 +492,10 @@ public class ModService {
         }
         if(mod.getTags() == null || mod.getTags().isEmpty()) {
             throw new IllegalArgumentException("At least one tag is required.");
+        }
+
+        if (mod.getSlug() != null) {
+            validateSlug(mod.getSlug());
         }
 
         if("PLUGIN".equals(mod.getClassification())) {
@@ -602,6 +623,23 @@ public class ModService {
         existing.setDescription(sanitizer.sanitize(updatedMod.getDescription()));
         existing.setCategory(updatedMod.getCategory());
         existing.setCategories(updatedMod.getCategories());
+
+        if (updatedMod.getSlug() != null) {
+            String newSlug = updatedMod.getSlug().toLowerCase();
+
+            if (newSlug.isEmpty()) {
+                existing.setSlug(null);
+            } else if (!newSlug.equals(existing.getSlug())) {
+                validateSlug(newSlug);
+
+                Optional<Mod> conflict = modRepository.findBySlug(newSlug);
+                if (conflict.isPresent() && !conflict.get().getId().equals(existing.getId())) {
+                    throw new IllegalArgumentException("URL Slug '" + newSlug + "' is already taken.");
+                }
+
+                existing.setSlug(newSlug);
+            }
+        }
 
         if ("MODPACK".equals(existing.getClassification())) {
             existing.setLicense(null);
@@ -856,6 +894,7 @@ public class ModService {
             if (mod.getBannerUrl() != null) storageService.deleteFile(mod.getBannerUrl());
             mod.setImageUrl(null);
             mod.setBannerUrl(null);
+            mod.setSlug(null);
 
             if (mod.getGalleryImages() != null) {
                 for (String img : mod.getGalleryImages()) {
@@ -1004,7 +1043,7 @@ public class ModService {
         new Thread(() -> {
             try {
                 List<User> fans = userRepository.findByLikedModIdsContaining(mod.getId());
-                String slug = createSlug(mod.getTitle(), mod.getId());
+                String slug = getLinkSlug(mod);
                 String link = ("MODPACK".equals(mod.getClassification()) ? "/modpack/" : "/mod/") + slug;
                 String msg = "Version " + versionNumber + " is now available.";
 
@@ -1027,7 +1066,7 @@ public class ModService {
                 User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
                 if (author == null) return;
                 List<User> followers = userRepository.findByFollowingIdsContaining(author.getId());
-                String slug = createSlug(mod.getTitle(), mod.getId());
+                String slug = getLinkSlug(mod);
                 String link = ("MODPACK".equals(mod.getClassification()) ? "/modpack/" : "/mod/") + slug;
                 String title = "New Project from " + mod.getAuthor();
                 String msg = mod.getTitle() + " has been released.";
@@ -1048,7 +1087,7 @@ public class ModService {
                     boolean sendEmail = author.getNotificationPreferences().getDependencyUpdates() == User.NotificationLevel.EMAIL;
                     String title = "Dependency Update";
                     String msg = updatedMod.getTitle() + " (used in " + dependent.getTitle() + ") has been updated to version " + version + ".";
-                    String link = "/mod/" + createSlug(updatedMod.getTitle(), updatedMod.getId());
+                    String link = "/mod/" + getLinkSlug(updatedMod);
                     notificationService.sendNotification(List.of(author.getId()), title, msg, link, updatedMod.getImageUrl(), sendEmail);
                 }
             }
@@ -1123,7 +1162,7 @@ public class ModService {
                         List.of(owner.getId()),
                         "Invite Accepted",
                         currentUser.getUsername() + " joined the team for " + mod.getTitle(),
-                        "/mod/" + createSlug(mod.getTitle(), mod.getId()) + "/contributors",
+                        "/mod/" + getLinkSlug(mod) + "/contributors",
                         currentUser.getAvatarUrl(),
                         true
                 );
@@ -1164,7 +1203,7 @@ public class ModService {
                         List.of(author.getId()),
                         "New Review: " + rating + "/5",
                         username + " reviewed " + mod.getTitle(),
-                        "/mod/" + createSlug(mod.getTitle(), mod.getId()),
+                        "/mod/" + getLinkSlug(mod),
                         mod.getImageUrl(),
                         email
                 );
@@ -1261,10 +1300,10 @@ public class ModService {
         }
     }
 
-    private String createSlug(String title, String id) {
-        if (title == null) return id;
-        String slug = title.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
-        if (slug.length() > 30) slug = slug.substring(0, 30);
-        return slug.isEmpty() ? id : slug + "-" + id;
+    private String getLinkSlug(Mod mod) {
+        if (mod.getSlug() != null && !mod.getSlug().isEmpty()) {
+            return mod.getSlug();
+        }
+        return mod.getId();
     }
 }
