@@ -90,7 +90,7 @@ public class SecurityConfig {
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/user/repos", "/api/v1/files/**", "/api/v1/user/profile/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**").permitAll()
 
                         .requestMatchers(
                                 "/api/v1/user/analytics",
@@ -116,6 +116,7 @@ public class SecurityConfig {
                                 "/api/v1/upload/**",
                                 "/api/v1/user/me",
                                 "/api/v1/user/settings/**",
+                                "/api/v1/user/repos/**",
                                 "/api/v1/projects/*/favorite",
                                 "/api/v1/projects/*/reviews"
                         ).authenticated()
@@ -162,6 +163,11 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/projects/*/analytics", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
+
+        source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
+        source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
+        source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);
+        source.registerCorsConfiguration("/api/v1/orgs/*/connections/**", restrictedConfig);
 
         CorsConfiguration publicConfig = new CorsConfiguration();
         publicConfig.setAllowedOriginPatterns(Collections.singletonList("*"));

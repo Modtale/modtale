@@ -908,68 +908,6 @@ export const ApiDocs: React.FC = () => {
                         />
                     </div>
                 </section>
-
-                <section>
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Zap className="w-6 h-6 text-slate-400" /> Analytics
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/analytics/view/{id}"
-                            desc="Log a view for a project. Used for stat tracking (throttled)."
-                            response={`200 OK`}
-                        />
-                    </div>
-                </section>
-
-                <section>
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Github className="w-6 h-6 text-slate-400" /> Git Integrations
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/user/repos/github"
-                            auth={true}
-                            desc="List repositories from connected GitHub account."
-                            response={`[ { "name": "repo", "url": "...", "private": false } ]`}
-                        />
-
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/user/repos/gitlab"
-                            auth={true}
-                            desc="List repositories from connected GitLab account."
-                            response={`[ { "name": "repo", "url": "...", "private": false } ]`}
-                        />
-
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/orgs/{orgId}/repos/github"
-                            auth={true}
-                            desc="List repositories from an Organization's connected GitHub account."
-                            response={`[ { "name": "repo", "url": "...", "private": false } ]`}
-                        />
-
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/user/connections/{provider}"
-                            auth={true}
-                            desc="Unlink a connected account (github | gitlab | discord | etc)."
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/orgs/{orgId}/connections/{provider}"
-                            auth={true}
-                            desc="Unlink a connected account from an organization."
-                            response={`200 OK`}
-                        />
-                    </div>
-                </section>
-
             </div>
         </div>
     );
