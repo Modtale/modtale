@@ -1,0 +1,692 @@
+package net.modtale.service.user;
+
+import net.modtale.model.analytics.CreatorAnalytics;
+import net.modtale.model.resources.Mod;
+import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.User;
+import net.modtale.model.user.Notification;
+import net.modtale.repository.user.UserRepository;
+import net.modtale.repository.user.ApiKeyRepository;
+import net.modtale.repository.user.NotificationRepository;
+import net.modtale.service.AnalyticsService;
+import net.modtale.service.security.SanitizationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+public class UserService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+
+    @Autowired private UserRepository userRepository;
+    @Autowired private ApiKeyRepository apiKeyRepository;
+    @Autowired private NotificationRepository notificationRepository;
+    @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
+    @Autowired private AnalyticsService analyticsService;
+    @Autowired private MongoTemplate mongoTemplate;
+    @Autowired private SanitizationService sanitizer;
+    @Autowired private NotificationService notificationService;
+
+    public List<User> searchUsers(String query) {
+        if (query == null || query.length() < 2) return new ArrayList<>();
+        Query dbQuery = new Query(Criteria.where("username").regex(query, "i")).limit(10);
+        dbQuery.fields().include("username", "avatarUrl", "accountType");
+        return mongoTemplate.find(dbQuery, User.class);
+    }
+
+    public User getPublicProfile(String username) {
+        return userRepository.findByUsernameIgnoreCase(username).orElse(null);
+    }
+
+    public void deleteUser(String userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        apiKeyRepository.deleteByUserId(userId);
+
+        mongoTemplate.remove(new Query(Criteria.where("userId").is(userId)), Notification.class);
+
+        mongoTemplate.updateMulti(
+                new Query(Criteria.where("followerIds").is(userId)),
+                new Update().pull("followerIds", userId),
+                User.class
+        );
+        mongoTemplate.updateMulti(
+                new Query(Criteria.where("followingIds").is(userId)),
+                new Update().pull("followingIds", userId),
+                User.class
+        );
+
+        userRepository.deleteById(userId);
+
+        logger.info("Deleted user account: " + user.getUsername() + " (" + userId + ")");
+    }
+
+    public User createOrganization(String name, User owner) {
+        String cleanName = name.trim();
+
+        if (userRepository.existsByUsernameIgnoreCase(cleanName)) {
+            throw new IllegalArgumentException("A user or organization with this name already exists.");
+        }
+
+        if (!cleanName.matches("^[a-zA-Z0-9_.-]+$")) {
+            throw new IllegalArgumentException("Organization name contains invalid characters.");
+        }
+
+        User org = new User();
+        org.setUsername(cleanName);
+        org.setAccountType(User.AccountType.ORGANIZATION);
+        org.setCreatedAt(LocalDate.now().toString());
+        org.setTier(owner.getTier());
+
+        List<User.OrganizationMember> members = new ArrayList<>();
+        members.add(new User.OrganizationMember(owner.getId(), "ADMIN"));
+        org.setOrganizationMembers(members);
+
+        return userRepository.save(org);
+    }
+
+    public User updateOrganization(String orgId, String newName, String bio, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+
+        if (newName != null && !newName.isBlank() && !newName.equals(org.getUsername())) {
+            Optional<User> existing = userRepository.findByUsernameIgnoreCase(newName);
+            if (existing.isPresent() && !existing.get().getId().equals(orgId)) {
+                throw new IllegalArgumentException("Name already taken.");
+            }
+
+            if (!newName.matches("^[a-zA-Z0-9_.-]+$")) {
+                throw new IllegalArgumentException("Name contains invalid characters.");
+            }
+            org.setUsername(newName);
+        }
+
+        if (bio != null) org.setBio(sanitizer.sanitizePlainText(bio));
+
+        return userRepository.save(org);
+    }
+
+    public void inviteOrganizationMember(String orgId, String targetUsername, String role, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        if (org.getAccountType() != User.AccountType.ORGANIZATION) throw new IllegalArgumentException("Target is not an organization");
+
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isAdmin) throw new SecurityException("Only organization admins can invite members.");
+
+        User target = userRepository.findByUsernameIgnoreCase(targetUsername).orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (org.getOrganizationMembers().stream().anyMatch(m -> m.getUserId().equals(target.getId()))) {
+            throw new IllegalArgumentException("User is already a member.");
+        }
+
+        if (org.getPendingOrgInvites() != null && org.getPendingOrgInvites().stream().anyMatch(m -> m.getUserId().equals(target.getId()))) {
+            throw new IllegalArgumentException("User has already been invited.");
+        }
+
+        if (org.getPendingOrgInvites() == null) org.setPendingOrgInvites(new ArrayList<>());
+        org.getPendingOrgInvites().add(new User.OrganizationMember(target.getId(), role));
+        userRepository.save(org);
+
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("orgId", org.getId());
+        metadata.put("action", "ORG_INVITE");
+
+        notificationService.sendActionableNotification(
+                List.of(target.getId()),
+                "Organization Invite",
+                "You have been invited to join " + org.getUsername() + " as a " + role.toLowerCase() + ".",
+                "/dashboard/orgs",
+                org.getAvatarUrl(),
+                "ORG_INVITE",
+                metadata,
+                true
+        );
+    }
+
+    public void resolveOrgInvite(String orgId, boolean accept, User responder) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        User.OrganizationMember invite = null;
+        if (org.getPendingOrgInvites() != null) {
+            invite = org.getPendingOrgInvites().stream()
+                    .filter(m -> m.getUserId().equals(responder.getId()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (invite == null) throw new IllegalArgumentException("No pending invite found for this organization.");
+
+        if (accept) {
+            org.getOrganizationMembers().add(invite);
+            org.getPendingOrgInvites().remove(invite);
+            userRepository.save(org);
+
+            String msg = responder.getUsername() + " accepted the invitation to join " + org.getUsername();
+            org.getOrganizationMembers().stream()
+                    .filter(m -> "ADMIN".equals(m.getRole()) && !m.getUserId().equals(responder.getId()))
+                    .forEach(admin -> notificationService.sendNotification(
+                            List.of(admin.getUserId()),
+                            "Invite Accepted",
+                            msg,
+                            "/dashboard/orgs",
+                            responder.getAvatarUrl(),
+                            false
+                    ));
+        } else {
+            org.getPendingOrgInvites().remove(invite);
+            userRepository.save(org);
+        }
+    }
+
+    public void voidOrgInvite(String orgId, String userId) {
+        userRepository.findById(orgId).ifPresent(org -> {
+            if (org.getPendingOrgInvites() != null) {
+                boolean removed = org.getPendingOrgInvites().removeIf(m -> m.getUserId().equals(userId));
+                if (removed) userRepository.save(org);
+            }
+        });
+    }
+
+    public void updateOrganizationMemberRole(String orgId, String targetUserId, String newRole, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        boolean isRequesterAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isRequesterAdmin) throw new SecurityException("Insufficient permissions.");
+
+        if (!"ADMIN".equals(newRole) && !"MEMBER".equals(newRole)) {
+            throw new IllegalArgumentException("Invalid role. Must be ADMIN or MEMBER.");
+        }
+
+        User.OrganizationMember targetMember = org.getOrganizationMembers().stream()
+                .filter(m -> m.getUserId().equals(targetUserId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("User is not a member of this organization."));
+
+        if ("MEMBER".equals(newRole) && targetUserId.equals(requester.getId())) {
+            long adminCount = org.getOrganizationMembers().stream().filter(m -> "ADMIN".equals(m.getRole())).count();
+            if (adminCount <= 1) {
+                throw new IllegalArgumentException("You cannot demote yourself as the only Admin.");
+            }
+        }
+
+        targetMember.setRole(newRole);
+        userRepository.save(org);
+
+        String roleName = "ADMIN".equals(newRole) ? "an Admin" : "a Member";
+        notificationService.sendNotification(
+                List.of(targetUserId),
+                "Role Updated",
+                "Your role in " + org.getUsername() + " has been updated to " + roleName + ".",
+                "/dashboard/orgs",
+                org.getAvatarUrl(),
+                false
+        );
+    }
+
+    public void removeOrganizationMember(String orgId, String targetUserId, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+
+        if (!isAdmin && !requester.getId().equals(targetUserId)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
+
+        if (org.getOrganizationMembers().size() <= 1) {
+            throw new IllegalArgumentException("Cannot remove the last member. Delete the organization instead.");
+        }
+
+        boolean removed = org.getOrganizationMembers().removeIf(m -> m.getUserId().equals(targetUserId));
+        if (removed) userRepository.save(org);
+    }
+
+    public void updateOrganizationAvatar(String orgId, String url, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+
+        org.setAvatarUrl(url);
+        userRepository.save(org);
+    }
+
+    public void updateOrganizationBanner(String orgId, String url, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+
+        org.setBannerUrl(url);
+        userRepository.save(org);
+    }
+
+    public void deleteOrganization(String orgId, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        if (org.getAccountType() != User.AccountType.ORGANIZATION) throw new IllegalArgumentException("Target is not an organization");
+
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+
+        deleteUser(orgId);
+    }
+
+    public List<User> getOrganizationMembers(String username) {
+        User org = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        if (org.getOrganizationMembers() == null || org.getOrganizationMembers().isEmpty()) return new ArrayList<>();
+
+        List<String> memberIds = org.getOrganizationMembers().stream()
+                .map(User.OrganizationMember::getUserId)
+                .collect(Collectors.toList());
+
+        Query query = new Query(Criteria.where("_id").in(memberIds));
+        query.fields().include("username", "avatarUrl", "roles", "tier", "id", "bio");
+        return mongoTemplate.find(query, User.class);
+    }
+
+    public List<User> getUserOrganizations(String userId) {
+        return userRepository.findOrganizationsByMemberId(userId);
+    }
+
+    public DefaultOAuth2User linkAccountToOrg(String orgId, String provider, OAuth2User oauthUser, String accessToken) {
+        if ("discord".equalsIgnoreCase(provider) || "google".equalsIgnoreCase(provider)) {
+            throw new IllegalArgumentException("Organizations cannot link " + provider + " accounts.");
+        }
+
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        String providerId = extractProviderId(provider, oauthUser);
+        String username = extractUsername(provider, oauthUser);
+        String profileUrl = extractProfileUrl(provider, oauthUser, username, providerId);
+        boolean isVisible = true;
+
+        Optional<User> conflict = userRepository.findByConnectedAccountsProviderId(providerId);
+        if (conflict.isPresent() && !conflict.get().getId().equals(orgId)) {
+            throw new IllegalArgumentException("This account is already linked to another user or organization.");
+        }
+
+        if ("github".equals(provider)) org.setGithubAccessToken(accessToken);
+        if ("gitlab".equals(provider)) org.setGitlabAccessToken(accessToken);
+
+        updateConnectedAccount(org, provider, providerId, username, profileUrl, isVisible);
+        userRepository.save(org);
+
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("login", org.getUsername());
+        attributes.put("id", org.getId());
+        return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
+    }
+
+    public void unlinkOrgAccount(String orgId, String provider, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+
+        boolean removed = org.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
+        if (removed) {
+            if ("github".equals(provider)) org.setGithubAccessToken(null);
+            if ("gitlab".equals(provider)) org.setGitlabAccessToken(null);
+            userRepository.save(org);
+        }
+    }
+
+    public void toggleOrgConnectionVisibility(String orgId, String provider, User requester) {
+        if ("google".equals(provider)) throw new IllegalArgumentException("Google accounts cannot be made visible.");
+
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        boolean isAdmin = org.getOrganizationMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+
+        org.getConnectedAccounts().stream()
+                .filter(a -> a.getProvider().equals(provider))
+                .findFirst()
+                .ifPresent(a -> a.setVisible(!a.isVisible()));
+        userRepository.save(org);
+    }
+
+    public DefaultOAuth2User processUserLogin(String provider, OAuth2User oauthUser, String accessToken) {
+        String providerId = extractProviderId(provider, oauthUser);
+        String username = extractUsername(provider, oauthUser);
+        String email = oauthUser.getAttribute("email");
+        String avatarUrl = extractAvatarUrl(provider, oauthUser, providerId);
+        String profileUrl = extractProfileUrl(provider, oauthUser, username, providerId);
+
+        boolean isVisible = !"google".equals(provider);
+        User user = null;
+
+        Optional<User> linkedUser = userRepository.findByConnectedAccountsProviderId(providerId);
+        if (linkedUser.isPresent()) {
+            user = linkedUser.get();
+        } else if (email != null && !email.isEmpty()) {
+            Optional<User> emailUser = userRepository.findByEmail(email);
+            if (emailUser.isPresent()) {
+                user = emailUser.get();
+            }
+        }
+
+        if (user != null) {
+            if (user.getAvatarUrl() == null || user.getAvatarUrl().isEmpty()) {
+                if (("github".equals(provider) || "gitlab".equals(provider) || "bluesky".equals(provider) || "google".equals(provider)) && avatarUrl != null) {
+                    user.setAvatarUrl(avatarUrl);
+                }
+            }
+
+            if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
+            if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
+
+            updateConnectedAccount(user, provider, providerId, username, profileUrl, isVisible);
+            userRepository.save(user);
+
+            Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
+            attributes.put("login", user.getUsername());
+            return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
+        }
+
+        String finalUsername = username;
+        if (userRepository.existsByUsernameIgnoreCase(finalUsername)) {
+            int suffix = 1;
+            while (userRepository.existsByUsernameIgnoreCase(finalUsername + "_" + suffix)) {
+                suffix++;
+            }
+            finalUsername = finalUsername + "_" + suffix;
+        }
+
+        user = new User();
+        user.setUsername(finalUsername);
+        user.setEmail(email);
+        user.setAvatarUrl(avatarUrl);
+        user.setCreatedAt(LocalDate.now().toString());
+
+        if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
+        if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
+
+        updateConnectedAccount(user, provider, providerId, username, profileUrl, isVisible);
+        userRepository.save(user);
+
+        Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
+        attributes.put("login", user.getUsername());
+        return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
+    }
+
+    public DefaultOAuth2User linkAccount(User currentUser, String provider, OAuth2User oauthUser, String accessToken) {
+        String providerId = extractProviderId(provider, oauthUser);
+        String username = extractUsername(provider, oauthUser);
+        String profileUrl = extractProfileUrl(provider, oauthUser, username, providerId);
+        boolean isVisible = !"google".equals(provider);
+
+        Optional<User> conflict = userRepository.findByConnectedAccountsProviderId(providerId);
+        if (conflict.isPresent() && !conflict.get().getId().equals(currentUser.getId())) {
+            throw new IllegalArgumentException("This account is already linked to another user.");
+        }
+
+        if ("github".equals(provider)) currentUser.setGithubAccessToken(accessToken);
+        if ("gitlab".equals(provider)) currentUser.setGitlabAccessToken(accessToken);
+
+        updateConnectedAccount(currentUser, provider, providerId, username, profileUrl, isVisible);
+        userRepository.save(currentUser);
+
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("login", currentUser.getUsername());
+        attributes.put("id", currentUser.getId());
+        return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
+    }
+
+    private String extractProviderId(String provider, OAuth2User user) {
+        if ("twitter".equals(provider)) {
+            Map<String, Object> data = user.getAttribute("data");
+            if (data != null) return String.valueOf(data.get("id"));
+        }
+        if ("bluesky".equals(provider)) {
+            return user.getAttribute("did");
+        }
+        if ("google".equals(provider)) {
+            return user.getAttribute("sub");
+        }
+        Object id = user.getAttribute("id");
+        return id != null ? String.valueOf(id) : user.getName();
+    }
+
+    private String extractUsername(String provider, OAuth2User user) {
+        if ("twitter".equals(provider)) {
+            Map<String, Object> data = user.getAttribute("data");
+            if (data != null) return (String) data.get("username");
+        }
+        if ("bluesky".equals(provider)) {
+            return user.getAttribute("handle");
+        }
+        if ("discord".equals(provider)) {
+            String name = user.getAttribute("username");
+            String discriminator = user.getAttribute("discriminator");
+            return (discriminator != null && !discriminator.equals("0")) ? name + "#" + discriminator : name;
+        }
+        if ("google".equals(provider)) {
+            String name = user.getAttribute("name");
+            if (name == null) name = user.getAttribute("email");
+            if (name == null) name = "User";
+            return name.split("@")[0].replaceAll("[^a-zA-Z0-9_]", "");
+        }
+        String login = user.getAttribute("login");
+        String uname = user.getAttribute("username");
+        return login != null ? login : (uname != null ? uname : user.getName());
+    }
+
+    private String extractProfileUrl(String provider, OAuth2User user, String username, String providerId) {
+        if ("discord".equals(provider)) return "https://discord.com/users/" + providerId;
+        if ("gitlab".equals(provider)) return user.getAttribute("web_url");
+        if ("twitter".equals(provider)) return "https://twitter.com/" + username;
+        if ("github".equals(provider)) return "https://github.com/" + username;
+        if ("bluesky".equals(provider)) return "https://bsky.app/profile/" + username;
+        return "";
+    }
+
+    private String extractAvatarUrl(String provider, OAuth2User user, String providerId) {
+        if ("discord".equals(provider)) {
+            String avatar = user.getAttribute("avatar");
+            if (avatar != null) return "https://cdn.discordapp.com/avatars/" + providerId + "/" + avatar + ".png";
+        }
+        if ("bluesky".equals(provider)) {
+            return user.getAttribute("avatar");
+        }
+        if ("google".equals(provider)) {
+            return user.getAttribute("picture");
+        }
+        return user.getAttribute("avatar_url");
+    }
+
+    private void updateConnectedAccount(User user, String provider, String providerId, String username, String profileUrl, boolean visible) {
+        if (user.getConnectedAccounts() == null) user.setConnectedAccounts(new ArrayList<>());
+        user.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
+        user.getConnectedAccounts().add(new User.ConnectedAccount(provider, providerId, username, profileUrl, visible));
+    }
+
+    public void toggleConnectionVisibility(String userId, String provider) {
+        if ("google".equals(provider)) {
+            throw new IllegalArgumentException("Google accounts cannot be made visible on public profiles.");
+        }
+        User user = userRepository.findById(userId).orElseThrow();
+        user.getConnectedAccounts().stream()
+                .filter(a -> a.getProvider().equals(provider))
+                .findFirst()
+                .ifPresent(a -> a.setVisible(!a.isVisible()));
+        userRepository.save(user);
+    }
+
+    public void unlinkAccount(String userId, String provider) {
+        User user = userRepository.findById(userId).orElseThrow();
+        if (user.getConnectedAccounts().size() <= 1) {
+            throw new IllegalArgumentException("You must have at least one connected account to sign in.");
+        }
+        boolean removed = user.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
+        if (removed) {
+            if ("github".equals(provider)) user.setGithubAccessToken(null);
+            if ("gitlab".equals(provider)) user.setGitlabAccessToken(null);
+            userRepository.save(user);
+        }
+    }
+
+    public User getCurrentUser() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null) return null;
+            Object principal = auth.getPrincipal();
+            String username = null;
+            if (principal instanceof User) {
+                username = ((User) principal).getUsername();
+            } else if (principal instanceof OAuth2User) {
+                username = ((OAuth2User) principal).getAttribute("login");
+            }
+            if (username != null) {
+                return userRepository.findByUsername(username).orElse(null);
+            }
+        } catch (Exception e) { logger.error("Error retrieving current user", e); }
+        return null;
+    }
+
+    public User updateUserProfile(String userId, String bio, String newUsername) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (bio != null) user.setBio(sanitizer.sanitizePlainText(bio));
+
+        if (newUsername != null && !newUsername.equals(user.getUsername())) {
+            if (!newUsername.matches("^[a-zA-Z0-9_.-]+$")) {
+                throw new IllegalArgumentException("Username can only contain letters, numbers, hyphens, underscores, and periods.");
+            }
+            if (newUsername.length() < 3 || newUsername.length() > 30) {
+                throw new IllegalArgumentException("Username must be between 3 and 30 characters.");
+            }
+
+            Optional<User> conflict = userRepository.findByUsernameIgnoreCase(newUsername);
+            if (conflict.isPresent() && !conflict.get().getId().equals(user.getId())) {
+                throw new IllegalArgumentException("Username is already taken.");
+            }
+
+            String oldUsername = user.getUsername();
+            user.setUsername(newUsername);
+
+            mongoTemplate.updateMulti(
+                    new Query(Criteria.where("author").is(oldUsername)),
+                    new Update().set("author", newUsername),
+                    Mod.class
+            );
+        }
+
+        return userRepository.save(user);
+    }
+
+    public void updateUserAvatar(String userId, String url) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setAvatarUrl(url);
+        userRepository.save(user);
+    }
+
+    public void updateUserBanner(String userId, String url) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setBannerUrl(url);
+        userRepository.save(user);
+    }
+
+    public void updateNotificationPreferences(String userId, User.NotificationPreferences prefs) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setNotificationPreferences(prefs);
+        userRepository.save(user);
+    }
+
+    public void followUser(String currentUserId, String targetUsername) {
+        User target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new IllegalArgumentException("Target not found"));
+        if (target.getId().equals(currentUserId)) throw new IllegalArgumentException("Cannot follow yourself.");
+
+        User currentUser = userRepository.findById(currentUserId).orElseThrow();
+
+        if (currentUser.getFollowingIds() == null) currentUser.setFollowingIds(new ArrayList<>());
+        if (target.getFollowerIds() == null) target.setFollowerIds(new ArrayList<>());
+
+        if (!currentUser.getFollowingIds().contains(target.getId())) {
+            currentUser.getFollowingIds().add(target.getId());
+            target.getFollowerIds().add(currentUser.getId());
+
+            userRepository.save(currentUser);
+            userRepository.save(target);
+
+            if (target.getNotificationPreferences().getNewFollowers() != User.NotificationLevel.OFF) {
+                boolean email = target.getNotificationPreferences().getNewFollowers() == User.NotificationLevel.EMAIL;
+                notificationService.sendNotification(
+                        List.of(target.getId()),
+                        "New Follower",
+                        currentUser.getUsername() + " started following you.",
+                        "/creator/" + currentUser.getUsername(),
+                        currentUser.getAvatarUrl(),
+                        email
+                );
+            }
+        }
+    }
+
+    public void unfollowUser(String currentUserId, String targetUsername) {
+        User target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new IllegalArgumentException("Target not found"));
+        User currentUser = userRepository.findById(currentUserId).orElseThrow();
+
+        if (currentUser.getFollowingIds() != null) {
+            currentUser.getFollowingIds().remove(target.getId());
+            userRepository.save(currentUser);
+        }
+        if (target.getFollowerIds() != null) {
+            target.getFollowerIds().remove(currentUser.getId());
+            userRepository.save(target);
+        }
+    }
+
+    public List<User> getFollowing(String username) {
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) return new ArrayList<>();
+        List<String> ids = userOpt.get().getFollowingIds();
+        if (ids == null || ids.isEmpty()) return new ArrayList<>();
+        Query query = new Query(Criteria.where("_id").in(ids));
+        query.fields().include("username", "avatarUrl", "roles", "tier", "id");
+        return mongoTemplate.find(query, User.class);
+    }
+
+    public List<User> getFollowers(String username) {
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) return new ArrayList<>();
+        List<String> ids = userOpt.get().getFollowerIds();
+        if (ids == null || ids.isEmpty()) return new ArrayList<>();
+        Query query = new Query(Criteria.where("_id").in(ids));
+        query.fields().include("username", "avatarUrl", "roles", "tier", "id");
+        return mongoTemplate.find(query, User.class);
+    }
+
+    public CreatorAnalytics getCreatorAnalytics(String username) {
+        return analyticsService.getCreatorDashboard(username, "30d", null);
+    }
+
+    public void setUserTier(String username, ApiKey.Tier newTier) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setTier(newTier);
+        userRepository.save(user);
+        mongoTemplate.updateMulti(new Query(Criteria.where("userId").is(user.getId())), new Update().set("tier", newTier), ApiKey.class);
+    }
+}

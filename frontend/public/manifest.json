@@ -1,0 +1,25 @@
+{
+  "short_name": "Modtale",
+  "name": "Modtale - Hytale Mods & Plugins",
+  "icons": [
+    {
+      "src": "/assets/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "48x48 96x96 144x144 192x192"
+    },
+    {
+      "src": "/assets/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/assets/logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff"
+}

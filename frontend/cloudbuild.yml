@@ -1,0 +1,27 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'PUBLIC_API_URL=${_PUBLIC_API_URL}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/modtale-frontend'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/modtale-frontend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'modtale-frontend' # Your Cloud Run service name
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/modtale-frontend'
+      - '--region'
+      - 'us-central1'
+      - '--allow-unauthenticated' # Allows public access to the frontend
+
+substitutions:
+  _PUBLIC_API_URL: https://api.modtale.net/api/v1

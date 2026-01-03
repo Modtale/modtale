@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        @apply bg-slate-50;
+    }
+
+    html.dark {
+        @apply bg-slate-900;
+    }
+
+    body {
+        @apply font-sans antialiased text-slate-900 dark:text-slate-300 bg-slate-50 dark:bg-slate-900;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+    }
+
+    #root {
+        min-height: 100vh;
+    }
+}

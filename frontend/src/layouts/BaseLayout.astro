@@ -1,0 +1,78 @@
+---
+import '../index.css';
+
+interface Props {
+    title?: string;
+    description?: string;
+    image?: string;
+    jsonLd?: object;
+    initialData?: object;
+    }
+
+const {
+    title = "Modtale - Hytale Mods & Plugins",
+    description = "The premier community repository for Hytale. Discover, download, and share Hytale mods, server plugins, art assets, and modpacks.",
+    image: propImage,
+    jsonLd,
+    initialData
+    } = Astro.props;
+
+const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
+
+const defaultImage = "https://modtale.net/assets/og-default.png";
+const rawImage = propImage || defaultImage;
+
+const finalImage = (rawImage && typeof rawImage === 'string' && rawImage.startsWith('/api'))
+? `https://api.modtale.net${rawImage}`
+: rawImage;
+
+const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
+const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark bg-slate-50 dark:bg-modtale-dark text-slate-900 dark:text-slate-400">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={finalImage} />
+    <meta property="og:site_name" content="Modtale" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={finalImage} />
+
+    <meta name="keywords" content="hytale, mods, plugins, assets, modpacks, worlds, modtale" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <meta name="theme-color" content="#3b82f6" />
+
+    {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
+
+    <script define:vars={{ initialData }}>
+        window.INITIAL_DATA = initialData;
+    </script>
+
+    <script is:inline>
+        (function() {
+            try {
+                const localTheme = localStorage.getItem('theme');
+                if (localTheme === 'light') {
+                    document.documentElement.classList.remove('dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body>
+<slot />
+</body>
+</html>

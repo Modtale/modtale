@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /oauth2/
+Disallow: /upload
+Disallow: /analytics
+Disallow: /admin
+Disallow: /settings
+
+Sitemap: https://api.modtale.net/sitemap.xml
