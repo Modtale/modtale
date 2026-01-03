@@ -1,9 +1,7 @@
 <div align="center">
-  <a href="https://github.com/Modtale/modtale">
+  <a href="https://modtale.net">
     <img src="logo.svg" alt="Modtale Logo" width="850" height="132">
   </a>
-
-  <h1 align="center">Modtale</h1>
 
   <p align="center">
     <strong>The Hytale Community Repository</strong>
