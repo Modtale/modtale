@@ -99,7 +99,7 @@ public class RateLimitFilter implements Filter {
                 }
 
                 limitKey = "IP:" + getClientIp(req);
-                capacity = 60; traffic
+                capacity = 60;
                 tierName = "Public";
             }
         }
