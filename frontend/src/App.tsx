@@ -13,8 +13,8 @@ import { EditMod } from './react-pages/resources/EditMod';
 import { TermsOfService } from './react-pages/TermsOfService';
 import { PrivacyPolicy } from './react-pages/PrivacyPolicy';
 import { Dashboard } from './react-pages/user/Dashboard.tsx';
-import { AdminPanel } from './react-pages/api/AdminPanel';
-import { ApiDocs } from './react-pages/api/ApiDocs';
+import { AdminPanel } from './react-pages/AdminPanel.tsx';
+import { ApiDocs } from './react-pages/ApiDocs.tsx';
 import { Status } from './react-pages/Status';
 import { Analytics } from '@/components/dashboard/analytics/Analytics';
 

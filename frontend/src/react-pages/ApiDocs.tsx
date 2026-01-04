@@ -520,7 +520,6 @@ export const ApiDocs: React.FC = () => {
                                 "File is required for standard projects (JAR/ZIP).",
                                 "File is ignored for Modpacks.",
                                 "Modpacks must have at least 2 dependencies.",
-                                "Zip Bombs and malicious extensions (.exe, .sh, etc) are rejected."
                             ]}
                             params={{
                                 "versionNumber": "string (Required, X.Y.Z)",
