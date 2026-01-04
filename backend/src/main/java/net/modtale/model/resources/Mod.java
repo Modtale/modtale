@@ -69,6 +69,8 @@ public class Mod {
     private String status = "PUBLISHED";
     private String expiresAt;
 
+    private String approvedBy;
+
     private List<String> contributors = new ArrayList<>();
     private List<String> pendingInvites = new ArrayList<>();
 
@@ -150,6 +152,9 @@ public class Mod {
     public void setStatus(String status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
     public void setExpiresAt(String expiresAt) { this.expiresAt = expiresAt; }
+
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
 
     public List<String> getContributors() { return contributors; }
     public void setContributors(List<String> contributors) { this.contributors = contributors; }
