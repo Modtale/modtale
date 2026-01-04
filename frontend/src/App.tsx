@@ -200,7 +200,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
             <div className="flex-1">
                 <Routes>
                     <Route path="/" element={renderHome()} />
-                    <Route path="/home" element={renderHome()} />
                     <Route path="/mods" element={<Navigate to="/" replace />} />
                     <Route path="/plugins" element={renderHome('PLUGIN')} />
                     <Route path="/modpacks" element={renderHome('MODPACK')} />

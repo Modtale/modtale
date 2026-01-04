@@ -32,6 +32,8 @@ public class SitemapController {
         addUrl(xml, baseUrl + "/plugins", "0.9", LocalDate.now());
         addUrl(xml, baseUrl + "/modpacks", "0.9", LocalDate.now());
         addUrl(xml, baseUrl + "/worlds", "0.9", LocalDate.now());
+        addUrl(xml, baseUrl + "/data", "0.9", LocalDate.now());
+        addUrl(xml, baseUrl + "/art", "0.9", LocalDate.now());
 
         addUrl(xml, baseUrl + "/api-docs", "0.8", LocalDate.now());
 
