@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../utils/api';
 import {
     CheckCircle, AlertTriangle, XCircle, Server, Database,
-    HardDrive, Globe, RefreshCw, Activity, Zap, BarChart2, Info
+    HardDrive, Globe, RefreshCw, Activity, Zap, BarChart2
 } from 'lucide-react';
 import { LineChart } from '../components/ui/charts/LineChart.tsx';
 import { Spinner } from '../components/ui/Spinner';
@@ -53,7 +53,7 @@ const UptimeHeatmap: React.FC<UptimeHeatmapProps> = ({ serviceId, data, range, l
 
             const points = data.filter(d => d.time >= bucketStart && d.time < bucketEnd);
 
-            let status: 'operational' | 'degraded' | 'down' | 'idle' = 'idle';
+            let status: 'operational' | 'degraded' | 'down' | 'no-data' = 'no-data';
             let uptimePercent = 0;
 
             if (points.length > 0) {
@@ -79,7 +79,7 @@ const UptimeHeatmap: React.FC<UptimeHeatmapProps> = ({ serviceId, data, range, l
             case 'operational': return 'bg-emerald-500 dark:bg-emerald-500 hover:bg-emerald-400';
             case 'degraded': return 'bg-yellow-500 dark:bg-yellow-500 hover:bg-yellow-400';
             case 'down': return 'bg-red-500 dark:bg-red-500 hover:bg-red-400';
-            default: return 'bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20';
+            default: return 'bg-slate-100 dark:bg-white/5'; // No Data
         }
     };
 
@@ -98,9 +98,9 @@ const UptimeHeatmap: React.FC<UptimeHeatmapProps> = ({ serviceId, data, range, l
                         <span className={
                             hoveredBar.status === 'down' ? 'text-red-500 font-bold' :
                                 hoveredBar.status === 'degraded' ? 'text-yellow-500 font-bold' :
-                                    hoveredBar.status === 'idle' ? 'text-slate-400' : 'text-emerald-500 font-bold'
+                                    hoveredBar.status === 'no-data' ? 'text-slate-400' : 'text-emerald-500 font-bold'
                         }>
-                            {hoveredBar.label}: {hoveredBar.status === 'idle' ? 'Sleeping' : `${hoveredBar.percent.toFixed(1)}%`}
+                            {hoveredBar.label}: {hoveredBar.status === 'no-data' ? 'No Data' : `${hoveredBar.percent.toFixed(1)}%`}
                         </span>
                     ) : (
                         range === '24h' ? 'Uptime: 24h' : 'Uptime: 30d'
@@ -123,7 +123,7 @@ const UptimeHeatmap: React.FC<UptimeHeatmapProps> = ({ serviceId, data, range, l
 };
 
 const StatusIcon = ({ status }: { status: string }) => {
-    if (status === 'operational') return <CheckCircle className="w-6 h-6 text-green-500" />;
+    if (status === 'operational') return <CheckCircle className="w-6 h-6 text-emerald-500" />;
     if (status === 'degraded') return <AlertTriangle className="w-6 h-6 text-yellow-500" />;
     return <XCircle className="w-6 h-6 text-red-500" />;
 };
@@ -144,16 +144,9 @@ export const Status: React.FC = () => {
 
     const fetchStatus = async () => {
         setIsRefreshing(true);
-        const start = Date.now();
         try {
             const res = await api.get(`/status?range=${range}`);
-            const apiLatency = Date.now() - start;
-
-            const services = res.data.services.map((s: ServiceStatus) =>
-                s.id === 'api' ? { ...s, latency: apiLatency } : s
-            );
-
-            setData({ ...res.data, services });
+            setData(res.data);
             setLastUpdated(new Date());
         } catch (e) {
             console.error(e);
@@ -173,23 +166,7 @@ export const Status: React.FC = () => {
     }, [range]);
 
     const displayHistory = useMemo(() => {
-        let history: HistoryPoint[] = data?.history ? [...data.history] : [];
-        const currentPoint: HistoryPoint = {
-            time: data?.timestamp || Date.now(),
-            api: data?.services?.find(s => s.id === 'api')?.latency || 0,
-            db: data?.services?.find(s => s.id === 'database')?.latency || 0,
-            storage: data?.services?.find(s => s.id === 'storage')?.latency || 0
-        };
-
-        if (history.length === 0) {
-            history.push(currentPoint);
-        } else if (currentPoint.time > history[history.length - 1].time) {
-            history.push(currentPoint);
-        }
-
-        if (history.length === 1) {
-            history.unshift({ ...history[0], time: history[0].time - 60000 });
-        }
+        const history: HistoryPoint[] = data?.history ? [...data.history] : [];
         return history;
     }, [data]);
 
@@ -209,32 +186,17 @@ export const Status: React.FC = () => {
     ];
 
     const overallColor = data?.overall === 'operational' ? 'bg-emerald-500' : (data?.overall === 'degraded' ? 'bg-yellow-500' : 'bg-red-500');
-    const overallText = data?.overall === 'operational' ? 'All Systems Operational' : (data?.overall === 'degraded' ? 'Partial System Degraded' : 'Major System Outage');
+    const overallText = data?.overall === 'operational' ? 'All Systems Operational' : (data?.overall === 'degraded' ? 'Partial System Degradation' : 'Major System Outage');
 
-    if (loading && !data) return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark"><Spinner label="Status Check..." /></div>;
+    if (loading && !data) return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark"><Spinner label="Checking Systems..." /></div>;
 
     return (
         <div className="max-w-5xl mx-auto px-4 py-16 min-h-screen">
-            <div className="text-center mb-10">
+            <div className="text-center mb-12">
                 <h1 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight flex items-center justify-center gap-3">
                     <Activity className="w-10 h-10 text-modtale-accent" /> System Status
                 </h1>
-                <p className="text-slate-500 dark:text-slate-400">Live performance and reliability tracking.</p>
-            </div>
-
-            <div className="max-w-3xl mx-auto mb-10 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex gap-4">
-                <Info className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <div className="text-sm">
-                    <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-1">Demo Environment: Scale-to-Zero Architecture</h3>
-                    <p className="text-blue-800 dark:text-blue-200 leading-relaxed opacity-90">
-                        Modtale is currently running in a cost-optimized <strong>Demo State</strong>.
-                        The backend infrastructure is configured to auto-scale down to <strong>0 instances</strong> when idle.
-                        <br className="mb-2 block"/>
-                        You may observe "Sleeping" periods (gray bars) or brief "Cold Start" latency in the graphs below.
-                        This is expected behavior for the demo. Once the site exits demo mode,
-                        always-on instances will be provisioned for <strong>99.9%+ availability</strong> and significantly faster response times.
-                    </p>
-                </div>
+                <p className="text-slate-500 dark:text-slate-400">Real-time performance and reliability monitoring.</p>
             </div>
 
             <div className={`rounded-2xl p-1 shadow-lg mb-12 ${overallColor} transition-colors duration-500`}>
@@ -264,16 +226,16 @@ export const Status: React.FC = () => {
 
                 <div className="flex flex-wrap justify-center gap-6 mt-6 border-t border-slate-100 dark:border-white/5 pt-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                     <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Operational</div>
-                    <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div> Partial Degraded</div>
+                    <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div> Degraded</div>
                     <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div> Outage</div>
-                    <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-white/10"></div> Sleeping (Demo Mode)</div>
+                    <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-white/10"></div> No Data</div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
                 <div className="lg:col-span-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm min-h-[400px]">
                     <h3 className="font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white">
-                        <Zap className="w-4 h-4 text-yellow-500" /> Response Times
+                        <Zap className="w-4 h-4 text-yellow-500" /> Response Latency
                     </h3>
                     <div className="h-96 w-full">
                         <LineChart datasets={perfDatasets} yAxisFormatter={(v) => `${Math.round(v)}ms`} />
@@ -282,14 +244,14 @@ export const Status: React.FC = () => {
 
                 <div className="space-y-4">
                     {data?.services.map((service) => (
-                        <div key={service.id} className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl p-5 shadow-sm">
+                        <div key={service.id} className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl p-5 shadow-sm hover:border-modtale-accent/50 transition-colors">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="p-2 bg-slate-50 dark:bg-white/5 rounded-lg"><ServiceIcon id={service.id} /></div>
                                 <StatusIcon status={service.status} />
                             </div>
                             <div className="text-sm font-bold text-slate-900 dark:text-white">{service.name}</div>
                             <div className="text-xs text-slate-500 mt-1 flex justify-between">
-                                <span>Current Latency</span>
+                                <span>Latency</span>
                                 <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{Math.round(service.latency)}ms</span>
                             </div>
                         </div>
@@ -304,7 +266,7 @@ export const Status: React.FC = () => {
                     className="flex items-center gap-2 px-8 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:border-modtale-accent transition-all active:scale-95 disabled:opacity-50"
                 >
                     <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    Force Refresh
+                    Refresh Status
                 </button>
             </div>
         </div>

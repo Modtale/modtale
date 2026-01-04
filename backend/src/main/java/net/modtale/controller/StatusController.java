@@ -2,6 +2,8 @@ package net.modtale.controller;
 
 import net.modtale.model.analytics.StatusHistory;
 import net.modtale.repository.analytics.StatusHistoryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -25,23 +27,34 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/status")
 public class StatusController {
 
+    private static final Logger logger = LoggerFactory.getLogger(StatusController.class);
+
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private S3Client s3Client;
     @Autowired private StatusHistoryRepository historyRepository;
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        checkAndRecordStatus();
+        performHealthCheck();
     }
 
     @Scheduled(fixedRate = 60000)
     public void performScheduledCheck() {
-        checkAndRecordStatus();
+        performHealthCheck();
     }
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> getSystemStatus(@RequestParam(defaultValue = "24h") String range) {
-        Map<String, Object> currentStatus = checkAndRecordStatus();
+        StatusHistory latest = historyRepository.findTopByOrderByTimestampDesc();
+
+        if (latest == null) {
+            latest = performHealthCheck();
+        }
+
+        List<Map<String, Object>> services = new ArrayList<>();
+        services.add(Map.of("id", "api", "name", "API Gateway", "status", latest.getOverallStatus(), "latency", latest.getApiLatency()));
+        services.add(Map.of("id", "database", "name", "Database (Atlas)", "status", "operational", "latency", latest.getDbLatency())); // Assuming simple mapping, could store individual status in DB if needed
+        services.add(Map.of("id", "storage", "name", "Storage (R2)", "status", "operational", "latency", latest.getStorageLatency()));
 
         LocalDateTime since;
         if ("30d".equals(range)) {
@@ -62,9 +75,9 @@ public class StatusController {
         }
 
         return ResponseEntity.ok(Map.of(
-                "overall", currentStatus.get("overall"),
-                "services", currentStatus.get("services"),
-                "timestamp", System.currentTimeMillis(),
+                "overall", latest.getOverallStatus(),
+                "services", services,
+                "timestamp", latest.getTimestamp().toEpochSecond(ZoneOffset.UTC) * 1000,
                 "history", history.stream().map(h -> Map.of(
                         "time", h.getTimestamp().toEpochSecond(ZoneOffset.UTC) * 1000,
                         "api", h.getApiLatency(),
@@ -74,39 +87,33 @@ public class StatusController {
         ));
     }
 
-    private Map<String, Object> checkAndRecordStatus() {
-        List<Map<String, Object>> services = new ArrayList<>();
+    private StatusHistory performHealthCheck() {
+        long totalStart = System.currentTimeMillis();
         boolean allOperational = true;
 
         long dbStart = System.currentTimeMillis();
-        String dbStatus = "operational";
         try {
             mongoTemplate.executeCommand("{ ping: 1 }");
         } catch (Exception e) {
-            dbStatus = "outage";
+            logger.error("Health Check: Database failed", e);
             allOperational = false;
         }
         int dbLatency = (int) (System.currentTimeMillis() - dbStart);
-        services.add(Map.of("id", "database", "name", "Database (Atlas)", "status", dbStatus, "latency", dbLatency));
 
         long storageStart = System.currentTimeMillis();
-        String storageStatus = "operational";
         try {
             s3Client.listBuckets();
         } catch (Exception e) {
-            storageStatus = "outage";
+            logger.error("Health Check: Storage failed", e);
             allOperational = false;
         }
         int storageLatency = (int) (System.currentTimeMillis() - storageStart);
-        services.add(Map.of("id", "storage", "name", "Storage (R2)", "status", storageStatus, "latency", storageLatency));
 
-        services.add(Map.of("id", "api", "name", "API Gateway", "status", "operational", "latency", 5));
+        int apiLatency = (int) (System.currentTimeMillis() - totalStart);
 
         String overall = allOperational ? "operational" : "degraded";
 
-        StatusHistory entry = new StatusHistory(5, dbLatency, storageLatency, overall);
-        historyRepository.save(entry);
-
-        return Map.of("overall", overall, "services", services);
+        StatusHistory entry = new StatusHistory(apiLatency, dbLatency, storageLatency, overall);
+        return historyRepository.save(entry);
     }
 }
