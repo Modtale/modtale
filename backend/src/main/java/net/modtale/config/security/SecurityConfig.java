@@ -1,5 +1,7 @@
 package net.modtale.config.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +18,7 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -25,7 +28,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpSession;
+import java.net.URI;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +38,8 @@ import java.util.Arrays;
 
 @Configuration
 public class SecurityConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -52,9 +59,40 @@ public class SecurityConfig {
     @Autowired
     private OAuth2AuthorizedClientRepository authorizedClientRepository;
 
+    @PostConstruct
+    public void logConfig() {
+        logger.info("Security Config Initialized. Frontend URL: {}", frontendUrl);
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
+
+        tokenRepository.setCookieHttpOnly(false);
+        tokenRepository.setSecure(true);
+        tokenRepository.setCookiePath("/");
+
+        tokenRepository.setCookieCustomizer(cookie -> {
+            cookie.sameSite("None");
+
+            if (frontendUrl != null && !frontendUrl.isBlank()) {
+                try {
+                    String host = URI.create(frontendUrl).getHost();
+                    if (host != null && !host.equalsIgnoreCase("localhost")) {
+                        String[] parts = host.split("\\.");
+                        if (parts.length >= 2) {
+                            String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                            cookie.domain(rootDomain);
+                        } else {
+                            cookie.domain(host);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to set CSRF cookie domain: {}", e.getMessage());
+                }
+            }
+        });
+
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName(null);
 
@@ -69,6 +107,7 @@ public class SecurityConfig {
 
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
+                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
 
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
                 .sessionManagement(session -> session
@@ -134,7 +173,11 @@ public class SecurityConfig {
                         .clearAuthentication(true)
                         .deleteCookies("JSESSIONID", "XSRF-TOKEN", "SESSION")
                         .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler())
-                ).exceptionHandling(exception -> exception
+                )
+                .exceptionHandling(exception -> exception
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.sendError(HttpStatus.FORBIDDEN.value(), "Access Denied: " + accessDeniedException.getMessage());
+                        })
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 );
         return http.build();
@@ -153,7 +196,7 @@ public class SecurityConfig {
 
         restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
         restrictedConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        restrictedConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token"));
+        restrictedConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN"));
         restrictedConfig.setAllowCredentials(true);
         restrictedConfig.setMaxAge(3600L);
 
@@ -170,9 +213,16 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/orgs/*/connections/**", restrictedConfig);
 
         CorsConfiguration publicConfig = new CorsConfiguration();
-        publicConfig.setAllowedOriginPatterns(Collections.singletonList("*"));
+        List<String> publicOrigins = new ArrayList<>();
+        publicOrigins.add("*");
+
+        if (frontendUrl != null && !frontendUrl.isBlank()) {
+            publicOrigins.add(frontendUrl);
+        }
+
+        publicConfig.setAllowedOriginPatterns(publicOrigins);
         publicConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        publicConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-Modtale-Key"));
+        publicConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN", "X-Modtale-Key"));
         publicConfig.setExposedHeaders(Arrays.asList("X-Xsrf-Token", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Tier"));
         publicConfig.setAllowCredentials(true);
         publicConfig.setMaxAge(3600L);
