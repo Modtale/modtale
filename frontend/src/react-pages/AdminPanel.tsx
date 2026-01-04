@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
-import { StatusModal } from '../../components/ui/StatusModal';
+import { api, API_BASE_URL, BACKEND_URL } from '../utils/api.ts';
+import { StatusModal } from '../components/ui/StatusModal.tsx';
 import {
     Shield, Search, User as UserIcon, Check, X,
     FileText, ExternalLink, ArrowRight, ArrowLeft, Image as ImageIcon,
     Clock, Download, Box, List, Copy, LayoutGrid, AlertTriangle, Zap, Terminal, FileCode, ChevronRight, Folder
 } from 'lucide-react';
-import type { Mod } from '../../types';
+import type { Mod } from '../types.ts';
 
 interface AdminPanelProps {
     currentUser: any;
