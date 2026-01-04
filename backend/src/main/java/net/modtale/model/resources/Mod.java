@@ -22,6 +22,9 @@ public class Mod {
     @Id
     private String id;
 
+    @Indexed(unique = true, sparse = true)
+    private String slug;
+
     @Indexed
     private String title;
 
@@ -85,6 +88,10 @@ public class Mod {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+
+    public String getSlug() { return slug; }
+    public void setSlug(String slug) { this.slug = slug; }
+
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getAbout() { return about; }

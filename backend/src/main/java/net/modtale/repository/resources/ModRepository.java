@@ -20,6 +20,10 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
 
     List<Mod> findByAuthor(String author);
 
+    Optional<Mod> findBySlug(String slug);
+
+    boolean existsBySlug(String slug);
+
     long countByAuthor(String author);
 
     boolean existsByTitleIgnoreCase(String title);

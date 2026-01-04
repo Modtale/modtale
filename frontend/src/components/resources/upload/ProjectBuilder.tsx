@@ -11,11 +11,12 @@ import {
     Save, UploadCloud, CheckCircle2, Image as ImageIcon, Link as LinkIcon, Tag,
     ChevronDown, ChevronUp, RefreshCw, Check, Loader2, GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, AlertCircle, FileText, Eye, LayoutTemplate,
-    UserPlus, X, Plus, Globe, Scale, Box, Clock, Lock, Undo2, Archive, EyeOff, RotateCcw
+    UserPlus, X, Plus, Globe, Scale, Box, Clock, Lock, Undo2, Archive, EyeOff, RotateCcw, Link2
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ModSidebar } from '@/components/resources/mod-detail/ModSidebar.tsx';
+import { createSlug } from '../../../utils/slug';
 import type { Mod, User } from '../../../types';
 
 const ThemedInput = ({ label, disabled, ...props }: any) => (
@@ -79,6 +80,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const repoDropdownRef = useRef<HTMLDivElement>(null);
     const [repoValid, setRepoValid] = useState(false);
 
+    const [slugError, setSlugError] = useState<string | null>(null);
+
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
 
@@ -101,11 +104,34 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const isUnlisted = modData?.status === 'UNLISTED';
     const canUpload = !readOnly && (!isDraft || (modData?.versions?.length || 0) === 0);
 
+    const getUrlPrefix = () => {
+        if (classification === 'MODPACK') return 'modtale.net/modpack/';
+        if (classification === 'SAVE') return 'modtale.net/world/';
+        return 'modtale.net/mod/';
+    };
+
     const checkRepoUrl = useCallback((url: string) => {
         const isValid = /^https:\/\/(github\.com|gitlab\.com)\/[\w.-]+\/[\w.-]+$/.test(url);
         setRepoValid(isValid);
         return isValid;
     }, []);
+
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setMetaData({...metaData, slug: val});
+
+        if (!val) {
+            setSlugError(null);
+            return;
+        }
+
+        const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;
+        if (!slugRegex.test(val)) {
+            setSlugError("Must be 3-50 chars, lowercase alphanumeric, no start/end dash.");
+        } else {
+            setSlugError(null);
+        }
+    };
 
     useEffect(() => {
         if (metaData.repositoryUrl) {
@@ -611,7 +637,32 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                             {activeTab === 'settings' && (
                                 <div className="space-y-6">
-                                    <div className="bg-slate-50 dark:bg-slate-950/30 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
+                                    <div className="bg-slate-50 dark:bg-slate-950/30 p-6 rounded-2xl border border-slate-200 dark:border-white/10">
+
+                                        <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
+                                            <div className="flex flex-col gap-2">
+                                                <div>
+                                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                        <Link2 className="w-4 h-4 text-slate-500" /> Project URL Slug
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500 mt-1">Customize the URL for your project. Leave blank to use the default ID.</p>
+                                                </div>
+                                                <div className="flex items-center w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                                    <div className="px-4 py-2 bg-slate-50 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-500 text-sm font-mono whitespace-nowrap select-none">
+                                                        {getUrlPrefix()}
+                                                    </div>
+                                                    <input
+                                                        disabled={readOnly}
+                                                        value={metaData.slug || ''}
+                                                        onChange={handleSlugChange}
+                                                        className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`}
+                                                        placeholder={createSlug(metaData.title, modData?.id || 'id')}
+                                                    />
+                                                </div>
+                                                {slugError && <p className="text-[10px] text-red-500 font-bold">{slugError}</p>}
+                                            </div>
+                                        </div>
+
                                         <div className="flex items-center justify-between mb-4">
                                             <div>
                                                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Modpack Inclusion</h3>
@@ -700,7 +751,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         </div>
 
                         <div className="lg:col-span-4 p-6 md:p-12 space-y-4 bg-transparent border-t md:border-t-0 md:border-l border-slate-200 dark:border-white/5">
-
                             {(classification === 'PLUGIN' || classification === 'MODPACK') && (
                                 <ModSidebar title="Repository Source" icon={GitMerge} defaultOpen={true}>
                                     <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2">

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 
 const RAW_URL =
     import.meta.env.PUBLIC_API_URL || 'https://api.modtale.net/api';
@@ -13,29 +13,39 @@ export const getCookie = (name: string): string | null => {
     if (typeof document === 'undefined') return null;
     if (!document.cookie) return null;
 
-    const xsrfCookies = document.cookie
-        .split(';')
-        .map(c => c.trim())
-        .filter(c => c.startsWith(name + '='));
-
-    if (xsrfCookies.length === 0) return null;
-    return decodeURIComponent(xsrfCookies[0].split('=')[1]);
+    const cookies = document.cookie.split(';');
+    for (const c of cookies) {
+        const [key, val] = c.trim().split('=');
+        if (key === name) {
+            return decodeURIComponent(val);
+        }
+    }
+    return null;
 };
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
-    headers: { Accept: 'application/json' }
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
 });
 
 api.interceptors.request.use(
-    (config: any) => {
-        config.withCredentials = true;
+    (config: InternalAxiosRequestConfig) => {
+        if (!config.headers) {
+            config.headers = {} as any;
+        }
 
         if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase() || '')) {
             const token = getCookie('XSRF-TOKEN');
-            if (token && config.headers) {
-                config.headers.set('X-XSRF-TOKEN', token);
+            if (token) {
+                if (typeof config.headers.set === 'function') {
+                    config.headers.set('X-XSRF-TOKEN', token);
+                } else {
+                    (config.headers as any)['X-XSRF-TOKEN'] = token;
+                }
             }
         }
 

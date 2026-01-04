@@ -2,6 +2,7 @@ import React from 'react';
 
 export interface MetadataFormData {
     title: string;
+    slug?: string;
     summary: string;
     description: string;
     category: string;

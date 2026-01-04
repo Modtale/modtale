@@ -242,7 +242,8 @@ public class ModController {
                 "classification", mod.getClassification(),
                 "downloads", mod.getDownloadCount(),
                 "rating", mod.getRating(),
-                "repositoryUrl", mod.getRepositoryUrl() != null ? mod.getRepositoryUrl() : ""
+                "repositoryUrl", mod.getRepositoryUrl() != null ? mod.getRepositoryUrl() : "",
+                "slug", mod.getSlug() != null ? mod.getSlug() : mod.getId()
         ));
     }
 
@@ -366,13 +367,14 @@ public class ModController {
             @RequestParam("title") String title,
             @RequestParam("classification") String classification,
             @RequestParam("description") String description,
-            @RequestParam(value = "owner", required = false) String owner
+            @RequestParam(value = "owner", required = false) String owner,
+            @RequestParam(value = "slug", required = false) String slug
     ) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         try {
-            Mod newMod = modService.createDraft(title, description, classification, user, owner);
+            Mod newMod = modService.createDraft(title, description, classification, user, owner, slug);
             return ResponseEntity.ok(newMod);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
