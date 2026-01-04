@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface StatusHistoryRepository extends MongoRepository<StatusHistory, String> {
     List<StatusHistory> findByTimestampAfterOrderByTimestampAsc(LocalDateTime timestamp);
+    StatusHistory findTopByOrderByTimestampDesc();
 }
