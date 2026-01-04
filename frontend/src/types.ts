@@ -71,6 +71,7 @@ export interface Review {
 
 export interface Mod {
     id: string;
+    slug?: string;
     title: string;
     about?: string;
     description: string;

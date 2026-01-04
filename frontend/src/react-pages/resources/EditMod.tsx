@@ -20,7 +20,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     const realId = React.useMemo(() => {
         if (!id) return '';
         const uuidMatch = id.match(/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
-        return uuidMatch ? uuidMatch[0] : '';
+        return uuidMatch ? uuidMatch[0] : id;
     }, [id]);
 
     const [loading, setLoading] = useState(true);
@@ -41,7 +41,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
     const [formData, setFormData] = useState<MetadataFormData>({
-        title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null
+        title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
     });
     const [versionData, setVersionData] = useState<VersionFormData>({
         versionNumber: '1.0.0', gameVersions: ['Release 1.1'], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
@@ -51,7 +51,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
         const fetchProjectAndPerms = async () => {
             if (!currentUser) return;
             if (!realId) {
-                setStatusModal({type: 'error', title: 'Error', msg: "Invalid Project ID format."});
+                setStatusModal({type: 'error', title: 'Error', msg: "Invalid Project Identifier."});
                 setLoading(false);
                 return;
             }
@@ -82,6 +82,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 setProject(data);
                 setFormData({
                     title: data.title,
+                    slug: data.slug || '',
                     summary: data.description,
                     description: data.about || '',
                     category: data.category || '',
@@ -108,13 +109,15 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     }, [realId, currentUser, navigate]);
 
     const handleSaveMetadata = async (silent = false): Promise<boolean> => {
-        if (!project) return false;
-        if (project.status === 'PENDING' || project.status === 'ARCHIVED') return false;
+        const currentProject = project;
+        if (!currentProject) return false;
+        if (currentProject.status === 'PENDING' || currentProject.status === 'ARCHIVED') return false;
 
         if (!silent) setIsLoading(true);
         try {
             const body = {
                 title: formData.title,
+                slug: formData.slug,
                 description: formData.summary,
                 about: formData.description,
                 category: formData.category,
@@ -122,37 +125,39 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 links: formData.links,
                 repositoryUrl: formData.repositoryUrl,
                 license: formData.license,
-                allowModpacks: project.allowModpacks
+                allowModpacks: currentProject.allowModpacks
             };
-            await api.put(`/projects/${realId}`, body);
+
+            await api.put(`/projects/${currentProject.id}`, body);
 
             if (formData.iconFile) {
                 const f = new FormData(); f.append('file', formData.iconFile);
-                await api.put(`/projects/${realId}/icon`, f);
+                await api.put(`/projects/${currentProject.id}/icon`, f);
             }
             if (bannerFile) {
                 const f = new FormData(); f.append('file', bannerFile);
-                await api.put(`/projects/${realId}/banner`, f);
+                await api.put(`/projects/${currentProject.id}/banner`, f);
             }
 
-            const res = await api.get(`/projects/${realId}`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
             if (!silent) setStatusModal({type: 'success', title: 'Saved', msg: "Changes saved successfully."});
             return true;
         } catch (e: any) {
             console.error(e);
-            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: "Failed to save changes."});
+            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: e.response?.data?.message || "Failed to save changes."});
             return false;
         }
         finally { if(!silent) setIsLoading(false); }
     };
 
     const handleUploadVersion = async () => {
-        if(!project) return;
-        if(project.status === 'PENDING' || project.status === 'ARCHIVED') return;
+        const currentProject = project;
+        if(!currentProject) return;
+        if(currentProject.status === 'PENDING' || currentProject.status === 'ARCHIVED') return;
 
         if(!versionData.versionNumber) { setStatusModal({type: 'error', title: 'Error', msg: "Version number required"}); return; }
-        if(project.classification !== 'MODPACK' && !versionData.file) { setStatusModal({type: 'error', title: 'Error', msg: "File required"}); return; }
+        if(currentProject.classification !== 'MODPACK' && !versionData.file) { setStatusModal({type: 'error', title: 'Error', msg: "File required"}); return; }
 
         setIsLoading(true);
         try {
@@ -169,9 +174,9 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             const depsToUse = versionData.modIds;
             if(depsToUse) depsToUse.forEach(d => fd.append('modIds', d));
 
-            await api.post(`/projects/${realId}/versions`, fd);
+            await api.post(`/projects/${currentProject.id}/versions`, fd);
 
-            const res = await api.get(`/projects/${realId}`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
             setVersionData({...versionData, versionNumber: '', file: null, changelog: ''});
             setStatusModal({type: 'success', title: 'Success', msg: "Version uploaded successfully!"});
@@ -184,32 +189,33 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     };
 
     const handlePublish = async () => {
-        if(!project) return;
+        const currentProject = project;
+        if(!currentProject) return;
         if(formData.summary.length < 10) { setStatusModal({type:'error', title:'Error', msg: "Short summary must be at least 10 characters."}); return; }
         if(!formData.tags.length) { setStatusModal({type:'error', title:'Error', msg: "At least one tag is required."}); return; }
-        if(project.classification === 'PLUGIN' && !formData.repositoryUrl) { setStatusModal({type:'error', title:'Error', msg: "Repository URL is required for plugins."}); return; }
-        if(project.classification !== 'MODPACK' && !formData.license) { setStatusModal({type:'error', title:'Error', msg: "License is required."}); return; }
-        if(!project.versions?.length && project.classification !== 'MODPACK') { setStatusModal({type:'error', title:'Error', msg: "You must upload at least one version."}); setActiveTab('files'); return; }
+        if(currentProject.classification === 'PLUGIN' && !formData.repositoryUrl) { setStatusModal({type:'error', title:'Error', msg: "Repository URL is required for plugins."}); return; }
+        if(currentProject.classification !== 'MODPACK' && !formData.license) { setStatusModal({type:'error', title:'Error', msg: "License is required."}); return; }
+        if(!currentProject.versions?.length && currentProject.classification !== 'MODPACK') { setStatusModal({type:'error', title:'Error', msg: "You must upload at least one version."}); setActiveTab('files'); return; }
 
         setIsLoading(true);
         try {
-            if (!project.imageUrl && !formData.iconFile) {
+            if (!currentProject.imageUrl && !formData.iconFile) {
                 try {
                     const res = await fetch('https://modtale.net/assets/favicon.svg');
                     const blob = await res.blob();
                     const file = new File([blob], 'icon.svg', { type: 'image/svg+xml' });
                     const fd = new FormData();
                     fd.append('file', file);
-                    await api.put(`/projects/${realId}/icon`, fd);
+                    await api.put(`/projects/${currentProject.id}/icon`, fd);
                 } catch (err) {
                     console.error("Failed to set default icon", err);
                 }
             }
 
             await handleSaveMetadata(true);
-            await api.post(`/projects/${realId}/submit`);
+            await api.post(`/projects/${currentProject.id}/submit`);
             onShowStatus('success', 'Submitted', 'Project submitted for verification.');
-            const res = await api.get(`/projects/${realId}`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
         } catch (e: any) {
             setStatusModal({type:'error', title:'Submit Failed', msg: e.response?.data || "Failed to submit."});
@@ -219,11 +225,12 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     };
 
     const handleRevert = async () => {
-        if(!project) return;
+        const currentProject = project;
+        if(!currentProject) return;
         setIsLoading(true);
         try {
-            await api.post(`/projects/${realId}/revert`);
-            const res = await api.get(`/projects/${realId}`);
+            await api.post(`/projects/${currentProject.id}/revert`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
             onShowStatus('success', 'Reverted', 'Project reverted to draft.');
         } catch(e: any) {
@@ -234,11 +241,12 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     };
 
     const handleArchive = async () => {
-        if(!project) return;
+        const currentProject = project;
+        if(!currentProject) return;
         setIsLoading(true);
         try {
-            await api.post(`/projects/${realId}/archive`);
-            const res = await api.get(`/projects/${realId}`);
+            await api.post(`/projects/${currentProject.id}/archive`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
             onShowStatus('success', 'Archived', 'Project is now archived.');
         } catch(e: any) {
@@ -249,11 +257,12 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     };
 
     const handleUnlist = async () => {
-        if(!project) return;
+        const currentProject = project;
+        if(!currentProject) return;
         setIsLoading(true);
         try {
-            await api.post(`/projects/${realId}/unlist`);
-            const res = await api.get(`/projects/${realId}`);
+            await api.post(`/projects/${currentProject.id}/unlist`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
             onShowStatus('success', 'Unlisted', 'Project is now unlisted.');
         } catch(e: any) {
@@ -264,11 +273,12 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     };
 
     const handleRestore = async () => {
-        if(!project) return;
+        const currentProject = project;
+        if(!currentProject) return;
         setIsLoading(true);
         try {
-            await api.post(`/projects/${realId}/publish`);
-            const res = await api.get(`/projects/${realId}`);
+            await api.post(`/projects/${currentProject.id}/publish`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
             onShowStatus('success', 'Restored', 'Project is now published.');
         } catch(e: any) {
@@ -279,10 +289,12 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     };
 
     const handleDeleteVersion = async (versionId: string) => {
+        const currentProject = project;
+        if(!currentProject) return;
         setIsLoading(true);
         try {
-            await api.delete(`/projects/${realId}/versions/${versionId}`);
-            const res = await api.get(`/projects/${realId}`);
+            await api.delete(`/projects/${currentProject.id}/versions/${versionId}`);
+            const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
         } catch(e: any) {
             setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete version."});
@@ -292,9 +304,11 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     };
 
     const handleDelete = async () => {
+        const currentProject = project;
+        if(!currentProject) return;
         setIsLoading(true);
         try {
-            await api.delete(`/projects/${realId}`);
+            await api.delete(`/projects/${currentProject.id}`);
             navigate('/home');
         } catch(e: any) { setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete project."}); setIsLoading(false); }
     };

@@ -44,7 +44,7 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
-        title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, license: ''
+        title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, license: '', slug: ''
     });
     const [bannerFile, setBannerFile] = useState<File | null>(null);
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -102,7 +102,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 links: {},
                 repositoryUrl: '',
                 iconFile: null, iconPreview: null,
-                license: ''
+                license: '',
+                slug: res.data.slug || ''
             });
             setStep(2);
         } catch (e: any) {
@@ -125,7 +126,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 links: metaData.links,
                 repositoryUrl: metaData.repositoryUrl,
                 license: metaData.license,
-                allowModpacks: modData?.allowModpacks
+                allowModpacks: modData?.allowModpacks,
+                slug: metaData.slug
             };
             await api.put(`/projects/${draftId}`, body);
 
@@ -142,8 +144,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             setModData(res.data);
             if(!silent) setStatusModal({type: 'success', title: 'Saved', msg: 'Draft saved successfully.'});
             return true;
-        } catch (e) {
-            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: 'Failed to save draft.'});
+        } catch (e: any) {
+            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: e.response?.data?.message || 'Failed to save draft.'});
             return false;
         } finally {
             if(!silent) setIsLoading(false);
