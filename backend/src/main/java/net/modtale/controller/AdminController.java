@@ -109,6 +109,29 @@ public class AdminController {
         return ResponseEntity.ok(modService.getPendingProjects());
     }
 
+    @GetMapping("/projects/{id}/review-details")
+    public ResponseEntity<?> getProjectReviewDetails(@PathVariable String id) {
+        User currentUser = userService.getCurrentUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        Mod mod = modService.getModById(id);
+        if (mod == null) return ResponseEntity.notFound().build();
+
+        User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
+        Map<String, Object> authorStats = Map.of(
+                "accountAge", author != null ? author.getCreatedAt() : "Unknown",
+                "tier", author != null ? author.getTier() : "Unknown",
+                "totalProjects", author != null ? modService.getCreatorProjects(author.getUsername(), org.springframework.data.domain.Pageable.unpaged()).getTotalElements() : 0
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "mod", mod,
+                "authorStats", authorStats
+        ));
+    }
+
     @PostMapping("/projects/{id}/reject")
     public ResponseEntity<?> rejectProject(@PathVariable String id, @RequestBody Map<String, String> body) {
         User currentUser = userService.getCurrentUser();
