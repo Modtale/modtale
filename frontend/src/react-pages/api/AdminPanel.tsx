@@ -1,12 +1,56 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { api } from '../../utils/api.ts';
-import { StatusModal } from '../../components/ui/StatusModal.tsx';
-import { Shield, Search, User as UserIcon, Zap, Check, X, FileText, Clock, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
+import { StatusModal } from '../../components/ui/StatusModal';
+import {
+    Shield, Search, User as UserIcon, Check, X,
+    FileText, ExternalLink, ArrowRight, ArrowLeft, Image as ImageIcon,
+    Clock, Download, Box, List, Copy, LayoutGrid, AlertTriangle, Zap, Terminal
+} from 'lucide-react';
 import type { Mod } from '../../types';
 
 interface AdminPanelProps {
     currentUser: any;
 }
+
+interface WizardStep {
+    id: string;
+    title: string;
+    icon: React.ReactNode;
+    rejectReasons: string[];
+}
+
+const WIZARD_STEPS: WizardStep[] = [
+    {
+        id: 'meta',
+        title: 'Metadata',
+        icon: <List className="w-4 h-4" />,
+        rejectReasons: ["Title violates naming conventions", "Incorrect classification selected", "Tags are irrelevant or spam", "Slug/URL is invalid"]
+    },
+    {
+        id: 'content',
+        title: 'Content',
+        icon: <FileText className="w-4 h-4" />,
+        rejectReasons: ["Inappropriate imagery", "Description contains spam/links", "Low quality assets", "Insufficient description"]
+    },
+    {
+        id: 'files',
+        title: 'Files',
+        icon: <Box className="w-4 h-4" />,
+        rejectReasons: ["Malicious code detected", "Invalid file structure", "Broken or missing dependencies", "Version number mismatch"]
+    },
+    {
+        id: 'author',
+        title: 'Author',
+        icon: <UserIcon className="w-4 h-4" />,
+        rejectReasons: ["Suspicious account activity", "Impersonating another creator", "Bot-like behavior"]
+    },
+    {
+        id: 'decision',
+        title: 'Decision',
+        icon: <Shield className="w-4 h-4" />,
+        rejectReasons: ["General quality standards", "Duplicate project"]
+    }
+];
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     const [activeTab, setActiveTab] = useState<'users' | 'verification'>('verification');
@@ -18,16 +62,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
 
     const [pendingProjects, setPendingProjects] = useState<Mod[]>([]);
     const [loadingQueue, setLoadingQueue] = useState(false);
-    const [rejectReason, setRejectReason] = useState('');
-    const [rejectingId, setRejectingId] = useState<string|null>(null);
 
-    const isAdmin = currentUser?.username === 'Villagers654' || (currentUser?.roles && currentUser.roles.includes('ADMIN'));
+    const [reviewingProject, setReviewingProject] = useState<any>(null);
+    const [loadingReview, setLoadingReview] = useState(false);
+    const [currentStep, setCurrentStep] = useState(0);
+    const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+
+    const [rejectReason, setRejectReason] = useState('');
+    const [showRejectPanel, setShowRejectPanel] = useState(false);
+
+    const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
+
+    const isAdmin = currentUser?.roles?.includes('ADMIN') || currentUser?.username === 'Villagers654';
+    const isSuperAdmin = currentUser?.username === 'Villagers654';
 
     useEffect(() => {
         if (activeTab === 'verification' && isAdmin) {
             fetchQueue();
         }
     }, [activeTab, isAdmin]);
+
+    useEffect(() => {
+        if (!reviewingProject?.mod?.versions?.[0]?.dependencies) return;
+
+        const deps = reviewingProject.mod.versions[0].dependencies;
+        const fetchMeta = async () => {
+            const newMeta = { ...depMeta };
+            await Promise.all(deps.map(async (d: any) => {
+                if (newMeta[d.modId]) return;
+                try {
+                    const res = await api.get(`/projects/${d.modId}/meta`);
+                    newMeta[d.modId] = {
+                        icon: res.data.icon,
+                        title: res.data.title
+                    };
+                } catch (e) {
+                    newMeta[d.modId] = { icon: '', title: d.modTitle || d.modId };
+                }
+            }));
+            setDepMeta(newMeta);
+        };
+        fetchMeta();
+    }, [reviewingProject]);
 
     const fetchQueue = async () => {
         setLoadingQueue(true);
@@ -41,17 +117,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
         }
     };
 
-    if (!currentUser || !isAdmin) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-modtale-dark">
-                <div className="text-center p-8 bg-white dark:bg-modtale-card rounded-xl border border-slate-200 dark:border-white/10 shadow-xl">
-                    <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Access Denied</h1>
-                    <p className="text-slate-500">You do not have permission to view this page.</p>
-                </div>
-            </div>
-        );
-    }
+    const fetchProjectDetails = async (id: string) => {
+        setLoadingReview(true);
+        setCurrentStep(0);
+        setChecklist({});
+        setRejectReason('');
+        setShowRejectPanel(false);
+        try {
+            const res = await api.get(`/admin/projects/${id}/review-details`);
+            setReviewingProject(res.data);
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Could not load project details' });
+        } finally {
+            setLoadingReview(false);
+        }
+    };
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -86,12 +166,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     const handleToggleAdmin = async () => {
         if (!foundUser) return;
         setLoading(true);
+        const hasAdmin = foundUser.roles && foundUser.roles.includes('ADMIN');
+
         try {
-            await api.post(`/admin/users/${foundUser.username}/role`, null, { params: { role: 'ADMIN' } });
-            setStatus({ type: 'success', title: 'Role Updated', msg: `Admin role granted to ${foundUser.username}.` });
-            const roles = foundUser.roles || [];
-            if (!roles.includes('ADMIN')) roles.push('ADMIN');
-            setFoundUser({...foundUser, roles});
+            if (hasAdmin) {
+                await api.delete(`/admin/users/${foundUser.username}/role`, { params: { role: 'ADMIN' } });
+                const roles = foundUser.roles.filter((r: string) => r !== 'ADMIN');
+                setFoundUser({...foundUser, roles});
+                setStatus({ type: 'info', title: 'Role Updated', msg: `Admin role revoked from ${foundUser.username}.` });
+            } else {
+                await api.post(`/admin/users/${foundUser.username}/role`, null, { params: { role: 'ADMIN' } });
+                const roles = foundUser.roles || [];
+                roles.push('ADMIN');
+                setFoundUser({...foundUser, roles});
+                setStatus({ type: 'success', title: 'Role Updated', msg: `Admin role granted to ${foundUser.username}.` });
+            }
         } catch (e: any) {
             setStatus({ type: 'error', title: 'Update Failed', msg: e.response?.data || 'Server error occurred.' });
         } finally {
@@ -99,11 +188,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
         }
     };
 
-    const handleApprove = async (id: string) => {
-        if (!confirm("Are you sure you want to approve this project?")) return;
+    const handleApprove = async () => {
+        if (!reviewingProject) return;
         try {
-            await api.post(`/projects/${id}/publish`);
+            await api.post(`/projects/${reviewingProject.mod.id}/publish`);
             setStatus({ type: 'success', title: 'Approved', msg: 'Project published successfully.' });
+            setReviewingProject(null);
             fetchQueue();
         } catch (e: any) {
             setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to approve.' });
@@ -111,181 +201,598 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     };
 
     const handleReject = async () => {
-        if (!rejectingId) return;
+        if (!reviewingProject) return;
         try {
-            await api.post(`/admin/projects/${rejectingId}/reject`, { reason: rejectReason });
+            await api.post(`/admin/projects/${reviewingProject.mod.id}/reject`, { reason: rejectReason });
             setStatus({ type: 'info', title: 'Rejected', msg: 'Project returned to drafts.' });
-            setRejectingId(null);
-            setRejectReason('');
+            setReviewingProject(null);
             fetchQueue();
         } catch (e: any) {
             setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to reject.' });
         }
     };
 
+    const toggleCheck = (id: string) => {
+        setChecklist(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const canProceed = () => {
+        switch(currentStep) {
+            case 0: return checklist['title'] && checklist['tags'] && checklist['class'];
+            case 1: return checklist['desc'] && checklist['images'];
+            case 2: return checklist['download'] && checklist['manual_check'];
+            case 3: return checklist['author'];
+            default: return true;
+        }
+    };
+
+    const getIconUrl = (path?: string) => {
+        if (!path) return null;
+        return path.startsWith('http') ? path : `${BACKEND_URL}${path}`;
+    };
+
+    if (!currentUser || !isAdmin) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-modtale-dark">
+                <div className="text-center p-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-white/5 shadow-xl">
+                    <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                    <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Access Denied</h1>
+                    <p className="text-slate-500">You do not have permission to view this page.</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="max-w-6xl mx-auto px-4 py-12 min-h-screen">
+        <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-20 font-sans">
             {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />}
 
-            {rejectingId && (
-                <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-modtale-card w-full max-w-md p-6 rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10">
-                        <h3 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">Reject Project</h3>
-                        <textarea
-                            value={rejectReason}
-                            onChange={e => setRejectReason(e.target.value)}
-                            placeholder="Reason for rejection (sent to user)..."
-                            className="w-full h-32 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-3 mb-4 focus:ring-2 focus:ring-red-500 outline-none"
-                        />
-                        <div className="flex justify-end gap-3">
-                            <button onClick={() => setRejectingId(null)} className="px-4 py-2 font-bold text-slate-500">Cancel</button>
-                            <button onClick={handleReject} className="px-4 py-2 bg-red-500 text-white rounded-lg font-bold">Reject Project</button>
+            {reviewingProject && (
+                <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
+                    <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-7xl h-[85vh] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex overflow-hidden ring-1 ring-white/10 relative">
+
+                        {showRejectPanel && (
+                            <div className="absolute inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                                <div className="bg-white dark:bg-slate-900 w-full max-w-lg p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                            <Shield className="w-6 h-6 text-red-500" />
+                                            Confirm Rejection
+                                        </h3>
+                                        <button onClick={() => setShowRejectPanel(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
+                                            <X className="w-5 h-5 text-slate-500" />
+                                        </button>
+                                    </div>
+
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quick Reasons (Step: {WIZARD_STEPS[currentStep].title})</h4>
+                                    <div className="flex flex-wrap gap-2 mb-6">
+                                        {WIZARD_STEPS[currentStep].rejectReasons.map(reason => (
+                                            <button
+                                                key={reason}
+                                                onClick={() => setRejectReason(reason)}
+                                                className="text-xs bg-slate-100 dark:bg-white/5 hover:bg-red-500 hover:text-white px-3 py-2 rounded-xl transition-colors text-left font-medium border border-slate-200 dark:border-white/5"
+                                            >
+                                                {reason}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <textarea
+                                        value={rejectReason}
+                                        onChange={e => setRejectReason(e.target.value)}
+                                        placeholder="Enter specific reason for rejection..."
+                                        className="w-full h-32 p-4 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-sm focus:ring-2 focus:ring-red-500 outline-none font-medium mb-6 resize-none"
+                                    />
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowRejectPanel(false)}
+                                            className="flex-1 py-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 rounded-xl font-bold transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleReject}
+                                            disabled={!rejectReason}
+                                            className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
+                                        >
+                                            Reject Project
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="w-64 bg-slate-100 dark:bg-slate-950/50 border-r border-slate-200 dark:border-white/5 p-6 flex flex-col">
+                            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Review Process</h2>
+                            <div className="space-y-2 flex-1">
+                                {WIZARD_STEPS.map((step, idx) => (
+                                    <div
+                                        key={step.id}
+                                        className={`flex items-center gap-3 p-3 rounded-xl text-sm font-bold transition-all ${
+                                            idx === currentStep
+                                                ? 'bg-modtale-accent text-white shadow-lg shadow-modtale-accent/20'
+                                                : idx < currentStep
+                                                    ? 'text-emerald-500 bg-emerald-500/10'
+                                                    : 'text-slate-500 dark:text-slate-400'
+                                        }`}
+                                    >
+                                        {idx < currentStep ? <Check className="w-4 h-4" /> : step.icon}
+                                        {step.title}
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => setReviewingProject(null)} className="mt-auto flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-white px-3 py-2 text-sm font-bold transition-colors">
+                                <ArrowLeft className="w-4 h-4" /> Exit Review
+                            </button>
+                        </div>
+
+                        <div className="flex-1 flex flex-col overflow-hidden relative bg-white dark:bg-transparent">
+                            <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-md">
+                                <div>
+                                    <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{reviewingProject.mod.title}</h1>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs font-mono text-slate-400">{reviewingProject.mod.id}</span>
+                                        <button onClick={() => navigator.clipboard.writeText(reviewingProject.mod.id)} className="text-slate-400 hover:text-modtale-accent"><Copy className="w-3 h-3" /></button>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <a href={`/mod/${reviewingProject.mod.id}`} target="_blank" rel="noreferrer" className="px-4 py-2 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors border border-slate-200 dark:border-white/5">
+                                        <ExternalLink className="w-4 h-4" /> View Live
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                {currentStep === 0 && (
+                                    <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Title</label>
+                                                <p className="font-bold text-lg dark:text-white mt-1">{reviewingProject.mod.title}</p>
+                                            </div>
+                                            <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Classification</label>
+                                                <p className="font-bold text-lg dark:text-white mt-1">{reviewingProject.mod.classification}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                            <label className="text-xs font-bold text-slate-400 uppercase block mb-3 tracking-wider">Tags</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {reviewingProject.mod.tags?.map((t: string) => (
+                                                    <span key={t} className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 shadow-sm">
+                                                        {t}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 pt-6 border-t border-slate-200 dark:border-white/5">
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['title'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['title'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['title']} onChange={() => toggleCheck('title')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">Title is appropriate</span>
+                                            </label>
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['class'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['class'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['class']} onChange={() => toggleCheck('class')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">Classification is correct</span>
+                                            </label>
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['tags'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['tags'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['tags']} onChange={() => toggleCheck('tags')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">Tags are relevant</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentStep === 1 && (
+                                    <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
+                                        <div className="flex gap-6 p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                            <img src={reviewingProject.mod.imageUrl} className="w-24 h-24 rounded-xl object-cover bg-slate-200 dark:bg-white/10" />
+                                            <div className="flex-1">
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Short Description</label>
+                                                <p className="text-lg text-slate-700 dark:text-slate-200 font-medium leading-relaxed mt-1">{reviewingProject.mod.description}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
+                                            <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Long Description Preview</label>
+                                            <div className="prose dark:prose-invert max-w-none text-sm prose-p:text-slate-600 dark:prose-p:text-slate-300">
+                                                <div className="whitespace-pre-wrap">{reviewingProject.mod.about}</div>
+                                            </div>
+                                        </div>
+
+                                        {reviewingProject.mod.gallery?.length > 0 && (
+                                            <div className="grid grid-cols-3 gap-4">
+                                                {reviewingProject.mod.gallery.map((url: string, i: number) => (
+                                                    <div key={i} className="aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-white/10">
+                                                        <img src={url} className="w-full h-full object-cover" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-3 pt-6 border-t border-slate-200 dark:border-white/5">
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['images'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['images'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['images']} onChange={() => toggleCheck('images')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">Images are appropriate</span>
+                                            </label>
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['desc'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['desc'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['desc']} onChange={() => toggleCheck('desc')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">Description is clean</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentStep === 2 && (
+                                    <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
+                                        <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-4">
+                                            <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="font-bold text-amber-500 mb-1">Manual Verification Required</h4>
+                                                <p className="text-sm text-amber-600/80 dark:text-amber-500/70 font-medium">
+                                                    You must manually verify the file structure. No automated scanning is performed.
+                                                    Dependencies are external projects and are assumed safe, but you should verify they exist.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {reviewingProject.mod.versions?.map((v: any) => (
+                                                <div key={v.id} className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 flex items-center justify-between group hover:border-modtale-accent/30 transition-colors">
+                                                    <div>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="font-black text-lg text-slate-900 dark:text-white">{v.versionNumber}</span>
+                                                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${v.channel === 'RELEASE' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{v.channel}</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-400 mt-1 font-bold">Game Versions: <span className="text-slate-600 dark:text-slate-300">{v.gameVersions?.join(', ')}</span></p>
+                                                    </div>
+                                                    <a
+                                                        href={`${API_BASE_URL}/projects/${reviewingProject.mod.id}/versions/${v.versionNumber}/download`}
+                                                        className="px-5 py-2.5 bg-slate-100 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center gap-2 transition-all"
+                                                        target="_blank" rel="noreferrer"
+                                                    >
+                                                        <Download className="w-4 h-4" /> Download for Review
+                                                    </a>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                            <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Dependencies</label>
+                                            {reviewingProject.mod.versions?.[0]?.dependencies?.length > 0 ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    {reviewingProject.mod.versions[0].dependencies.map((d: any) => {
+                                                        const meta = depMeta[d.modId];
+                                                        return (
+                                                            <a
+                                                                key={d.modId}
+                                                                href={`/mod/${d.modId}`}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent/50 transition-colors group"
+                                                            >
+                                                                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center shrink-0">
+                                                                    {getIconUrl(meta?.icon) ? (
+                                                                        <img src={getIconUrl(meta.icon)!} className="w-full h-full rounded-lg object-cover" />
+                                                                    ) : (
+                                                                        <Box className="w-4 h-4 text-slate-400" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate group-hover:text-modtale-accent">
+                                                                        {meta?.title || d.modId}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-slate-400 font-mono">{d.modId}</div>
+                                                                </div>
+                                                                <ExternalLink className="w-3 h-3 text-slate-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </a>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-slate-400 italic font-medium">No dependencies listed.</p>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-3 pt-6 border-t border-slate-200 dark:border-white/5">
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['download'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['download'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['download']} onChange={() => toggleCheck('download')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">File structure verified manually</span>
+                                            </label>
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['manual_check'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['manual_check'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['manual_check']} onChange={() => toggleCheck('manual_check')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">No malicious code found</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentStep === 3 && (
+                                    <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
+                                        <div className="p-8 bg-white dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 flex items-center gap-8">
+                                            <div className="w-24 h-24 bg-slate-100 dark:bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
+                                                {reviewingProject.authorStats?.avatarUrl ? (
+                                                    <img src={reviewingProject.authorStats.avatarUrl} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <UserIcon className="w-10 h-10 text-slate-400" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 grid grid-cols-2 gap-y-6 gap-x-8">
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Username</label>
+                                                    <a href={`/creator/${reviewingProject.mod.author}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 group">
+                                                        <p className="font-black text-2xl dark:text-white mt-1 group-hover:underline">{reviewingProject.mod.author}</p>
+                                                        <ExternalLink className="w-4 h-4 text-slate-400" />
+                                                    </a>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Joined</label>
+                                                    <p className="font-mono text-sm dark:text-slate-300 mt-2">{reviewingProject.authorStats?.accountAge}</p>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Projects</label>
+                                                    <p className="font-black text-2xl text-modtale-accent mt-1">{reviewingProject.authorStats?.totalProjects}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 pt-6 border-t border-slate-200 dark:border-white/5">
+                                            <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['author'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                    {checklist['author'] && <Check className="w-4 h-4 text-white" />}
+                                                </div>
+                                                <input type="checkbox" checked={!!checklist['author']} onChange={() => toggleCheck('author')} className="hidden" />
+                                                <span className="font-bold text-slate-700 dark:text-slate-200">Author appears legitimate (not a bot/impersonator)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentStep === 4 && (
+                                    <div className="max-w-xl mx-auto text-center animate-in slide-in-from-bottom-8 duration-500">
+                                        <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-500/10">
+                                            <Shield className="w-12 h-12 text-emerald-500" />
+                                        </div>
+                                        <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">Ready to Publish?</h2>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mb-10 text-lg leading-relaxed">
+                                            You have manually verified the files, content, and author details.
+                                            Approving will make this project publicly visible immediately.
+                                        </p>
+
+                                        <div className="flex flex-col gap-4">
+                                            <button
+                                                onClick={handleApprove}
+                                                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95"
+                                            >
+                                                Approve & Publish Project
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-900 flex justify-between items-center relative z-20">
+                                <button
+                                    onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                                    disabled={currentStep === 0}
+                                    className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-white/5 disabled:opacity-30 transition-colors"
+                                >
+                                    Back
+                                </button>
+
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setShowRejectPanel(true)}
+                                        className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl font-bold transition-colors"
+                                    >
+                                        Reject...
+                                    </button>
+
+                                    {currentStep < 4 && (
+                                        <button
+                                            onClick={() => setCurrentStep(Math.min(4, currentStep + 1))}
+                                            disabled={!canProceed()}
+                                            className="px-8 py-3 bg-modtale-accent text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-modtale-accentHover transition-colors flex items-center gap-2 shadow-lg shadow-modtale-accent/20"
+                                        >
+                                            Next Step <ArrowRight className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            <div className="flex items-center gap-4 mb-8">
-                <div className="bg-red-500/10 p-3 rounded-xl"><Shield className="w-8 h-8 text-red-500" /></div>
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white">Admin Console</h1>
-                    <p className="text-slate-500">Manage users and content verification.</p>
+            <div className="max-w-7xl mx-auto px-4 py-12">
+                <div className="flex items-center gap-6 mb-12">
+                    <div className="bg-gradient-to-br from-modtale-accent to-purple-600 p-5 rounded-3xl shadow-2xl shadow-modtale-accent/20">
+                        <Shield className="w-10 h-10 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">Admin Console</h1>
+                        <p className="text-slate-500 dark:text-slate-400 font-bold text-lg mt-2">Platform management & verification</p>
+                    </div>
                 </div>
-            </div>
 
-            <div className="flex gap-2 mb-8 border-b border-slate-200 dark:border-white/10">
-                <button
-                    onClick={() => setActiveTab('verification')}
-                    className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'verification' ? 'border-modtale-accent text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
-                >
-                    Verification Queue {pendingProjects.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingProjects.length}</span>}
-                </button>
-                <button
-                    onClick={() => setActiveTab('users')}
-                    className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'users' ? 'border-modtale-accent text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
-                >
-                    User Management
-                </button>
-            </div>
-
-            {activeTab === 'verification' && (
-                <div className="space-y-4">
-                    {loadingQueue ? (
-                        <div className="text-center py-12 text-slate-500">Loading queue...</div>
-                    ) : pendingProjects.length === 0 ? (
-                        <div className="text-center py-12 bg-white dark:bg-modtale-card rounded-xl border border-slate-200 dark:border-white/5">
-                            <Check className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">All Caught Up!</h3>
-                            <p className="text-slate-500">No projects pending verification.</p>
-                        </div>
-                    ) : (
-                        pendingProjects.map(p => (
-                            <div key={p.id} className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl p-6 flex flex-col md:flex-row gap-6">
-                                <img src={p.imageUrl} className="w-24 h-24 rounded-xl object-cover bg-slate-100" />
-                                <div className="flex-1">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div>
-                                            <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                                {p.title}
-                                                <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-slate-100 dark:bg-white/10 rounded text-slate-500">{p.classification}</span>
-                                            </h3>
-                                            <p className="text-sm text-slate-500 font-bold mb-1">by {p.author}</p>
-                                        </div>
-                                        <div className="text-xs text-slate-400 font-mono">Submitted: {p.updatedAt}</div>
-                                    </div>
-                                    <p className="text-slate-600 dark:text-slate-300 text-sm mb-4 line-clamp-2">{p.description}</p>
-
-                                    <div className="flex flex-wrap gap-2 text-xs text-slate-500 mb-4">
-                                        {p.tags?.map(t => <span key={t} className="px-2 py-1 bg-slate-100 dark:bg-white/5 rounded">{t}</span>)}
-                                    </div>
-
-                                    <div className="flex items-center gap-4">
-                                        <a href={`/mod/${p.id}`} target="_blank" rel="noreferrer" className="text-sm font-bold text-modtale-accent flex items-center gap-1 hover:underline">
-                                            <ExternalLink className="w-4 h-4" /> Preview Page
-                                        </a>
-                                        <div className="flex-1" />
-                                        <button onClick={() => setRejectingId(p.id)} className="px-4 py-2 bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white rounded-lg font-bold text-xs transition-colors">
-                                            Reject
-                                        </button>
-                                        <button onClick={() => handleApprove(p.id)} className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold text-xs transition-colors shadow-lg shadow-green-500/20">
-                                            Approve & Publish
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'users' && (
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl p-8 shadow-lg">
-                    <form onSubmit={handleSearch} className="flex gap-4 mb-8">
-                        <div className="relative flex-1">
-                            <UserIcon className="absolute left-3 top-3.5 w-5 h-5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Enter Username (exact match)..."
-                                className="w-full pl-10 px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold"
-                                value={username}
-                                onChange={e => setUsername(e.target.value)}
-                            />
-                        </div>
+                <div className="flex gap-2 mb-8 border-b border-slate-200 dark:border-white/5">
+                    <button
+                        onClick={() => setActiveTab('verification')}
+                        className={`pb-4 px-6 font-black text-sm tracking-wide border-b-2 transition-all ${activeTab === 'verification' ? 'border-modtale-accent text-modtale-accent' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                    >
+                        VERIFICATION QUEUE {pendingProjects.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow-lg shadow-red-500/30">{pendingProjects.length}</span>}
+                    </button>
+                    {isSuperAdmin && (
                         <button
-                            type="submit"
-                            disabled={loading || !username}
-                            className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+                            onClick={() => setActiveTab('users')}
+                            className={`pb-4 px-6 font-black text-sm tracking-wide border-b-2 transition-all ${activeTab === 'users' ? 'border-modtale-accent text-modtale-accent' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
-                            {loading ? 'Searching...' : <><Search className="w-4 h-4" /> Find User</>}
+                            USER MANAGEMENT
                         </button>
-                    </form>
+                    )}
+                </div>
 
-                    {foundUser && (
-                        <div className="border border-slate-200 dark:border-white/10 rounded-xl p-6 bg-slate-50 dark:bg-white/5 animate-in fade-in slide-in-from-bottom-2">
-                            <div className="flex items-center gap-4 mb-6">
-                                <img src={foundUser.avatarUrl} alt={foundUser.username} className="w-16 h-16 rounded-xl border border-slate-200 dark:border-white/10" />
-                                <div>
-                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">{foundUser.username}</h3>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs font-bold text-slate-500 uppercase">Roles:</span>
-                                        <div className="flex gap-1">
-                                            {foundUser.roles?.map((r: string) => (
-                                                <span key={r} className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[10px] font-bold rounded border border-blue-500/20">{r}</span>
-                                            ))}
+                {activeTab === 'verification' && (
+                    <div className="space-y-4">
+                        {loadingQueue ? (
+                            <div className="text-center py-24 text-slate-400 font-bold animate-pulse">Loading queue...</div>
+                        ) : pendingProjects.length === 0 ? (
+                            <div className="text-center py-32 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-sm">
+                                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <Check className="w-10 h-10 text-emerald-500" />
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">All Caught Up!</h3>
+                                <p className="text-slate-500 font-medium">No projects pending verification.</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-4">
+                                {pendingProjects.map(p => (
+                                    <div key={p.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
+                                        <div className="w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-100 dark:bg-white/5 relative shrink-0 shadow-inner">
+                                            <img src={p.imageUrl} className="w-full h-full object-cover" alt="" onError={(e) => e.currentTarget.src = '/assets/favicon.svg'} />
+                                        </div>
+                                        <div className="flex-1 min-w-0 py-1 flex flex-col justify-center">
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div>
+                                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3 truncate tracking-tight">
+                                                        {p.title}
+                                                        <span className="text-[10px] uppercase font-bold px-2.5 py-1 bg-modtale-accent/10 text-modtale-accent rounded-lg tracking-wider">{p.classification}</span>
+                                                    </h3>
+                                                    <p className="text-sm text-slate-500 font-bold mb-1">by <span className="text-slate-700 dark:text-slate-300">{p.author}</span></p>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 dark:bg-white/5 px-3 py-1.5 rounded-lg uppercase tracking-wider">
+                                                    <Clock className="w-3 h-3" />
+                                                    {p.updatedAt}
+                                                </div>
+                                            </div>
+                                            <p className="text-slate-600 dark:text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed font-medium">{p.description}</p>
+
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => fetchProjectDetails(p.id)}
+                                                    className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-black text-sm flex items-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-200 transition-all shadow-lg shadow-black/10 dark:shadow-white/5 hover:scale-105 active:scale-95"
+                                                >
+                                                    {loadingReview && reviewingProject?.mod?.id === p.id ? 'Loading...' : <><Shield className="w-4 h-4" /> Verify Project</>}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'users' && isSuperAdmin && (
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
+                        <form onSubmit={handleSearch} className="flex gap-4 mb-10">
+                            <div className="relative flex-1 group">
+                                <UserIcon className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="Enter Username to manage..."
+                                    className="w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium"
+                                    value={username}
+                                    onChange={e => setUsername(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={loading || !username}
+                                className="bg-modtale-accent text-white px-10 rounded-2xl font-black hover:bg-modtale-accentHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-xl shadow-modtale-accent/20"
+                            >
+                                {loading ? '...' : <><Search className="w-5 h-5" /> Search</>}
+                            </button>
+                        </form>
+
+                        {foundUser && (
+                            <div className="border border-slate-200 dark:border-white/10 rounded-3xl p-8 bg-slate-50/50 dark:bg-white/[0.02] animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-8 mb-10">
+                                    <div className="p-1 bg-white dark:bg-white/10 rounded-3xl shadow-lg">
+                                        <img src={foundUser.avatarUrl} alt={foundUser.username} className="w-24 h-24 rounded-2xl object-cover" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{foundUser.username}</h3>
+                                        <div className="flex items-center gap-3 mt-3">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Roles</span>
+                                            <div className="flex gap-2">
+                                                {foundUser.roles && foundUser.roles.length > 0 ? foundUser.roles.map((r: string) => (
+                                                    <span key={r} className="px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black rounded-lg border border-blue-500/20">{r}</span>
+                                                )) : <span className="text-xs text-slate-400 italic font-medium">No special roles</span>}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <button
-                                    onClick={() => handleUpdateTier('ENTERPRISE')}
-                                    disabled={loading || foundUser.tier === 'ENTERPRISE'}
-                                    className={`p-4 rounded-xl border-2 text-left transition-all ${foundUser.tier === 'ENTERPRISE' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10 cursor-default' : 'border-slate-200 dark:border-white/10 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10'}`}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="font-black text-purple-600 dark:text-purple-400 flex items-center gap-2"><Zap className="w-4 h-4" /> Enterprise Tier</span>
-                                        {foundUser.tier === 'ENTERPRISE' && <Check className="w-5 h-5 text-purple-500" />}
-                                    </div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">High volume limits (1000 req/min). For CI/CD & Apps.</p>
-                                </button>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <button
+                                        onClick={handleToggleAdmin}
+                                        disabled={loading}
+                                        className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.roles?.includes('ADMIN') ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
+                                    >
+                                        <div className="relative z-10">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className={`font-black text-xl flex items-center gap-3 ${foundUser.roles?.includes('ADMIN') ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400'}`}>
+                                                    <Shield className="w-6 h-6" /> Admin Privileges
+                                                </span>
+                                                {foundUser.roles?.includes('ADMIN') && <Check className="w-8 h-8 text-red-500 bg-red-100 dark:bg-red-900/30 p-1.5 rounded-full" />}
+                                            </div>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                                {foundUser.roles?.includes('ADMIN')
+                                                    ? 'User currently has full administrative access. Click to revoke immediately.'
+                                                    : 'Granting Admin access will allow this user to approve projects, manage users, and modify content.'}
+                                            </p>
+                                        </div>
+                                    </button>
 
-                                <button
-                                    onClick={handleToggleAdmin}
-                                    disabled={loading || (foundUser.roles && foundUser.roles.includes('ADMIN'))}
-                                    className={`p-4 rounded-xl border-2 text-left transition-all ${foundUser.roles?.includes('ADMIN') ? 'border-red-500 bg-red-50 dark:bg-red-900/10 cursor-default' : 'border-slate-200 dark:border-white/10 hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/10'}`}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="font-black text-red-600 dark:text-red-400 flex items-center gap-2"><Shield className="w-4 h-4" /> Grant Admin</span>
-                                        {foundUser.roles?.includes('ADMIN') && <Check className="w-5 h-5 text-red-500" />}
-                                    </div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Full access to moderation tools and verification queue.</p>
-                                </button>
+                                    <button
+                                        onClick={() => handleUpdateTier(foundUser.tier === 'ENTERPRISE' ? 'USER' : 'ENTERPRISE')}
+                                        disabled={loading}
+                                        className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.tier === 'ENTERPRISE' ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10' : 'border-slate-200 dark:border-white/5 hover:border-purple-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
+                                    >
+                                        <div className="relative z-10">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className={`font-black text-xl flex items-center gap-3 ${foundUser.tier === 'ENTERPRISE' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400'}`}>
+                                                    <Zap className="w-6 h-6" /> Enterprise Tier
+                                                </span>
+                                                {foundUser.tier === 'ENTERPRISE' && <Check className="w-8 h-8 text-purple-500 bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-full" />}
+                                            </div>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                                {foundUser.tier === 'ENTERPRISE'
+                                                    ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.'
+                                                    : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.'}
+                                            </p>
+                                        </div>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
