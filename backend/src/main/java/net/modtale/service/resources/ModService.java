@@ -441,6 +441,10 @@ public class ModService {
         mod.setExpiresAt(null);
         mod.setUpdatedAt(LocalDate.now().toString());
 
+        if (!isRestoration && isAdmin && user != null) {
+            mod.setApprovedBy(user.getUsername());
+        }
+
         if (mod.getImageUrl() == null || mod.getImageUrl().isEmpty()) {
             mod.setImageUrl("https://modtale.net/assets/favicon.svg");
         }
