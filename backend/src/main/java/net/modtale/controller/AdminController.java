@@ -39,7 +39,7 @@ public class AdminController {
     @PostMapping("/users/{username}/tier")
     public ResponseEntity<?> setUserTier(
             @PathVariable String username,
-            @RequestParam ApiKey.Tier tier
+            @RequestParam String tier
     ) {
         User currentUser = userService.getCurrentUser();
         if (!isSuperAdmin(currentUser)) {
@@ -48,18 +48,25 @@ public class AdminController {
         }
 
         try {
-            userService.setUserTier(username, tier);
+            ApiKey.Tier tierEnum;
+            if ("USER".equalsIgnoreCase(tier) || "FREE".equalsIgnoreCase(tier)) {
+                tierEnum = ApiKey.Tier.USER;
+            } else {
+                tierEnum = ApiKey.Tier.valueOf(tier.toUpperCase());
+            }
+
+            userService.setUserTier(username, tierEnum);
             return ResponseEntity.ok(Map.of(
                     "status", "success",
-                    "message", "User " + username + " updated to tier " + tier
+                    "message", "User " + username + " updated to tier " + tierEnum
             ));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid Tier", "message", "Tier must be USER or ENTERPRISE"));
         }
     }
 
     @PostMapping("/users/{username}/role")
-    public ResponseEntity<?> setUserRole(@PathVariable String username, @RequestParam String role) {
+    public ResponseEntity<?> addUserRole(@PathVariable String username, @RequestParam String role) {
         User currentUser = userService.getCurrentUser();
         if (!isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
@@ -73,6 +80,23 @@ public class AdminController {
             target.getRoles().add(role);
         }
         userRepository.save(target);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/users/{username}/role")
+    public ResponseEntity<?> removeUserRole(@PathVariable String username, @RequestParam String role) {
+        User currentUser = userService.getCurrentUser();
+        if (!isSuperAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
+        }
+
+        User target = userRepository.findByUsername(username).orElse(null);
+        if (target == null) return ResponseEntity.notFound().build();
+
+        if (target.getRoles() != null) {
+            target.getRoles().remove(role);
+            userRepository.save(target);
+        }
         return ResponseEntity.ok().build();
     }
 
