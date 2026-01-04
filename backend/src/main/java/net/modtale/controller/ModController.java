@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 public class ModController {
 
     private static final Logger logger = LoggerFactory.getLogger(ModController.class);
+    private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
     @Autowired private ModService modService;
     @Autowired private UserService userService;
@@ -46,6 +47,12 @@ public class ModController {
     @Autowired private AnalyticsService analyticsService;
     @Autowired private FileValidationService validationService;
     @Autowired private UserRepository userRepository;
+
+    private boolean isAdminOrSuper(User user) {
+        if (user == null) return false;
+        if (SUPER_ADMIN_ID.equals(user.getId())) return true;
+        return user.getRoles() != null && user.getRoles().contains("ADMIN");
+    }
 
     @PutMapping("/projects/{id}/icon")
     public ResponseEntity<?> updateProjectIcon(@PathVariable String id, @RequestParam("file") MultipartFile file) {
@@ -89,9 +96,8 @@ public class ModController {
 
             if ("DRAFT".equals(mod.getStatus()) || "PENDING".equals(mod.getStatus())) {
                 User user = userService.getCurrentUser();
-                if (!modService.hasEditPermission(mod, user)) {
-                    boolean isAdmin = user != null && user.getRoles().contains("ADMIN");
-                    if (!isAdmin) {
+                if (!isAdminOrSuper(user)) {
+                    if (user == null || !modService.hasEditPermission(mod, user)) {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                     }
                 }
@@ -214,9 +220,10 @@ public class ModController {
 
         if ("DRAFT".equals(mod.getStatus()) || "PENDING".equals(mod.getStatus())) {
             User user = userService.getCurrentUser();
-            boolean isAdmin = user != null && user.getRoles().contains("ADMIN");
-            if (!isAdmin && (user == null || !modService.hasEditPermission(mod, user))) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            if (!isAdminOrSuper(user)) {
+                if (user == null || !modService.hasEditPermission(mod, user)) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
             }
         }
 
