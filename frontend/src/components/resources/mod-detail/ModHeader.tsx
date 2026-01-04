@@ -81,7 +81,7 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent"></div>
 
                 <div className="absolute top-4 left-4 z-10">
-                    <button onClick={() => navigate('/home')} className="p-2 rounded-full bg-black/40 backdrop-blur text-white hover:bg-black/60 transition-colors border border-white/10">
+                    <button onClick={() => navigate('/')} className="p-2 rounded-full bg-black/40 backdrop-blur text-white hover:bg-black/60 transition-colors border border-white/10">
                         <ChevronLeft className="w-5 h-5" />
                     </button>
                 </div>

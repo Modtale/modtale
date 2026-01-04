@@ -75,7 +75,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 );
 
                 if (!isOwner && !isContributor && !isOrgAdmin) {
-                    navigate('/home');
+                    navigate('/');
                     return;
                 }
 
@@ -100,7 +100,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             } catch (e) {
                 console.error(e);
                 setStatusModal({type: 'error', title: 'Error', msg: "Failed to load project."});
-                navigate('/home');
+                navigate('/');
             } finally {
                 setLoading(false);
             }
@@ -309,7 +309,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
         setIsLoading(true);
         try {
             await api.delete(`/projects/${currentProject.id}`);
-            navigate('/home');
+            navigate('/');
         } catch(e: any) { setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete project."}); setIsLoading(false); }
     };
 

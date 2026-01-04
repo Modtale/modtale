@@ -458,7 +458,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
 
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />
-            {showDeleteConfirm && <StatusModal type="warning" title="Delete Project?" message="Are you sure?" onClose={() => setShowDeleteConfirm(false)} actionLabel="Delete" onAction={async () => { try { await api.delete(`/projects/${mod.id}`); navigate('/home'); } catch(e) { setStatusModal({type:'error', title:'Error', msg:'Failed'}); } }} secondaryLabel="Cancel" />}
+            {showDeleteConfirm && <StatusModal type="warning" title="Delete Project?" message="Are you sure?" onClose={() => setShowDeleteConfirm(false)} actionLabel="Delete" onAction={async () => { try { await api.delete(`/projects/${mod.id}`); navigate('/'); } catch(e) { setStatusModal({type:'error', title:'Error', msg:'Failed'}); } }} secondaryLabel="Cancel" />}
 
             {pendingDownloadVer && <DependencyModal dependencies={pendingDownloadVer.deps} onClose={() => setPendingDownloadVer(null)} onConfirm={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver)} />}
 
@@ -486,7 +486,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-modtale-dark via-transparent to-black/30" />
 
                 <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-6 relative z-40 pt-6">
-                    <button onClick={() => navigate('/home')} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl w-fit shadow-lg group">
+                    <button onClick={() => navigate('/')} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl w-fit shadow-lg group">
                         <ChevronLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" /> Back
                     </button>
                 </div>
