@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useNavigate } from 'react-router-dom';
 import type { Mod, Modpack, World } from '../types';
 import { ModCard } from '../components/resources/ModCard';
 import { HomeHero } from '../components/home/HomeHero';
@@ -11,17 +12,8 @@ import { PROJECT_TYPES, BROWSE_VIEWS } from '../data/categories';
 import type { Classification } from '../data/categories';
 import { createSlug } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
-
-const getSEOContent = (classification: Classification | 'All') => {
-    switch (classification) {
-        case 'PLUGIN': return { title: "Hytale Plugins & Server Scripts | Modtale", h1: "Hytale Plugins", description: "Enhance your server with top-rated Hytale plugins, admin tools, and gameplay scripts.", keywords: "hytale plugins, server scripts, admin tools, hytale server" };
-        case 'MODPACK': return { title: "Hytale Modpacks & Collections | Modtale", h1: "Hytale Modpacks", description: "Play the best Hytale modpacks. Curated collections of mods, plugins, and configs in one click.", keywords: "hytale modpacks, mod collections, rpg packs, tech mods" };
-        case 'SAVE': return { title: "Hytale Maps, Worlds & Spawns | Modtale", h1: "Hytale Worlds & Maps", description: "Explore custom Hytale worlds, parkour maps, server lobbies, and survival spawns.", keywords: "hytale maps, worlds, schematics, builds, spawns" };
-        case 'ART': return { title: "Hytale Models & Art Assets | Modtale", h1: "Hytale Models & Art", description: "Download free Hytale models, textures, animations, and art assets for your projects.", keywords: "hytale models, textures, art assets, animations, resource packs" };
-        case 'DATA': return { title: "Hytale Data Packs & Configs | Modtale", h1: "Hytale Data Assets", description: "Customize gameplay with Hytale data assets, loot tables, and configuration presets.", keywords: "hytale data packs, configs, loot tables, functions" };
-        default: return { title: "Modtale - Hytale Mods, Plugins & Modpacks", h1: null, description: "The ultimate library for Hytale content. Download mods, plugins, modpacks, models, and maps.", keywords: "hytale mods, hytale plugins, modtale, hytale marketplace, download hytale mods" };
-    }
-};
+import { getCategorySEO } from '../data/seo-constants';
+import { generateItemListSchema } from '../utils/schema'; // Import schema generator
 
 interface HomeProps {
     onModClick: (mod: Mod) => void;
@@ -38,11 +30,23 @@ interface HomeProps {
 
 type SortOption = 'relevance' | 'downloads' | 'rating' | 'newest' | 'updated' | 'trending' | 'gems' | 'popular';
 
+const getRouteForClassification = (cls: Classification | 'All') => {
+    switch(cls) {
+        case 'PLUGIN': return '/plugins';
+        case 'MODPACK': return '/modpacks';
+        case 'SAVE': return '/worlds';
+        case 'ART': return '/art';
+        case 'DATA': return '/data';
+        default: return '/';
+    }
+};
+
 export const Home: React.FC<HomeProps> = ({
                                               onModClick, onModpackClick, onWorldClick, onAuthorClick,
                                               likedModIds, likedModpackIds, onToggleFavoriteMod, onToggleFavoriteModpack, isLoggedIn,
                                               initialClassification
                                           }) => {
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedClassification, setSelectedClassification] = useState<Classification | 'All'>(initialClassification || 'All');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -64,7 +68,15 @@ export const Home: React.FC<HomeProps> = ({
 
     const cardsSectionRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => { if (initialClassification) setSelectedClassification(initialClassification); else setSelectedClassification('All'); }, [initialClassification]);
+    const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
+
+    useEffect(() => {
+        if (initialClassification) {
+            setSelectedClassification(initialClassification);
+        } else {
+            setSelectedClassification('All');
+        }
+    }, [initialClassification]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -135,7 +147,13 @@ export const Home: React.FC<HomeProps> = ({
 
     useEffect(() => { const timer = setTimeout(() => fetchData(page), 300); return () => clearTimeout(timer); }, [fetchData, page]);
 
-    const handleClassificationChange = (cls: Classification | 'All') => { if (cls !== selectedClassification) { setItems([]); setPage(0); setSelectedClassification(cls); } };
+    const handleClassificationChange = (cls: Classification | 'All') => {
+        if (cls !== selectedClassification) {
+            const route = getRouteForClassification(cls);
+            navigate(route);
+        }
+    };
+
     const handlePageChange = (p: number) => { if (p >= 0 && p < totalPages) { setPage(p); window.scrollTo({ top: cardsSectionRef.current?.offsetTop ? cardsSectionRef.current.offsetTop - 120 : 0, behavior: 'smooth' }); } };
     const handleJump = (e: React.FormEvent) => { e.preventDefault(); const p = parseInt(jumpPage); if (!isNaN(p) && p >= 1 && p <= totalPages) { handlePageChange(p - 1); setJumpPage(''); } };
 
@@ -164,7 +182,7 @@ export const Home: React.FC<HomeProps> = ({
 
     const resetFilters = () => { setSelectedVersion('Any'); setMinRating(0); setMinDownloads(0); setFilterDate(null); setIsTopFilterOpen(false); setSelectedTags([]); setPage(0); }
     const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minRating > 0 ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (filterDate ? 1 : 0);
-    const seoContent = getSEOContent(selectedClassification);
+    const seoContent = getCategorySEO(selectedClassification);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-300">
@@ -172,6 +190,11 @@ export const Home: React.FC<HomeProps> = ({
                 <title>{seoContent.title}</title>
                 <meta name="description" content={seoContent.description} />
                 <meta name="keywords" content={seoContent.keywords} />
+                {itemListSchema && (
+                    <script type="application/ld+json">
+                        {JSON.stringify(itemListSchema)}
+                    </script>
+                )}
             </Helmet>
 
             <HomeHero
@@ -181,7 +204,7 @@ export const Home: React.FC<HomeProps> = ({
                 onSearchChange={setSearchTerm}
                 currentTypeLabel={PROJECT_TYPES.find(t => t.id === selectedClassification)?.label || 'Content'}
                 showMiniSearch={showMiniSearch}
-                seoH1={seoContent.h1}
+                seoH1={seoContent.h1 || undefined}
             />
 
             <main className="max-w-7xl min-[1800px]:max-w-[112rem] mx-auto px-4 sm:px-6 lg:px-8 py-4 transition-[max-width] duration-300">

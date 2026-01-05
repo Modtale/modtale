@@ -9,7 +9,7 @@ interface HomeHeroProps {
     onSearchChange: (term: string) => void;
     currentTypeLabel: string;
     showMiniSearch: boolean;
-    seoH1: string | null;
+    seoH1?: string | null;
 }
 
 export const HomeHero: React.FC<HomeHeroProps> = ({
@@ -71,10 +71,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             <div className="max-w-7xl mx-auto relative z-10">
                 <div className="text-center max-w-4xl mx-auto mb-6 md:mb-14">
                     <h1 className="text-3xl md:text-5xl font-black mb-4 md:mb-6 text-slate-800 dark:text-white tracking-tight drop-shadow-sm">
-                        {selectedClassification === 'All' ? (
-                            <>Discover <span className="text-modtale-accent">Hytale</span> Content</>
+                        {seoH1 ? (
+                            seoH1
                         ) : (
-                            <>Discover Hytale <span className="text-modtale-accent">{currentTypeLabel.replace(' Assets', '').replace('Server ', '')}</span></>
+                            selectedClassification === 'All' ? (
+                                <>Discover <span className="text-modtale-accent">Hytale</span> Content</>
+                            ) : (
+                                <>Discover Hytale <span className="text-modtale-accent">{currentTypeLabel.replace(' Assets', '').replace('Server ', '')}</span></>
+                            )
                         )}
                     </h1>
 

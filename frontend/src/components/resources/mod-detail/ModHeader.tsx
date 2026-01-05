@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { Mod, User, ModDependency } from '../../../types';
 import { BACKEND_URL } from '../../../utils/api';
-import { createSlug } from '../../../utils/slug';
+import { getProjectUrl, getProjectSlug } from '../../../utils/slug';
 import { formatTimeAgo } from '../../../utils/modHelpers';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
@@ -47,9 +47,8 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
     const canEdit = isOwner || (currentUser && mod.contributors?.includes(currentUser.username));
 
     const handleEdit = () => {
-        const slug = createSlug(mod.title, mod.id);
-        const basePath = mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`;
-        navigate(`${basePath}/edit`);
+        const url = getProjectUrl(mod);
+        navigate(`${url}/edit`);
     };
 
     const getIconUrl = (path?: string) => {
@@ -171,12 +170,13 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
                                     const meta = depMeta[dep.modId];
                                     const iconUrl = getIconUrl(meta?.icon);
                                     const title = meta?.title || dep.modTitle || dep.modId;
-                                    const slug = createSlug(title, dep.modId);
+                                    const slug = getProjectSlug({ id: dep.modId, title: title, slug: (dep as any).slug });
+                                    const path = mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`;
 
                                     return (
                                         <button
                                             key={idx}
-                                            onClick={() => navigate(mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`)}
+                                            onClick={() => navigate(path)}
                                             className="w-full text-left py-2 px-3 rounded-lg hover:bg-white/5 flex items-center justify-between group/item"
                                         >
                                             <div className="flex items-center gap-3 overflow-hidden">

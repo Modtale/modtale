@@ -3,6 +3,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
 import { extractId } from '../../utils/slug';
 import { isBotUserAgent } from '../../utils/seo';
+import { generateProjectMeta } from '../../utils/meta';
+import { ROUTE_SEO } from '../../data/seo-constants';
 
 const { slug } = Astro.params;
 const id = extractId(slug || '');
@@ -13,10 +15,10 @@ const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
 
 let modData = null;
-let title = "Hytale Worlds - Modtale";
-let description = "Download Hytale worlds and saves.";
+let title = ROUTE_SEO['/worlds'].title;
+let description = ROUTE_SEO['/worlds'].description;
 let image = undefined;
-let jsonLd = null;
+let jsonLd = undefined;
 
 if (isBot) {
     try {
@@ -25,13 +27,11 @@ if (isBot) {
             modData = await res.json();
             modData.classification = 'SAVE';
 
-            title = `${modData.title} | Hytale Worlds`;
-            const downloads = (modData.downloadCount || 0).toLocaleString();
-            const author = modData.author || 'Unknown';
-            const statsLine = `⬇️ ${downloads}  🌍 World  👤 ${author}`;
-
-            let baseDesc = modData.about || (modData.description ? modData.description.replace(/[#*_\[\]`]/g, '').substring(0, 150) + '...' : "");
-            description = `${baseDesc} — ${statsLine}`;
+            const meta = generateProjectMeta(modData);
+            if (meta) {
+                title = meta.title;
+                description = meta.description;
+            }
 
             if (modData.imageUrl) {
                 image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
@@ -41,9 +41,9 @@ if (isBot) {
                 "@context": "https://schema.org",
                 "@type": "SoftwareApplication",
                 "name": modData.title,
-                "description": baseDesc,
+                "description": meta?.description || description,
                 "image": image,
-                "author": { "@type": "Person", "name": author },
+                "author": { "@type": "Person", "name": modData.author || 'Unknown' },
                 "applicationCategory": "GameApplication",
                 "operatingSystem": "Windows, macOS, Linux",
                 "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },

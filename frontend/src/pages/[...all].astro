@@ -3,6 +3,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import App from '../App';
 import { extractId } from '../utils/slug';
 import { isBotUserAgent } from '../utils/seo';
+import { DEFAULT_SEO, ROUTE_SEO } from '../data/seo-constants';
+import { generateProjectMeta } from '../utils/meta';
+import { generateItemListSchema } from '../utils/schema';
 
 const { all } = Astro.params;
 const path = Astro.url.pathname;
@@ -14,31 +17,18 @@ if (cleanPath === '/mods') {
     return Astro.redirect('/', 301);
 }
 
-let title = "Modtale - Hytale Mods & Plugins";
-let description = "The premier community repository for Hytale. Discover, download, and share Hytale mods, worlds, server plugins, art + data assets, and modpacks.";
+let title = DEFAULT_SEO.title;
+let description = DEFAULT_SEO.description;
+let keywords = DEFAULT_SEO.keywords;
 let image = "https://modtale.net/assets/favicon.svg";
-let jsonLd = null;
+let jsonLd = undefined;
 let initialData = null;
 
-if (cleanPath === '/plugins') {
-    title = "Hytale Plugins - Modtale";
-    description = "Browse and download thousands of Hytale server plugins. Enhance your server with new mechanics, administration tools, and minigames.";
-}
-else if (cleanPath === '/modpacks') {
-    title = "Hytale Modpacks - Modtale";
-    description = "Discover curated Hytale modpacks. The easiest way to install collections of mods, plugins, and configuration files in one click.";
-}
-else if (cleanPath === '/worlds') {
-    title = "Hytale Worlds - Modtale";
-    description = "Download Hytale worlds, saves, and schematics. Explore custom maps, spawns, and structures created by the community.";
-}
-else if (cleanPath === '/art') {
-    title = "Hytale Art Assets - Modtale";
-    description = "Find Hytale models, textures, and art assets. Customize the look of your game with community-created resource bundles.";
-}
-else if (cleanPath === '/data') {
-    title = "Hytale Data Assets - Modtale";
-    description = "Browse Data Assets for Hytale. Find scripts, configurations, and data packs to customize your gameplay experience.";
+if (ROUTE_SEO[cleanPath]) {
+    const seo = ROUTE_SEO[cleanPath];
+    title = seo.title;
+    description = seo.description;
+    if (seo.keywords) keywords = seo.keywords;
 }
 
 if (cleanPath === '' || cleanPath === '/') {
@@ -56,63 +46,83 @@ if (cleanPath === '' || cleanPath === '/') {
 
 const userAgent = Astro.request.headers.get('user-agent');
 const isBot = isBotUserAgent(userAgent);
-
 const id = extractId(all || '');
 
-if (isBot && id) {
+if (isBot) {
     try {
-        let endpoint = null;
-        let typeOverride = null;
+        if (id) {
+            let endpoint = null;
+            let typeOverride = null;
 
-        if (cleanPath.startsWith('/modpack/')) {
-            endpoint = `/modpacks/${id}`;
-            typeOverride = 'MODPACK';
-        } else if (cleanPath.startsWith('/world/')) {
-            endpoint = `/worlds/${id}`;
-            typeOverride = 'SAVE';
-        } else if (cleanPath.startsWith('/mod/')) {
-            endpoint = `/projects/${id}`;
-        }
+            if (cleanPath.startsWith('/modpack/')) {
+                endpoint = `/modpacks/${id}`;
+                typeOverride = 'MODPACK';
+            } else if (cleanPath.startsWith('/world/')) {
+                endpoint = `/worlds/${id}`;
+                typeOverride = 'SAVE';
+            } else if (cleanPath.startsWith('/mod/')) {
+                endpoint = `/projects/${id}`;
+            }
 
-        if (endpoint) {
-            console.log(`[SSR] Bot detected (${userAgent}). Fetching ${endpoint}...`);
-            const res = await fetch(`${API_URL}${endpoint}`);
+            if (endpoint) {
+                console.log(`[SSR] Bot detected (${userAgent}). Fetching ${endpoint}...`);
+                const res = await fetch(`${API_URL}${endpoint}`);
 
-            if (res.ok) {
-                const modData = await res.json();
-                if (typeOverride) modData.classification = typeOverride;
+                if (res.ok) {
+                    const modData = await res.json();
+                    if (typeOverride) modData.classification = typeOverride;
 
-                initialData = modData;
+                    initialData = modData;
+                    const meta = generateProjectMeta(modData);
+                    if (meta) {
+                        title = meta.title;
+                        description = meta.description;
+                    }
 
-                title = `${modData.title} | Modtale`;
-                const downloads = (modData.downloadCount || 0).toLocaleString();
-                const type = modData.classification ? modData.classification.charAt(0) + modData.classification.slice(1).toLowerCase() : 'Project';
-                const author = modData.author || 'Unknown';
-                const statsLine = `⬇️ ${downloads}  🏷️ ${type}  👤 ${author}`;
+                    if (modData.imageUrl) {
+                        image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
+                    }
 
-                let baseDesc = modData.about || (modData.description ? modData.description.replace(/[#*_\[\]`]/g, '').substring(0, 150) + '...' : "");
-                description = `${baseDesc} — ${statsLine}`;
-
-                if (modData.imageUrl) {
-                    image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
+                    jsonLd = {
+                        "@context": "https://schema.org",
+                        "@type": "SoftwareApplication",
+                        "name": modData.title,
+                        "description": meta?.description || description,
+                        "image": image,
+                        "author": { "@type": "Person", "name": modData.author || 'Unknown' },
+                        "applicationCategory": "GameApplication",
+                        "operatingSystem": "Windows, macOS, Linux",
+                        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+                        "aggregateRating": modData.rating > 0 ? {
+                            "@type": "AggregateRating",
+                            "ratingValue": modData.rating,
+                            "ratingCount": Math.max(1, modData.reviews ? modData.reviews.length : 0)
+                        } : undefined
+                    };
                 }
+            }
+        } else {
+            // --- Category / List Logic ---
+            let classification = null;
+            if (cleanPath === '/plugins') classification = 'PLUGIN';
+            else if (cleanPath === '/modpacks') classification = 'MODPACK';
+            else if (cleanPath === '/worlds') classification = 'SAVE';
+            else if (cleanPath === '/art') classification = 'ART';
+            else if (cleanPath === '/data') classification = 'DATA';
 
-                jsonLd = {
-                    "@context": "https://schema.org",
-                    "@type": "SoftwareApplication",
-                    "name": modData.title,
-                    "description": baseDesc,
-                    "image": image,
-                    "author": { "@type": "Person", "name": author },
-                    "applicationCategory": "GameApplication",
-                    "operatingSystem": "Windows, macOS, Linux",
-                    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-                    "aggregateRating": modData.rating > 0 ? {
-                        "@type": "AggregateRating",
-                        "ratingValue": modData.rating,
-                        "ratingCount": Math.max(1, modData.reviews ? modData.reviews.length : 0)
-                    } : undefined
-                };
+            if (classification) {
+                console.log(`[SSR] Bot detected on category (${userAgent}). Fetching list for ${classification}...`);
+                const res = await fetch(`${API_URL}/projects?classification=${classification}&size=12&sort=relevance`);
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const items = data.content || [];
+
+                    const listSchema = generateItemListSchema(items);
+                    if (listSchema) {
+                        jsonLd = listSchema;
+                    }
+                }
             }
         }
     } catch (e) {
