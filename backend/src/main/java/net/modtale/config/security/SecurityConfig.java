@@ -1,5 +1,6 @@
 package net.modtale.config.security;
 
+import net.modtale.service.security.CustomUserDetailsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,9 +9,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -33,7 +36,6 @@ import jakarta.servlet.http.HttpSession;
 import java.net.URI;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Arrays;
 
 @Configuration
@@ -59,9 +61,23 @@ public class SecurityConfig {
     @Autowired
     private OAuth2AuthorizedClientRepository authorizedClientRepository;
 
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @PostConstruct
     public void logConfig() {
         logger.info("Security Config Initialized. Frontend URL: {}", frontendUrl);
+    }
+
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder);
+        return authProvider;
     }
 
     @Bean
@@ -97,12 +113,13 @@ public class SecurityConfig {
         requestHandler.setCsrfRequestAttributeName(null);
 
         http
+                .authenticationProvider(authenticationProvider())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(tokenRepository)
                         .csrfTokenRequestHandler(requestHandler)
-                        .ignoringRequestMatchers("/api/v1/user/api-keys/**")
+                        .ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**")
                 )
 
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
@@ -113,6 +130,18 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionFixation().migrateSession()
+                )
+                .formLogin(form -> form
+                        .loginProcessingUrl("/api/v1/auth/login")
+                        .successHandler((request, response, authentication) -> {
+                            response.setStatus(HttpStatus.OK.value());
+                            response.getWriter().write("{\"status\":\"success\"}");
+                        })
+                        .failureHandler((request, response, exception) -> {
+                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                            response.getWriter().write("{\"error\":\"Invalid credentials\"}");
+                        })
+                        .permitAll()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
@@ -126,6 +155,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login**", "/error", "/logout").permitAll()
+                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/verify", "/api/v1/auth/login").permitAll()
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
 

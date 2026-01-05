@@ -18,6 +18,8 @@ public interface UserRepository extends MongoRepository<User, String> {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByVerificationToken(String token);
+
     @Query("{ 'connectedAccounts.providerId': ?0 }")
     Optional<User> findByConnectedAccountsProviderId(String providerId);
 

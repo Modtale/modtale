@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, BACKEND_URL } from '../../utils/api';
-import { Save, Upload, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Image as ImageIcon } from 'lucide-react';
+import { Save, Upload, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Image as ImageIcon, Mail, ShieldCheck, ShieldAlert } from 'lucide-react';
 import type {User as UserType} from '../../types';
 import { Spinner } from '../ui/Spinner';
 import { ErrorBanner } from '../ui/error/ErrorBanner.tsx';
@@ -55,6 +55,9 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showUnlinkModal, setShowUnlinkModal] = useState<{provider: string, label: string} | null>(null);
+
+    const [resendingEmail, setResendingEmail] = useState(false);
+    const [emailSent, setEmailSent] = useState(false);
 
     const accounts = user.connectedAccounts || [];
 
@@ -163,6 +166,18 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
         }
     };
 
+    const handleResendVerification = async () => {
+        setResendingEmail(true);
+        try {
+            await api.post('/auth/resend-verification');
+            setEmailSent(true);
+        } catch (e: any) {
+            setError(e.response?.data?.error || "Failed to send email.");
+        } finally {
+            setResendingEmail(false);
+        }
+    };
+
     const AccountRow = ({ provider, icon: Icon, label }: { provider: string, icon: any, label: string }) => {
         const account = accounts.find(a => a.provider === provider);
         const isLinked = !!account;
@@ -248,6 +263,38 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                     onClose={() => setShowUnlinkModal(null)}
                     secondaryLabel="Cancel"
                 />
+            )}
+
+            {!user.emailVerified && user.email && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/10 border-b border-yellow-200 dark:border-yellow-900/30 px-4 py-3">
+                    <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded-lg text-yellow-600 dark:text-yellow-400">
+                                <Mail className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Verify your email address</p>
+                                <p className="text-xs text-yellow-700 dark:text-yellow-300/80">
+                                    We sent a verification link to <strong>{user.email}</strong>.
+                                </p>
+                            </div>
+                        </div>
+                        {emailSent ? (
+                            <span className="text-xs font-bold text-green-600 dark:text-green-400 flex items-center gap-1 bg-white dark:bg-black/20 px-3 py-2 rounded-lg">
+                                <Check className="w-3 h-3" /> Email Sent!
+                            </span>
+                        ) : (
+                            <button
+                                onClick={handleResendVerification}
+                                disabled={resendingEmail}
+                                className="text-xs font-bold text-yellow-800 dark:text-yellow-200 bg-white dark:bg-white/5 border border-yellow-200 dark:border-yellow-500/20 px-4 py-2 rounded-lg hover:bg-yellow-50 dark:hover:bg-white/10 transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap h-8"
+                            >
+                                {resendingEmail && <Spinner className="w-3 h-3" />}
+                                Resend Verification
+                            </button>
+                        )}
+                    </div>
+                </div>
             )}
 
             <div className="space-y-0">
@@ -343,6 +390,24 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                                         </div>
                                     </div>
 
+                                    {user.email && (
+                                        <div className="mt-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Email Address</label>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 font-mono">{user.email}</span>
+                                                {user.emailVerified ? (
+                                                    <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" title="Verified">
+                                                        <ShieldCheck className="w-3 h-3" /> Verified
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" title="Unverified">
+                                                        <ShieldAlert className="w-3 h-3" /> Unverified
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {isEditingUsername && (
                                         <p className="text-[10px] text-orange-500 font-bold mt-1">
                                             Warning: Changing your username will break existing links to your profile.
@@ -350,7 +415,11 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                                     )}
                                 </div>
 
-                                <button onClick={handleSave} disabled={saving} className="bg-modtale-accent text-white px-6 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 hover:bg-modtale-accentHover disabled:opacity-70 text-xs flex-shrink-0 mt-4 md:mt-0">
+                                <button
+                                    onClick={handleSave}
+                                    disabled={saving}
+                                    className="bg-modtale-accent text-white px-6 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 hover:bg-modtale-accentHover disabled:opacity-70 text-xs flex-shrink-0 mt-4 md:mt-0 h-10" // Added h-10 for fixed height
+                                >
                                     {saving ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : (saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
                                     {saved ? 'Saved' : 'Save Changes'}
                                 </button>

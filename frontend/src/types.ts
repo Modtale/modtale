@@ -19,6 +19,7 @@ export interface User {
     bannerUrl?: string;
     bio?: string;
     email?: string;
+    emailVerified?: boolean;
     createdAt?: string;
     likedModIds: string[];
     likedModpackIds: string[];

@@ -16,6 +16,7 @@ import { Dashboard } from './react-pages/user/Dashboard.tsx';
 import { AdminPanel } from './react-pages/AdminPanel.tsx';
 import { ApiDocs } from './react-pages/ApiDocs.tsx';
 import { Status } from './react-pages/Status';
+import { VerifyEmail } from './react-pages/user/VerifyEmail'; // Import VerifyEmail
 import { Analytics } from '@/components/dashboard/analytics/Analytics';
 
 import { Navbar } from './components/Navbar';
@@ -220,6 +221,18 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                     <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, false)} downloadedSessionIds={downloadedSessionIds} />} />
 
                     <Route path="/creator/:username" element={<CreatorProfile onModClick={handleModClick} onModpackClick={handleModpackClick} onBack={() => handleNavigate('home')} likedModIds={user?.likedModIds || []} likedModpackIds={user?.likedModpackIds || []} onToggleFavorite={handleToggleFavorite} onToggleFavoriteModpack={handleToggleFavorite} currentUser={user} onRefreshUser={fetchUser} />} />
+
+                    <Route path="/verify" element={
+                        <VerifyEmail
+                            user={user}
+                            isDarkMode={isDarkMode}
+                            toggleDarkMode={toggleDarkMode}
+                            onLogout={handleLogout}
+                            onNavigate={handleNavigate}
+                            currentPage={location.pathname.replace('/', '')}
+                            onAuthorClick={handleAuthorClick}
+                        />
+                    } />
 
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/privacy" element={<PrivacyPolicy />} />

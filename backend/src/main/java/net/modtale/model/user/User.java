@@ -1,8 +1,10 @@
 package net.modtale.model.user;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +22,18 @@ public class User implements Serializable {
     private String username;
 
     private String email;
+
+    private boolean emailVerified = false;
+
+    @JsonIgnore
+    private String verificationToken;
+
+    @JsonIgnore
+    private LocalDateTime verificationTokenExpiry;
+
+    @JsonIgnore
+    private String password;
+
     private String avatarUrl;
     private String bannerUrl;
     private String bio;
@@ -139,6 +153,19 @@ public class User implements Serializable {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public String getVerificationToken() { return verificationToken; }
+    public void setVerificationToken(String verificationToken) { this.verificationToken = verificationToken; }
+
+    public LocalDateTime getVerificationTokenExpiry() { return verificationTokenExpiry; }
+    public void setVerificationTokenExpiry(LocalDateTime verificationTokenExpiry) { this.verificationTokenExpiry = verificationTokenExpiry; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
     public String getBannerUrl() { return bannerUrl; }
