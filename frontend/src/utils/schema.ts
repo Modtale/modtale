@@ -31,3 +31,30 @@ export const generateItemListSchema = (items: (Mod | Modpack | World)[]) => {
         })
     };
 };
+
+export const getBreadcrumbsForClassification = (classification: string | 'All') => {
+    const home = { name: 'Home', url: '/' };
+    switch (classification) {
+        case 'PLUGIN': return [home, { name: 'Plugins', url: '/plugins' }];
+        case 'MODPACK': return [home, { name: 'Modpacks', url: '/modpacks' }];
+        case 'SAVE': return [home, { name: 'Worlds', url: '/worlds' }];
+        case 'ART': return [home, { name: 'Art Assets', url: '/art' }];
+        case 'DATA': return [home, { name: 'Data Assets', url: '/data' }];
+        default: return [home];
+    }
+};
+
+export const generateBreadcrumbSchema = (breadcrumbs: { name: string; url: string }[]) => {
+    if (!breadcrumbs || breadcrumbs.length === 0) return null;
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": breadcrumbs.map((item, index) => ({
+            "@type": "ListItem",
+            "position": index + 1,
+            "name": item.name,
+            "item": item.url.startsWith('http') ? item.url : `https://modtale.net${item.url}`
+        }))
+    };
+};
