@@ -47,7 +47,19 @@ export const Navbar: React.FC<NavbarProps> = ({
     }, [currentPage]);
 
     const NavLink = ({ id, icon: Icon, label }: any) => {
-        const isActive = id === 'dashboard' ? currentPage.startsWith('dashboard') : currentPage === id;
+        let isActive = false;
+
+        if (id === 'home') {
+            const homeCategories = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
+            const detailPrefixes = ['mod/', 'world/', 'modpack/'];
+
+            isActive = homeCategories.includes(currentPage) ||
+                detailPrefixes.some(prefix => currentPage.startsWith(prefix));
+        } else if (id === 'dashboard') {
+            isActive = currentPage.startsWith('dashboard');
+        } else {
+            isActive = currentPage === id;
+        }
 
         return (
             <button
