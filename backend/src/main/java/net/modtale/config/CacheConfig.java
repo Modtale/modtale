@@ -23,7 +23,8 @@ public class CacheConfig {
                 "hytaleVersions",
                 "allTags",
                 "creatorAnalytics",
-                "projectAnalytics"
+                "projectAnalytics",
+                "sitemapData"
         );
 
         cacheManager.setCaffeine(Caffeine.newBuilder()

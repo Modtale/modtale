@@ -263,6 +263,11 @@ public class ModService {
     public List<Mod> getAllMods() { return modRepository.findAll(); }
     public List<Mod> getPublishedMods() { return modRepository.findAllPublished(); }
 
+    @Cacheable("sitemapData")
+    public List<Mod> getSitemapData() {
+        return modRepository.findAllForSitemap();
+    }
+
     public Mod getModById(String identifier) {
         Optional<Mod> direct = Optional.empty();
 
@@ -355,7 +360,7 @@ public class ModService {
         return createDraft(title, description, classification, user, ownerName, null);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void submitMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -385,7 +390,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void archiveMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -400,7 +405,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void unlistMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -415,7 +420,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void publishMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -596,7 +601,7 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void addMod(Mod mod) {
         validateTags(mod.getTags());
         validateClassification(mod.getClassification());
@@ -604,7 +609,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void updateMod(String id, Mod updatedMod) {
         User user = userService.getCurrentUser();
         Mod existing = getModById(id);
@@ -659,7 +664,7 @@ public class ModService {
         modRepository.save(existing);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void updateProjectIcon(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
         Mod mod = getModById(id);
@@ -862,7 +867,7 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
     public void deleteMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -881,6 +886,7 @@ public class ModService {
             performDeletionStrategy(mod);
         }
         Objects.requireNonNull(cacheManager.getCache("projectSearch_v3")).clear();
+        Objects.requireNonNull(cacheManager.getCache("sitemapData")).clear();
     }
 
     private void performDeletionStrategy(Mod mod) {
