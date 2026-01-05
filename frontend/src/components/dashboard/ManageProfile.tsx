@@ -110,7 +110,17 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
         setUploadingBanner(true);
         const formData = new FormData();
         formData.append('file', croppedFile);
-        try { await api.post('/user/profile/banner', formData); onUpdate(); } catch (e) { setError("Failed to upload banner."); } finally { setUploadingBanner(false); }
+
+        const uploadConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
+
+        try {
+            await api.post('/user/profile/banner', formData, uploadConfig);
+            onUpdate();
+        } catch (e) {
+            setError("Failed to upload banner.");
+        } finally {
+            setUploadingBanner(false);
+        }
     };
 
     const handleAvatarCropComplete = async (croppedFile: File) => {
@@ -118,7 +128,17 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
         setUploadingAvatar(true);
         const formData = new FormData();
         formData.append('file', croppedFile);
-        try { await api.post('/user/profile/avatar', formData); onUpdate(); } catch (e) { setError("Failed to upload avatar."); } finally { setUploadingAvatar(false); }
+
+        const uploadConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
+
+        try {
+            await api.post('/user/profile/avatar', formData, uploadConfig);
+            onUpdate();
+        } catch (e) {
+            setError("Failed to upload avatar.");
+        } finally {
+            setUploadingAvatar(false);
+        }
     };
 
     const handleDeleteAccount = async () => {

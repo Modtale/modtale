@@ -222,8 +222,11 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         if (!selectedOrg) return;
         const formData = new FormData();
         formData.append('file', croppedFile);
+
+        const uploadConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
+
         try {
-            const res = await api.post(`/orgs/${selectedOrg.id}/${cropType}`, formData);
+            const res = await api.post(`/orgs/${selectedOrg.id}/${cropType}`, formData, uploadConfig);
             if (cropType === 'avatar') {
                 setSelectedOrg(prev => prev ? { ...prev, avatarUrl: res.data } : null);
                 setOrgs(prev => prev.map(o => o.id === selectedOrg.id ? { ...o, avatarUrl: res.data } : o));
