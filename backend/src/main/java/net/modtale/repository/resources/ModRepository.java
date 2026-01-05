@@ -43,5 +43,8 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
     @Query(value = "{ 'status': { $in: ['PUBLISHED', 'ARCHIVED'] } }")
     List<Mod> findAllPublished();
 
+    @Query(value = "{ 'status': 'PUBLISHED' }", fields = "{ 'id': 1, 'title': 1, 'slug': 1, 'updatedAt': 1, 'classification': 1, 'author': 1 }")
+    List<Mod> findAllForSitemap();
+
     void deleteByStatusAndExpiresAtBefore(String status, String date);
 }
