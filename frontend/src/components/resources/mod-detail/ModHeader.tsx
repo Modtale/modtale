@@ -12,13 +12,14 @@ import { formatTimeAgo } from '../../../utils/modHelpers';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
-        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-4.2-48.62-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
+        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66-2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-4.2-48.62-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
     </svg>
 );
 
 interface ModHeaderProps {
     mod: Mod;
     dependencies?: ModDependency[];
+    depMeta?: Record<string, { icon: string, title: string }>;
     isOwner: boolean;
     isLiked: boolean;
     isFollowing: boolean;
@@ -38,7 +39,7 @@ interface ModHeaderProps {
 }
 
 export const ModHeader: React.FC<ModHeaderProps> = ({
-                                                        mod, dependencies, isOwner, isLiked, isFollowing, currentUser, onToggleFavorite, onToggleFollow, onShare,
+                                                        mod, dependencies, depMeta = {}, isOwner, isLiked, isFollowing, currentUser, onToggleFavorite, onToggleFollow, onShare,
                                                         onOpenGallery, onOpenHistory, onScrollToReviews,
                                                         navigate, classificationIcon, displayClassification, onDownloadClick
                                                     }) => {
@@ -50,6 +51,11 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
         const slug = createSlug(mod.title, mod.id);
         const basePath = mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`;
         navigate(`${basePath}/edit`);
+    };
+
+    const getIconUrl = (path?: string) => {
+        if (!path) return null;
+        return path.startsWith('http') ? path : `${BACKEND_URL}${path}`;
     };
 
     const LinkButton = ({ url, type, icon: Icon, label }: any) => {
@@ -162,22 +168,38 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
 
                         {showMobileDeps && (
                             <div className="mt-2 space-y-2 pl-2 border-l-2 border-white/10 ml-2 animate-in slide-in-from-top-2 duration-200">
-                                {dependencies.map((dep, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => navigate(mod.classification === 'MODPACK' ? `/modpack/${createSlug(dep.modTitle || dep.modId, dep.modId)}` : `/mod/${createSlug(dep.modTitle || dep.modId, dep.modId)}`)}
-                                        className="w-full text-left py-2 px-3 rounded-lg hover:bg-white/5 flex items-center justify-between group/item"
-                                    >
-                                        <span className="text-sm text-slate-400 group-hover/item:text-modtale-accent truncate max-w-[70%]">
-                                            {dep.modTitle || dep.modId}
-                                        </span>
-                                        {mod.classification !== 'MODPACK' && (
-                                            <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
-                                                {dep.isOptional ? 'Optional' : 'Required'}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
+                                {dependencies.map((dep, idx) => {
+                                    const meta = depMeta[dep.modId];
+                                    const iconUrl = getIconUrl(meta?.icon);
+                                    const title = meta?.title || dep.modTitle || dep.modId;
+                                    const slug = createSlug(title, dep.modId);
+
+                                    return (
+                                        <button
+                                            key={idx}
+                                            onClick={() => navigate(mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`)}
+                                            className="w-full text-left py-2 px-3 rounded-lg hover:bg-white/5 flex items-center justify-between group/item"
+                                        >
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 overflow-hidden border border-white/5">
+                                                    {iconUrl ? (
+                                                        <img src={iconUrl} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        mod.classification === 'MODPACK' ? <Box className="w-4 h-4 text-slate-500" /> : <LinkIcon className="w-4 h-4 text-slate-500" />
+                                                    )}
+                                                </div>
+                                                <span className="text-sm text-slate-400 group-hover/item:text-modtale-accent truncate">
+                                                    {title}
+                                                </span>
+                                            </div>
+                                            {mod.classification !== 'MODPACK' && (
+                                                <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
+                                                    {dep.isOptional ? 'Optional' : 'Required'}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

@@ -49,37 +49,12 @@ const ProjectSidebar: React.FC<{
     avgRating: string;
     totalReviews: number;
     dependencies?: ModDependency[];
+    depMeta: Record<string, { icon: string, title: string }>;
     sourceUrl?: string;
     navigate: (path: string) => void;
-}> = ({ mod, latestDownloads, avgRating, totalReviews, dependencies, sourceUrl, navigate }) => {
+}> = ({ mod, latestDownloads, avgRating, totalReviews, dependencies, depMeta, sourceUrl, navigate }) => {
     const licenseInfo = mod.license ? getLicenseInfo(mod.license) : null;
-    const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
-
     const isModpack = mod.classification === 'MODPACK';
-
-    useEffect(() => {
-        if (!dependencies || dependencies.length === 0) return;
-
-        const fetchMeta = async () => {
-            const missing = dependencies.filter(d => !depMeta[d.modId]);
-            if (missing.length === 0) return;
-
-            const newMeta = { ...depMeta };
-            await Promise.all(missing.map(async (d) => {
-                try {
-                    const res = await api.get(`/projects/${d.modId}/meta`);
-                    newMeta[d.modId] = {
-                        icon: res.data.icon,
-                        title: res.data.title
-                    };
-                } catch (e) {
-                    newMeta[d.modId] = { icon: '', title: d.modTitle || d.modId };
-                }
-            }));
-            setDepMeta(newMeta);
-        };
-        fetchMeta();
-    }, [dependencies]);
 
     const gameVersions = useMemo(() => {
         const set = new Set<string>();
@@ -339,6 +314,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
     const [showExperimentalPopup, setShowExperimentalPopup] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
     const [pendingDownloadVer, setPendingDownloadVer] = useState<{url: string, ver: string, deps: any[]} | null>(null);
+    const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
 
     const reviewsRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
@@ -407,6 +383,30 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
         const latest = [...allVersions].sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime())[0];
         return latest.dependencies || [];
     }, [allVersions]);
+
+    useEffect(() => {
+        if (!latestDependencies || latestDependencies.length === 0) return;
+
+        const fetchMeta = async () => {
+            const missing = latestDependencies.filter(d => !depMeta[d.modId]);
+            if (missing.length === 0) return;
+
+            const newMeta = { ...depMeta };
+            await Promise.all(missing.map(async (d) => {
+                try {
+                    const res = await api.get(`/projects/${d.modId}/meta`);
+                    newMeta[d.modId] = {
+                        icon: res.data.icon,
+                        title: res.data.title
+                    };
+                } catch (e) {
+                    newMeta[d.modId] = { icon: '', title: d.modTitle || d.modId };
+                }
+            }));
+            setDepMeta(newMeta);
+        };
+        fetchMeta();
+    }, [latestDependencies]);
 
     const initiateDownload = (url: string, ver?: string, deps?: any[]) => {
         if (mod?.classification !== 'MODPACK' && deps && deps.length > 0) {
@@ -486,7 +486,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-modtale-dark via-transparent to-black/30" />
 
                 <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-6 relative z-40 pt-6">
-                    <button onClick={() => navigate('/')} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl w-fit shadow-lg group">
+                    <button onClick={() => navigate('/home')} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl w-fit shadow-lg group">
                         <ChevronLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" /> Back
                     </button>
                 </div>
@@ -499,6 +499,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                         <ModHeader
                             mod={mod}
                             dependencies={latestDependencies}
+                            depMeta={depMeta}
                             isOwner={isOwner}
                             isLiked={isLiked(mod.id)}
                             isFollowing={isFollowing}
@@ -530,6 +531,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                                     totalReviews={mod.reviews?.length || 0}
                                     navigate={navigate}
                                     dependencies={latestDependencies}
+                                    depMeta={depMeta}
                                     sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
                                 />
                             </div>
@@ -553,6 +555,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                                 totalReviews={mod.reviews?.length || 0}
                                 navigate={navigate}
                                 dependencies={latestDependencies}
+                                depMeta={depMeta}
                                 sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
                             />
 
