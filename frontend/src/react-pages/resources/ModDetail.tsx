@@ -20,6 +20,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { compareSemVer, getClassificationIcon } from '../../utils/modHelpers';
 import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
 import { ModSidebar } from '@/components/resources/mod-detail/ModSidebar.tsx';
+import { generateProjectMeta } from '../../utils/meta'; // Import the new utility
 
 const getLicenseInfo = (license: string) => {
     const l = license.toUpperCase().replace(/\s+/g, '');
@@ -319,6 +320,8 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
     const reviewsRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
 
+    const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
+
     useEffect(() => {
         if (mod && extractId(mod.id) === realId) {
             setLoading(false);
@@ -454,7 +457,17 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-20">
-            <Helmet><title>{mod.title} | Modtale</title><meta property="og:title" content={mod.title} /><meta property="og:description" content={mod.description} />{mod.imageUrl && <meta property="og:image" content={resolveUrl(mod.imageUrl)} />}</Helmet>
+            {projectMeta && (
+                <Helmet>
+                    <title>{projectMeta.title}</title>
+                    <meta name="description" content={projectMeta.description} />
+                    <meta property="og:title" content={projectMeta.title} />
+                    <meta property="og:description" content={projectMeta.description} />
+                    {mod.imageUrl && <meta property="og:image" content={resolveUrl(mod.imageUrl)} />}
+                    <meta property="og:type" content="game.modification" />
+                    <meta name="author" content={projectMeta.author} />
+                </Helmet>
+            )}
 
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />

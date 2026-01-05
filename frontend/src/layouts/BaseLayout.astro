@@ -1,5 +1,6 @@
 ---
 import '../index.css';
+import { DEFAULT_SEO } from '../data/seo-constants';
 
 interface Props {
     title?: string;
@@ -7,15 +8,15 @@ interface Props {
     image?: string;
     jsonLd?: object;
     initialData?: object;
-    }
+}
 
 const {
-    title = "Modtale - Hytale Mods & Plugins",
-    description = "The premier community repository for Hytale. Discover, download, and share Hytale mods, server plugins, art assets, and modpacks.",
+    title = DEFAULT_SEO.title,
+    description = DEFAULT_SEO.description,
     image: propImage,
     jsonLd,
     initialData
-    } = Astro.props;
+} = Astro.props;
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
@@ -23,8 +24,8 @@ const defaultImage = "https://modtale.net/assets/og-default.png";
 const rawImage = propImage || defaultImage;
 
 const finalImage = (rawImage && typeof rawImage === 'string' && rawImage.startsWith('/api'))
-? `https://api.modtale.net${rawImage}`
-: rawImage;
+    ? `https://api.modtale.net${rawImage}`
+    : rawImage;
 
 const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
@@ -51,7 +52,7 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={finalImage} />
 
-    <meta name="keywords" content="hytale, mods, plugins, assets, modpacks, worlds, modtale" />
+    <meta name="keywords" content={DEFAULT_SEO.keywords} />
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <meta name="theme-color" content="#3b82f6" />
 

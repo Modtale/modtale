@@ -3,10 +3,11 @@ import type { Mod } from '../../types';
 import { Download, Calendar, Heart, Star, Code, Paintbrush, Database, Layers, Layout, Box, HardDrive, Globe } from 'lucide-react';
 import { BACKEND_URL } from '../../utils/api';
 import { Link } from 'react-router-dom';
+import { getProjectUrl } from '../../utils/slug'; // Import the centralized URL helper
 
 interface ModCardProps {
     mod: Mod;
-    path: string;
+    path?: string;
     isFavorite: boolean;
     onToggleFavorite: (modId: string) => void;
     isLoggedIn: boolean;
@@ -53,10 +54,10 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
     const title = mod.title || 'Untitled Project';
     const author = mod.author || 'Unknown';
 
+    const canonicalPath = path || getProjectUrl(mod);
+
     const desc = mod.description ? mod.description : 'No description provided.';
-
     const classification = mod.classification || 'PLUGIN';
-
     const displayCategory = (mod.categories && mod.categories.length > 0) ? mod.categories[0] : (mod.category || 'Misc');
 
     const rating = mod.rating || 0;
@@ -64,10 +65,8 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
     const favorites = (mod.favoriteCount || 0).toLocaleString();
 
     const timeAgo = formatTimeAgo(mod.updatedAt || '');
-
     const modCount = (mod.modIds || mod.childProjectIds || []).length;
     const sizeMB = mod.sizeBytes ? (mod.sizeBytes / 1024 / 1024).toFixed(1) + ' MB' : null;
-
     const displayClassification = toTitleCase(classification);
 
     const resolveUrl = (url: string) => {
@@ -83,7 +82,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
 
     return (
         <Link
-            to={path}
+            to={canonicalPath}
             onClick={onClick}
             className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:ring-1 hover:ring-modtale-accent border border-slate-200 dark:border-white/5 overflow-hidden"
         >
