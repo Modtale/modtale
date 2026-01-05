@@ -63,6 +63,22 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         };
     }, [calculatePillPosition, checkScroll]);
 
+    const renderTitle = () => {
+        if (seoH1) {
+            if (seoH1.startsWith('Hytale ')) {
+                const suffix = seoH1.replace('Hytale ', '');
+                return <><span className="text-modtale-accent">Hytale</span> {suffix}</>;
+            }
+            return seoH1;
+        }
+
+        if (selectedClassification === 'All') {
+            return <>Discover <span className="text-modtale-accent">Hytale</span> Content</>;
+        }
+
+        return <>Discover <span className="text-modtale-accent">Hytale</span> {currentTypeLabel.replace(' Assets', '').replace('Server ', '')}</>;
+    };
+
     return (
         <div className="relative bg-slate-50 dark:bg-[#141d30] border-b border-slate-200 dark:border-white/5 pt-24 md:pt-32 pb-4 px-4 overflow-hidden z-20 shadow-sm">
 
@@ -71,15 +87,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             <div className="max-w-7xl mx-auto relative z-10">
                 <div className="text-center max-w-4xl mx-auto mb-6 md:mb-14">
                     <h1 className="text-3xl md:text-5xl font-black mb-4 md:mb-6 text-slate-800 dark:text-white tracking-tight drop-shadow-sm">
-                        {seoH1 ? (
-                            seoH1
-                        ) : (
-                            selectedClassification === 'All' ? (
-                                <>Discover <span className="text-modtale-accent">Hytale</span> Content</>
-                            ) : (
-                                <>Discover Hytale <span className="text-modtale-accent">{currentTypeLabel.replace(' Assets', '').replace('Server ', '')}</span></>
-                            )
-                        )}
+                        {renderTitle()}
                     </h1>
 
                     <div className={`relative max-w-3xl mx-auto group z-30 transition-all duration-300 ${showMiniSearch ? 'md:opacity-0 md:pointer-events-none' : 'md:opacity-100'} opacity-100`}>
