@@ -12,7 +12,7 @@ import {
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
 import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
-import { extractId, createSlug } from '../../utils/slug';
+import { extractId, createSlug, getProjectUrl } from '../../utils/slug';
 import { useSSRData } from '../../context/SSRContext';
 import NotFound from '../../components/ui/error/NotFound';
 import { ModHeader } from '@/components/resources/mod-detail/ModHeader';
@@ -20,7 +20,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { compareSemVer, getClassificationIcon } from '../../utils/modHelpers';
 import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
 import { ModSidebar } from '@/components/resources/mod-detail/ModSidebar.tsx';
-import { generateProjectMeta } from '../../utils/meta'; // Import the new utility
+import { generateProjectMeta } from '../../utils/meta';
 
 const getLicenseInfo = (license: string) => {
     const l = license.toUpperCase().replace(/\s+/g, '');
@@ -157,7 +157,7 @@ const ProjectSidebar: React.FC<{
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden">
                                             {iconUrl ? (
-                                                <img src={iconUrl} alt="" className="w-full h-full object-cover" />
+                                                <img src={iconUrl} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                                             ) : (
                                                 <Box className="w-4 h-4" />
                                             )}
@@ -262,6 +262,8 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, currentUs
                                                 alt={review.user}
                                                 className="w-full h-full object-cover absolute inset-0 z-10"
                                                 onError={(e) => e.currentTarget.style.display = 'none'}
+                                                loading="lazy"
+                                                decoding="async"
                                             />
                                         )}
                                         <span className="relative z-0">{review.user.charAt(0)}</span>
@@ -484,7 +486,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                     <button onClick={() => setGalleryIndex(null)} className="absolute top-6 right-6 p-2 text-white/70 hover:text-white z-[210]"><X className="w-8 h-8" /></button>
                     <div className="relative flex items-center justify-center w-full max-w-7xl min-[1600px]:max-w-[100rem] px-0 md:px-4 h-[70vh] transition-[max-width] duration-300">
                         <button onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex - 1 + mod.galleryImages!.length) % mod.galleryImages!.length)}} className="absolute left-2 md:relative md:left-0 p-3 bg-black/50 md:bg-transparent text-white/70 hover:text-white rounded-full z-10"><ChevronLeft className="w-8 h-8 md:w-10 md:h-10" /></button>
-                        <img src={resolveUrl(mod.galleryImages[galleryIndex])} className="max-h-full max-w-full object-contain shadow-2xl md:rounded-lg" onClick={e => e.stopPropagation()} alt="" />
+                        <img src={resolveUrl(mod.galleryImages[galleryIndex])} className="max-h-full max-w-full object-contain shadow-2xl md:rounded-lg" onClick={e => e.stopPropagation()} alt="" loading="eager" />
                         <button onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex + 1) % mod.galleryImages!.length)}} className="absolute right-2 md:relative md:right-0 p-3 bg-black/50 md:bg-transparent text-white/70 hover:text-white rounded-full z-10"><ChevronRight className="w-8 h-8 md:w-10 md:h-10" /></button>
                     </div>
                 </div>
@@ -492,7 +494,13 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
 
             <div className="relative w-full aspect-[3/1] bg-slate-800 overflow-hidden hidden md:block">
                 {mod.bannerUrl ? (
-                    <img src={resolveUrl(mod.bannerUrl)} alt="" className="w-full h-full object-cover opacity-80" />
+                    <img
+                        src={resolveUrl(mod.bannerUrl)}
+                        alt=""
+                        className="w-full h-full object-cover opacity-80"
+                        loading="eager"
+                        decoding="async"
+                    />
                 ) : (
                     <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-slate-900 to-black"></div>
                 )}
@@ -551,7 +559,21 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
 
                             <div className="prose dark:prose-invert prose-lg max-w-none prose-a:text-modtale-accent prose-a:no-underline hover:prose-a:underline prose-img:rounded-2xl prose-headings:font-black prose-p:text-slate-600 dark:prose-p:text-slate-300 prose-p:leading-relaxed">
                                 {mod.about ? (
-                                    <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{mod.about}</ReactMarkdown>
+                                    <ReactMarkdown
+                                        rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                        components={{
+                                            img: ({node, ...props}) => (
+                                                <img
+                                                    {...props}
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    className="rounded-xl shadow-md max-w-full h-auto"
+                                                />
+                                            )
+                                        }}
+                                    >
+                                        {mod.about}
+                                    </ReactMarkdown>
                                 ) : (
                                     <p className="text-slate-500 italic">No detailed description provided.</p>
                                 )}

@@ -78,6 +78,8 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
                         src={mod.bannerUrl.startsWith('/api') ? `${BACKEND_URL}${mod.bannerUrl}` : mod.bannerUrl}
                         alt=""
                         className="w-full h-full object-cover opacity-90"
+                        loading="eager"
+                        decoding="async"
                     />
                 ) : (
                     <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-slate-900 to-black"></div>
@@ -99,6 +101,8 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
                             alt={mod.title}
                             className="w-full h-full object-cover"
                             onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
+                            loading="eager"
+                            decoding="async"
                         />
                     </div>
 
@@ -216,6 +220,8 @@ export const ModHeader: React.FC<ModHeaderProps> = ({
                         onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
                         alt={mod.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        loading="eager"
+                        decoding="async"
                     />
                 </div>
             </div>
