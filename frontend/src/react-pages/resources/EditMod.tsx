@@ -126,13 +126,17 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
 
             await api.put(`/projects/${currentProject.id}`, body);
 
+            const uploadConfig = {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            };
+
             if (formData.iconFile) {
                 const f = new FormData(); f.append('file', formData.iconFile);
-                await api.put(`/projects/${currentProject.id}/icon`, f);
+                await api.put(`/projects/${currentProject.id}/icon`, f, uploadConfig);
             }
             if (bannerFile) {
                 const f = new FormData(); f.append('file', bannerFile);
-                await api.put(`/projects/${currentProject.id}/banner`, f);
+                await api.put(`/projects/${currentProject.id}/banner`, f, uploadConfig);
             }
 
             const res = await api.get(`/projects/${currentProject.id}`);
@@ -170,7 +174,11 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             const depsToUse = versionData.modIds;
             if(depsToUse) depsToUse.forEach(d => fd.append('modIds', d));
 
-            await api.post(`/projects/${currentProject.id}/versions`, fd);
+            const uploadConfig = {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            };
+
+            await api.post(`/projects/${currentProject.id}/versions`, fd, uploadConfig);
 
             const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
@@ -201,7 +209,12 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                     const file = new File([blob], 'icon.svg', { type: 'image/svg+xml' });
                     const fd = new FormData();
                     fd.append('file', file);
-                    await api.put(`/projects/${currentProject.id}/icon`, fd);
+
+                    const uploadConfig = {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    };
+
+                    await api.put(`/projects/${currentProject.id}/icon`, fd, uploadConfig);
                 } catch (err) {
                     console.error("Failed to set default icon", err);
                 }

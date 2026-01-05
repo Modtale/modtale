@@ -83,7 +83,11 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             formData.append('description', summary);
             formData.append('owner', owner);
 
-            const res = await api.post('/projects', formData);
+            const uploadConfig = {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            };
+
+            const res = await api.post('/projects', formData, uploadConfig);
             setDraftId(res.data.id);
             setModData(res.data);
 
@@ -125,13 +129,17 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             };
             await api.put(`/projects/${draftId}`, body);
 
+            const uploadConfig = {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            };
+
             if (metaData.iconFile) {
                 const f = new FormData(); f.append('file', metaData.iconFile);
-                await api.put(`/projects/${draftId}/icon`, f);
+                await api.put(`/projects/${draftId}/icon`, f, uploadConfig);
             }
             if (bannerFile) {
                 const f = new FormData(); f.append('file', bannerFile);
-                await api.put(`/projects/${draftId}/banner`, f);
+                await api.put(`/projects/${draftId}/banner`, f, uploadConfig);
             }
 
             const res = await api.get(`/projects/${draftId}`);
@@ -166,7 +174,11 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             const depsToUse = versionData.modIds;
             if(depsToUse) depsToUse.forEach(d => fd.append('modIds', d));
 
-            await api.post(`/projects/${draftId}/versions`, fd);
+            const uploadConfig = {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            };
+
+            await api.post(`/projects/${draftId}/versions`, fd, uploadConfig);
 
             const res = await api.get(`/projects/${draftId}`);
             setModData(res.data);
@@ -211,7 +223,12 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                     const file = new File([blob], 'icon.svg', { type: 'image/svg+xml' });
                     const fd = new FormData();
                     fd.append('file', file);
-                    await api.put(`/projects/${draftId}/icon`, fd);
+
+                    const uploadConfig = {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    };
+
+                    await api.put(`/projects/${draftId}/icon`, fd, uploadConfig);
                 } catch (err) {
                     console.error("Failed to set default icon", err);
                 }
