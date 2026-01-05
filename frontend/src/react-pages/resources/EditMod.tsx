@@ -4,8 +4,7 @@ import { api, BACKEND_URL } from '../../utils/api';
 import type { Mod, User } from '../../types';
 import type { MetadataFormData, VersionFormData } from '../../components/resources/upload/FormShared';
 import { Spinner } from '../../components/ui/Spinner';
-import { ProjectBuilder } from '../../components/resources/upload/ProjectBuilder.tsx';
-import { ImageCropperModal } from '../../components/ui/ImageCropperModal';
+import { ProjectBuilder } from '../../components/resources/upload/ProjectBuilder';
 import { StatusModal } from '../../components/ui/StatusModal';
 
 interface EditModProps {
@@ -34,9 +33,6 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
 
     const [statusModal, setStatusModal] = useState<{type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string} | null>(null);
 
-    const [cropperOpen, setCropperOpen] = useState(false);
-    const [tempImage, setTempImage] = useState<string | null>(null);
-    const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
     const [bannerFile, setBannerFile] = useState<File | null>(null);
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
@@ -193,7 +189,6 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
         if(!currentProject) return;
         if(formData.summary.length < 10) { setStatusModal({type:'error', title:'Error', msg: "Short summary must be at least 10 characters."}); return; }
         if(!formData.tags.length) { setStatusModal({type:'error', title:'Error', msg: "At least one tag is required."}); return; }
-        if(currentProject.classification === 'PLUGIN' && !formData.repositoryUrl) { setStatusModal({type:'error', title:'Error', msg: "Repository URL is required for plugins."}); return; }
         if(currentProject.classification !== 'MODPACK' && !formData.license) { setStatusModal({type:'error', title:'Error', msg: "License is required."}); return; }
         if(!currentProject.versions?.length && currentProject.classification !== 'MODPACK') { setStatusModal({type:'error', title:'Error', msg: "You must upload at least one version."}); setActiveTab('files'); return; }
 
@@ -313,30 +308,6 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
         } catch(e: any) { setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete project."}); setIsLoading(false); }
     };
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
-        if (project?.status === 'PENDING' || project?.status === 'ARCHIVED') return;
-
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setTempImage(URL.createObjectURL(file));
-            setCropType(type);
-            setCropperOpen(true);
-            e.target.value = '';
-        }
-    };
-
-    const handleCropComplete = (croppedFile: File) => {
-        const preview = URL.createObjectURL(croppedFile);
-        if (cropType === 'icon') {
-            setFormData(p => ({ ...p, iconFile: croppedFile, iconPreview: preview }));
-        } else {
-            setBannerFile(croppedFile);
-            setBannerPreview(preview);
-        }
-        setCropperOpen(false);
-        setTempImage(null);
-    };
-
     const onShowStatus = (type: any, title: string, msg: string) => setStatusModal({type, title, msg});
 
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
@@ -349,15 +320,6 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
         <>
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
 
-            {cropperOpen && tempImage && (
-                <ImageCropperModal
-                    imageSrc={tempImage}
-                    aspect={cropType === 'banner' ? 3 : 1}
-                    onCancel={() => { setCropperOpen(false); setTempImage(null); }}
-                    onCropComplete={handleCropComplete}
-                />
-            )}
-
             <ProjectBuilder
                 modData={project}
                 setModData={setProject}
@@ -366,7 +328,8 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 versionData={versionData}
                 setVersionData={setVersionData}
                 bannerPreview={bannerPreview}
-                handleFileSelect={handleFileSelect}
+                setBannerPreview={setBannerPreview}
+                setBannerFile={setBannerFile}
                 handleSave={handleSaveMetadata}
                 handlePublish={isDraft ? handlePublish : undefined}
                 handleUploadVersion={handleUploadVersion}

@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../utils/api';
 import { PROJECT_TYPES } from '../../data/categories';
 import type { Classification } from '../../data/categories';
-import { ProjectBuilder } from '../../components/resources/upload/ProjectBuilder.tsx';
+import { ProjectBuilder } from '../../components/resources/upload/ProjectBuilder';
 import type { MetadataFormData, VersionFormData } from '../../components/resources/upload/FormShared';
-import { ArrowLeft, ArrowRight, AlertCircle, Building2, User as UserIcon, ChevronDown, Check } from 'lucide-react';
-import { createSlug } from '../../utils/slug';
+import { ArrowLeft, ArrowRight, AlertCircle, Building2, User as UserIcon, ChevronDown, Check, Plus, ImageIcon } from 'lucide-react';
 import type { User, Mod } from '../../types';
 import { Spinner } from '@/components/ui/Spinner';
-import { ImageCropperModal } from '../../components/ui/ImageCropperModal';
-import { StatusModal } from '../../components/ui/StatusModal';
+import { StatusModal } from '@/components/ui/StatusModal';
 
 interface UploadProps {
     onNavigate: (page: string) => void;
@@ -38,10 +36,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
     const [modData, setModData] = useState<Mod | null>(null);
     const [activeTab, setActiveTab] = useState<'details' | 'files' | 'settings'>('details');
-
-    const [cropperOpen, setCropperOpen] = useState(false);
-    const [tempImage, setTempImage] = useState<string | null>(null);
-    const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
         title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, license: '', slug: ''
@@ -205,7 +199,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         if(!draftId) return;
         if(metaData.summary.length < 10) { setStatusModal({type:'error', title:'Error', msg: "Short summary must be at least 10 characters."}); return; }
         if(!metaData.tags.length) { setStatusModal({type:'error', title:'Error', msg: "At least one tag is required."}); return; }
-        if(classification === 'PLUGIN' && !metaData.repositoryUrl) { setStatusModal({type:'error', title:'Error', msg: "Repository URL is required for plugins."}); return; }
         if(classification !== 'MODPACK' && !metaData.license) { setStatusModal({type:'error', title:'Error', msg: "License is required."}); return; }
         if(!modData?.versions.length && classification !== 'MODPACK') { setStatusModal({type:'error', title:'Error', msg: "You must upload at least one version."}); setActiveTab('files'); return; }
 
@@ -238,26 +231,16 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         }
     };
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setTempImage(URL.createObjectURL(file));
-            setCropType(type);
-            setCropperOpen(true);
-            e.target.value = '';
+    const handleDelete = async () => {
+        if(!draftId) return;
+        setIsLoading(true);
+        try {
+            await api.delete(`/projects/${draftId}`);
+            navigate('/');
+        } catch(e: any) {
+            setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete project."});
+            setIsLoading(false);
         }
-    };
-
-    const handleCropComplete = (croppedFile: File) => {
-        const preview = URL.createObjectURL(croppedFile);
-        if (cropType === 'icon') {
-            setMetaData(p => ({ ...p, iconFile: croppedFile, iconPreview: preview }));
-        } else {
-            setBannerFile(croppedFile);
-            setBannerPreview(preview);
-        }
-        setCropperOpen(false);
-        setTempImage(null);
     };
 
     if (step === 0) {
@@ -359,8 +342,28 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     return (
         <>
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
-            {cropperOpen && tempImage && <ImageCropperModal imageSrc={tempImage} aspect={cropType === 'banner' ? 3 : 1} onCancel={() => { setCropperOpen(false); setTempImage(null); }} onCropComplete={handleCropComplete} />}
-            <ProjectBuilder modData={modData} setModData={setModData} metaData={metaData} setMetaData={setMetaData} versionData={versionData} setVersionData={setVersionData} bannerPreview={bannerPreview} handleFileSelect={handleFileSelect} handleSave={handleSaveMetadata} handlePublish={handlePublish} handleUploadVersion={handleUploadVersion} handleDeleteVersion={handleDeleteVersion} isLoading={isLoading} classification={classification || 'PLUGIN'} currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onShowStatus={(type, title, msg) => setStatusModal({type, title, msg})} />
+            <ProjectBuilder
+                modData={modData}
+                setModData={setModData}
+                metaData={metaData}
+                setMetaData={setMetaData}
+                versionData={versionData}
+                setVersionData={setVersionData}
+                bannerPreview={bannerPreview}
+                setBannerPreview={setBannerPreview}
+                setBannerFile={setBannerFile}
+                handleSave={handleSaveMetadata}
+                handlePublish={handlePublish}
+                handleUploadVersion={handleUploadVersion}
+                handleDeleteVersion={handleDeleteVersion}
+                handleDelete={handleDelete}
+                isLoading={isLoading}
+                classification={classification || 'PLUGIN'}
+                currentUser={currentUser}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                onShowStatus={(type, title, msg) => setStatusModal({type, title, msg})}
+            />
         </>
     );
 };
