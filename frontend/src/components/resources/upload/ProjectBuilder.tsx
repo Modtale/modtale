@@ -1,11 +1,11 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { BACKEND_URL, api } from '../../../utils/api';
 import { GLOBAL_TAGS, LICENSES } from '../../../data/categories';
 import type { Classification } from '../../../data/categories';
-import { VersionFields } from './VersionFields.tsx';
+import { VersionFields } from './VersionFields';
 import type { MetadataFormData, VersionFormData } from './FormShared';
 import {
     Save, UploadCloud, CheckCircle2, Image as ImageIcon, Link as LinkIcon, Tag,
@@ -15,9 +15,10 @@ import {
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { ModSidebar } from '@/components/resources/mod-detail/ModSidebar.tsx';
+import { ModSidebar } from '@/components/resources/mod-detail/ModSidebar';
 import { createSlug } from '../../../utils/slug';
 import type { Mod, User } from '../../../types';
+import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 
 const ThemedInput = ({ label, disabled, ...props }: any) => (
     <div className="space-y-1.5">
@@ -34,7 +35,9 @@ interface ProjectBuilderProps {
     versionData: VersionFormData;
     setVersionData: React.Dispatch<React.SetStateAction<VersionFormData>>;
     bannerPreview: string | null;
-    handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => void;
+    setBannerPreview: (url: string | null) => void;
+    setBannerFile: (file: File | null) => void;
+
     handleSave: (silent?: boolean) => void;
     handlePublish?: () => void;
     handleDelete?: () => void;
@@ -44,6 +47,7 @@ interface ProjectBuilderProps {
     handleArchive?: () => void;
     handleUnlist?: () => void;
     handleRestore?: () => void;
+
     isLoading: boolean;
     classification: Classification | string;
     currentUser: User | null;
@@ -54,9 +58,10 @@ interface ProjectBuilderProps {
 }
 
 export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
-                                                                  modData, setModData, metaData, setMetaData, versionData, setVersionData, bannerPreview,
-                                                                  handleFileSelect, handleSave, handlePublish, handleDelete, handleDeleteVersion, handleUploadVersion, handleRevert, handleArchive, handleUnlist, handleRestore, isLoading,
-                                                                  classification, currentUser, activeTab, setActiveTab, onShowStatus, readOnly
+                                                                  modData, setModData, metaData, setMetaData, versionData, setVersionData,
+                                                                  bannerPreview, setBannerPreview, setBannerFile,
+                                                                  handleSave, handlePublish, handleDelete, handleDeleteVersion, handleUploadVersion, handleRevert, handleArchive, handleUnlist, handleRestore,
+                                                                  isLoading, classification, currentUser, activeTab, setActiveTab, onShowStatus, readOnly
                                                               }) => {
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>(readOnly ? 'preview' : 'write');
     const [inviteUsername, setInviteUsername] = useState('');
@@ -72,13 +77,18 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
     const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null);
 
+    // Repository Logic
     const [repos, setRepos] = useState<any[]>([]);
     const [loadingRepos, setLoadingRepos] = useState(false);
     const [manualRepo, setManualRepo] = useState(false);
     const [repoSearch, setRepoSearch] = useState('');
     const [repoDropdownOpen, setRepoDropdownOpen] = useState(false);
     const repoDropdownRef = useRef<HTMLDivElement>(null);
-    const [repoValid, setRepoValid] = useState(false);
+    const [repoValid, setRepoValid] = useState(true); // Default true since optional
+
+    const [cropperOpen, setCropperOpen] = useState(false);
+    const [tempImage, setTempImage] = useState<string | null>(null);
+    const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
 
     const [slugError, setSlugError] = useState<string | null>(null);
 
@@ -88,7 +98,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const hasTags = metaData.tags.length > 0;
     const hasSummary = metaData.summary && metaData.summary.length >= 10;
     const hasVersion = (modData?.versions?.length || 0) > 0;
-    const hasRepo = !isPlugin || (!!metaData.repositoryUrl && metaData.repositoryUrl.length > 0 && repoValid);
+    const hasRepo = !metaData.repositoryUrl || repoValid;
     const hasLicense = isModpack || !!metaData.license;
 
     const isPublishable = hasTags && hasSummary && hasVersion && hasRepo && hasLicense;
@@ -111,6 +121,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     const checkRepoUrl = useCallback((url: string) => {
+        if (!url) {
+            setRepoValid(true);
+            return true;
+        }
         const isValid = /^https:\/\/(github\.com|gitlab\.com)\/[\w.-]+\/[\w.-]+$/.test(url);
         setRepoValid(isValid);
         return isValid;
@@ -134,9 +148,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     useEffect(() => {
-        if (metaData.repositoryUrl) {
-            checkRepoUrl(metaData.repositoryUrl);
-        }
+        checkRepoUrl(metaData.repositoryUrl || '');
     }, [metaData.repositoryUrl, checkRepoUrl]);
 
     useEffect(() => {
@@ -210,6 +222,29 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
+        if (readOnly) return;
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setTempImage(URL.createObjectURL(file));
+            setCropType(type);
+            setCropperOpen(true);
+            e.target.value = '';
+        }
+    };
+
+    const handleCropComplete = (croppedFile: File) => {
+        const preview = URL.createObjectURL(croppedFile);
+        if (cropType === 'icon') {
+            setMetaData(p => ({ ...p, iconFile: croppedFile, iconPreview: preview }));
+        } else {
+            setBannerFile(croppedFile);
+            setBannerPreview(preview);
+        }
+        setCropperOpen(false);
+        setTempImage(null);
+    };
+
     const bgStyle = bannerPreview
         ? { backgroundImage: `url(${bannerPreview})` }
         : modData?.bannerUrl
@@ -217,12 +252,21 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             : { backgroundImage: 'linear-gradient(to bottom right, #1e293b, #0f172a)' };
 
     const hasBanner = !!(bannerPreview || modData?.bannerUrl);
-
     const iconSrc = metaData.iconPreview ? metaData.iconPreview : modData?.imageUrl ? (modData.imageUrl.startsWith('/api') ? `${BACKEND_URL}${modData.imageUrl}` : modData.imageUrl) : null;
     const filteredRepos = repos.filter(r => (r.name || '').toLowerCase().includes(repoSearch.toLowerCase()));
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative pb-20 overflow-x-hidden">
+
+            {cropperOpen && tempImage && (
+                <ImageCropperModal
+                    imageSrc={tempImage}
+                    aspect={cropType === 'banner' ? 3 : 1}
+                    onCancel={() => { setCropperOpen(false); setTempImage(null); }}
+                    onCropComplete={handleCropComplete}
+                />
+            )}
+
             {showPublishConfirm && handlePublish && (
                 <StatusModal
                     type="info"
@@ -457,9 +501,9 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                                 <li className={`flex items-center gap-2 ${hasTags ? 'text-green-500' : 'text-red-400'}`}>
                                                                     {hasTags ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} At least 1 Tag
                                                                 </li>
-                                                                {isPlugin && (
-                                                                    <li className={`flex items-center gap-2 ${hasRepo ? 'text-green-500' : 'text-red-400'}`}>
-                                                                        {hasRepo ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} Valid Repository
+                                                                {isPlugin && metaData.repositoryUrl && !repoValid && (
+                                                                    <li className="flex items-center gap-2 text-red-400">
+                                                                        <X className="w-4 h-4" /> Valid Repository
                                                                     </li>
                                                                 )}
                                                                 {!isModpack && (
@@ -695,13 +739,13 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                 {modData?.contributors?.map(u => (
                                                     <div key={u} className="flex justify-between items-center p-2 bg-slate-100 dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/5">
                                                         <span className="text-sm text-slate-700 dark:text-slate-300 font-bold">{u}</span>
-                                                        <button disabled={readOnly} onClick={() => handleRemoveContributor(u, false)} className={`text-slate-500 ${!readOnly ? 'hover:text-red-500' : 'opacity-50 cursor-not-allowed'}`}><X className="w-4 h-4"/></button>
+                                                        <button disabled={readOnly} onClick={() => {if(handleDeleteVersion) handleRemoveContributor(u, false)}} className={`text-slate-500 ${!readOnly ? 'hover:text-red-500' : 'opacity-50 cursor-not-allowed'}`}><X className="w-4 h-4"/></button>
                                                     </div>
                                                 ))}
                                                 {modData?.pendingInvites?.map(u => (
                                                     <div key={u} className="flex justify-between items-center p-2 bg-slate-100 dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/5 border-dashed">
                                                         <span className="text-sm text-slate-500 font-bold italic">{u} (Pending)</span>
-                                                        <button disabled={readOnly} onClick={() => handleRemoveContributor(u, true)} className={`text-slate-500 ${!readOnly ? 'hover:text-red-500' : 'opacity-50 cursor-not-allowed'}`}><X className="w-4 h-4"/></button>
+                                                        <button disabled={readOnly} onClick={() => {if(handleDeleteVersion) handleRemoveContributor(u, true)}} className={`text-slate-500 ${!readOnly ? 'hover:text-red-500' : 'opacity-50 cursor-not-allowed'}`}><X className="w-4 h-4"/></button>
                                                     </div>
                                                 ))}
                                                 {(!modData?.contributors?.length && !modData?.pendingInvites?.length) && <p className="text-xs text-slate-500 italic">No contributors.</p>}
