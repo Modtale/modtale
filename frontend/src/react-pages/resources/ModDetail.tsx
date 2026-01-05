@@ -21,6 +21,7 @@ import { compareSemVer, getClassificationIcon } from '../../utils/modHelpers';
 import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
 import { ModSidebar } from '@/components/resources/mod-detail/ModSidebar.tsx';
 import { generateProjectMeta } from '../../utils/meta';
+import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
 
 const getLicenseInfo = (license: string) => {
     const l = license.toUpperCase().replace(/\s+/g, '');
@@ -149,10 +150,12 @@ const ProjectSidebar: React.FC<{
                                 const title = meta?.title || dep.modTitle || dep.modId;
                                 const slug = createSlug(title, dep.modId);
 
+                                const path = mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`;
+
                                 return (
                                     <button
                                         key={idx}
-                                        onClick={() => navigate(mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`)}
+                                        onClick={() => navigate(path)}
                                         className="w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md dark:hover:bg-slate-900 transition-all group text-left shadow-sm dark:shadow-none"
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden">
@@ -324,6 +327,19 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
 
     const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
 
+    const breadcrumbSchema = useMemo(() => {
+        if (!mod) return null;
+
+        const crumbs = getBreadcrumbsForClassification(mod.classification || 'PLUGIN');
+
+        const fullCrumbs = [
+            ...crumbs,
+            { name: mod.title, url: getProjectUrl(mod) }
+        ];
+
+        return generateBreadcrumbSchema(fullCrumbs);
+    }, [mod]);
+
     useEffect(() => {
         if (mod && extractId(mod.id) === realId) {
             setLoading(false);
@@ -468,6 +484,11 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                     {mod.imageUrl && <meta property="og:image" content={resolveUrl(mod.imageUrl)} />}
                     <meta property="og:type" content="game.modification" />
                     <meta name="author" content={projectMeta.author} />
+                    {breadcrumbSchema && (
+                        <script type="application/ld+json">
+                            {JSON.stringify(breadcrumbSchema)}
+                        </script>
+                    )}
                 </Helmet>
             )}
 

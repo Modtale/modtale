@@ -13,7 +13,7 @@ import type { Classification } from '../data/categories';
 import { createSlug } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getCategorySEO } from '../data/seo-constants';
-import { generateItemListSchema } from '../utils/schema'; // Import schema generator
+import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
 
 interface HomeProps {
     onModClick: (mod: Mod) => void;
@@ -69,6 +69,11 @@ export const Home: React.FC<HomeProps> = ({
     const cardsSectionRef = useRef<HTMLDivElement>(null);
 
     const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
+
+    const breadcrumbSchema = useMemo(() => {
+        const crumbs = getBreadcrumbsForClassification(selectedClassification);
+        return generateBreadcrumbSchema(crumbs);
+    }, [selectedClassification]);
 
     useEffect(() => {
         if (initialClassification) {
@@ -190,11 +195,8 @@ export const Home: React.FC<HomeProps> = ({
                 <title>{seoContent.title}</title>
                 <meta name="description" content={seoContent.description} />
                 <meta name="keywords" content={seoContent.keywords} />
-                {itemListSchema && (
-                    <script type="application/ld+json">
-                        {JSON.stringify(itemListSchema)}
-                    </script>
-                )}
+                {itemListSchema && <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>}
+                {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
             </Helmet>
 
             <HomeHero

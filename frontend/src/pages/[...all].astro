@@ -5,7 +5,7 @@ import { extractId } from '../utils/slug';
 import { isBotUserAgent } from '../utils/seo';
 import { DEFAULT_SEO, ROUTE_SEO } from '../data/seo-constants';
 import { generateProjectMeta } from '../utils/meta';
-import { generateItemListSchema } from '../utils/schema';
+import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
 
 const { all } = Astro.params;
 const path = Astro.url.pathname;
@@ -21,7 +21,7 @@ let title = DEFAULT_SEO.title;
 let description = DEFAULT_SEO.description;
 let keywords = DEFAULT_SEO.keywords;
 let image = "https://modtale.net/assets/favicon.svg";
-let jsonLd = undefined;
+let jsonLd: any = undefined;
 let initialData = null;
 
 if (ROUTE_SEO[cleanPath]) {
@@ -83,7 +83,7 @@ if (isBot) {
                         image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
                     }
 
-                    jsonLd = {
+                    const appSchema = {
                         "@context": "https://schema.org",
                         "@type": "SoftwareApplication",
                         "name": modData.title,
@@ -99,10 +99,15 @@ if (isBot) {
                             "ratingCount": Math.max(1, modData.reviews ? modData.reviews.length : 0)
                         } : undefined
                     };
+
+                    const crumbs = getBreadcrumbsForClassification(modData.classification || 'PLUGIN');
+                    const fullCrumbs = [...crumbs, { name: modData.title, url: cleanPath }]; // cleanPath is /mod/slug
+                    const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
+
+                    jsonLd = [appSchema, breadcrumbSchema];
                 }
             }
         } else {
-            // --- Category / List Logic ---
             let classification = null;
             if (cleanPath === '/plugins') classification = 'PLUGIN';
             else if (cleanPath === '/modpacks') classification = 'MODPACK';
@@ -119,9 +124,14 @@ if (isBot) {
                     const items = data.content || [];
 
                     const listSchema = generateItemListSchema(items);
-                    if (listSchema) {
-                        jsonLd = listSchema;
-                    }
+                    const crumbs = getBreadcrumbsForClassification(classification);
+                    const breadcrumbSchema = generateBreadcrumbSchema(crumbs);
+
+                    const schemas = [];
+                    if (listSchema) schemas.push(listSchema);
+                    if (breadcrumbSchema) schemas.push(breadcrumbSchema);
+
+                    if (schemas.length > 0) jsonLd = schemas;
                 }
             }
         }
