@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Github } from 'lucide-react';
-import { BACKEND_URL } from '../../utils/api';
+import { X, Github, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { BACKEND_URL, api } from '../../utils/api';
 
 const GitLabIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -31,6 +31,12 @@ interface SignInModalProps {
 
 export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
     const [mounted, setMounted] = useState(false);
+    const [mode, setMode] = useState<'signin' | 'register'>('signin');
+    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -40,8 +46,45 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
     if (!isOpen || !mounted) return null;
 
-    const handleLogin = (provider: string) => {
+    const handleOAuthLogin = (provider: string) => {
         window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+
+        try {
+            if (mode === 'register') {
+                await api.post('/auth/register', { username, email, password });
+                setMode('signin');
+                setError("Account created! Please sign in.");
+                setLoading(false);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('username', username || email);
+            formData.append('password', password);
+
+            await api.post('/auth/login', formData, {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            });
+
+            window.location.href = '/dashboard/profile';
+        } catch (err: any) {
+            console.error(err);
+            if (err.response?.status === 401) {
+                setError("Invalid credentials.");
+            } else if (err.response?.data?.error) {
+                setError(err.response.data.error);
+            } else {
+                setError("An error occurred. Please try again.");
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     return createPortal(
@@ -51,49 +94,130 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                     <X className="w-5 h-5" />
                 </button>
 
-                <div className="text-center mb-8">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Welcome Back</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">Sign in to manage your projects.</p>
+                <div className="text-center mb-6">
+                    <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+                        {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">
+                        {mode === 'signin' ? 'Sign in to manage your projects.' : 'Join the community today.'}
+                    </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3 mb-6">
                     <button
-                        onClick={() => handleLogin('github')}
+                        onClick={() => handleOAuthLogin('github')}
                         className="w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10"
                     >
                         <Github className="w-5 h-5" />
-                        Sign in with GitHub
+                        <span className="text-sm">GitHub</span>
                     </button>
 
-                    <button
-                        onClick={() => handleLogin('gitlab')}
-                        className="w-full bg-[#FC6D26] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
-                    >
-                        <GitLabIcon className="w-5 h-5" />
-                        Sign in with GitLab
-                    </button>
-
-                    <button
-                        onClick={() => handleLogin('discord')}
-                        className="w-full bg-[#5865F2] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
-                    >
-                        <DiscordIcon className="w-5 h-5" />
-                        Sign in with Discord
-                    </button>
-
-                    <button
-                        onClick={() => handleLogin('google')}
-                        className="w-full bg-white text-slate-700 border border-slate-200 py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
-                    >
-                        <GoogleIcon className="w-5 h-5" />
-                        Sign in with Google
-                    </button>
+                    <div className="grid grid-cols-3 gap-3">
+                        <button
+                            onClick={() => handleOAuthLogin('gitlab')}
+                            className="w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
+                            title="Sign in with GitLab"
+                        >
+                            <GitLabIcon className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => handleOAuthLogin('discord')}
+                            className="w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
+                            title="Sign in with Discord"
+                        >
+                            <DiscordIcon className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => handleOAuthLogin('google')}
+                            className="w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
+                            title="Sign in with Google"
+                        >
+                            <GoogleIcon className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
+                <div className="relative mb-6">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-200 dark:border-white/10"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white dark:bg-modtale-card px-2 text-slate-500">Or continue with email</span>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {error && (
+                        <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+                            {error}
+                        </div>
+                    )}
+
+                    {mode === 'register' && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Username</label>
+                            <input
+                                type="text"
+                                required
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                                placeholder="Display name"
+                            />
+                        </div>
+                    )}
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                            {mode === 'signin' ? 'Email or Username' : 'Email'}
+                        </label>
+                        <input
+                            type={mode === 'signin' ? "text" : "email"}
+                            required
+                            value={mode === 'signin' ? (username || email) : email}
+                            onChange={e => mode === 'signin' ? setUsername(e.target.value) : setEmail(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                            placeholder={mode === 'signin' ? "user@example.com" : "user@example.com"}
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Password</label>
+                        <input
+                            type="password"
+                            required
+                            minLength={6}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                            placeholder="••••••••"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-modtale-accent/90 transition-colors active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20"
+                    >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                            <>
+                                {mode === 'signin' ? 'Sign In' : 'Create Account'}
+                                <ArrowRight className="w-4 h-4" />
+                            </>
+                        )}
+                    </button>
+                </form>
+
                 <div className="mt-6 text-center">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                        By signing in, you agree to our <a href="/terms" className="underline hover:text-slate-900 dark:hover:text-white">Terms</a> and <a href="/privacy" className="underline hover:text-slate-900 dark:hover:text-white">Privacy Policy</a>.
-                    </p>
+                    <button
+                        onClick={() => {
+                            setMode(mode === 'signin' ? 'register' : 'signin');
+                            setError(null);
+                        }}
+                        className="text-sm text-slate-500 hover:text-modtale-accent dark:text-slate-400 dark:hover:text-white transition-colors"
+                    >
+                        {mode === 'signin' ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+                    </button>
                 </div>
             </div>
         </div>,

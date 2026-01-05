@@ -10,6 +10,7 @@ import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.NotificationRepository;
 import net.modtale.service.AnalyticsService;
 import net.modtale.service.security.SanitizationService;
+import net.modtale.service.security.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,12 +21,14 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -42,6 +45,76 @@ public class UserService {
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private SanitizationService sanitizer;
     @Autowired private NotificationService notificationService;
+    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private EmailService emailService;
+
+    public User registerUser(String username, String email, String password) {
+        if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
+            throw new IllegalArgumentException("Invalid username. Must be at least 3 characters and alphanumeric.");
+        }
+        if (email == null || !email.contains("@")) {
+            throw new IllegalArgumentException("Invalid email address.");
+        }
+        if (password == null || password.length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters.");
+        }
+
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
+            throw new IllegalArgumentException("Username already taken.");
+        }
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new IllegalArgumentException("Email already registered.");
+        }
+
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setCreatedAt(LocalDate.now().toString());
+        user.setRoles(Collections.singletonList("USER"));
+        user.setEmailVerified(false);
+        user.setVerificationToken(UUID.randomUUID().toString());
+        user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(24));
+
+        user.setAvatarUrl("https://ui-avatars.com/api/?name=" + username + "&background=random");
+
+        User savedUser = userRepository.save(user);
+
+        try {
+            emailService.sendVerificationEmail(email, username, savedUser.getVerificationToken());
+        } catch (Exception e) {
+            logger.error("Failed to send verification email during registration", e);
+        }
+
+        return savedUser;
+    }
+
+    public void verifyEmail(String token) {
+        User user = userRepository.findByVerificationToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired verification token."));
+
+        if (user.getVerificationTokenExpiry() != null && user.getVerificationTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Verification link has expired. Please request a new one.");
+        }
+
+        user.setEmailVerified(true);
+        user.setVerificationToken(null);
+        user.setVerificationTokenExpiry(null);
+        userRepository.save(user);
+    }
+
+    public void resendVerificationEmail(User user) {
+        if (user.isEmailVerified()) {
+            throw new IllegalArgumentException("Email is already verified.");
+        }
+
+        // Generate new token
+        user.setVerificationToken(UUID.randomUUID().toString());
+        user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(24));
+        userRepository.save(user);
+
+        emailService.sendVerificationEmail(user.getEmail(), user.getUsername(), user.getVerificationToken());
+    }
 
     public List<User> searchUsers(String query) {
         if (query == null || query.length() < 2) return new ArrayList<>();
@@ -385,6 +458,11 @@ public class UserService {
             Optional<User> emailUser = userRepository.findByEmail(email);
             if (emailUser.isPresent()) {
                 user = emailUser.get();
+                if (!user.isEmailVerified()) {
+                    user.setEmailVerified(true);
+                    user.setVerificationToken(null);
+                    user.setVerificationTokenExpiry(null);
+                }
             }
         }
 
@@ -420,6 +498,7 @@ public class UserService {
         user.setEmail(email);
         user.setAvatarUrl(avatarUrl);
         user.setCreatedAt(LocalDate.now().toString());
+        user.setEmailVerified(true);
 
         if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
         if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
@@ -537,8 +616,8 @@ public class UserService {
 
     public void unlinkAccount(String userId, String provider) {
         User user = userRepository.findById(userId).orElseThrow();
-        if (user.getConnectedAccounts().size() <= 1) {
-            throw new IllegalArgumentException("You must have at least one connected account to sign in.");
+        if (user.getConnectedAccounts().size() <= 1 && user.getPassword() == null) {
+            throw new IllegalArgumentException("You must have at least one connected account or a password to sign in.");
         }
         boolean removed = user.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
         if (removed) {
@@ -556,6 +635,8 @@ public class UserService {
             String username = null;
             if (principal instanceof User) {
                 username = ((User) principal).getUsername();
+            } else if (principal instanceof org.springframework.security.core.userdetails.User) {
+                username = ((org.springframework.security.core.userdetails.User) principal).getUsername();
             } else if (principal instanceof OAuth2User) {
                 username = ((OAuth2User) principal).getAttribute("login");
             }
