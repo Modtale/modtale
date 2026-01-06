@@ -89,6 +89,37 @@ public class UserService {
         return savedUser;
     }
 
+    public void addCredentials(String userId, String email, String password) {
+        User user = userRepository.findById(userId).orElseThrow();
+
+        if (email == null || !email.contains("@")) {
+            throw new IllegalArgumentException("Invalid email format.");
+        }
+        if (password == null || password.length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters.");
+        }
+
+        if (!email.equalsIgnoreCase(user.getEmail())) {
+            Optional<User> existing = userRepository.findByEmail(email);
+            if (existing.isPresent() && !existing.get().getId().equals(userId)) {
+                throw new IllegalArgumentException("Email already in use.");
+            }
+            user.setEmail(email);
+            user.setEmailVerified(false);
+            user.setVerificationToken(UUID.randomUUID().toString());
+            user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(24));
+
+            try {
+                emailService.sendVerificationEmail(email, user.getUsername(), user.getVerificationToken());
+            } catch (Exception e) {
+                logger.error("Failed to send verification email during update", e);
+            }
+        }
+
+        user.setPassword(passwordEncoder.encode(password));
+        userRepository.save(user);
+    }
+
     public void verifyEmail(String token) {
         User user = userRepository.findByVerificationToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired verification token."));
@@ -108,7 +139,6 @@ public class UserService {
             throw new IllegalArgumentException("Email is already verified.");
         }
 
-        // Generate new token
         user.setVerificationToken(UUID.randomUUID().toString());
         user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(24));
         userRepository.save(user);

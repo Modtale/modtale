@@ -359,6 +359,22 @@ public class UserController {
         }
     }
 
+    @PutMapping("/user/credentials")
+    public ResponseEntity<?> updateCredentials(@RequestBody Map<String, String> payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+
+        String email = payload.get("email");
+        String password = payload.get("password");
+
+        try {
+            userService.addCredentials(user.getId(), email, password);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/user/profile/avatar")
     public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
