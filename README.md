@@ -52,7 +52,7 @@ Modtale is engineered to support the specific file structures and metadata requi
 ## Resources
 
 * **API Documentation:** [modtale.net/api-docs](https://modtale.net/api-docs)
-* **Publishing Examples:** [github.com/Modtale/modtale-examples](https://github.com/Modtale/modtale-examples)
+* **Publishing Examples:** [github.com/Modtale/modtale-examples](https://github.com/Modtale/modtale-example)
 
 ## Local Development
 
