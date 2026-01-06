@@ -18,7 +18,7 @@ import { ApiDocs } from './react-pages/ApiDocs.tsx';
 import { Status } from './react-pages/Status';
 import { VerifyEmail } from './react-pages/auth/VerifyEmail.tsx';
 import { ResetPassword } from './react-pages/auth/ResetPassword.tsx';
-import { MfaVerify } from './react-pages/auth/MfaVerify'; // Import New Page
+import { MfaVerify } from './react-pages/auth/MfaVerify';
 import { Analytics } from '@/components/dashboard/analytics/Analytics';
 
 import { Navbar } from './components/Navbar';

@@ -88,7 +88,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
     return (
         <Link
             to={canonicalPath}
-            onClick={onClick}
             onMouseEnter={handleMouseEnter}
             className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:ring-1 hover:ring-modtale-accent border border-slate-200 dark:border-white/5 overflow-hidden"
         >

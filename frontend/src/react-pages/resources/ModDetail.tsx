@@ -218,7 +218,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, currentUs
     };
 
     return (
-        <div ref={innerRef} className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10 scroll-mt-32">
+        <div ref={innerRef} className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
                 <MessageSquare className="w-6 h-6 text-modtale-accent" /> Community Reviews
             </h2>
@@ -528,7 +528,7 @@ export const ModDetail: React.FC<ModDetailProps> = ({ onToggleFavorite, isLiked,
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-modtale-dark via-transparent to-black/30" />
 
                 <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-6 relative z-40 pt-6">
-                    <button onClick={() => navigate('/home')} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl w-fit shadow-lg group">
+                    <button onClick={() => navigate(-1)} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl w-fit shadow-lg group">
                         <ChevronLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" /> Back
                     </button>
                 </div>
