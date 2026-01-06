@@ -11,7 +11,7 @@ import {
     Save, UploadCloud, CheckCircle2, Image as ImageIcon, Link as LinkIcon, Tag,
     ChevronDown, ChevronUp, RefreshCw, Check, Loader2, GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, AlertCircle, FileText, Eye, LayoutTemplate,
-    UserPlus, X, Plus, Globe, Scale, Box, Clock, Lock, Undo2, Archive, EyeOff, RotateCcw, Link2
+    UserPlus, X, Plus, Globe, Scale, Box, Clock, Lock, Undo2, Archive, EyeOff, RotateCcw, Link2, Copy
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -77,20 +77,21 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
     const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null);
 
-    // Repository Logic
     const [repos, setRepos] = useState<any[]>([]);
     const [loadingRepos, setLoadingRepos] = useState(false);
     const [manualRepo, setManualRepo] = useState(false);
     const [repoSearch, setRepoSearch] = useState('');
     const [repoDropdownOpen, setRepoDropdownOpen] = useState(false);
     const repoDropdownRef = useRef<HTMLDivElement>(null);
-    const [repoValid, setRepoValid] = useState(true); // Default true since optional
+    const [repoValid, setRepoValid] = useState(true);
 
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
 
     const [slugError, setSlugError] = useState<string | null>(null);
+    const [isDirty, setIsDirty] = useState(false);
+    const [idCopied, setIdCopied] = useState(false);
 
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
@@ -120,6 +121,17 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         return 'modtale.net/mod/';
     };
 
+    const markDirty = () => {
+        if (!readOnly && !isDirty) {
+            setIsDirty(true);
+        }
+    };
+
+    const handleSaveWrapper = (silent?: boolean) => {
+        handleSave(silent);
+        setIsDirty(false);
+    };
+
     const checkRepoUrl = useCallback((url: string) => {
         if (!url) {
             setRepoValid(true);
@@ -131,6 +143,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     }, []);
 
     const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        markDirty();
         const val = e.target.value;
         setMetaData({...metaData, slug: val});
 
@@ -147,6 +160,14 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const handleCopyId = () => {
+        if (modData?.id) {
+            navigator.clipboard.writeText(modData.id);
+            setIdCopied(true);
+            setTimeout(() => setIdCopied(false), 2000);
+        }
+    };
+
     useEffect(() => {
         checkRepoUrl(metaData.repositoryUrl || '');
     }, [metaData.repositoryUrl, checkRepoUrl]);
@@ -156,6 +177,18 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             setEditorMode('preview');
         }
     }, [readOnly]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
 
     const fetchRepos = useCallback(() => {
         if (readOnly) return;
@@ -186,6 +219,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
     const toggleTag = (tag: string) => {
         if (readOnly) return;
+        markDirty();
         setMetaData(prev => ({
             ...prev,
             tags: prev.tags.includes(tag) ? prev.tags.filter(t => t !== tag) : [...prev.tags, tag]
@@ -234,6 +268,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     const handleCropComplete = (croppedFile: File) => {
+        markDirty();
         const preview = URL.createObjectURL(croppedFile);
         if (cropType === 'icon') {
             setMetaData(p => ({ ...p, iconFile: croppedFile, iconPreview: preview }));
@@ -468,58 +503,65 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                 <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
-                                            <input value={metaData.title} disabled={readOnly} onChange={e => setMetaData({...metaData, title: e.target.value})}
+                                            <input value={metaData.title} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, title: e.target.value}); }}
                                                    className={`text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter bg-transparent border-b border-transparent outline-none pb-1 placeholder:text-slate-400 dark:placeholder:text-slate-600 w-full md:w-auto ${!readOnly ? 'hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent' : 'cursor-not-allowed opacity-80'}`} placeholder="Project Title"/>
                                         </div>
-                                        <input value={metaData.summary} disabled={readOnly} onChange={e => setMetaData({...metaData, summary: e.target.value})}
+                                        <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }}
                                                className={`text-lg text-slate-600 dark:text-slate-300 font-medium bg-transparent border-b border-transparent outline-none pb-1 placeholder:text-slate-400 dark:placeholder:text-slate-500 w-full md:max-w-2xl ${!readOnly ? 'hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent' : 'cursor-not-allowed opacity-80'}`} placeholder="Short summary..."/>
                                     </div>
 
                                     {!readOnly && (
-                                        <div className="flex items-center gap-3 relative">
-                                            <button onClick={() => handleSave(false)} disabled={isLoading} className="h-10 min-w-[100px] px-5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 font-bold flex items-center justify-center gap-2 transition-all">
-                                                {isLoading ? <Spinner className="w-4 h-4"/> : <><Save className="w-4 h-4" /> Save</>}
-                                            </button>
-
-                                            {handlePublish && (
-                                                <div className="relative" onMouseEnter={() => setShowReqs(true)} onMouseLeave={() => setShowReqs(false)}>
-                                                    <button
-                                                        onClick={() => setShowPublishConfirm(true)}
-                                                        disabled={isLoading || !isPublishable}
-                                                        className="h-10 min-w-[120px] bg-green-500 hover:bg-green-600 disabled:bg-slate-200 dark:disabled:bg-slate-700 disabled:text-slate-400 dark:disabled:text-slate-500 text-white px-6 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 transition-all active:scale-95"
-                                                    >
-                                                        <UploadCloud className="w-5 h-5" /> Submit for Verification
-                                                    </button>
-
-                                                    {showReqs && !isPublishable && (
-                                                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl p-4 z-50 animate-in fade-in slide-in-from-top-2">
-                                                            <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Requirements</h4>
-                                                            <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                                                                <li className={`flex items-center gap-2 ${hasSummary ? 'text-green-500' : 'text-red-400'}`}>
-                                                                    {hasSummary ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} Short Summary (10+ chars)
-                                                                </li>
-                                                                <li className={`flex items-center gap-2 ${hasTags ? 'text-green-500' : 'text-red-400'}`}>
-                                                                    {hasTags ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} At least 1 Tag
-                                                                </li>
-                                                                {isPlugin && metaData.repositoryUrl && !repoValid && (
-                                                                    <li className="flex items-center gap-2 text-red-400">
-                                                                        <X className="w-4 h-4" /> Valid Repository
-                                                                    </li>
-                                                                )}
-                                                                {!isModpack && (
-                                                                    <li className={`flex items-center gap-2 ${hasLicense ? 'text-green-500' : 'text-red-400'}`}>
-                                                                        {hasLicense ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} License Selected
-                                                                    </li>
-                                                                )}
-                                                                <li className={`flex items-center gap-2 ${hasVersion ? 'text-green-500' : 'text-red-400'}`}>
-                                                                    {hasVersion ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                                                                    {isModpack ? "2+ Dependencies" : "Uploaded Version"}
-                                                                </li>
-                                                            </ul>
-                                                        </div>
-                                                    )}
+                                        <div className="flex flex-col items-end gap-2">
+                                            {isDirty && (
+                                                <div className="text-[10px] font-bold text-amber-500 animate-pulse uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded">
+                                                    Unsaved Changes
                                                 </div>
                                             )}
+                                            <div className="flex items-center gap-3 relative">
+                                                <button onClick={() => handleSaveWrapper(false)} disabled={isLoading} className="h-10 min-w-[100px] px-5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 font-bold flex items-center justify-center gap-2 transition-all">
+                                                    {isLoading ? <Spinner className="w-4 h-4"/> : <><Save className="w-4 h-4" /> Save</>}
+                                                </button>
+
+                                                {handlePublish && (
+                                                    <div className="relative" onMouseEnter={() => setShowReqs(true)} onMouseLeave={() => setShowReqs(false)}>
+                                                        <button
+                                                            onClick={() => setShowPublishConfirm(true)}
+                                                            disabled={isLoading || !isPublishable}
+                                                            className="h-10 min-w-[120px] bg-green-500 hover:bg-green-600 disabled:bg-slate-200 dark:disabled:bg-slate-700 disabled:text-slate-400 dark:disabled:text-slate-500 text-white px-6 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 transition-all active:scale-95"
+                                                        >
+                                                            <UploadCloud className="w-5 h-5" /> Submit for Verification
+                                                        </button>
+
+                                                        {showReqs && !isPublishable && (
+                                                            <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl p-4 z-50 animate-in fade-in slide-in-from-top-2">
+                                                                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Requirements</h4>
+                                                                <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                                                                    <li className={`flex items-center gap-2 ${hasSummary ? 'text-green-500' : 'text-red-400'}`}>
+                                                                        {hasSummary ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} Short Summary (10+ chars)
+                                                                    </li>
+                                                                    <li className={`flex items-center gap-2 ${hasTags ? 'text-green-500' : 'text-red-400'}`}>
+                                                                        {hasTags ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} At least 1 Tag
+                                                                    </li>
+                                                                    {isPlugin && metaData.repositoryUrl && !repoValid && (
+                                                                        <li className="flex items-center gap-2 text-red-400">
+                                                                            <X className="w-4 h-4" /> Valid Repository
+                                                                        </li>
+                                                                    )}
+                                                                    {!isModpack && (
+                                                                        <li className={`flex items-center gap-2 ${hasLicense ? 'text-green-500' : 'text-red-400'}`}>
+                                                                            {hasLicense ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />} License Selected
+                                                                        </li>
+                                                                    )}
+                                                                    <li className={`flex items-center gap-2 ${hasVersion ? 'text-green-500' : 'text-red-400'}`}>
+                                                                        {hasVersion ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                                                                        {isModpack ? "2+ Dependencies" : "Uploaded Version"}
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -556,7 +598,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     {editorMode === 'write' && !readOnly ? (
                                         <textarea
                                             value={metaData.description}
-                                            onChange={e => setMetaData({...metaData, description: e.target.value})}
+                                            onChange={e => { markDirty(); setMetaData({...metaData, description: e.target.value}); }}
                                             className="flex-1 w-full h-full min-h-[400px] bg-transparent border-none outline-none text-slate-900 dark:text-slate-300 placeholder:text-slate-400 dark:placeholder:text-slate-600 resize-none font-mono text-sm"
                                             placeholder="# Use Markdown to describe your project...\n\n* Features\n* Installation\n* Credits"
                                         />
@@ -683,6 +725,31 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                 <div className="space-y-6">
                                     <div className="bg-slate-50 dark:bg-slate-950/30 p-6 rounded-2xl border border-slate-200 dark:border-white/10">
 
+                                        {modData?.id && (
+                                            <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
+                                                <div className="flex flex-col gap-2">
+                                                    <div>
+                                                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                            <Tag className="w-4 h-4 text-slate-500" /> Project ID
+                                                        </h3>
+                                                        <p className="text-xs text-slate-500 mt-1">Unique identifier for API usage.</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <code className="bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-slate-600 dark:text-slate-300 select-all">
+                                                            {modData.id}
+                                                        </code>
+                                                        <button
+                                                            onClick={handleCopyId}
+                                                            className="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                                                            title="Copy ID"
+                                                        >
+                                                            {idCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
                                             <div className="flex flex-col gap-2">
                                                 <div>
@@ -714,7 +781,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             </div>
                                             <button
                                                 disabled={readOnly}
-                                                onClick={() => setModData(prev => prev ? {...prev, allowModpacks: !prev.allowModpacks} : null)}
+                                                onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowModpacks: !prev.allowModpacks} : null); }}
                                                 className={`transition-colors ${readOnly ? 'opacity-50 cursor-not-allowed text-slate-400' : modData?.allowModpacks ? 'text-green-500' : 'text-slate-600'}`}
                                             >
                                                 {modData?.allowModpacks ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
@@ -840,6 +907,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                     value={metaData.repositoryUrl}
                                                     disabled={readOnly}
                                                     onChange={e => {
+                                                        markDirty();
                                                         const val = e.target.value;
                                                         setMetaData({...metaData, repositoryUrl: val});
                                                         checkRepoUrl(val);
@@ -878,6 +946,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                         <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
                                                             {loadingRepos ? <div className="p-4 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-modtale-accent" /></div> : filteredRepos.length > 0 ? filteredRepos.map(r => (
                                                                 <button key={r.url} onClick={() => {
+                                                                    markDirty();
                                                                     const url = r.html_url || r.url;
                                                                     setMetaData({...metaData, repositoryUrl: url});
                                                                     checkRepoUrl(url);
@@ -903,7 +972,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             <button
                                                 key={lic.id}
                                                 disabled={readOnly}
-                                                onClick={() => setMetaData({ ...metaData, license: lic.id })}
+                                                onClick={() => { markDirty(); setMetaData({ ...metaData, license: lic.id }); }}
                                                 className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-between group ${metaData.license === lic.id ? 'bg-modtale-accent text-white' : readOnly ? 'text-slate-400 opacity-50 cursor-not-allowed' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
                                             >
                                                 <span>{lic.name}</span>
@@ -926,10 +995,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                             <ModSidebar title="External Links" icon={LinkIcon} defaultOpen={false}>
                                 <div className="space-y-3">
-                                    <ThemedInput disabled={readOnly} label="Website" value={metaData.links.WEBSITE || ''} onChange={(e:any) => setMetaData({...metaData, links: {...metaData.links, WEBSITE: e.target.value}})} placeholder="https://..." />
-                                    <ThemedInput disabled={readOnly} label="Wiki" value={metaData.links.WIKI || ''} onChange={(e:any) => setMetaData({...metaData, links: {...metaData.links, WIKI: e.target.value}})} placeholder="https://..." />
-                                    <ThemedInput disabled={readOnly} label="Issues" value={metaData.links.ISSUE_TRACKER || ''} onChange={(e:any) => setMetaData({...metaData, links: {...metaData.links, ISSUE_TRACKER: e.target.value}})} placeholder="https://..." />
-                                    <ThemedInput disabled={readOnly} label="Discord" value={metaData.links.DISCORD || ''} onChange={(e:any) => setMetaData({...metaData, links: {...metaData.links, DISCORD: e.target.value}})} placeholder="Invite Link" />
+                                    <ThemedInput disabled={readOnly} label="Website" value={metaData.links.WEBSITE || ''} onChange={(e:any) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, WEBSITE: e.target.value}}); }} placeholder="https://..." />
+                                    <ThemedInput disabled={readOnly} label="Wiki" value={metaData.links.WIKI || ''} onChange={(e:any) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, WIKI: e.target.value}}); }} placeholder="https://..." />
+                                    <ThemedInput disabled={readOnly} label="Issues" value={metaData.links.ISSUE_TRACKER || ''} onChange={(e:any) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, ISSUE_TRACKER: e.target.value}}); }} placeholder="https://..." />
+                                    <ThemedInput disabled={readOnly} label="Discord" value={metaData.links.DISCORD || ''} onChange={(e:any) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, DISCORD: e.target.value}}); }} placeholder="Invite Link" />
                                 </div>
                             </ModSidebar>
                         </div>
