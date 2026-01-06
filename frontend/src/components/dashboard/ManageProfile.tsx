@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, BACKEND_URL } from '../../utils/api';
-import { Save, Upload, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Image as ImageIcon, Mail, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Save, Upload, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Image as ImageIcon, Mail, ShieldCheck, ShieldAlert, Key } from 'lucide-react';
 import type {User as UserType} from '../../types';
 import { Spinner } from '../ui/Spinner';
 import { ErrorBanner } from '../ui/error/ErrorBanner.tsx';
@@ -59,6 +59,11 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     const [resendingEmail, setResendingEmail] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
 
+    const [credEmail, setCredEmail] = useState(user.email || '');
+    const [credPassword, setCredPassword] = useState('');
+    const [savingCreds, setSavingCreds] = useState(false);
+    const [credsSaved, setCredsSaved] = useState(false);
+
     const accounts = user.connectedAccounts || [];
 
     const getAvatarSource = () => {
@@ -97,6 +102,25 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
             setError(e.response?.data || "Failed to save profile.");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveCredentials = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSavingCreds(true);
+        setError(null);
+        try {
+            await api.put('/user/credentials', {
+                email: credEmail,
+                password: credPassword
+            });
+            setCredsSaved(true);
+            setTimeout(() => setCredsSaved(false), 3000);
+            onUpdate();
+        } catch (e: any) {
+            setError(e.response?.data || "Failed to update credentials.");
+        } finally {
+            setSavingCreds(false);
         }
     };
 
@@ -275,7 +299,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                             <div>
                                 <p className="text-sm font-bold text-yellow-800 dark:text-yellow-200">Verify your email address</p>
                                 <p className="text-xs text-yellow-700 dark:text-yellow-300/80">
-                                    We sent a verification link to <strong>{user.email}</strong>.
+                                    We sent a verification link to <strong>{user.email}</strong>. Link expires in 24h.
                                 </p>
                             </div>
                         </div>
@@ -418,7 +442,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="bg-modtale-accent text-white px-6 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 hover:bg-modtale-accentHover disabled:opacity-70 text-xs flex-shrink-0 mt-4 md:mt-0 h-10" // Added h-10 for fixed height
+                                    className="bg-modtale-accent text-white px-6 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 hover:bg-modtale-accentHover disabled:opacity-70 text-xs flex-shrink-0 mt-4 md:mt-0 h-10"
                                 >
                                     {saving ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : (saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
                                     {saved ? 'Saved' : 'Save Changes'}
@@ -443,6 +467,55 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                     </div>
                 </div>
             </div>
+
+            {!(user as any).hasPassword && (
+                <div className="max-w-6xl mx-auto px-4">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
+                            <Key className="w-4 h-4 text-modtale-accent" />
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Set Login Credentials</h3>
+                        </div>
+
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                            Add an email and password to sign in without using a third-party provider.
+                        </p>
+
+                        <form onSubmit={handleSaveCredentials} className="space-y-4 max-w-md">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Email Address</label>
+                                <input
+                                    type="email"
+                                    required
+                                    value={credEmail}
+                                    onChange={e => setCredEmail(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                                    placeholder="your@email.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={6}
+                                    value={credPassword}
+                                    onChange={e => setCredPassword(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={savingCreds}
+                                className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10"
+                            >
+                                {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
+                                {credsSaved ? 'Saved' : 'Save Credentials'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             <div className="max-w-6xl mx-auto px-4">
                 <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">

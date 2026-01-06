@@ -69,6 +69,10 @@ public class User implements Serializable {
         this.roles.add("USER");
     }
 
+    public boolean getHasPassword() {
+        return this.password != null && !this.password.isEmpty();
+    }
+
     public enum NotificationLevel {
         OFF, ON, EMAIL
     }
