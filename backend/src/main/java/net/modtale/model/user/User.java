@@ -32,6 +32,12 @@ public class User implements Serializable {
     private LocalDateTime verificationTokenExpiry;
 
     @JsonIgnore
+    private String passwordResetToken;
+
+    @JsonIgnore
+    private LocalDateTime passwordResetTokenExpiry;
+
+    @JsonIgnore
     private String password;
 
     private String avatarUrl;
@@ -166,6 +172,12 @@ public class User implements Serializable {
 
     public LocalDateTime getVerificationTokenExpiry() { return verificationTokenExpiry; }
     public void setVerificationTokenExpiry(LocalDateTime verificationTokenExpiry) { this.verificationTokenExpiry = verificationTokenExpiry; }
+
+    public String getPasswordResetToken() { return passwordResetToken; }
+    public void setPasswordResetToken(String passwordResetToken) { this.passwordResetToken = passwordResetToken; }
+
+    public LocalDateTime getPasswordResetTokenExpiry() { return passwordResetTokenExpiry; }
+    public void setPasswordResetTokenExpiry(LocalDateTime passwordResetTokenExpiry) { this.passwordResetTokenExpiry = passwordResetTokenExpiry; }
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }

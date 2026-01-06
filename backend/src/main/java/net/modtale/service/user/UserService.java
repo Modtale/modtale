@@ -146,6 +146,47 @@ public class UserService {
         emailService.sendVerificationEmail(user.getEmail(), user.getUsername(), user.getVerificationToken());
     }
 
+    public void initiatePasswordReset(String email) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+            return;
+        }
+
+        User user = userOpt.get();
+        if (user.getPassword() == null && user.getConnectedAccounts().isEmpty()) {
+            return;
+        }
+
+        user.setPasswordResetToken(UUID.randomUUID().toString());
+        user.setPasswordResetTokenExpiry(LocalDateTime.now().plusHours(1));
+        userRepository.save(user);
+
+        try {
+            emailService.sendPasswordResetEmail(email, user.getUsername(), user.getPasswordResetToken());
+        } catch (Exception e) {
+            logger.error("Failed to send password reset email", e);
+        }
+    }
+
+    public void completePasswordReset(String token, String newPassword) {
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters.");
+        }
+
+        User user = userRepository.findByPasswordResetToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired reset token."));
+
+        if (user.getPasswordResetTokenExpiry() != null && user.getPasswordResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Reset link has expired. Please request a new one.");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiry(null);
+        userRepository.save(user);
+    }
+
     public List<User> searchUsers(String query) {
         if (query == null || query.length() < 2) return new ArrayList<>();
         Query dbQuery = new Query(Criteria.where("username").regex(query, "i")).limit(10);
