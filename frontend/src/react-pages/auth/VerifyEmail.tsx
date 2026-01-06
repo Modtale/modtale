@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api } from '../../utils/api';
+import { api } from '../../utils/api.ts';
 import { Check, X, Loader2, ArrowRight } from 'lucide-react';
-import type { User } from '../../types';
+import type { User } from '../../types.ts';
 
 interface VerifyEmailProps {
     user: User | null;
@@ -71,7 +71,7 @@ export const VerifyEmail: React.FC<VerifyEmailProps> = ({ }) => {
                     >
                         Go to Dashboard <ArrowRight className="w-4 h-4" />
                     </a>
-                    <a href="/" className="text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white font-medium">
+                    <a href="/public" className="text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white font-medium">
                         Back to Home
                     </a>
                 </div>

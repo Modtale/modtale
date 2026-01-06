@@ -27,6 +27,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'dev.samstevens.totp:totp-spring-boot-starter:1.7.1'
     implementation 'com.github.ben-manes.caffeine:caffeine'
 
     implementation platform('software.amazon.awssdk:bom:2.25.11')
