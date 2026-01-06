@@ -51,9 +51,35 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
+        }
+
+        userService.initiatePasswordReset(email);
+        return ResponseEntity.ok(Map.of("message", "If an account exists for that email, a password reset link has been sent."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        try {
+            userService.completePasswordReset(request.token, request.password);
+            return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now login."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     public static class RegisterRequest {
         public String username;
         public String email;
+        public String password;
+    }
+
+    public static class ResetPasswordRequest {
+        public String token;
         public String password;
     }
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Github, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { X, Github, Mail, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import { BACKEND_URL, api } from '../../utils/api';
 
 const GitLabIcon = ({ className }: { className?: string }) => (
@@ -31,12 +31,13 @@ interface SignInModalProps {
 
 export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
     const [mounted, setMounted] = useState(false);
-    const [mode, setMode] = useState<'signin' | 'register'>('signin');
+    const [mode, setMode] = useState<'signin' | 'register' | 'forgot-password'>('signin');
     const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -54,16 +55,25 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setSuccessMessage(null);
 
         try {
             if (mode === 'register') {
                 await api.post('/auth/register', { username, email, password });
                 setMode('signin');
-                setError("Account created! Please sign in.");
+                setSuccessMessage("Account created! Please sign in.");
                 setLoading(false);
                 return;
             }
 
+            if (mode === 'forgot-password') {
+                await api.post('/auth/forgot-password', { email });
+                setSuccessMessage("If an account exists, a reset link has been sent.");
+                setLoading(false);
+                return;
+            }
+
+            // Login
             const formData = new FormData();
             formData.append('username', username || email);
             formData.append('password', password);
@@ -96,60 +106,69 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
                 <div className="text-center mb-6">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
-                        {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
+                        {mode === 'signin' ? 'Welcome Back' : (mode === 'register' ? 'Create Account' : 'Reset Password')}
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-sm">
-                        {mode === 'signin' ? 'Sign in to manage your projects.' : 'Join the community today.'}
+                        {mode === 'signin' ? 'Sign in to manage your projects.' : (mode === 'register' ? 'Join the community today.' : 'Enter your email to receive a reset link.')}
                     </p>
                 </div>
 
-                <div className="space-y-3 mb-6">
-                    <button
-                        onClick={() => handleOAuthLogin('github')}
-                        className="w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10"
-                    >
-                        <Github className="w-5 h-5" />
-                        <span className="text-sm">GitHub</span>
-                    </button>
+                {mode !== 'forgot-password' && (
+                    <>
+                        <div className="space-y-3 mb-6">
+                            <button
+                                onClick={() => handleOAuthLogin('github')}
+                                className="w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10"
+                            >
+                                <Github className="w-5 h-5" />
+                                <span className="text-sm">GitHub</span>
+                            </button>
 
-                    <div className="grid grid-cols-3 gap-3">
-                        <button
-                            onClick={() => handleOAuthLogin('gitlab')}
-                            className="w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
-                            title="Sign in with GitLab"
-                        >
-                            <GitLabIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => handleOAuthLogin('discord')}
-                            className="w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
-                            title="Sign in with Discord"
-                        >
-                            <DiscordIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => handleOAuthLogin('google')}
-                            className="w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
-                            title="Sign in with Google"
-                        >
-                            <GoogleIcon className="w-5 h-5" />
-                        </button>
-                    </div>
-                </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <button
+                                    onClick={() => handleOAuthLogin('gitlab')}
+                                    className="w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
+                                    title="Sign in with GitLab"
+                                >
+                                    <GitLabIcon className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => handleOAuthLogin('discord')}
+                                    className="w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
+                                    title="Sign in with Discord"
+                                >
+                                    <DiscordIcon className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => handleOAuthLogin('google')}
+                                    className="w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
+                                    title="Sign in with Google"
+                                >
+                                    <GoogleIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
 
-                <div className="relative mb-6">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-slate-200 dark:border-white/10"></div>
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-white dark:bg-modtale-card px-2 text-slate-500">Or continue with email</span>
-                    </div>
-                </div>
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-slate-200 dark:border-white/10"></div>
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-white dark:bg-modtale-card px-2 text-slate-500">Or continue with email</span>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {error && (
                         <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
                             {error}
+                        </div>
+                    )}
+                    {successMessage && (
+                        <div className="p-3 text-sm text-green-500 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+                            {successMessage}
                         </div>
                     )}
 
@@ -181,18 +200,31 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                         />
                     </div>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Password</label>
-                        <input
-                            type="password"
-                            required
-                            minLength={6}
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
-                            placeholder="••••••••"
-                        />
-                    </div>
+                    {mode !== 'forgot-password' && (
+                        <div className="space-y-1">
+                            <div className="flex justify-between items-center">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Password</label>
+                                {mode === 'signin' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setMode('forgot-password'); setError(null); setSuccessMessage(null); }}
+                                        className="text-xs text-modtale-accent hover:text-modtale-accentHover font-medium"
+                                    >
+                                        Forgot?
+                                    </button>
+                                )}
+                            </div>
+                            <input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                                placeholder="••••••••"
+                            />
+                        </div>
+                    )}
 
                     <button
                         type="submit"
@@ -201,7 +233,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                             <>
-                                {mode === 'signin' ? 'Sign In' : 'Create Account'}
+                                {mode === 'signin' ? 'Sign In' : (mode === 'register' ? 'Create Account' : 'Send Reset Link')}
                                 <ArrowRight className="w-4 h-4" />
                             </>
                         )}
@@ -211,12 +243,23 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                 <div className="mt-6 text-center">
                     <button
                         onClick={() => {
-                            setMode(mode === 'signin' ? 'register' : 'signin');
+                            if (mode === 'forgot-password') {
+                                setMode('signin');
+                            } else {
+                                setMode(mode === 'signin' ? 'register' : 'signin');
+                            }
                             setError(null);
+                            setSuccessMessage(null);
                         }}
-                        className="text-sm text-slate-500 hover:text-modtale-accent dark:text-slate-400 dark:hover:text-white transition-colors"
+                        className="text-sm text-slate-500 hover:text-modtale-accent dark:text-slate-400 dark:hover:text-white transition-colors flex items-center justify-center gap-2 mx-auto"
                     >
-                        {mode === 'signin' ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+                        {mode === 'forgot-password' ? (
+                            <>
+                                <ArrowLeft className="w-3 h-3" /> Back to Sign In
+                            </>
+                        ) : (
+                            mode === 'signin' ? "Don't have an account? Sign up" : "Already have an account? Sign in"
+                        )}
                     </button>
                 </div>
             </div>

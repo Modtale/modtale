@@ -155,7 +155,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login**", "/error", "/logout").permitAll()
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/verify", "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/verify", "/api/v1/auth/login", "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password").permitAll()
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
 

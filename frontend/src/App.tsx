@@ -16,7 +16,8 @@ import { Dashboard } from './react-pages/user/Dashboard.tsx';
 import { AdminPanel } from './react-pages/AdminPanel.tsx';
 import { ApiDocs } from './react-pages/ApiDocs.tsx';
 import { Status } from './react-pages/Status';
-import { VerifyEmail } from './react-pages/user/VerifyEmail'; // Import VerifyEmail
+import { VerifyEmail } from './react-pages/user/VerifyEmail';
+import { ResetPassword } from './react-pages/user/ResetPassword'; // Import ResetPassword
 import { Analytics } from '@/components/dashboard/analytics/Analytics';
 
 import { Navbar } from './components/Navbar';
@@ -233,6 +234,8 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             onAuthorClick={handleAuthorClick}
                         />
                     } />
+
+                    <Route path="/reset-password" element={<ResetPassword />} />
 
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/privacy" element={<PrivacyPolicy />} />
