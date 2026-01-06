@@ -14,6 +14,7 @@ import net.modtale.service.security.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -27,6 +28,11 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -47,6 +53,8 @@ public class UserService {
     @Autowired private NotificationService notificationService;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailService emailService;
+
+    private final String PRE_AUTH_SIGNING_KEY = UUID.randomUUID().toString();
 
     public User registerUser(String username, String email, String password) {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
@@ -87,6 +95,75 @@ public class UserService {
         }
 
         return savedUser;
+    }
+
+    public User authenticate(String login, String password) {
+        User user = userRepository.findByUsernameIgnoreCase(login)
+                .or(() -> userRepository.findByEmail(login))
+                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
+        return user;
+    }
+
+    public void setTempMfaSecret(String userId, String secret) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setMfaSecret(secret);
+        userRepository.save(user);
+    }
+
+    public void enableMfa(String userId) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+    }
+
+    public void disableMfa(String userId) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setMfaEnabled(false);
+        user.setMfaSecret(null);
+        userRepository.save(user);
+    }
+
+    public String generatePreAuthToken(String userId) {
+        long expiry = System.currentTimeMillis() + (5 * 60 * 1000); // 5 minutes
+        String payload = userId + ":" + expiry;
+        String signature = hmacSha256(payload, PRE_AUTH_SIGNING_KEY);
+        return Base64.getEncoder().encodeToString((payload + ":" + signature).getBytes(StandardCharsets.UTF_8));
+    }
+
+    public User validatePreAuthToken(String token) {
+        try {
+            String decoded = new String(Base64.getDecoder().decode(token), StandardCharsets.UTF_8);
+            String[] parts = decoded.split(":");
+            if (parts.length != 3) return null;
+
+            String userId = parts[0];
+            long expiry = Long.parseLong(parts[1]);
+            String providedSignature = parts[2];
+
+            if (System.currentTimeMillis() > expiry) return null;
+
+            String expectedSignature = hmacSha256(userId + ":" + expiry, PRE_AUTH_SIGNING_KEY);
+            if (!expectedSignature.equals(providedSignature)) return null;
+
+            return userRepository.findById(userId).orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String hmacSha256(String data, String key) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(secretKeySpec);
+            return Base64.getEncoder().encodeToString(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException("Failed to calculate HMAC", e);
+        }
     }
 
     public void addCredentials(String userId, String email, String password) {

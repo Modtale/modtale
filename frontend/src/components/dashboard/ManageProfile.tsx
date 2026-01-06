@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, BACKEND_URL } from '../../utils/api';
-import { Save, Upload, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Image as ImageIcon, Mail, ShieldCheck, ShieldAlert, Key } from 'lucide-react';
+import { Save, Upload, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Image as ImageIcon, Mail, ShieldCheck, ShieldAlert, Key, Smartphone } from 'lucide-react';
 import type {User as UserType} from '../../types';
 import { Spinner } from '../ui/Spinner';
 import { ErrorBanner } from '../ui/error/ErrorBanner.tsx';
@@ -63,6 +63,12 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     const [credPassword, setCredPassword] = useState('');
     const [savingCreds, setSavingCreds] = useState(false);
     const [credsSaved, setCredsSaved] = useState(false);
+
+    const [showMfaSetup, setShowMfaSetup] = useState(false);
+    const [mfaSecret, setMfaSecret] = useState('');
+    const [mfaQr, setMfaQr] = useState('');
+    const [mfaCode, setMfaCode] = useState('');
+    const [mfaLoading, setMfaLoading] = useState(false);
 
     const accounts = user.connectedAccounts || [];
 
@@ -199,6 +205,32 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
             setError(e.response?.data?.error || "Failed to send email.");
         } finally {
             setResendingEmail(false);
+        }
+    };
+
+    const handleStartMfaSetup = async () => {
+        try {
+            const res = await api.get('/auth/mfa/setup');
+            setMfaSecret(res.data.secret);
+            setMfaQr(res.data.qrCode);
+            setShowMfaSetup(true);
+            setError(null);
+        } catch (e: any) {
+            setError(e.response?.data?.error || "Failed to start 2FA setup.");
+        }
+    };
+
+    const handleVerifyMfa = async () => {
+        setMfaLoading(true);
+        try {
+            await api.post('/auth/mfa/verify', { code: mfaCode });
+            setShowMfaSetup(false);
+            setMfaCode('');
+            onUpdate();
+        } catch (e: any) {
+            setError(e.response?.data?.error || "Invalid code.");
+        } finally {
+            setMfaLoading(false);
         }
     };
 
@@ -465,6 +497,83 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div className="max-w-6xl mx-auto px-4 mt-6">
+                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
+                        <ShieldCheck className="w-4 h-4 text-modtale-accent" />
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Two-Factor Authentication</h3>
+                    </div>
+
+                    {(user as any).mfaEnabled ? (
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 text-green-600 dark:text-green-400">
+                                <Check className="w-5 h-5" />
+                                <span className="font-bold text-sm">2FA is enabled. Your account is secure.</span>
+                            </div>
+                            <button className="text-red-500 text-xs font-bold hover:underline opacity-50 cursor-not-allowed" title="Disabling 2FA is currently disabled for security.">Disable</button>
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                                Protect your account by requiring a code from an authenticator app when you log in.
+                            </p>
+                            {!showMfaSetup && (
+                                <button
+                                    onClick={handleStartMfaSetup}
+                                    className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 transition-colors"
+                                >
+                                    Enable 2FA
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {showMfaSetup && (
+                        <div className="mt-6 p-6 bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-white/10">
+                            <h4 className="font-bold text-slate-900 dark:text-white mb-4">Scan QR Code</h4>
+                            <div className="flex flex-col md:flex-row gap-6">
+                                <div className="bg-white p-2 rounded-xl w-fit h-fit">
+                                    <img src={mfaQr} alt="2FA QR Code" className="w-48 h-48" />
+                                </div>
+                                <div className="space-y-4 flex-1">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        1. Open Google Authenticator or Authy on your phone.<br/>
+                                        2. Scan the QR code to the left.<br/>
+                                        3. Enter the 6-digit code below to verify.
+                                    </p>
+                                    <div className="relative max-w-xs">
+                                        <input
+                                            type="text"
+                                            placeholder="000 000"
+                                            value={mfaCode}
+                                            onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            className="w-full px-4 py-2 pl-10 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 font-mono tracking-widest text-lg focus:ring-2 focus:ring-modtale-accent outline-none transition-all"
+                                            maxLength={6}
+                                        />
+                                        <Smartphone className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+                                    </div>
+                                    <div className="flex gap-2 max-w-xs">
+                                        <button
+                                            onClick={handleVerifyMfa}
+                                            disabled={mfaLoading || mfaCode.length !== 6}
+                                            className="flex-1 bg-modtale-accent text-white py-2 rounded-xl font-bold text-xs hover:bg-modtale-accentHover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {mfaLoading ? <Spinner className="w-3 h-3" /> : 'Verify & Enable'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowMfaSetup(false); setMfaCode(''); }}
+                                            className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

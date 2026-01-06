@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Github, Mail, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
+import { X, Github, Mail, ArrowRight, Loader2, ArrowLeft, Smartphone } from 'lucide-react';
 import { BACKEND_URL, api } from '../../utils/api';
 
 const GitLabIcon = ({ className }: { className?: string }) => (
@@ -31,10 +31,13 @@ interface SignInModalProps {
 
 export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
     const [mounted, setMounted] = useState(false);
-    const [mode, setMode] = useState<'signin' | 'register' | 'forgot-password'>('signin');
+    const [mode, setMode] = useState<'signin' | 'register' | 'forgot-password' | 'mfa'>('signin');
     const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [mfaCode, setMfaCode] = useState('');
+    const [preAuthToken, setPreAuthToken] = useState<string | null>(null);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -73,20 +76,33 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                 return;
             }
 
-            // Login
-            const formData = new FormData();
-            formData.append('username', username || email);
-            formData.append('password', password);
+            if (mode === 'mfa') {
+                await api.post('/auth/mfa/validate-login', {
+                    pre_auth_token: preAuthToken,
+                    code: mfaCode
+                });
+                window.location.href = '/dashboard/profile';
+                return;
+            }
 
-            await api.post('/auth/login', formData, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            const res = await api.post('/auth/signin', {
+                username: username || email,
+                password
             });
 
+            if (res.data.mfa_required) {
+                setPreAuthToken(res.data.pre_auth_token);
+                setMode('mfa');
+                setLoading(false);
+                return;
+            }
+
+            // Login successful (No MFA)
             window.location.href = '/dashboard/profile';
         } catch (err: any) {
             console.error(err);
             if (err.response?.status === 401) {
-                setError("Invalid credentials.");
+                setError(mode === 'mfa' ? "Invalid code." : "Invalid credentials.");
             } else if (err.response?.data?.error) {
                 setError(err.response.data.error);
             } else {
@@ -106,14 +122,14 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
                 <div className="text-center mb-6">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
-                        {mode === 'signin' ? 'Welcome Back' : (mode === 'register' ? 'Create Account' : 'Reset Password')}
+                        {mode === 'signin' ? 'Welcome Back' : (mode === 'register' ? 'Create Account' : (mode === 'mfa' ? 'Security Check' : 'Reset Password'))}
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-sm">
-                        {mode === 'signin' ? 'Sign in to manage your projects.' : (mode === 'register' ? 'Join the community today.' : 'Enter your email to receive a reset link.')}
+                        {mode === 'signin' ? 'Sign in to manage your projects.' : (mode === 'register' ? 'Join the community today.' : (mode === 'mfa' ? 'Enter the code from your authenticator app.' : 'Enter your email to receive a reset link.'))}
                     </p>
                 </div>
 
-                {mode !== 'forgot-password' && (
+                {mode !== 'forgot-password' && mode !== 'mfa' && (
                     <>
                         <div className="space-y-3 mb-6">
                             <button
@@ -186,21 +202,23 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                         </div>
                     )}
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
-                            {mode === 'signin' ? 'Email or Username' : 'Email'}
-                        </label>
-                        <input
-                            type={mode === 'signin' ? "text" : "email"}
-                            required
-                            value={mode === 'signin' ? (username || email) : email}
-                            onChange={e => mode === 'signin' ? setUsername(e.target.value) : setEmail(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
-                            placeholder={mode === 'signin' ? "user@example.com" : "user@example.com"}
-                        />
-                    </div>
+                    {(mode === 'signin' || mode === 'register' || mode === 'forgot-password') && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                                {mode === 'signin' ? 'Email or Username' : 'Email'}
+                            </label>
+                            <input
+                                type={mode === 'signin' ? "text" : "email"}
+                                required
+                                value={mode === 'signin' ? (username || email) : email}
+                                onChange={e => mode === 'signin' ? setUsername(e.target.value) : setEmail(e.target.value)}
+                                className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                                placeholder={mode === 'signin' ? "user@example.com" : "user@example.com"}
+                            />
+                        </div>
+                    )}
 
-                    {mode !== 'forgot-password' && (
+                    {(mode === 'signin' || mode === 'register') && (
                         <div className="space-y-1">
                             <div className="flex justify-between items-center">
                                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Password</label>
@@ -226,6 +244,24 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                         </div>
                     )}
 
+                    {mode === 'mfa' && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Authentication Code</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    required
+                                    value={mfaCode}
+                                    onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    className="w-full px-3 py-2.5 pl-10 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm font-mono tracking-widest text-center"
+                                    placeholder="000 000"
+                                    autoFocus
+                                />
+                                <Smartphone className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+                            </div>
+                        </div>
+                    )}
+
                     <button
                         type="submit"
                         disabled={loading}
@@ -233,7 +269,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                             <>
-                                {mode === 'signin' ? 'Sign In' : (mode === 'register' ? 'Create Account' : 'Send Reset Link')}
+                                {mode === 'signin' ? 'Sign In' : (mode === 'register' ? 'Create Account' : (mode === 'mfa' ? 'Verify Code' : 'Send Reset Link'))}
                                 <ArrowRight className="w-4 h-4" />
                             </>
                         )}
@@ -243,17 +279,18 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                 <div className="mt-6 text-center">
                     <button
                         onClick={() => {
-                            if (mode === 'forgot-password') {
+                            if (mode === 'forgot-password' || mode === 'mfa') {
                                 setMode('signin');
                             } else {
                                 setMode(mode === 'signin' ? 'register' : 'signin');
                             }
                             setError(null);
                             setSuccessMessage(null);
+                            setMfaCode('');
                         }}
                         className="text-sm text-slate-500 hover:text-modtale-accent dark:text-slate-400 dark:hover:text-white transition-colors flex items-center justify-center gap-2 mx-auto"
                     >
-                        {mode === 'forgot-password' ? (
+                        {(mode === 'forgot-password' || mode === 'mfa') ? (
                             <>
                                 <ArrowLeft className="w-3 h-3" /> Back to Sign In
                             </>

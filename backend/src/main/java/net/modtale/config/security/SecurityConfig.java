@@ -1,6 +1,8 @@
 package net.modtale.config.security;
 
 import net.modtale.service.security.CustomUserDetailsService;
+import net.modtale.service.user.UserService;
+import net.modtale.model.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
@@ -46,26 +49,14 @@ public class SecurityConfig {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    @Autowired
-    private ApiKeyAuthFilter apiKeyAuthFilter;
-
-    @Autowired
-    private RateLimitFilter rateLimitFilter;
-
-    @Autowired
-    private CustomOAuth2UserService customOAuth2UserService;
-
-    @Autowired
-    private CustomOidcUserService customOidcUserService;
-
-    @Autowired
-    private OAuth2AuthorizedClientRepository authorizedClientRepository;
-
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    @Autowired private ApiKeyAuthFilter apiKeyAuthFilter;
+    @Autowired private RateLimitFilter rateLimitFilter;
+    @Autowired private CustomOAuth2UserService customOAuth2UserService;
+    @Autowired private CustomOidcUserService customOidcUserService;
+    @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
+    @Autowired private CustomUserDetailsService userDetailsService;
+    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private UserService userService; // Injected for MFA check
 
     @PostConstruct
     public void logConfig() {
@@ -83,14 +74,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
-
         tokenRepository.setCookieHttpOnly(false);
         tokenRepository.setSecure(true);
         tokenRepository.setCookiePath("/");
-
         tokenRepository.setCookieCustomizer(cookie -> {
             cookie.sameSite("None");
-
             if (frontendUrl != null && !frontendUrl.isBlank()) {
                 try {
                     String host = URI.create(frontendUrl).getHost();
@@ -115,32 +103,21 @@ public class SecurityConfig {
         http
                 .authenticationProvider(authenticationProvider())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(tokenRepository)
                         .csrfTokenRequestHandler(requestHandler)
                         .ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**")
                 )
-
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
-
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionFixation().migrateSession()
                 )
                 .formLogin(form -> form
-                        .loginProcessingUrl("/api/v1/auth/login")
-                        .successHandler((request, response, authentication) -> {
-                            response.setStatus(HttpStatus.OK.value());
-                            response.getWriter().write("{\"status\":\"success\"}");
-                        })
-                        .failureHandler((request, response, exception) -> {
-                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                            response.getWriter().write("{\"error\":\"Invalid credentials\"}");
-                        })
+                        .loginProcessingUrl("/api/v1/auth/login-legacy")
                         .permitAll()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -155,12 +132,17 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login**", "/error", "/logout").permitAll()
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/verify", "/api/v1/auth/login", "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password").permitAll()
+                        .requestMatchers(
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/verify",
+                                "/api/v1/auth/signin",
+                                "/api/v1/auth/mfa/validate-login",
+                                "/api/v1/auth/forgot-password",
+                                "/api/v1/auth/reset-password"
+                        ).permitAll()
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
-
                         .requestMatchers(HttpMethod.GET, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**").permitAll()
-
                         .requestMatchers(
                                 "/api/v1/user/analytics",
                                 "/api/v1/projects/*/analytics",
@@ -170,31 +152,25 @@ public class SecurityConfig {
                         ).access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
-
                             if (isApiKeyUser) return new AuthorizationDecision(false);
-
                             String path = context.getRequest().getRequestURI();
-                            if (path.contains("/analytics/view/")) {
-                                return new AuthorizationDecision(true);
-                            }
-
+                            if (path.contains("/analytics/view/")) return new AuthorizationDecision(true);
                             return new AuthorizationDecision(authentication.get().isAuthenticated());
                         })
-
                         .requestMatchers(
                                 "/api/v1/upload/**",
                                 "/api/v1/user/me",
                                 "/api/v1/user/settings/**",
                                 "/api/v1/user/repos/**",
                                 "/api/v1/projects/*/favorite",
-                                "/api/v1/projects/*/reviews"
+                                "/api/v1/projects/*/reviews",
+                                "/api/v1/auth/mfa/setup",
+                                "/api/v1/auth/mfa/verify"
                         ).authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/projects/**").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**").authenticated()
-
                         .requestMatchers("/api/**").authenticated()
-
                         .anyRequest().permitAll()
                 )
                 .logout(logout -> logout
@@ -216,14 +192,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-
         CorsConfiguration restrictedConfig = new CorsConfiguration();
         List<String> restrictedOrigins = new ArrayList<>();
-
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             restrictedOrigins.add(frontendUrl);
         }
-
         restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
         restrictedConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         restrictedConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN"));
@@ -236,7 +209,6 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/projects/*/analytics", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
-
         source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);
@@ -245,20 +217,16 @@ public class SecurityConfig {
         CorsConfiguration publicConfig = new CorsConfiguration();
         List<String> publicOrigins = new ArrayList<>();
         publicOrigins.add("*");
-
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             publicOrigins.add(frontendUrl);
         }
-
         publicConfig.setAllowedOriginPatterns(publicOrigins);
         publicConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         publicConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN", "X-Modtale-Key"));
         publicConfig.setExposedHeaders(Arrays.asList("X-Xsrf-Token", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Tier"));
         publicConfig.setAllowCredentials(true);
         publicConfig.setMaxAge(3600L);
-
         source.registerCorsConfiguration("/**", publicConfig);
-
         return source;
     }
 
@@ -270,10 +238,26 @@ public class SecurityConfig {
     @Bean
     public AuthenticationSuccessHandler oauthSuccessHandler() {
         return (request, response, authentication) -> {
-            HttpSession session = request.getSession(false);
-            SecurityContextRepository repository = securityContextRepository();
-            repository.saveContext(SecurityContextHolder.getContext(), request, response);
-            response.sendRedirect(frontendUrl + "/dashboard/profile");
+            OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
+            String login = oauthUser.getAttribute("login");
+            if (login == null) {
+                login = oauthUser.getAttribute("username"); // fallback
+            }
+
+            User user = userService.getPublicProfile(login);
+
+            if (user != null && user.isMfaEnabled()) {
+                String preAuthToken = userService.generatePreAuthToken(user.getId());
+
+                SecurityContextHolder.clearContext();
+
+                response.sendRedirect(frontendUrl + "/mfa?token=" + preAuthToken);
+            } else {
+                HttpSession session = request.getSession(false);
+                SecurityContextRepository repository = securityContextRepository();
+                repository.saveContext(SecurityContextHolder.getContext(), request, response);
+                response.sendRedirect(frontendUrl + "/dashboard/profile");
+            }
         };
     }
 

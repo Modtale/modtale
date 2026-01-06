@@ -25,6 +25,11 @@ public class User implements Serializable {
 
     private boolean emailVerified = false;
 
+    private boolean mfaEnabled = false;
+
+    @JsonIgnore
+    private String mfaSecret;
+
     @JsonIgnore
     private String verificationToken;
 
@@ -166,6 +171,12 @@ public class User implements Serializable {
 
     public boolean isEmailVerified() { return emailVerified; }
     public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public boolean isMfaEnabled() { return mfaEnabled; }
+    public void setMfaEnabled(boolean mfaEnabled) { this.mfaEnabled = mfaEnabled; }
+
+    public String getMfaSecret() { return mfaSecret; }
+    public void setMfaSecret(String mfaSecret) { this.mfaSecret = mfaSecret; }
 
     public String getVerificationToken() { return verificationToken; }
     public void setVerificationToken(String verificationToken) { this.verificationToken = verificationToken; }
