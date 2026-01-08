@@ -31,19 +31,21 @@ const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null,
     );
 };
 
-const SortDropdown = ({ value, onChange, onOpen }: { value: string, onChange: (val: any) => void, onOpen: () => void }) => {
+const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, onChange: (val: any) => void, onOpen: () => void, isMobile: boolean }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const options = [
-        { id: 'relevance', label: 'Relevance' },
-        { id: 'popular', label: 'Popular' },
-        { id: 'trending', label: 'Trending' },
-        { id: 'downloads', label: 'Downloads' },
-        { id: 'rating', label: 'Rating' },
-        { id: 'newest', label: 'Newest' },
-        { id: 'updated', label: 'Updated' }
+        { id: 'relevance', label: 'Relevance', mobileOnly: false },
+        { id: 'popular', label: 'Popular', mobileOnly: true },
+        { id: 'trending', label: 'Trending', mobileOnly: true },
+        { id: 'downloads', label: 'Downloads', mobileOnly: false },
+        { id: 'rating', label: 'Rating', mobileOnly: false },
+        { id: 'newest', label: 'Newest', mobileOnly: true },
+        { id: 'updated', label: 'Updated', mobileOnly: true }
     ];
+
+    const visibleOptions = options.filter(opt => isMobile || !opt.mobileOnly);
 
     useEffect(() => { const handleClick = (e: MouseEvent) => { if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false); }; document.addEventListener('mousedown', handleClick); return () => document.removeEventListener('mousedown', handleClick); }, []);
     const handleToggle = () => { if (!isOpen) onOpen(); setIsOpen(!isOpen); };
@@ -55,7 +57,7 @@ const SortDropdown = ({ value, onChange, onOpen }: { value: string, onChange: (v
                 <div className="flex items-center gap-2"><ArrowDownUp className="w-4 h-4 text-slate-400" /><span className="truncate">{currentLabel}</span></div>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
-            {isOpen && <div className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-2 z-[70]">{options.map(opt => (<button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium flex justify-between items-center transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-bold' : 'text-slate-700 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt.label}{value === opt.id && <Check className="w-3 h-3" />}</button>))}</div>}
+            {isOpen && <div className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-2 z-[70]">{visibleOptions.map(opt => (<button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium flex justify-between items-center transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-bold' : 'text-slate-700 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt.label}{value === opt.id && <Check className="w-3 h-3" />}</button>))}</div>}
         </div>
     );
 };
@@ -96,13 +98,15 @@ interface HomeFiltersProps {
     setFilterDate: (d: string | null) => void;
     setPage: (p: number) => void;
     showMiniSearch: boolean;
+    isMobile: boolean;
 }
 
 export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                                             pageTitle, totalItems, loading, sortBy, onSortChange,
                                                             selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
                                                             isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
-                                                            selectedVersion, setSelectedVersion, minRating, setMinRating, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage, showMiniSearch
+                                                            selectedVersion, setSelectedVersion, minRating, setMinRating, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage, showMiniSearch,
+                                                            isMobile
                                                         }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
@@ -253,7 +257,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                     </div>
 
                     <div className="flex-1 md:flex-none">
-                        <SortDropdown value={sortBy} onChange={onSortChange} onOpen={handleSortOpen} />
+                        <SortDropdown value={sortBy} onChange={onSortChange} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
                 </div>
             </div>

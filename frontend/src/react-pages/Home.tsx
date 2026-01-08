@@ -63,6 +63,7 @@ export const Home: React.FC<HomeProps> = ({
     const [jumpPage, setJumpPage] = useState('');
     const [activeViewId, setActiveViewId] = useState('all');
     const [showMiniSearch, setShowMiniSearch] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const [isTopFilterOpen, setIsTopFilterOpen] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(12);
 
@@ -86,6 +87,7 @@ export const Home: React.FC<HomeProps> = ({
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
+            setIsMobile(width < 768);
             const threshold = width < 768 ? 200 : 260;
             setShowMiniSearch(window.scrollY > threshold);
 
@@ -120,6 +122,8 @@ export const Home: React.FC<HomeProps> = ({
             let categoryParam: string | undefined = undefined;
             if (activeViewId === 'favorites') categoryParam = 'Favorites';
             else if (activeViewId === 'hidden_gems') categoryParam = 'hidden_gems';
+            else if (activeViewId === 'popular') categoryParam = 'popular';
+            else if (activeViewId === 'trending') categoryParam = 'trending';
 
             const res = await api.get('/projects', {
                 params: {
@@ -156,6 +160,46 @@ export const Home: React.FC<HomeProps> = ({
         if (cls !== selectedClassification) {
             const route = getRouteForClassification(cls);
             navigate(route);
+            setActiveViewId('all');
+            setSortBy('relevance');
+        }
+    };
+
+    const handleViewChange = (viewId: string) => {
+        setActiveViewId(viewId);
+        if (viewId === 'hidden_gems') setSortBy('rating');
+        else if (viewId === 'popular') setSortBy('popular');
+        else if (viewId === 'trending') setSortBy('trending');
+        else if (viewId === 'new') setSortBy('newest');
+        else if (viewId === 'updated') setSortBy('updated');
+        else setSortBy('relevance');
+    };
+
+    const handleSortChange = (newSort: any) => {
+        const sortOption = newSort as SortOption;
+
+        if (activeViewId === 'hidden_gems' || activeViewId === 'favorites') {
+            setSortBy(sortOption);
+            return;
+        }
+
+        if (sortOption === 'popular') {
+            setActiveViewId('popular');
+            setSortBy('popular');
+        } else if (sortOption === 'trending') {
+            setActiveViewId('trending');
+            setSortBy('trending');
+        } else if (sortOption === 'newest') {
+            setActiveViewId('new');
+            setSortBy('newest');
+        } else if (sortOption === 'updated') {
+            setActiveViewId('updated');
+            setSortBy('updated');
+        } else {
+            if (['popular', 'trending', 'new', 'updated'].includes(activeViewId)) {
+                setActiveViewId('all');
+            }
+            setSortBy(sortOption);
         }
     };
 
@@ -221,7 +265,7 @@ export const Home: React.FC<HomeProps> = ({
                                 {BROWSE_VIEWS.map(v => (
                                     <button
                                         key={v.id}
-                                        onClick={() => { setActiveViewId(v.id); setSortBy(v.defaultSort as SortOption); }}
+                                        onClick={() => handleViewChange(v.id)}
                                         className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all ${activeViewId === v.id ? 'bg-modtale-accent text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}
                                     >
                                         {v.label}
@@ -238,7 +282,7 @@ export const Home: React.FC<HomeProps> = ({
                                 totalItems={totalItems}
                                 loading={loading}
                                 sortBy={sortBy}
-                                onSortChange={setSortBy}
+                                onSortChange={handleSortChange}
                                 selectedTags={selectedTags}
                                 onToggleTag={(tag) => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
                                 onClearTags={() => setSelectedTags([])}
@@ -258,6 +302,7 @@ export const Home: React.FC<HomeProps> = ({
                                 setFilterDate={setFilterDate}
                                 setPage={setPage}
                                 showMiniSearch={showMiniSearch}
+                                isMobile={isMobile}
                             />
                         </div>
 
