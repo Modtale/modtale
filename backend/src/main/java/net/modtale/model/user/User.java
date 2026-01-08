@@ -71,7 +71,10 @@ public class User implements Serializable {
     private NotificationPreferences notificationPreferences = new NotificationPreferences();
 
     private String githubAccessToken;
+
     private String gitlabAccessToken;
+    private String gitlabRefreshToken;
+    private LocalDateTime gitlabTokenExpiresAt;
 
     public User() {
         this.tier = ApiKey.Tier.USER;
@@ -230,7 +233,7 @@ public class User implements Serializable {
     public void setConnectedAccounts(List<ConnectedAccount> connectedAccounts) { this.connectedAccounts = connectedAccounts; }
 
     public List<String> getBadges() {
-        if (createdAt != null && LocalDate.parse(createdAt).isBefore(LocalDate.of(2026, 1, 13))) {
+        if (createdAt != null && LocalDate.parse(createdAt).isBefore(LocalDate.of(2026, 1, 14))) {
             if (!badges.contains("OG")) {
                 List<String> dynamicBadges = new ArrayList<>(badges);
                 dynamicBadges.add("OG");
@@ -249,4 +252,10 @@ public class User implements Serializable {
 
     public String getGitlabAccessToken() { return gitlabAccessToken; }
     public void setGitlabAccessToken(String gitlabAccessToken) { this.gitlabAccessToken = gitlabAccessToken; }
+
+    public String getGitlabRefreshToken() { return gitlabRefreshToken; }
+    public void setGitlabRefreshToken(String gitlabRefreshToken) { this.gitlabRefreshToken = gitlabRefreshToken; }
+
+    public LocalDateTime getGitlabTokenExpiresAt() { return gitlabTokenExpiresAt; }
+    public void setGitlabTokenExpiresAt(LocalDateTime gitlabTokenExpiresAt) { this.gitlabTokenExpiresAt = gitlabTokenExpiresAt; }
 }

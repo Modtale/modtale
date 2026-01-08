@@ -14,7 +14,6 @@ import net.modtale.service.security.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -569,7 +568,11 @@ public class UserService {
         boolean removed = org.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
         if (removed) {
             if ("github".equals(provider)) org.setGithubAccessToken(null);
-            if ("gitlab".equals(provider)) org.setGitlabAccessToken(null);
+            if ("gitlab".equals(provider)) {
+                org.setGitlabAccessToken(null);
+                org.setGitlabRefreshToken(null);
+                org.setGitlabTokenExpiresAt(null);
+            }
             userRepository.save(org);
         }
     }
@@ -682,6 +685,18 @@ public class UserService {
         return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
     }
 
+    public void updateProviderTokens(String userId, String provider, String accessToken, String refreshToken, LocalDateTime expiresAt) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) return;
+
+        if ("gitlab".equals(provider)) {
+            user.setGitlabAccessToken(accessToken);
+            if (refreshToken != null) user.setGitlabRefreshToken(refreshToken);
+            if (expiresAt != null) user.setGitlabTokenExpiresAt(expiresAt);
+            userRepository.save(user);
+        }
+    }
+
     private String extractProviderId(String provider, OAuth2User user) {
         if ("twitter".equals(provider)) {
             Map<String, Object> data = user.getAttribute("data");
@@ -770,7 +785,11 @@ public class UserService {
         boolean removed = user.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
         if (removed) {
             if ("github".equals(provider)) user.setGithubAccessToken(null);
-            if ("gitlab".equals(provider)) user.setGitlabAccessToken(null);
+            if ("gitlab".equals(provider)) {
+                user.setGitlabAccessToken(null);
+                user.setGitlabRefreshToken(null);
+                user.setGitlabTokenExpiresAt(null);
+            }
             userRepository.save(user);
         }
     }
