@@ -16,6 +16,8 @@ import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
@@ -37,6 +39,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -242,6 +246,26 @@ public class SecurityConfig {
             String login = oauthUser.getAttribute("login");
             if (login == null) {
                 login = oauthUser.getAttribute("username"); // fallback
+            }
+
+            if (authentication instanceof OAuth2AuthenticationToken) {
+                OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
+                String registrationId = oauthToken.getAuthorizedClientRegistrationId();
+                if ("gitlab".equals(registrationId)) {
+                    OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient(
+                            registrationId, oauthToken, request);
+                    if (client != null) {
+                        String accessToken = client.getAccessToken().getTokenValue();
+                        String refreshToken = client.getRefreshToken() != null ? client.getRefreshToken().getTokenValue() : null;
+                        LocalDateTime expiresAt = client.getAccessToken().getExpiresAt() != null ?
+                                LocalDateTime.ofInstant(client.getAccessToken().getExpiresAt(), ZoneId.systemDefault()) : null;
+
+                        User user = userService.getPublicProfile(login);
+                        if (user != null) {
+                            userService.updateProviderTokens(user.getId(), "gitlab", accessToken, refreshToken, expiresAt);
+                        }
+                    }
+                }
             }
 
             User user = userService.getPublicProfile(login);
