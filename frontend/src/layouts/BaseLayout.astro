@@ -5,6 +5,7 @@ import { DEFAULT_SEO } from '../data/seo-constants';
 interface Props {
     title?: string;
     description?: string;
+    keywords?: string;
     image?: string;
     jsonLd?: object;
     initialData?: object;
@@ -13,6 +14,7 @@ interface Props {
 const {
     title = DEFAULT_SEO.title,
     description = DEFAULT_SEO.description,
+    keywords = DEFAULT_SEO.keywords,
     image: propImage,
     jsonLd,
     initialData
@@ -52,7 +54,7 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={finalImage} />
 
-    <meta name="keywords" content={DEFAULT_SEO.keywords} />
+    <meta name="keywords" content={keywords} />
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <meta name="theme-color" content="#3b82f6" />
 
