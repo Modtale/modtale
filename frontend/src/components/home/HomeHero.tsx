@@ -73,7 +73,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         }
 
         if (selectedClassification === 'All') {
-            return <>Discover <span className="text-modtale-accent">Hytale</span> Content</>;
+            return <>Discover <span className="text-modtale-accent">Hytale Mods</span> & Resources</>;
         }
 
         return <>Discover <span className="text-modtale-accent">Hytale</span> {currentTypeLabel.replace(' Assets', '').replace('Server ', '')}</>;
