@@ -5,7 +5,13 @@ export const createSlug = (title: string, id: string) => {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)+/g, '')
         .substring(0, 30);
+
     if (!slug) return id;
+
+    if (/^\d+$/.test(slug)) {
+        return `${slug}-mod-${id}`;
+    }
+
     return `${slug}-${id}`;
 };
 
@@ -29,5 +35,6 @@ export const getProjectUrl = (mod: { id: string, title: string, slug?: string, c
 
     if (mod.classification === 'MODPACK') return `/modpack/${slug}`;
     if (mod.classification === 'SAVE') return `/world/${slug}`;
+
     return `/mod/${slug}`;
 };

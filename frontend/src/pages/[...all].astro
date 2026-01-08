@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import App from '../App';
-import { extractId } from '../utils/slug';
+import { extractId, getProjectUrl } from '../utils/slug';
 import { isBotUserAgent } from '../utils/seo';
 import { DEFAULT_SEO, ROUTE_SEO } from '../data/seo-constants';
 import { generateProjectMeta } from '../utils/meta';
@@ -47,65 +47,62 @@ const isBot = isBotUserAgent(userAgent);
 const id = extractId(all || '');
 
 if (isBot) {
-    try {
-        if (id) {
-            let endpoint = null;
-            let typeOverride = null;
+    const isProjectRoute = cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
 
-            if (cleanPath.startsWith('/modpack/')) {
-                endpoint = `/modpacks/${id}`;
-                typeOverride = 'MODPACK';
-            } else if (cleanPath.startsWith('/world/')) {
-                endpoint = `/worlds/${id}`;
-                typeOverride = 'SAVE';
-            } else if (cleanPath.startsWith('/mod/')) {
-                endpoint = `/projects/${id}`;
-            }
+    if (id && isProjectRoute) {
+        try {
+            console.log(`[SSR] Bot detected on project route (${id}). Fetching details...`);
+            const res = await fetch(`${API_URL}/projects/${id}`);
 
-            if (endpoint) {
-                console.log(`[SSR] Bot detected (${userAgent}). Fetching ${endpoint}...`);
-                const res = await fetch(`${API_URL}${endpoint}`);
+            if (res.ok) {
+                const modData = await res.json();
 
-                if (res.ok) {
-                    const modData = await res.json();
-                    if (typeOverride) modData.classification = typeOverride;
-
-                    initialData = modData;
-                    const meta = generateProjectMeta(modData);
-                    if (meta) {
-                        title = meta.title;
-                        description = meta.description;
-                    }
-
-                    if (modData.imageUrl) {
-                        image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
-                    }
-
-                    const appSchema = {
-                        "@context": "https://schema.org",
-                        "@type": "SoftwareApplication",
-                        "name": modData.title,
-                        "description": meta?.description || description,
-                        "image": image,
-                        "author": { "@type": "Person", "name": modData.author || 'Unknown' },
-                        "applicationCategory": "GameApplication",
-                        "operatingSystem": "Windows, macOS, Linux",
-                        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-                        "aggregateRating": modData.rating > 0 ? {
-                            "@type": "AggregateRating",
-                            "ratingValue": modData.rating,
-                            "ratingCount": Math.max(1, modData.reviews ? modData.reviews.length : 0)
-                        } : undefined
-                    };
-
-                    const crumbs = getBreadcrumbsForClassification(modData.classification || 'PLUGIN');
-                    const fullCrumbs = [...crumbs, { name: modData.title, url: cleanPath }];
-                    const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
-
-                    jsonLd = [appSchema, breadcrumbSchema];
+                const canonicalUrl = getProjectUrl(modData);
+                if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
+                    console.log(`[SEO] Bot Redirect: ${cleanPath} -> ${canonicalUrl}`);
+                    return Astro.redirect(canonicalUrl, 301);
                 }
+
+                initialData = modData;
+
+                const meta = generateProjectMeta(modData);
+                if (meta) {
+                    title = meta.title;
+                    description = meta.description;
+                }
+
+                if (modData.imageUrl) {
+                    image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
+                }
+
+                const appSchema = {
+                    "@context": "https://schema.org",
+                    "@type": "SoftwareApplication",
+                    "name": modData.title,
+                    "description": meta?.description || description,
+                    "image": image,
+                    "author": { "@type": "Person", "name": modData.author || 'Unknown' },
+                    "applicationCategory": "GameApplication",
+                    "operatingSystem": "Windows, macOS, Linux",
+                    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+                    "aggregateRating": modData.rating > 0 ? {
+                        "@type": "AggregateRating",
+                        "ratingValue": modData.rating,
+                        "ratingCount": Math.max(1, modData.reviews ? modData.reviews.length : 0)
+                    } : undefined
+                };
+
+                const crumbs = getBreadcrumbsForClassification(modData.classification || 'PLUGIN');
+                const fullCrumbs = [...crumbs, { name: modData.title, url: canonicalUrl }];
+                const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
+
+                jsonLd = [appSchema, breadcrumbSchema];
             }
-        } else {
+        } catch (e) {
+            console.error("[SSR] Bot Fetch Error:", e);
+        }
+    } else {
+        try {
             let classification = null;
             let isHome = false;
 
@@ -120,8 +117,6 @@ if (isBot) {
             }
 
             if (classification) {
-                console.log(`[SSR] Bot detected on listing (${userAgent}). Fetching list for ${classification}...`);
-
                 const endpoint = classification === 'ALL'
                     ? `${API_URL}/projects?size=12&sort=relevance`
                     : `${API_URL}/projects?classification=${classification}&size=12&sort=relevance`;
@@ -138,16 +133,15 @@ if (isBot) {
 
                     const schemas = [];
                     if (isHome) schemas.push(websiteSchema);
-
                     if (listSchema) schemas.push(listSchema);
                     if (breadcrumbSchema) schemas.push(breadcrumbSchema);
 
                     if (schemas.length > 0) jsonLd = schemas;
                 }
             }
+        } catch (e) {
+            console.error("[SSR] Bot List Fetch Error:", e);
         }
-    } catch (e) {
-        console.error("[SSR] Fetch Error:", e);
     }
 }
 ---
