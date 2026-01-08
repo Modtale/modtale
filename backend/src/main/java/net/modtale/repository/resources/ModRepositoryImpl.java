@@ -19,6 +19,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -36,9 +37,9 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
     @Override
     public Page<Mod> searchMods(
             String search, List<String> tags, String gameVersion, String classification,
-            Double minRating, Pageable pageable, boolean demoMode, String currentUsername,
-            List<String> seededAuthors, String sortBy, String viewCategory, LocalDate dateCutoff,
-            String author
+            Double minRating, Integer minDownloads, Pageable pageable, boolean demoMode,
+            String currentUsername, List<String> seededAuthors, String sortBy,
+            String viewCategory, LocalDate dateCutoff, String author
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
 
@@ -75,9 +76,15 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         if (gameVersion != null && !gameVersion.isEmpty()) {
             criteriaList.add(Criteria.where("versions.gameVersions").is(gameVersion));
         }
+
         if (minRating != null) {
             criteriaList.add(Criteria.where("rating").gte(minRating));
         }
+
+        if (minDownloads != null) {
+            criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
+        }
+
         if (dateCutoff != null) {
             criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
         }
@@ -103,28 +110,9 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         }
 
         List<AggregationOperation> pipeline = new ArrayList<>();
-
         pipeline.add(Aggregation.match(baseCriteria));
 
-        if ("popular".equals(sortBy) || "popular".equals(viewCategory)) {
-            pipeline.add(Aggregation.addFields().addField("popularScore")
-                    .withValue(
-                            ArithmeticOperators.Multiply.valueOf("downloadCount")
-                                    .multiplyBy(
-                                            ConditionalOperators.when(Criteria.where("rating").gte(4.5))
-                                                    .then(1.0)
-                                                    .otherwise(
-                                                            ConditionalOperators.when(Criteria.where("rating").gt(0))
-                                                                    .then(
-                                                                            ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5)
-                                                                    )
-                                                                    .otherwise(0.5)
-                                                    )
-                                    )
-                    ).build());
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
-
-        } else if ("gems".equals(sortBy) || "hidden_gems".equals(viewCategory)) {
+        if ("hidden_gems".equals(viewCategory)) {
             long totalDocs = mongoTemplate.count(new Query(baseCriteria), Mod.class);
             int p5Index = Math.max(0, (int) (totalDocs * 0.05));
             int p90Index = Math.max(0, (int) (totalDocs * 0.90));
@@ -144,10 +132,26 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                             Criteria.where("downloadCount").gt(minDl),
                             Criteria.where("downloadCount").lt(maxDl),
                             Criteria.where("rating").gte(4.5),
-                            Criteria.where("reviews.2").exists(true)
+                            Criteria.where("reviews.2").exists(true) // At least 3 reviews
                     )
             ));
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "rating"));
+        }
+
+        if ("popular".equals(sortBy) || "popular".equals(viewCategory)) {
+            pipeline.add(Aggregation.addFields().addField("popularScore")
+                    .withValue(
+                            ArithmeticOperators.Multiply.valueOf("downloadCount")
+                                    .multiplyBy(
+                                            ConditionalOperators.when(Criteria.where("rating").gte(4.5))
+                                                    .then(1.0)
+                                                    .otherwise(
+                                                            ConditionalOperators.when(Criteria.where("rating").gt(0))
+                                                                    .then(ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5))
+                                                                    .otherwise(0.5)
+                                                    )
+                                    )
+                    ).build());
+            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
 
         } else if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
             LocalDateTime now = LocalDateTime.now();
@@ -216,9 +220,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                                                     .then(1.0)
                                                     .otherwise(
                                                             ConditionalOperators.when(Criteria.where("rating").gt(0))
-                                                                    .then(
-                                                                            ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5)
-                                                                    )
+                                                                    .then(ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5))
                                                                     .otherwise(0.5)
                                                     )
                                     )
@@ -228,7 +230,11 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         } else if (pageable.getSort().isSorted()) {
             pipeline.add(Aggregation.sort(pageable.getSort()));
         } else {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "updatedAt"));
+            if ("hidden_gems".equals(viewCategory)) {
+                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "rating"));
+            } else {
+                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "updatedAt"));
+            }
         }
 
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
@@ -237,7 +243,18 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         Aggregation mainAgg = Aggregation.newAggregation(Mod.class, pipeline);
         List<Mod> results = mongoTemplate.aggregate(mainAgg, Mod.class, Mod.class).getMappedResults();
 
-        long total = mongoTemplate.count(new Query(baseCriteria), Mod.class);
+        long total;
+        if ("hidden_gems".equals(viewCategory)) {
+            List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
+            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation);
+            countPipeline.add(Aggregation.count().as("total"));
+
+            Aggregation countAgg = Aggregation.newAggregation(Mod.class, countPipeline);
+            AggregationResults<HashMap> countRes = mongoTemplate.aggregate(countAgg, Mod.class, HashMap.class);
+            total = countRes.getUniqueMappedResult() != null ? ((Number) countRes.getUniqueMappedResult().get("total")).longValue() : 0;
+        } else {
+            total = mongoTemplate.count(new Query(baseCriteria), Mod.class);
+        }
 
         return new PageImpl<>(results, pageable, total);
     }

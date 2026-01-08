@@ -188,10 +188,10 @@ public class ModService {
 
     public Page<Mod> getMods(
             List<String> tags, String search, int page, int size, String sortBy,
-            String gameVersion, String contentType, Double minRating, String viewCategory,
+            String gameVersion, String contentType, Double minRating, Integer minDownloads, String viewCategory,
             String dateRange, String author
     ) {
-        Page<Mod> results = self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, viewCategory, dateRange, author);
+        Page<Mod> results = self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
 
         if (results != null && !results.isEmpty()) {
             List<String> idsToCheck = results.getContent().stream().map(Mod::getId).collect(Collectors.toList());
@@ -201,7 +201,7 @@ public class ModService {
             if (count != idsToCheck.size()) {
                 logger.warn("Cache verification failed for getMods. Invalidating 'projectSearch_v3' and retrying.");
                 Objects.requireNonNull(cacheManager.getCache("projectSearch_v3")).clear();
-                return self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, viewCategory, dateRange, author);
+                return self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
             }
         }
 
@@ -210,12 +210,12 @@ public class ModService {
 
     @Cacheable(
             value = "projectSearch_v3",
-            key = "{#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minRating, #viewCategory, #dateRange, #author}",
+            key = "{#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minRating, #minDownloads, #viewCategory, #dateRange, #author}",
             condition = "!('Favorites'.equals(#viewCategory))"
     )
     public Page<Mod> getModsCached(
             List<String> tags, String search, int page, int size, String sortBy,
-            String gameVersion, String contentType, Double minRating, String viewCategory,
+            String gameVersion, String contentType, Double minRating, Integer minDownloads, String viewCategory,
             String dateRange, String author
     ) {
         if ("Favorites".equals(viewCategory)) {
@@ -228,7 +228,7 @@ public class ModService {
         }
 
         Sort sort = switch (sortBy != null ? sortBy : "relevance") {
-            case "best" -> Sort.by("rating").descending();
+            case "rating" -> Sort.by("rating").descending();
             case "downloads" -> Sort.by("downloadCount").descending();
             case "updated" -> Sort.by("updatedAt").descending();
             case "newest" -> Sort.by("createdAt").descending();
@@ -254,7 +254,7 @@ public class ModService {
         }
 
         return modRepository.searchMods(
-                search, tags, gameVersion, contentType, minRating, pageable,
+                search, tags, gameVersion, contentType, minRating, minDownloads, pageable,
                 demoMode, currentUsername, seededAuthors, sortBy, viewCategory,
                 dateCutoff, author
         );
@@ -1106,7 +1106,7 @@ public class ModService {
     public void checkTrendingNotifications() {
         String[] algos = {"trending", "popular", "gems", "relevance"};
         for (String algo : algos) {
-            Page<Mod> topMods = getMods(null, null, 0, 12, algo, null, null, null, algo, null, null);
+            Page<Mod> topMods = getMods(null, null, 0, 12, algo, null, null, null, null, algo, null, null);
             for (Mod mod : topMods.getContent()) {
                 LocalDateTime lastNotified = mod.getLastTrendingNotification() != null
                         ? LocalDateTime.parse(mod.getLastTrendingNotification()) : null;

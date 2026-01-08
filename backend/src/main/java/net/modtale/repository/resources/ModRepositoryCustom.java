@@ -14,6 +14,7 @@ public interface ModRepositoryCustom {
             String gameVersion,
             String classification,
             Double minRating,
+            Integer minDownloads,
             Pageable pageable,
             boolean demoMode,
             String currentUsername,
