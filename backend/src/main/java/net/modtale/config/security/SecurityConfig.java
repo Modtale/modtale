@@ -251,9 +251,16 @@ public class SecurityConfig {
 
                 SecurityContextHolder.clearContext();
 
+                SecurityContextRepository repository = securityContextRepository();
+                repository.saveContext(SecurityContextHolder.createEmptyContext(), request, response);
+
+                HttpSession session = request.getSession(false);
+                if (session != null) {
+                    session.invalidate();
+                }
+
                 response.sendRedirect(frontendUrl + "/mfa?token=" + preAuthToken);
             } else {
-                HttpSession session = request.getSession(false);
                 SecurityContextRepository repository = securityContextRepository();
                 repository.saveContext(SecurityContextHolder.getContext(), request, response);
                 response.sendRedirect(frontendUrl + "/dashboard/profile");
