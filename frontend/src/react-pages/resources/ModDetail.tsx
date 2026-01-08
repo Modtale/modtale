@@ -248,7 +248,6 @@ export const ModDetail: React.FC<{ onToggleFavorite: (id: string) => void; isLik
     const [loading, setLoading] = useState(!initialMod);
     const [isNotFound, setIsNotFound] = useState(false);
 
-    // Modal States
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [showAllVersionsModal, setShowAllVersionsModal] = useState(false);
     const [statusModal, setStatusModal] = useState<any>(null);
@@ -265,6 +264,7 @@ export const ModDetail: React.FC<{ onToggleFavorite: (id: string) => void; isLik
 
     const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
     const breadcrumbSchema = useMemo(() => mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null, [mod]);
+    const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
 
     useEffect(() => {
         if (mod && extractId(mod.id) === realId) {
@@ -272,14 +272,29 @@ export const ModDetail: React.FC<{ onToggleFavorite: (id: string) => void; isLik
             if(currentUser?.followingIds) setIsFollowing(currentUser.followingIds.includes(mod.author));
             return;
         }
+
         if (realId) {
+            setLoading(true);
             api.get(`/projects/${realId}`).then(res => {
                 setMod(res.data);
                 if (currentUser?.followingIds?.includes(res.data.author)) setIsFollowing(true);
             }).catch(() => setIsNotFound(true)).finally(() => setLoading(false));
+
             api.post(`/analytics/view/${realId}`).catch(() => {});
         }
     }, [realId, currentUser]);
+
+    useEffect(() => {
+        if (mod && !loading) {
+            const canonicalPath = getProjectUrl(mod);
+            const currentPath = location.pathname;
+
+            if (currentPath.replace(/\/$/, "") !== canonicalPath.replace(/\/$/, "")) {
+                console.log(`[SEO] CSR Redirecting: ${currentPath} -> ${canonicalPath}`);
+                navigate(canonicalPath, { replace: true });
+            }
+        }
+    }, [mod, loading, location, navigate]);
 
     const allVersions = useMemo(() => mod?.versions || [], [mod]);
 
@@ -362,9 +377,15 @@ export const ModDetail: React.FC<{ onToggleFavorite: (id: string) => void; isLik
 
     return (
         <>
-            {projectMeta && <Helmet><title>{projectMeta.title}</title><meta name="description" content={projectMeta.description} /><script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script></Helmet>}
+            {projectMeta && (
+                <Helmet>
+                    <title>{projectMeta.title}</title>
+                    <meta name="description" content={projectMeta.description} />
+                    {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+                    {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
+                </Helmet>
+            )}
 
-            {/* Hoisted Modals */}
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />
 
