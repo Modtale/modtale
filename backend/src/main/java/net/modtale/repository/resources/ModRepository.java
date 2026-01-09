@@ -10,7 +10,6 @@ import java.util.Optional;
 
 public interface ModRepository extends MongoRepository<Mod, String>, ModRepositoryCustom {
 
-    @Query(value = "{ 'author': { $regex: ?0, $options: 'i' } }")
     Page<Mod> findByAuthorIgnoreCase(String author, Pageable pageable);
 
     @Query(value = "{ 'author': ?0, 'status': { $in: ['PUBLISHED', 'ARCHIVED'] } }")
