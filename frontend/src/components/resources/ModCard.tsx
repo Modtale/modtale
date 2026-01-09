@@ -51,7 +51,7 @@ const formatTimeAgo = (dateString: string) => {
     return "Just now";
 };
 
-export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggleFavorite, isLoggedIn, onClick }) => {
+export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggleFavorite, isLoggedIn }) => {
     const title = mod.title || 'Untitled Project';
     const author = mod.author || 'Unknown';
 
@@ -89,7 +89,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
         <Link
             to={canonicalPath}
             onMouseEnter={handleMouseEnter}
-            onClick={onClick}
             className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:ring-1 hover:ring-modtale-accent border border-slate-200 dark:border-white/5 overflow-hidden"
         >
             <div className="relative h-24 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-200/50 dark:border-white/5">
