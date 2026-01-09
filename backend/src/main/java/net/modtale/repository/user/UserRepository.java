@@ -10,10 +10,8 @@ public interface UserRepository extends MongoRepository<User, String> {
 
     Optional<User> findByUsername(String username);
 
-    @Query(value = "{ 'username': { $regex: ?0, $options: 'i' } }")
     Optional<User> findByUsernameIgnoreCase(String username);
 
-    @Query(value = "{ 'username': { $regex: ?0, $options: 'i' } }", exists = true)
     boolean existsByUsernameIgnoreCase(String username);
 
     Optional<User> findByEmail(String email);
