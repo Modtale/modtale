@@ -7,7 +7,6 @@ public class Review {
     private String comment;
     private int rating;
     private String date;
-    private String version;
 
     public Review() {}
 
@@ -23,6 +22,4 @@ public class Review {
     public void setRating(int rating) { this.rating = rating; }
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }
-    public String getVersion() { return version; }
-    public void setVersion(String version) { this.version = version; }
 }

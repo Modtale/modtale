@@ -227,6 +227,9 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, currentUs
                                 <div className="w-10 h-10 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black">{review.user.charAt(0)}</div>
                                 <div><span className="font-bold text-slate-900 dark:text-white block">{review.user}</span><StarRating rating={review.rating} size="w-3 h-3" /></div>
                             </div>
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                {new Date(review.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </div>
                         </div>
                         <p className="text-slate-700 dark:text-slate-300 pl-14">{review.comment}</p>
                     </div>

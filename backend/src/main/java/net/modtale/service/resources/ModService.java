@@ -1199,7 +1199,6 @@ public class ModService {
             review.setComment(sanitizer.sanitizePlainText(comment));
             review.setRating(rating);
             review.setDate(LocalDate.now().toString());
-            review.setVersion(version);
             if (mod.getReviews() == null) mod.setReviews(new ArrayList<>());
             mod.getReviews().add(0, review);
             double avg = mod.getReviews().stream().mapToInt(Review::getRating).average().orElse(0.0);
