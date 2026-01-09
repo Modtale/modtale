@@ -11,13 +11,14 @@ import {
     Save, UploadCloud, Link as LinkIcon, Tag,
     GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
-    UserPlus, Scale, Check, Copy, Link2, Edit2, X, Plus, ChevronDown, RefreshCw, Loader2, CheckCircle2
+    UserPlus, Scale, Check, Copy, Link2, Edit2, X, Plus, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ProjectLayout, SidebarSection } from '@/components/resources/shared/ProjectLayout';
 import { createSlug } from '../../../utils/slug';
 import type { Mod, User } from '../../../types';
+import { ModCard } from '../ModCard';
 
 const ThemedInput = ({ label, disabled, ...props }: any) => (
     <div className="space-y-1.5">
@@ -64,6 +65,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [inviteUsername, setInviteUsername] = useState('');
     const [isInviting, setIsInviting] = useState(false);
     const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+    const [showCardPreview, setShowCardPreview] = useState(false);
 
     const [repos, setRepos] = useState<any[]>([]);
     const [loadingRepos, setLoadingRepos] = useState(false);
@@ -120,7 +122,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         if ((isPlugin || isModpack) && !manualRepo && !readOnly) {
             fetchRepos();
         }
-    }, [classification, provider, manualRepo, readOnly]); // removed fetchRepos from deps to avoid loop if not memoized, added back cautiously
+    }, [classification, provider, manualRepo, readOnly]);
 
     useEffect(() => {
         if (metaData.license && !LICENSES.some(l => l.id === metaData.license)) {
@@ -170,9 +172,65 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
     const filteredRepos = repos.filter(r => (r.name || '').toLowerCase().includes(repoSearch.toLowerCase()));
 
+    const previewMod: Mod = {
+        ...(modData || {} as Mod),
+        id: modData?.id || 'new-project',
+        title: metaData.title || 'Untitled Project',
+        description: metaData.summary || 'No summary provided.',
+        author: modData?.author || currentUser?.username || 'You',
+        imageUrl: metaData.iconPreview || modData?.imageUrl || '',
+        bannerUrl: bannerPreview || modData?.bannerUrl || '',
+        classification: (typeof classification === 'string' ? classification : 'PLUGIN') as any,
+        categories: metaData.tags.length > 0 ? metaData.tags : (modData?.categories || ['Misc']),
+        updatedAt: new Date().toISOString(),
+        downloadCount: modData?.downloadCount || 0,
+        favoriteCount: modData?.favoriteCount || 0,
+        rating: modData?.rating || 0,
+        sizeBytes: modData?.sizeBytes || 0,
+        modIds: modData?.modIds || [],
+        childProjectIds: modData?.childProjectIds || [],
+        versions: modData?.versions || [],
+        reviews: [],
+        galleryImages: []
+    };
+
     return (
         <>
             {showPublishConfirm && handlePublish && <StatusModal type="info" title="Submit?" message="Submit for verification?" onClose={() => setShowPublishConfirm(false)} actionLabel="Submit" onAction={() => { setShowPublishConfirm(false); handlePublish(); }} secondaryLabel="Cancel" />}
+
+            {showCardPreview && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="relative w-full max-w-4xl">
+                        <button
+                            onClick={() => setShowCardPreview(false)}
+                            className="absolute -top-10 -right-2 md:-right-10 text-white/50 hover:text-white transition-colors z-10"
+                        >
+                            <X className="w-8 h-8" />
+                        </button>
+                        <div
+                            className="cursor-default pointer-events-none select-none shadow-2xl w-full flex items-center justify-center"
+                            onClickCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        >
+                            <div
+                                className="w-full"
+                                style={{
+                                    zoom: '1.5',
+                                    MozTransform: 'scale(1.5)',
+                                    MozTransformOrigin: 'center center'
+                                }}
+                            >
+                                <ModCard
+                                    mod={previewMod}
+                                    isFavorite={false}
+                                    onToggleFavorite={() => {}}
+                                    isLoggedIn={false}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="absolute inset-0 -z-10" onClick={() => setShowCardPreview(false)} />
+                </div>
+            )}
 
             <ProjectLayout
                 isEditing={!readOnly}
@@ -289,6 +347,37 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 }
                 sidebarContent={
                     <>
+                        <SidebarSection title="Card Preview" icon={Eye}>
+                            <div className="flex justify-center w-full overflow-hidden">
+                                <div
+                                    className="cursor-pointer transition-transform origin-top mt-2 relative group"
+                                    onClick={() => setShowCardPreview(true)}
+                                    style={{
+                                        width: '115%',
+                                        zoom: '0.75',
+                                        MozTransform: 'scale(0.75)',
+                                        MozTransformOrigin: 'top center',
+                                    }}
+                                >
+                                    <div className="pointer-events-none select-none h-full w-full block relative" onClickCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                        <ModCard
+                                            mod={previewMod}
+                                            isFavorite={false}
+                                            onToggleFavorite={() => {}}
+                                            isLoggedIn={false}
+                                        />
+                                        <div className="absolute inset-0 z-50 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px] rounded-xl border-2 border-white/20">
+                                            <div className="bg-black/50 px-3 py-1.5 rounded-full flex items-center gap-2 text-white border border-white/10 shadow-xl transform scale-125">
+                                                <Maximize2 className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase tracking-widest">Expand</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-center text-[10px] text-slate-500 mt-2">Click to expand</p>
+                        </SidebarSection>
+
                         {(isPlugin || isModpack) && (
                             <SidebarSection title="Repository Source" icon={GitMerge}>
                                 <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2">
