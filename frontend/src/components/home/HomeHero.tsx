@@ -67,13 +67,13 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         if (seoH1) {
             if (seoH1.startsWith('Hytale ')) {
                 const suffix = seoH1.replace('Hytale ', '');
-                return <><span className="text-modtale-accent">Hytale</span> {suffix}</>;
+                return <>Discover <span className="text-modtale-accent">Hytale</span> {suffix}</>;
             }
             return seoH1;
         }
 
         if (selectedClassification === 'All') {
-            return <>Discover <span className="text-modtale-accent">Hytale Mods</span> & Resources</>;
+            return <>Discover <span className="text-modtale-accent">Hytale</span> Mods</>;
         }
 
         return <>Discover <span className="text-modtale-accent">Hytale</span> {currentTypeLabel.replace(' Assets', '').replace('Server ', '')}</>;
