@@ -11,6 +11,7 @@ import net.modtale.service.AnalyticsService;
 import net.modtale.service.user.NotificationService;
 import net.modtale.service.user.UserService;
 import net.modtale.service.security.SanitizationService;
+import net.modtale.service.resources.StorageService;
 import net.modtale.service.security.FileValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -459,7 +460,7 @@ public class ModService {
             notifyNewProject(saved);
             User author = userRepository.findByUsername(saved.getAuthor()).orElse(null);
             if(author != null) {
-                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", "/mod/" + getLinkSlug(saved), saved.getImageUrl());
+                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", getProjectLink(saved), saved.getImageUrl());
             }
         }
     }
@@ -1049,8 +1050,6 @@ public class ModService {
         new Thread(() -> {
             try {
                 List<User> fans = userRepository.findByLikedModIdsContaining(mod.getId());
-                String slug = getLinkSlug(mod);
-                String link = ("MODPACK".equals(mod.getClassification()) ? "/modpack/" : "/mod/") + slug;
                 String msg = "Version " + versionNumber + " is now available.";
 
                 List<String> usersToNotify = fans.stream()
@@ -1058,7 +1057,7 @@ public class ModService {
                         .map(User::getId).toList();
 
                 if (!usersToNotify.isEmpty()) {
-                    notificationService.sendNotification(usersToNotify, "Update: " + mod.getTitle(), msg, link, mod.getImageUrl());
+                    notificationService.sendNotification(usersToNotify, "Update: " + mod.getTitle(), msg, getProjectLink(mod), mod.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send notifications", e); }
         }).start();
@@ -1070,8 +1069,6 @@ public class ModService {
                 User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
                 if (author == null) return;
                 List<User> followers = userRepository.findByFollowingIdsContaining(author.getId());
-                String slug = getLinkSlug(mod);
-                String link = ("MODPACK".equals(mod.getClassification()) ? "/modpack/" : "/mod/") + slug;
                 String title = "New Project from " + mod.getAuthor();
                 String msg = mod.getTitle() + " has been released.";
 
@@ -1080,7 +1077,7 @@ public class ModService {
                         .map(User::getId).toList();
 
                 if (!usersToNotify.isEmpty()) {
-                    notificationService.sendNotification(usersToNotify, title, msg, link, mod.getImageUrl());
+                    notificationService.sendNotification(usersToNotify, title, msg, getProjectLink(mod), mod.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send new project notifications", e); }
         }).start();
@@ -1094,8 +1091,7 @@ public class ModService {
                 if (author != null && author.getNotificationPreferences().getDependencyUpdates() != User.NotificationLevel.OFF) {
                     String title = "Dependency Update";
                     String msg = updatedMod.getTitle() + " (used in " + dependent.getTitle() + ") has been updated to version " + version + ".";
-                    String link = "/mod/" + getLinkSlug(updatedMod);
-                    notificationService.sendNotification(List.of(author.getId()), title, msg, link, updatedMod.getImageUrl());
+                    notificationService.sendNotification(List.of(author.getId()), title, msg, getProjectLink(updatedMod), updatedMod.getImageUrl());
                 }
             }
         }).start();
@@ -1169,7 +1165,7 @@ public class ModService {
                         List.of(owner.getId()),
                         "Invite Accepted",
                         currentUser.getUsername() + " joined the team for " + mod.getTitle(),
-                        "/mod/" + getLinkSlug(mod) + "/contributors",
+                        getProjectLink(mod) + "/contributors",
                         currentUser.getAvatarUrl()
                 );
             }
@@ -1207,7 +1203,7 @@ public class ModService {
                         List.of(author.getId()),
                         "New Review: " + rating + "/5",
                         username + " reviewed " + mod.getTitle(),
-                        "/mod/" + getLinkSlug(mod),
+                        getProjectLink(mod),
                         mod.getImageUrl()
                 );
             }
@@ -1308,5 +1304,16 @@ public class ModService {
             return mod.getSlug();
         }
         return mod.getId();
+    }
+
+    private String getProjectLink(Mod mod) {
+        String slug = getLinkSlug(mod);
+        if ("MODPACK".equals(mod.getClassification())) {
+            return "/modpack/" + slug;
+        } else if ("SAVE".equals(mod.getClassification())) {
+            return "/world/" + slug;
+        } else {
+            return "/mod/" + slug;
+        }
     }
 }
