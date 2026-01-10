@@ -134,11 +134,8 @@ public class NotificationService {
     }
 
     @Async
-    public void sendActionableNotification(List<String> targetIds, String title, String message, String link, String iconUrl, String type, Map<String, String> metadata, boolean preferEmail) {
+    public void sendActionableNotification(List<String> targetIds, String title, String message, String link, String iconUrl, String type, Map<String, String> metadata) {
         if (targetIds.isEmpty()) return;
-
-        boolean forceEmail = "TRANSFER_REQUEST".equals(type) || "ORG_INVITE".equals(type) || "CONTRIBUTOR_INVITE".equals(type);
-        boolean shouldEmail = forceEmail || preferEmail;
 
         List<Notification> toSave = new ArrayList<>();
 
@@ -152,11 +149,9 @@ public class NotificationService {
                         .filter(m -> "ADMIN".equals(m.getRole()))
                         .forEach(admin -> {
                             toSave.add(new Notification(admin.getUserId(), orgContextTitle, message, link, iconUrl, type, metadata));
-                            if (shouldEmail) logger.info("EMAIL: " + orgContextTitle + " to " + admin.getUserId());
                         });
             } else {
                 toSave.add(new Notification(targetId, title, message, link, iconUrl, type, metadata));
-                if (shouldEmail) logger.info("EMAIL: " + title + " to " + targetId);
             }
         }
 
@@ -166,7 +161,7 @@ public class NotificationService {
     }
 
     @Async
-    public void sendNotification(List<String> userIds, String title, String message, String link, String iconUrl, boolean sendEmail) {
-        sendActionableNotification(userIds, title, message, link, iconUrl, "INFO", null, sendEmail);
+    public void sendNotification(List<String> userIds, String title, String message, String link, String iconUrl) {
+        sendActionableNotification(userIds, title, message, link, iconUrl, "INFO", null);
     }
 }

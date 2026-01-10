@@ -11,7 +11,6 @@ import net.modtale.service.AnalyticsService;
 import net.modtale.service.user.NotificationService;
 import net.modtale.service.user.UserService;
 import net.modtale.service.security.SanitizationService;
-import net.modtale.service.resources.StorageService;
 import net.modtale.service.security.FileValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -460,7 +459,7 @@ public class ModService {
             notifyNewProject(saved);
             User author = userRepository.findByUsername(saved.getAuthor()).orElse(null);
             if(author != null) {
-                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", "/mod/" + getLinkSlug(saved), saved.getImageUrl(), true);
+                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", "/mod/" + getLinkSlug(saved), saved.getImageUrl());
             }
         }
     }
@@ -485,8 +484,7 @@ public class ModService {
                     "Project Returned",
                     "Your submission '" + mod.getTitle() + "' was returned to drafts. Reason: " + (reason != null ? reason : "Quality Standards"),
                     "/dashboard/projects",
-                    mod.getImageUrl(),
-                    true
+                    mod.getImageUrl()
             );
         }
     }
@@ -557,8 +555,7 @@ public class ModService {
                 "/dashboard/projects",
                 mod.getImageUrl(),
                 "TRANSFER_REQUEST",
-                metadata,
-                true
+                metadata
         );
     }
 
@@ -589,14 +586,14 @@ public class ModService {
 
             User oldOwner = userRepository.findByUsername(oldAuthor).orElse(null);
             if(oldOwner != null) {
-                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Accepted", mod.getTitle() + " has been transferred to " + mod.getAuthor(), "/projects/" + mod.getId(), mod.getImageUrl(), true);
+                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Accepted", mod.getTitle() + " has been transferred to " + mod.getAuthor(), "/projects/" + mod.getId(), mod.getImageUrl());
             }
         } else {
             mod.setPendingTransferTo(null);
             modRepository.save(mod);
             User oldOwner = userRepository.findByUsername(mod.getAuthor()).orElse(null);
             if(oldOwner != null) {
-                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Declined", "Transfer request for " + mod.getTitle() + " was declined.", "/dashboard/projects", mod.getImageUrl(), false);
+                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Declined", "Transfer request for " + mod.getTitle() + " was declined.", "/dashboard/projects", mod.getImageUrl());
             }
         }
     }
@@ -1042,7 +1039,7 @@ public class ModService {
                 String link = "/dashboard";
                 User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
                 if (author != null) {
-                    notificationService.sendNotification(List.of(author.getId()), title, msg, link, mod.getImageUrl(), true);
+                    notificationService.sendNotification(List.of(author.getId()), title, msg, link, mod.getImageUrl());
                 }
             }
         }
@@ -1056,15 +1053,13 @@ public class ModService {
                 String link = ("MODPACK".equals(mod.getClassification()) ? "/modpack/" : "/mod/") + slug;
                 String msg = "Version " + versionNumber + " is now available.";
 
-                List<String> emailUsers = fans.stream()
-                        .filter(u -> u.getNotificationPreferences().getProjectUpdates() == User.NotificationLevel.EMAIL)
-                        .map(User::getId).toList();
-                List<String> appUsers = fans.stream()
+                List<String> usersToNotify = fans.stream()
                         .filter(u -> u.getNotificationPreferences().getProjectUpdates() == User.NotificationLevel.ON)
                         .map(User::getId).toList();
 
-                if (!emailUsers.isEmpty()) notificationService.sendNotification(emailUsers, "Update: " + mod.getTitle(), msg, link, mod.getImageUrl(), true);
-                if (!appUsers.isEmpty()) notificationService.sendNotification(appUsers, "Update: " + mod.getTitle(), msg, link, mod.getImageUrl(), false);
+                if (!usersToNotify.isEmpty()) {
+                    notificationService.sendNotification(usersToNotify, "Update: " + mod.getTitle(), msg, link, mod.getImageUrl());
+                }
             } catch (Exception e) { logger.error("Failed to send notifications", e); }
         }).start();
     }
@@ -1079,10 +1074,14 @@ public class ModService {
                 String link = ("MODPACK".equals(mod.getClassification()) ? "/modpack/" : "/mod/") + slug;
                 String title = "New Project from " + mod.getAuthor();
                 String msg = mod.getTitle() + " has been released.";
-                List<String> emailUsers = followers.stream().filter(u -> u.getNotificationPreferences().getCreatorUploads() == User.NotificationLevel.EMAIL).map(User::getId).toList();
-                List<String> appUsers = followers.stream().filter(u -> u.getNotificationPreferences().getCreatorUploads() == User.NotificationLevel.ON).map(User::getId).toList();
-                if (!emailUsers.isEmpty()) notificationService.sendNotification(emailUsers, title, msg, link, mod.getImageUrl(), true);
-                if (!appUsers.isEmpty()) notificationService.sendNotification(appUsers, title, msg, link, mod.getImageUrl(), false);
+
+                List<String> usersToNotify = followers.stream()
+                        .filter(u -> u.getNotificationPreferences().getCreatorUploads() == User.NotificationLevel.ON)
+                        .map(User::getId).toList();
+
+                if (!usersToNotify.isEmpty()) {
+                    notificationService.sendNotification(usersToNotify, title, msg, link, mod.getImageUrl());
+                }
             } catch (Exception e) { logger.error("Failed to send new project notifications", e); }
         }).start();
     }
@@ -1093,11 +1092,10 @@ public class ModService {
             for (Mod dependent : dependents) {
                 User author = userRepository.findByUsername(dependent.getAuthor()).orElse(null);
                 if (author != null && author.getNotificationPreferences().getDependencyUpdates() != User.NotificationLevel.OFF) {
-                    boolean sendEmail = author.getNotificationPreferences().getDependencyUpdates() == User.NotificationLevel.EMAIL;
                     String title = "Dependency Update";
                     String msg = updatedMod.getTitle() + " (used in " + dependent.getTitle() + ") has been updated to version " + version + ".";
                     String link = "/mod/" + getLinkSlug(updatedMod);
-                    notificationService.sendNotification(List.of(author.getId()), title, msg, link, updatedMod.getImageUrl(), sendEmail);
+                    notificationService.sendNotification(List.of(author.getId()), title, msg, link, updatedMod.getImageUrl());
                 }
             }
         }).start();
@@ -1124,7 +1122,7 @@ public class ModService {
                         String title = "Your Project is Trending!";
                         String msg = mod.getTitle() + " has hit " + friendlyName + "!";
                         String link = "/dashboard/analytics";
-                        notificationService.sendNotification(List.of(author.getId()), title, msg, link, mod.getImageUrl(), true);
+                        notificationService.sendNotification(List.of(author.getId()), title, msg, link, mod.getImageUrl());
                         mod.setLastTrendingNotification(LocalDateTime.now().toString());
                         modRepository.save(mod);
                     }
@@ -1146,7 +1144,7 @@ public class ModService {
         Map<String, String> metadata = new HashMap<>();
         metadata.put("modId", mod.getId());
         metadata.put("action", "CONTRIBUTOR_INVITE");
-        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", "/dashboard/projects", mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata, true);
+        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", "/dashboard/projects", mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
     }
 
     public void removeContributor(String modId, String usernameToRemove) {
@@ -1172,8 +1170,7 @@ public class ModService {
                         "Invite Accepted",
                         currentUser.getUsername() + " joined the team for " + mod.getTitle(),
                         "/mod/" + getLinkSlug(mod) + "/contributors",
-                        currentUser.getAvatarUrl(),
-                        true
+                        currentUser.getAvatarUrl()
                 );
             }
         }
@@ -1206,14 +1203,12 @@ public class ModService {
             modRepository.save(mod);
             User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
             if (author != null && author.getNotificationPreferences().getNewReviews() != User.NotificationLevel.OFF) {
-                boolean email = author.getNotificationPreferences().getNewReviews() == User.NotificationLevel.EMAIL;
                 notificationService.sendNotification(
                         List.of(author.getId()),
                         "New Review: " + rating + "/5",
                         username + " reviewed " + mod.getTitle(),
                         "/mod/" + getLinkSlug(mod),
-                        mod.getImageUrl(),
-                        email
+                        mod.getImageUrl()
                 );
             }
         }

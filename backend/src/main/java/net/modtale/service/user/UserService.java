@@ -398,8 +398,7 @@ public class UserService {
                 "/dashboard/orgs",
                 org.getAvatarUrl(),
                 "ORG_INVITE",
-                metadata,
-                true
+                metadata
         );
     }
 
@@ -429,8 +428,7 @@ public class UserService {
                             "Invite Accepted",
                             msg,
                             "/dashboard/orgs",
-                            responder.getAvatarUrl(),
-                            false
+                            responder.getAvatarUrl()
                     ));
         } else {
             org.getPendingOrgInvites().remove(invite);
@@ -479,8 +477,7 @@ public class UserService {
                 "Role Updated",
                 "Your role in " + org.getUsername() + " has been updated to " + roleName + ".",
                 "/dashboard/orgs",
-                org.getAvatarUrl(),
-                false
+                org.getAvatarUrl()
         );
     }
 
@@ -904,14 +901,12 @@ public class UserService {
             userRepository.save(target);
 
             if (target.getNotificationPreferences().getNewFollowers() != User.NotificationLevel.OFF) {
-                boolean email = target.getNotificationPreferences().getNewFollowers() == User.NotificationLevel.EMAIL;
                 notificationService.sendNotification(
                         List.of(target.getId()),
                         "New Follower",
                         currentUser.getUsername() + " started following you.",
                         "/creator/" + currentUser.getUsername(),
-                        currentUser.getAvatarUrl(),
-                        email
+                        currentUser.getAvatarUrl()
                 );
             }
         }
