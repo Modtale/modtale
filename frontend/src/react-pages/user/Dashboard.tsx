@@ -43,7 +43,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="max-w-[112rem] mx-auto px-8 sm:px-12 md:px-16 lg:px-28 py-8 transition-[max-width,padding] duration-300">
                 <div className="flex flex-col lg:flex-row gap-8">
                     <aside className="w-full lg:w-64 flex-shrink-0">
                         <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-2xl p-4 shadow-sm sticky top-28">

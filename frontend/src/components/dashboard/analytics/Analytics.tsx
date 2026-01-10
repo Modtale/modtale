@@ -38,10 +38,6 @@ const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPerce
     </div>
 );
 
-// ----------------------------------------------------------------------
-// Main Component
-// ----------------------------------------------------------------------
-
 export const Analytics: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();

@@ -47,9 +47,16 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
 
     const linkClass = "flex items-center text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors";
 
+    const homeLikePages = ['/', '/plugins', '/modpacks', '/worlds', '/art', 'data'];
+    const isHomeLayout = homeLikePages.includes(path);
+
+    const containerClasses = isHomeLayout
+        ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
+        : "max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28";
+
     return (
         <footer className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-white/5 py-12 mt-auto relative z-50">
-            <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 transition-[max-width] duration-300">
+            <div className={`${containerClasses} mx-auto`}>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
 
                     <div className="col-span-2 md:col-span-1">

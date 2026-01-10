@@ -76,6 +76,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         );
     };
 
+    const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
+    const isHomeLayout = homeLikePages.includes(currentPage);
+
+    const containerClasses = isHomeLayout
+        ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
+        : "max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28";
+
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
             <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
@@ -84,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <FollowingModal username={user.username} onClose={() => setIsFollowingOpen(false)} />
             )}
 
-            <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 h-full transition-[max-width] duration-300">
+            <div className={`${containerClasses} mx-auto h-full`}>
                 <div className="flex items-center justify-between h-full">
 
                     <div className="flex items-center cursor-pointer group flex-shrink-0" onClick={() => onNavigate('home')}>

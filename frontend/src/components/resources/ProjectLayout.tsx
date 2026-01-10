@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-react';
-import { BACKEND_URL } from '../../../utils/api';
-import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
+import { BACKEND_URL } from '../../utils/api.ts';
+import { ImageCropperModal } from '@/components/ui/ImageCropperModal.tsx';
 
 export const SidebarSection = ({
                                    title,
@@ -94,6 +94,8 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
         ? { backgroundImage: `url(${finalBanner})` }
         : { backgroundImage: 'linear-gradient(to bottom right, #1e293b, #0f172a)' };
 
+    const containerClasses = "max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28";
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative pb-20 overflow-x-hidden">
             {cropperOpen && tempImage && (
@@ -105,20 +107,17 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                 />
             )}
 
-            <div className="fixed inset-0 w-full h-[60vh] z-0 overflow-hidden pointer-events-none">
-                <div className="w-full h-full bg-cover bg-center opacity-60 scale-105 blur-sm transition-all duration-1000" style={bgStyle}></div>
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-50/50 dark:from-slate-950/50 via-slate-50/90 dark:via-slate-950/90 to-slate-50 dark:to-slate-950"></div>
-            </div>
-
             <div className="relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group z-10">
                 <div className={`w-full h-full bg-cover bg-center transition-opacity duration-300 ${finalBanner ? 'opacity-100' : 'opacity-0'}`} style={bgStyle}></div>
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-950/90 to-transparent" />
 
                 {onBack && (
-                    <div className="absolute top-4 left-4 md:top-6 md:left-6 z-40 max-w-7xl mx-auto w-full">
-                        <button onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl w-fit shadow-lg group/back">
-                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" /> <span className="hidden md:inline">Back</span>
-                        </button>
+                    <div className={`absolute top-0 left-0 right-0 z-40 mx-auto ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
+                        <div className="pt-6 pointer-events-auto w-fit">
+                            <button onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back">
+                                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" /> <span className="hidden md:inline">Back</span>
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -145,7 +144,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                 )}
             </div>
 
-            <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 relative z-50 -mt-2 md:-mt-32 transition-[max-width] duration-300">
+            <div className={`${containerClasses} mx-auto relative z-50 -mt-2 md:-mt-32 transition-[max-width,padding] duration-300`}>
                 <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl min-h-[80vh]`}>
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/5 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
@@ -213,11 +212,11 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                     </div>
 
                     <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-[500px]">
-                        <div className="lg:col-span-8 p-6 md:p-12 md:border-r md:border-slate-200 md:dark:border-white/5 order-2 lg:order-1">
+                        <div className="lg:col-span-8 xl:col-span-9 p-6 md:p-12 md:border-r md:border-slate-200 md:dark:border-white/5 order-2 lg:order-1">
                             {mainContent}
                         </div>
 
-                        <div className="lg:col-span-4 p-6 md:p-12 space-y-6 bg-transparent border-t md:border-t-0 border-slate-200 dark:border-white/5 order-1 lg:order-2">
+                        <div className="lg:col-span-4 xl:col-span-3 p-3 md:p-6 space-y-6 bg-transparent border-t md:border-t-0 border-slate-200 dark:border-white/5 order-1 lg:order-2">
                             {sidebarContent}
                         </div>
                     </div>
