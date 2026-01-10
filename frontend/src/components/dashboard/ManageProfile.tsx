@@ -48,6 +48,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     // Password / Credentials State
     const [credEmail, setCredEmail] = useState(user.email || '');
     const [credPassword, setCredPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [currentPassword, setCurrentPassword] = useState('');
     const [savingCreds, setSavingCreds] = useState(false);
     const [credsSaved, setCredsSaved] = useState(false);
@@ -93,12 +94,19 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
 
     const handleSaveCredentials = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSavingCreds(true);
         setError(null);
+
+        if (credPassword !== confirmPassword) {
+            setError("Passwords do not match.");
+            return;
+        }
+
+        setSavingCreds(true);
         try {
-            await api.put('/user/credentials', { email: credEmail, password: credPassword });
+            await api.put('/auth/credentials', { email: credEmail, password: credPassword });
             setCredsSaved(true);
             setCredPassword('');
+            setConfirmPassword('');
             setTimeout(() => setCredsSaved(false), 3000);
             onUpdate();
         } catch (e: any) {
@@ -110,13 +118,20 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
 
     const handleChangePassword = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSavingCreds(true);
         setError(null);
+
+        if (credPassword !== confirmPassword) {
+            setError("New passwords do not match.");
+            return;
+        }
+
+        setSavingCreds(true);
         try {
-            await api.post('/user/change-password', { currentPassword, newPassword: credPassword });
+            await api.post('/auth/change-password', { currentPassword, newPassword: credPassword });
             setCredsSaved(true);
             setCurrentPassword('');
             setCredPassword('');
+            setConfirmPassword('');
             setTimeout(() => setCredsSaved(false), 3000);
         } catch (e: any) {
             setError(e.response?.data || "Failed to change password.");
@@ -374,58 +389,62 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                                 </div>
                             )}
                         </div>
-                    )}
-                </div>
-            </div>
 
-            {!(user as any).hasPassword && (
-                <div className="max-w-6xl mx-auto px-4">
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-                        <div className="flex items-center gap-3 mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
-                            <Key className="w-4 h-4 text-modtale-accent" />
-                            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Set Login Credentials</h3>
+                        <div className="border-t border-slate-100 dark:border-white/5 pt-6">
+                            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2">
+                                <Key className="w-4 h-4 text-slate-400" />
+                                {(user as any).hasPassword ? 'Change Password' : 'Set Password'}
+                            </h4>
+
+                            {(user as any).hasPassword ? (
+                                <div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Change your current login password.</p>
+                                    <form onSubmit={handleChangePassword} className="max-w-md space-y-3">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Current Password</label>
+                                            <input type="password" required value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
+                                            <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Confirm New Password</label>
+                                            <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
+                                        </div>
+                                        <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10 mt-2">
+                                            {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Update Password'}
+                                        </button>
+                                    </form>
+                                </div>
+                            ) : (
+                                <div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Set a password to log in with your email address instead of a social provider.</p>
+                                    <form onSubmit={handleSaveCredentials} className="max-w-md space-y-3">
+                                        {!user.email && (
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Email Address</label>
+                                                <input type="email" required value={credEmail} onChange={e => setCredEmail(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="your@email.com" />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
+                                            <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Confirm Password</label>
+                                            <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
+                                        </div>
+                                        <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10 mt-2">
+                                            {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Set Password'}
+                                        </button>
+                                    </form>
+                                </div>
+                            )}
                         </div>
-
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                            Add an email and password to sign in without using a third-party provider.
-                        </p>
-
-                        <form onSubmit={handleSaveCredentials} className="space-y-4 max-w-md">
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Email Address</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={credEmail}
-                                    onChange={e => setCredEmail(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
-                                    placeholder="your@email.com"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
-                                <input
-                                    type="password"
-                                    required
-                                    minLength={6}
-                                    value={credPassword}
-                                    onChange={e => setCredPassword(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={savingCreds}
-                                className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10"
-                            >
-                                {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
-                                {credsSaved ? 'Saved' : 'Save Credentials'}
-                            </button>
-                        </form>
                     </div>
                 </div>
-            )}
+            </div>
 
             <div className="max-w-6xl mx-auto px-4">
                 <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">

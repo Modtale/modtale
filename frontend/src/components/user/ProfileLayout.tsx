@@ -8,8 +8,6 @@ import { ImageCropperModal } from '../ui/ImageCropperModal';
 import { Spinner } from '../ui/Spinner';
 import type { User } from '../../types';
 
-// --- Internal Helper Components ---
-
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
         <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-4.2-48.62-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
@@ -212,7 +210,6 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 relative z-50 -mt-10 md:-mt-32 transition-[max-width] duration-300">
                 <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start">
 
-                    {/* Avatar Container: Adjusted negative margin and Z-index to overlap banner properly */}
                     <div className="flex-shrink-0 relative group self-start">
                         <div className="w-24 h-24 md:w-48 md:h-48 md:-mt-24 rounded-2xl md:rounded-[2rem] border-4 md:border-[6px] border-white dark:border-slate-900 md:dark:border-slate-800 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20">
                             {user.avatarUrl ? (

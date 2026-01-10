@@ -60,7 +60,7 @@ public class SecurityConfig {
     @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
     @Autowired private CustomUserDetailsService userDetailsService;
     @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private UserService userService; // Injected for MFA check
+    @Autowired private UserService userService;
 
     @PostConstruct
     public void logConfig() {
@@ -169,7 +169,10 @@ public class SecurityConfig {
                                 "/api/v1/projects/*/favorite",
                                 "/api/v1/projects/*/reviews",
                                 "/api/v1/auth/mfa/setup",
-                                "/api/v1/auth/mfa/verify"
+                                "/api/v1/auth/mfa/verify",
+                                "/api/v1/auth/resend-verification",
+                                "/api/v1/auth/change-password",
+                                "/api/v1/auth/credentials"
                         ).authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/projects/**").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**").authenticated()

@@ -49,7 +49,7 @@ public class AuthController {
     }
 
     @PostMapping("/resend-verification")
-    public ResponseEntity<?> resendVerification(@AuthenticationPrincipal Object principal) {
+    public ResponseEntity<?> resendVerification() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
@@ -78,8 +78,40 @@ public class AuthController {
         }
     }
 
+    @PutMapping("/credentials")
+    public ResponseEntity<?> updateCredentials(@RequestBody Map<String, String> payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+
+        String email = payload.get("email");
+        String password = payload.get("password");
+
+        try {
+            userService.addCredentials(user.getId(), email, password);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+
+        String currentPassword = payload.get("currentPassword");
+        String newPassword = payload.get("newPassword");
+
+        try {
+            userService.changePassword(user.getId(), currentPassword, newPassword);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/mfa/setup")
-    public ResponseEntity<?> setupMfa(@AuthenticationPrincipal Object principal) {
+    public ResponseEntity<?> setupMfa() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         if (user.isMfaEnabled()) return ResponseEntity.badRequest().body(Map.of("error", "MFA is already enabled."));
@@ -92,7 +124,7 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<?> verifyMfaSetup(@AuthenticationPrincipal Object principal, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> verifyMfaSetup(@RequestBody Map<String, String> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
