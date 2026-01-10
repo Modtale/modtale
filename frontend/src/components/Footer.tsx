@@ -52,7 +52,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
 
     const containerClasses = isHomeLayout
         ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
-        : "max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28";
+        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
     return (
         <footer className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-white/5 py-12 mt-auto relative z-50">
