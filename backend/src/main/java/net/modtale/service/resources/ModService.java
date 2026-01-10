@@ -29,8 +29,12 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
@@ -89,6 +93,15 @@ public class ModService {
 
     @Value("#{'${app.seeded-authors}'.split(',')}")
     private List<String> seededAuthors;
+
+    @Value("${app.webhook.url}")
+    private String webhookUrl;
+
+    @Value("${app.webhook.key}")
+    private String webhookKey;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     private void ensureEditable(Mod mod) {
         if ("PENDING".equals(mod.getStatus())) {
@@ -458,11 +471,36 @@ public class ModService {
 
         if (isNewRelease) {
             notifyNewProject(saved);
+            triggerWebhook(saved);
             User author = userRepository.findByUsername(saved.getAuthor()).orElse(null);
             if(author != null) {
                 notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", getProjectLink(saved), saved.getImageUrl());
             }
         }
+    }
+
+    private void triggerWebhook(Mod mod) {
+        new Thread(() -> {
+            try {
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                Map<String, Object> body = new HashMap<>();
+                body.put("apiKey", webhookKey);
+                body.put("type", "New");
+                body.put("title", mod.getTitle());
+                body.put("description", mod.getDescription());
+                body.put("iconLink", mod.getImageUrl());
+                body.put("modLink", frontendUrl + getProjectLink(mod));
+                body.put("developerName", mod.getAuthor());
+
+                HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+                restTemplate.postForEntity(webhookUrl, request, String.class);
+            } catch (Exception e) {
+                logger.error("Failed to trigger webhook", e);
+            }
+        }).start();
     }
 
     public void rejectMod(String id, String reason) {
