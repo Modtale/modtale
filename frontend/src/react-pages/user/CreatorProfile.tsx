@@ -5,7 +5,7 @@ import { ModCard } from '../../components/resources/ModCard.tsx';
 import { api } from '../../utils/api.ts';
 import { Package, Users, ChevronLeft, ChevronRight, CornerDownLeft } from 'lucide-react';
 import { createSlug } from '../../utils/slug.ts';
-import { CreatorHeader } from '../../components/user/CreatorHeader.tsx';
+import { ProfileLayout } from '../../components/user/ProfileLayout.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
 import { EmptyState } from '../../components/ui/EmptyState.tsx';
 import NotFound from '../../components/ui/error/NotFound.tsx';
@@ -58,9 +58,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         };
         handleResize();
         window.addEventListener('resize', handleResize);
-        return () => {
-            window.removeEventListener('resize', handleResize);
-        };
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     const { totalDownloads, totalFavorites } = useMemo(() => {
@@ -216,23 +214,24 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
     if (notFound) return <NotFound />;
     if (!creator) return <div className="min-h-screen flex flex-col items-center justify-center"><h2 className="text-2xl font-bold">Creator not found</h2><button onClick={onBack}>Go Back</button></div>;
 
+    const stats = {
+        downloads: totalDownloads,
+        favorites: totalFavorites,
+        followers: followerCount,
+        projects: totalItems
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-20">
-            <CreatorHeader
-                creator={creator}
-                totalItems={totalItems}
-                totalDownloads={totalDownloads}
-                totalFavorites={totalFavorites}
-                followerCount={followerCount}
-                username={username || ''}
-                onBack={onBack}
+            <ProfileLayout
+                user={creator}
+                stats={stats}
                 isFollowing={actualIsFollowing}
                 onToggleFollow={handleToggleFollow}
                 isSelf={currentUser?.username === creator.username}
                 isLoggedIn={!!currentUser}
-            />
-
-            <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 md:px-6 transition-[max-width] duration-300">
+                onBack={onBack}
+            >
                 {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
                     <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -315,7 +314,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                         </form>
                     </div>
                 )}
-            </div>
+            </ProfileLayout>
         </div>
     );
 };
