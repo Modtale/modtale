@@ -35,12 +35,15 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class UserService {
 
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+    private static final String EMAIL_REGEX = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(EMAIL_REGEX);
 
     @Autowired private UserRepository userRepository;
     @Autowired private ApiKeyRepository apiKeyRepository;
@@ -59,9 +62,11 @@ public class UserService {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
             throw new IllegalArgumentException("Invalid username. Must be at least 3 characters and alphanumeric.");
         }
-        if (email == null || !email.contains("@")) {
-            throw new IllegalArgumentException("Invalid email address.");
+
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new IllegalArgumentException("Invalid email address format.");
         }
+
         if (password == null || password.length() < 6) {
             throw new IllegalArgumentException("Password must be at least 6 characters.");
         }
@@ -168,7 +173,7 @@ public class UserService {
     public void addCredentials(String userId, String email, String password) {
         User user = userRepository.findById(userId).orElseThrow();
 
-        if (email == null || !email.contains("@")) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
             throw new IllegalArgumentException("Invalid email format.");
         }
         if (password == null || password.length() < 6) {
