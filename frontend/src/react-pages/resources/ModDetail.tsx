@@ -8,7 +8,7 @@ import type { Mod, User, ProjectVersion, Review, ModDependency } from '../../typ
 import {
     MessageSquare, Send, Star, StarHalf, Copy, X,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
-    Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown
+    Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -165,13 +165,12 @@ const ProjectSidebar: React.FC<{
                 </SidebarSection>
             )}
 
-            <div className="pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group">
-                <div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Project ID</div>
-                    <code className="text-xs font-mono text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{mod.id}</code>
+            <SidebarSection title="Project ID" icon={Hash}>
+                <div className="flex items-center justify-between group bg-white dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">
+                    <code className="text-xs font-mono text-slate-600 dark:text-slate-300">{mod.id}</code>
+                    <button onClick={() => {navigator.clipboard.writeText(mod.id);}} className="text-slate-400 hover:text-modtale-accent transition-colors"><Copy className="w-4 h-4" /></button>
                 </div>
-                <button onClick={() => {navigator.clipboard.writeText(mod.id);}} className="p-2 text-slate-500 hover:text-modtale-accent transition-colors"><Copy className="w-4 h-4" /></button>
-            </div>
+            </SidebarSection>
         </div>
     );
 };

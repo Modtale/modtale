@@ -17,8 +17,15 @@ export const SidebarSection = ({
     className?: string;
 }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    const MOBILE_VISIBLE_KEYWORDS = ['Downloads', 'Ratings', 'Dependencies'];
+    const isVisibleOnMobile = MOBILE_VISIBLE_KEYWORDS.some(keyword =>
+        title.toLowerCase().includes(keyword.toLowerCase())
+    );
+    const visibilityClass = isVisibleOnMobile ? "" : "hidden md:block";
+
     return (
-        <div className={`border-b border-slate-200 dark:border-white/5 last:border-0 pb-4 mb-4 last:mb-0 last:pb-0 ${className}`}>
+        <div className={`border-b border-slate-200 dark:border-white/5 last:border-0 pb-4 mb-4 last:mb-0 last:pb-0 ${visibilityClass} ${className}`}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 hover:text-slate-900 dark:hover:text-white transition-colors"
@@ -94,7 +101,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
         ? { backgroundImage: `url(${finalBanner})` }
         : { backgroundImage: 'linear-gradient(to bottom right, #1e293b, #0f172a)' };
 
-    const containerClasses = "max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28";
+    const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative pb-20 overflow-x-hidden">

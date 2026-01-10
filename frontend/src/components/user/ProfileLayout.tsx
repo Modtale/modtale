@@ -15,8 +15,8 @@ const DiscordIcon = ({ className }: { className?: string }) => (
 );
 
 const Badge = ({ type }: { type: string }) => {
-    if (type === 'OG') return <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded shadow-md border border-orange-400/50 uppercase tracking-tighter cursor-help" title="Early Adopter">OG</span>;
-    if (type === 'VERIFIED') return <span className="bg-blue-500 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow-md uppercase tracking-tight cursor-help" title="Verified Creator">Verified</span>;
+    if (type === 'OG') return <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tighter cursor-help align-middle" title="Early Adopter">OG</span>;
+    if (type === 'VERIFIED') return <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tight cursor-help align-middle" title="Verified Creator">Verified</span>;
     return null;
 };
 
@@ -117,7 +117,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         }
     };
 
-    const SocialButton = ({ account }: { account: any }) => {
+    const SocialButton = ({ account, compact = false }: { account: any, compact?: boolean }) => {
         const { icon: Icon, label, activeClass, btnHover, iconBg, profileBtnBg } = getProviderDetails(account.provider);
         const isOpen = activePopup === account.provider;
         const displayUrl = account.profileUrl || '#';
@@ -125,37 +125,84 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         const finalUrl = isDiscord ? `https://discord.com/users/${account.providerId}` : displayUrl;
 
         return (
-            <div className="relative inline-block">
-                <button onClick={(e) => { e.stopPropagation(); setActivePopup(isOpen ? null : account.provider); }} className={`p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative ${isOpen ? activeClass : `text-slate-400 ${btnHover}`}`}>
-                    <Icon className="w-5 h-5" />
+            <div className="relative inline-block align-middle">
+                <button
+                    onClick={(e) => { e.stopPropagation(); setActivePopup(isOpen ? null : account.provider); }}
+                    className={`${compact ? 'p-1.5' : 'p-2.5 md:p-2.5 p-2'} rounded-lg md:rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative flex-shrink-0 ${isOpen ? activeClass : `text-slate-400 ${btnHover}`}`}
+                >
+                    <Icon className={compact ? "w-3.5 h-3.5" : "w-4 h-4 md:w-5 md:h-5"} />
                 </button>
                 {isOpen && (
-                    <div ref={popupRef} className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl p-4 z-50 animate-in zoom-in-95 duration-200 text-left cursor-default">
-                        <div className="flex justify-between items-start mb-3">
-                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label} Identity</h4>
-                            <button onClick={() => setActivePopup(null)}><X className="w-3 h-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" /></button>
-                        </div>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className={`p-2 rounded-lg ${iconBg}`}><Icon className="w-6 h-6" /></div>
-                            <div className="min-w-0">
-                                <p className="font-black text-slate-900 dark:text-white text-sm truncate">{account.username}</p>
-                                <p className="text-[10px] text-slate-500">Connected Account</p>
+                    <>
+                        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setActivePopup(null)} />
+
+                        <div ref={popupRef} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-xs md:absolute md:bottom-full md:left-1/2 md:-translate-x-1/2 md:top-auto md:translate-y-0 md:mb-3 md:w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-50 animate-in zoom-in-95 duration-200 text-left cursor-default">
+                            <div className="flex justify-between items-start mb-3">
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label} Identity</h4>
+                                <button onClick={() => setActivePopup(null)}><X className="w-3 h-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" /></button>
                             </div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`p-2 rounded-lg ${iconBg}`}><Icon className="w-6 h-6" /></div>
+                                <div className="min-w-0">
+                                    <p className="font-black text-slate-900 dark:text-white text-sm truncate">{account.username}</p>
+                                    <p className="text-[10px] text-slate-500">Connected Account</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => copyHandle(account.username, account.provider)} className="flex items-center justify-center gap-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 py-2 rounded-lg text-xs font-bold transition-colors text-slate-700 dark:text-slate-200">
+                                    {popupCopied === account.provider ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />} {popupCopied === account.provider ? 'Copied' : 'Copy'}
+                                </button>
+                                <a href={finalUrl} target="_blank" rel="noreferrer" className={`flex items-center justify-center gap-2 text-white py-2 rounded-lg text-xs font-bold transition-colors hover:opacity-90 ${profileBtnBg}`}>
+                                    <ExternalLink className="w-3 h-3" /> Profile
+                                </a>
+                            </div>
+                            <div className="hidden md:block absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-white dark:border-t-slate-800 pointer-events-none"></div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button onClick={() => copyHandle(account.username, account.provider)} className="flex items-center justify-center gap-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 py-2 rounded-lg text-xs font-bold transition-colors text-slate-700 dark:text-slate-200">
-                                {popupCopied === account.provider ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />} {popupCopied === account.provider ? 'Copied' : 'Copy'}
-                            </button>
-                            <a href={finalUrl} target="_blank" rel="noreferrer" className={`flex items-center justify-center gap-2 text-white py-2 rounded-lg text-xs font-bold transition-colors hover:opacity-90 ${profileBtnBg}`}>
-                                <ExternalLink className="w-3 h-3" /> Profile
-                            </a>
-                        </div>
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-white dark:border-t-slate-800 pointer-events-none"></div>
-                    </div>
+                    </>
                 )}
             </div>
         );
     };
+
+    const Avatar = ({ className, forceSizeClass }: { className?: string, forceSizeClass?: string }) => (
+        <div className={`relative group ${className}`}>
+            <div className={`w-full h-full ${forceSizeClass} rounded-[1.25rem] md:rounded-[2rem] border-4 md:border-[6px] border-slate-50 dark:border-slate-950 md:dark:border-slate-800 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20`}>
+                {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                    <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                        <Building2 className="w-10 h-10 md:w-20 md:h-20 text-slate-400" />
+                    </div>
+                )}
+                {isEditing && (
+                    <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] cursor-pointer">
+                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'avatar')} disabled={uploadingAvatar} />
+                        {uploadingAvatar ? <Spinner className="w-6 h-6 text-white" /> : <Upload className="w-6 h-6 text-white mb-1" />}
+                        <span className="text-white text-[9px] font-bold uppercase text-center px-2">Change</span>
+                        <span className="text-white/70 text-[8px] font-bold uppercase text-center px-2 mt-0.5">Rec: 512x512</span>
+                    </label>
+                )}
+            </div>
+        </div>
+    );
+
+    const HeaderInfo = () => (
+        <>
+            <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter truncate leading-tight">{displayTitle}</h1>
+                    <div className="flex gap-1.5 flex-wrap items-center">
+                        {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
+                        {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
+
+                        <div className="md:hidden flex items-center gap-1.5">
+                            {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} compact={true} />)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
 
     return (
         <div className="relative mb-6 md:mb-16">
@@ -171,9 +218,9 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-900/90 to-transparent md:to-black/30" />
 
                 {onBack && (
-                    <div className="absolute top-0 left-0 right-0 z-40 mx-auto max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28 h-full pointer-events-none">
+                    <div className="absolute top-0 left-0 right-0 z-40 mx-auto max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 h-full pointer-events-none">
                         <div className="pt-6 pointer-events-auto w-fit">
-                            <button onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
+                            <button onClick={onBack} className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
                                 <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
                                 <span className="hidden md:inline">Back</span>
                             </button>
@@ -209,96 +256,100 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 )}
             </div>
 
-            <div className="max-w-[112rem] mx-auto px-8 sm:px-12 md:px-16 lg:px-28 relative z-50 -mt-10 md:-mt-32 transition-[max-width,padding] duration-300">
-                <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start">
+            <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 relative z-50 transition-[max-width,padding] duration-300">
+                <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start md:-mt-32">
 
-                    <div className="flex-shrink-0 relative group self-start">
-                        <div className="w-24 h-24 md:w-48 md:h-48 md:-mt-24 rounded-2xl md:rounded-[2rem] border-4 md:border-[6px] border-white dark:border-slate-900 md:dark:border-slate-800 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20">
-                            {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                                    <Building2 className="w-12 h-12 md:w-20 md:h-20 text-slate-400" />
-                                </div>
-                            )}
-                            {isEditing && (
-                                <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] cursor-pointer">
-                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'avatar')} disabled={uploadingAvatar} />
-                                    {uploadingAvatar ? <Spinner className="w-6 h-6 text-white" /> : <Upload className="w-6 h-6 text-white mb-1" />}
-                                    <span className="text-white text-[9px] font-bold uppercase text-center px-2">Change</span>
-                                    <span className="text-white/70 text-[8px] font-bold uppercase text-center px-2 mt-0.5">Rec: 512x512</span>
-                                </label>
-                            )}
-                        </div>
+                    <div className="hidden md:block flex-shrink-0 self-start md:-mt-24">
+                        <Avatar className="w-48 h-48" />
                     </div>
 
-                    <div className="flex-1 w-full pt-2 md:pt-0">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-start gap-4 mb-4">
-                            <div className="w-full flex-1">
-                                {headerInput ? headerInput : (
-                                    <>
-                                        <div className="flex items-center justify-start gap-3">
-                                            <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{displayTitle}</h1>
-                                            <div className="flex gap-1.5 flex-wrap">
-                                                {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 md:px-3 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
-                                                {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{isOrg ? 'Organization' : 'Creator'}</p>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                    <div className="flex-1 w-full min-w-0 md:pt-0">
 
-                            <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0 flex-wrap md:flex-nowrap">
-                                {actionInput ? actionInput : (
-                                    <>
-                                        <button onClick={copyId} className="hidden md:block p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all" title="Copy ID">
-                                            {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                                        </button>
-                                        <button onClick={copyId} className="md:hidden flex-1 px-4 py-2.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-                                            {copied ? <Check className="w-5 h-5 text-green-500 mx-auto" /> : <Copy className="w-5 h-5 mx-auto" />}
-                                        </button>
-                                        {!isSelf && (
-                                            <button onClick={onToggleFollow} className={`flex-1 md:flex-initial px-8 py-3 rounded-lg md:rounded-xl font-bold md:font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
-                                                {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> <span className="hidden md:inline">Following</span></> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in to follow"}
-                                            </button>
-                                        )}
-                                    </>
-                                )}
-                            </div>
+                        <div className="md:hidden -mt-10 mb-3 flex justify-start">
+                            <Avatar className="w-24 h-24" forceSizeClass="rounded-[1.2rem]" />
                         </div>
 
-                        <div className="mb-6">
-                            {bioInput ? bioInput : (user.bio && <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-sm md:text-lg text-left">{user.bio}</p>)}
+                        <div className="mb-4">
+                            <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                                <div className="w-full flex-1 min-w-0">
+                                    {headerInput ? headerInput : <HeaderInfo />}
+                                </div>
+                                <div className="hidden md:flex items-center gap-2">
+                                    {actionInput ? actionInput : (
+                                        <>
+                                            {!isSelf && (
+                                                <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
+                                                    {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
+                                                </button>
+                                            )}
+                                            <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all" title="Copy ID">
+                                                {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         {!isEditing && stats && (
-                            <div className="pt-6 border-t border-slate-200 dark:border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                                <div className="grid grid-cols-4 w-full md:w-auto md:flex md:gap-8 text-left gap-4">
+                            <div className="md:hidden grid grid-cols-3 gap-3 mb-5">
+                                <div className="bg-slate-200 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 dark:border-white/5">
+                                    <span className="text-white font-black text-lg leading-none mb-1">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</span>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Downloads</span>
+                                </div>
+                                <div className="bg-slate-200 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 dark:border-white/5">
+                                    <span className="text-white font-black text-lg leading-none mb-1">{stats.favorites.toLocaleString()}</span>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Likes</span>
+                                </div>
+                                <div className="bg-slate-200 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 dark:border-white/5">
+                                    <span className="text-white font-black text-lg leading-none mb-1">{stats.projects}</span>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Projects</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="md:hidden flex items-center gap-3 w-full mb-6 h-12">
+                            {actionInput ? actionInput : (
+                                <>
+                                    {!isSelf && (
+                                        <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                                            {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : "Sign in to Follow"}
+                                        </button>
+                                    )}
+                                    <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-200 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0" title="Copy ID">
+                                        {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="mb-4 md:mb-6">
+                            {bioInput ? bioInput : (user.bio && <p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p>)}
+                        </div>
+
+                        {!isEditing && stats && (
+                            <div className="hidden pt-4 md:pt-6 border-t border-slate-200 dark:border-white/5 md:flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6">
+                                <div className="flex justify-between w-full md:w-auto md:flex md:gap-8 text-left">
                                     <div className="text-center md:text-left">
-                                        <div className="text-lg md:text-2xl font-black text-slate-900 dark:text-white">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</div>
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Downloads</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</div>
+                                        <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Downloads</div>
                                     </div>
                                     <div className="text-center md:text-left">
-                                        <div className="text-lg md:text-2xl font-black text-slate-900 dark:text-white">{stats.favorites.toLocaleString()}</div>
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Favorites</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.favorites.toLocaleString()}</div>
+                                        <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Favorites</div>
                                     </div>
                                     <div className="text-center md:text-left">
-                                        <div className="text-lg md:text-2xl font-black text-slate-900 dark:text-white">{stats.followers >= 1000 ? (stats.followers / 1000).toFixed(1) + 'k' : stats.followers}</div>
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Followers</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.followers >= 1000 ? (stats.followers / 1000).toFixed(1) + 'k' : stats.followers}</div>
+                                        <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Followers</div>
                                     </div>
                                     <div className="text-center md:text-left">
-                                        <div className="text-lg md:text-2xl font-black text-slate-900 dark:text-white">{stats.projects}</div>
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Projects</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.projects}</div>
+                                        <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Projects</div>
                                     </div>
                                 </div>
-                                {linkedAccounts.length > 0 && (
-                                    <div className="flex gap-2 flex-wrap justify-end">
-                                        {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} />)}
-                                    </div>
-                                )}
+                                <div className="hidden md:flex gap-2 flex-wrap justify-end">
+                                    {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} />)}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -306,7 +357,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             </div>
 
             {children && (
-                <div className="max-w-[112rem] mx-auto px-8 sm:px-12 md:px-16 lg:px-28 transition-[max-width,padding] duration-300 mt-12 md:mt-16">
+                <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 transition-[max-width,padding] duration-300 mt-0 md:mt-16">
                     {children}
                 </div>
             )}
