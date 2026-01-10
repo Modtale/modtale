@@ -576,6 +576,7 @@ public class UserService {
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("login", org.getUsername());
         attributes.put("id", org.getId());
+        attributes.put("is_linking", true);
         return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
     }
 
@@ -652,6 +653,7 @@ public class UserService {
 
             Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
             attributes.put("login", user.getUsername());
+            attributes.remove("is_linking");
             return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
         }
 
@@ -679,6 +681,7 @@ public class UserService {
 
         Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
         attributes.put("login", user.getUsername());
+        attributes.remove("is_linking");
         return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
     }
 
@@ -702,6 +705,7 @@ public class UserService {
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("login", currentUser.getUsername());
         attributes.put("id", currentUser.getId());
+        attributes.put("is_linking", true);
         return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
     }
 

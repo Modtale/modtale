@@ -272,8 +272,9 @@ public class SecurityConfig {
             }
 
             User user = userService.getPublicProfile(login);
+            boolean isLinking = Boolean.TRUE.equals(oauthUser.getAttribute("is_linking"));
 
-            if (user != null && user.isMfaEnabled()) {
+            if (user != null && user.isMfaEnabled() && !isLinking) {
                 String preAuthToken = userService.generatePreAuthToken(user.getId());
 
                 SecurityContextHolder.clearContext();
