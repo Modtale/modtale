@@ -23,7 +23,6 @@ import { Analytics } from '@/components/dashboard/analytics/Analytics';
 
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer.tsx';
-import ScrollToTop from './components/home/ScrollToTop';
 import { SEOHead } from './components/SEOHead';
 import NotFound from './components/ui/error/NotFound.tsx';
 import { Spinner } from './components/ui/Spinner';
@@ -36,6 +35,16 @@ import type { Classification } from './data/categories';
 import { SSRProvider } from './context/SSRContext';
 import { ExternalLinkProvider } from './context/ExternalLinkContext';
 import { NotificationProvider } from './context/NotificationsContext.tsx';
+
+const ScrollToTop = () => {
+    const { pathname } = useLocation();
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [pathname]);
+
+    return null;
+};
 
 const GlobalDemoWarning = () => {
     const [isVisible, setIsVisible] = useState(

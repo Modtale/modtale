@@ -40,6 +40,7 @@ interface ProjectLayoutProps {
 
     headerContent: React.ReactNode;
     headerActions?: React.ReactNode;
+    actionBar?: React.ReactNode;
     tabs?: React.ReactNode;
     mainContent: React.ReactNode;
     sidebarContent: React.ReactNode;
@@ -54,6 +55,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                                                                 onIconUpload,
                                                                 headerContent,
                                                                 headerActions,
+                                                                actionBar,
                                                                 tabs,
                                                                 mainContent,
                                                                 sidebarContent,
@@ -145,7 +147,6 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
 
             <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 relative z-50 -mt-2 md:-mt-32 transition-[max-width] duration-300">
                 <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl min-h-[80vh]`}>
-
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/5 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
@@ -166,7 +167,6 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                         </div>
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
-
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
                                 <label className={`block w-56 h-56 rounded-[2.5rem] bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-[8px] border-white dark:border-slate-800 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
@@ -189,7 +189,24 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                             </div>
 
                             <div className="flex-1 min-w-0 flex flex-col justify-end pt-2 w-full">
-                                {headerContent}
+                                <div className="flex flex-col xl:flex-row items-start justify-between gap-4">
+                                    <div className="w-full flex-1 min-w-0">
+                                        {headerContent}
+                                    </div>
+
+                                    {headerActions && (
+                                        <div className="hidden md:flex items-center gap-2 flex-shrink-0 mt-2 xl:mt-0">
+                                            {headerActions}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {actionBar && (
+                                    <div className="mt-8 pt-8 border-t border-slate-200 dark:border-white/5 w-full">
+                                        {actionBar}
+                                    </div>
+                                )}
+
                                 {tabs && <div className="mt-6 border-t border-slate-200 dark:border-white/5 pt-1">{tabs}</div>}
                             </div>
                         </div>
