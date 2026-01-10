@@ -96,7 +96,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                     <img
                         src={resolvedBanner}
                         alt=""
-                        loading="lazy"
                         decoding="async"
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
@@ -121,7 +120,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                             alt={title}
                             width="80"
                             height="80"
-                            loading="lazy"
                             decoding="async"
                             className="w-full h-full object-cover"
                         />
