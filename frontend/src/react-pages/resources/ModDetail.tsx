@@ -19,7 +19,7 @@ import NotFound from '../../components/ui/error/NotFound';
 import { Spinner } from '../../components/ui/Spinner';
 import { getClassificationIcon, compareSemVer, formatTimeAgo } from '../../utils/modHelpers';
 import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
-import { ProjectLayout, SidebarSection } from '@/components/resources/shared/ProjectLayout';
+import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
 

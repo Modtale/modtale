@@ -46,8 +46,8 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
-            const isWide = width >= 1600;
-            const targetSize = isWide ? 16 : 12;
+            const isWide = width >= 1800;
+            const targetSize = isWide ? 20 : (width >= 1600 ? 16 : 12);
             setItemsPerPage(prev => {
                 if (prev !== targetSize) {
                     setPage(0);
@@ -268,11 +268,11 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                 </h2>
 
                 {loadingProjects && page === 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-[1600px]:grid-cols-4 gap-4 md:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-5 gap-4 md:gap-6">
                         {[...Array(itemsPerPage)].map((_, i) => <div key={i} className="h-[280px] bg-white dark:bg-white/5 rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />)}
                     </div>
                 ) : projects.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-[1600px]:grid-cols-4 gap-4 md:gap-6 gap-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-5 gap-4 md:gap-6 gap-y-8">
                         {projects.map((project) => (
                             <div key={project.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <ModCard

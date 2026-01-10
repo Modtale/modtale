@@ -171,11 +171,13 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-900/90 to-transparent md:to-black/30" />
 
                 {onBack && (
-                    <div className="absolute top-4 left-4 z-40">
-                        <button onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl w-fit shadow-lg group">
-                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
-                            <span className="hidden md:inline">Back</span>
-                        </button>
+                    <div className="absolute top-0 left-0 right-0 z-40 mx-auto max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28 h-full pointer-events-none">
+                        <div className="pt-6 pointer-events-auto w-fit">
+                            <button onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
+                                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
+                                <span className="hidden md:inline">Back</span>
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -207,7 +209,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 )}
             </div>
 
-            <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 relative z-50 -mt-10 md:-mt-32 transition-[max-width] duration-300">
+            <div className="max-w-[112rem] mx-auto px-8 sm:px-12 md:px-16 lg:px-28 relative z-50 -mt-10 md:-mt-32 transition-[max-width,padding] duration-300">
                 <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start">
 
                     <div className="flex-shrink-0 relative group self-start">
@@ -304,7 +306,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             </div>
 
             {children && (
-                <div className="max-w-7xl min-[1600px]:max-w-[100rem] mx-auto px-4 md:px-6 transition-[max-width] duration-300 mt-12 md:mt-16">
+                <div className="max-w-[112rem] mx-auto px-8 sm:px-12 md:px-16 lg:px-28 transition-[max-width,padding] duration-300 mt-12 md:mt-16">
                     {children}
                 </div>
             )}

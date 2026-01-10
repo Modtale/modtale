@@ -17,7 +17,7 @@ import type { Classification } from '../../../data/categories';
 import { DependencySelector } from './DependencySelector';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { ProjectLayout, SidebarSection } from '@/components/resources/shared/ProjectLayout';
+import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { createSlug } from '../../../utils/slug';
 import type { Mod, User } from '../../../types';
 import { ModCard } from '../ModCard';

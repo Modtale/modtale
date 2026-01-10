@@ -260,19 +260,46 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         }
     };
 
+    const containerClasses = "max-w-[112rem] px-8 sm:px-12 md:px-16 lg:px-28";
+
     if (step === 0) {
         return (
-            <div className="max-w-6xl mx-auto px-4 pt-8 pb-12 min-h-screen flex flex-col">
-                <div className="mb-4"><button onClick={() => navigate(-1)} className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors group"><ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Cancel</button></div>
-                <div className="text-center mb-10"><h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight mb-2">What are you creating?</h1><p className="text-lg text-slate-500 dark:text-slate-400">Select a project type to get started.</p></div>
-                <div className="flex flex-wrap justify-center gap-8 w-full">
+            <div className={`${containerClasses} mx-auto pt-8 pb-12 min-h-screen flex flex-col transition-[max-width,padding] duration-300`}>
+                <div className="mb-8 max-w-7xl mx-auto w-full relative">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors group"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Cancel
+                    </button>
+
+                    <div className="text-center pt-8 md:pt-0">
+                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight mb-2">What are you creating?</h1>
+                        <p className="text-lg text-slate-500 dark:text-slate-400">Select a project type to get started.</p>
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap justify-center gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
                     {PROJECT_TYPES.filter(t => t.id !== 'All').map(type => {
                         const Icon = type.icon;
                         return (
-                            <button key={type.id} onClick={() => handleClassificationSelect(type.id as string)} className="relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden flex flex-col justify-center min-h-[280px] w-full md:w-[30%] border-slate-200 dark:border-white/5 bg-white dark:bg-modtale-card hover:border-modtale-accent dark:hover:border-modtale-accent hover:shadow-xl hover:-translate-y-1">
-                                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors bg-slate-100 dark:bg-black/20 text-slate-500 dark:text-slate-400 group-hover:bg-modtale-accent group-hover:text-white transform duration-200"><Icon className="w-8 h-8" /></div>
-                                <h3 className="font-black text-2xl mb-2 text-slate-900 dark:text-white group-hover:text-modtale-accent">{type.label}</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{type.id === 'MODPACK' ? 'Bundle multiple mods.' : type.id === 'SAVE' ? 'Share worlds or schematics.' : type.id === 'PLUGIN' ? 'Server-side logic and tools.' : 'Custom models and textures.'}</p>
+                            <button
+                                key={type.id}
+                                onClick={() => handleClassificationSelect(type.id as string)}
+                                className="relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden flex flex-col justify-center aspect-[4/3] w-full md:w-[46%] lg:w-[30%] border-slate-200 dark:border-white/5 bg-white dark:bg-modtale-card hover:border-modtale-accent dark:hover:border-modtale-accent hover:shadow-xl hover:-translate-y-1"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-br from-modtale-accent/0 to-modtale-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-8 transition-colors bg-slate-100 dark:bg-black/20 text-slate-500 dark:text-slate-400 group-hover:bg-modtale-accent group-hover:text-white transform duration-200 group-hover:scale-110 shadow-sm relative z-10">
+                                    <Icon className="w-10 h-10" />
+                                </div>
+
+                                <h3 className="font-black text-3xl mb-3 text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors relative z-10">
+                                    {type.label}
+                                </h3>
+                                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 leading-relaxed font-medium group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors relative z-10">
+                                    {type.id === 'MODPACK' ? 'Bundle multiple mods into a pack.' : type.id === 'SAVE' ? 'Share worlds, schematics, or lobbies.' : type.id === 'PLUGIN' ? 'Server-side logic, tools, and scripts.' : 'Custom models, textures, and art.'}
+                                </p>
                             </button>
                         );
                     })}
@@ -285,12 +312,12 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         const selectedOwner = owner === currentUser?.username ? currentUser : myOrgs.find(o => o.username === owner);
 
         return (
-            <div className="max-w-xl mx-auto px-4 pt-20 pb-12 min-h-screen flex flex-col">
-                <button onClick={() => setStep(0)} className="text-slate-500 font-bold mb-6 flex items-center gap-2"><ArrowLeft className="w-4 h-4"/> Back</button>
+            <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12 min-h-screen flex flex-col">
+                <button onClick={() => setStep(0)} className="text-slate-500 font-bold mb-6 flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors"><ArrowLeft className="w-4 h-4"/> Back</button>
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-8">Let's give it a name.</h1>
                 {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-2 text-sm"><AlertCircle className="w-4 h-4"/> {error}</div>}
 
-                <div className="space-y-6 bg-white dark:bg-modtale-card p-8 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+                <div className="space-y-6 bg-white dark:bg-modtale-card p-8 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm animate-in fade-in zoom-in-95 duration-300">
                     {myOrgs.length > 0 && (
                         <div className="relative z-50" ref={ownerDropdownRef}>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Owner</label>
@@ -340,15 +367,15 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Title</label>
-                        <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 font-bold text-lg dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none" placeholder="My Awesome Project"/>
+                        <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 font-bold text-lg dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all" placeholder="My Awesome Project"/>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Short Summary</label>
-                        <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none" placeholder="A brief description..."/>
+                        <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all" placeholder="A brief description..."/>
                         <p className="text-[10px] text-slate-500 mt-1 text-right">{summary.length}/250 (Min 10)</p>
                     </div>
 
-                    <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary} className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2">
+                    <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary} className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2 shadow-lg shadow-modtale-accent/20">
                         {isLoading ? <Spinner className="w-5 h-5 text-white" fullScreen={false} /> : <>Start Building <ArrowRight className="w-5 h-5"/></>}
                     </button>
                 </div>
