@@ -4,22 +4,22 @@ import { Bell, Save, Check, Trash2, X } from 'lucide-react';
 import type { User as UserType } from '../../types';
 import { Spinner } from '../ui/Spinner';
 import { Link } from 'react-router-dom';
-import { useNotifications } from '../../context/NotificationsContext.tsx'; // Update path as needed
+import { useNotifications } from '../../context/NotificationsContext.tsx';
 
 interface NotificationSettingsProps {
     user: UserType;
 }
 
-type PrefLevel = 'OFF' | 'ON' | 'EMAIL';
+type PrefLevel = 'OFF' | 'ON';
 
 export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user }) => {
     const { notifications, loading: loadingNotifications, dismiss, clearAll, isIdle } = useNotifications();
 
-    const [projectUpdates, setProjectUpdates] = useState<PrefLevel>(user.notificationPreferences?.projectUpdates || 'ON');
-    const [creatorUploads, setCreatorUploads] = useState<PrefLevel>(user.notificationPreferences?.creatorUploads || 'ON');
-    const [newReviews, setNewReviews] = useState<PrefLevel>(user.notificationPreferences?.newReviews || 'ON');
-    const [newFollowers, setNewFollowers] = useState<PrefLevel>(user.notificationPreferences?.newFollowers || 'ON');
-    const [dependencyUpdates, setDependencyUpdates] = useState<PrefLevel>(user.notificationPreferences?.dependencyUpdates || 'ON');
+    const [projectUpdates, setProjectUpdates] = useState<PrefLevel>(user.notificationPreferences?.projectUpdates === 'OFF' ? 'OFF' : 'ON');
+    const [creatorUploads, setCreatorUploads] = useState<PrefLevel>(user.notificationPreferences?.creatorUploads === 'OFF' ? 'OFF' : 'ON');
+    const [newReviews, setNewReviews] = useState<PrefLevel>(user.notificationPreferences?.newReviews === 'OFF' ? 'OFF' : 'ON');
+    const [newFollowers, setNewFollowers] = useState<PrefLevel>(user.notificationPreferences?.newFollowers === 'OFF' ? 'OFF' : 'ON');
+    const [dependencyUpdates, setDependencyUpdates] = useState<PrefLevel>(user.notificationPreferences?.dependencyUpdates === 'OFF' ? 'OFF' : 'ON');
 
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -46,7 +46,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{desc}</p>
             </div>
             <div className="flex bg-slate-100 dark:bg-black/20 p-1 rounded-lg">
-                {(['OFF', 'ON', 'EMAIL'] as PrefLevel[]).map((level) => (
+                {(['OFF', 'ON'] as PrefLevel[]).map((level) => (
                     <button
                         key={level}
                         onClick={() => onChange(level)}
@@ -56,7 +56,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user
                                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                     >
-                        {level === 'EMAIL' ? 'On + Email' : (level === 'ON' ? 'On' : 'Off')}
+                        {level === 'ON' ? 'On' : 'Off'}
                     </button>
                 ))}
             </div>

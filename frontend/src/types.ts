@@ -28,11 +28,11 @@ export interface User {
     connectedAccounts?: ConnectedAccount[];
     badges?: string[];
     notificationPreferences?: {
-        projectUpdates: 'OFF' | 'ON' | 'EMAIL';
-        creatorUploads: 'OFF' | 'ON' | 'EMAIL';
-        newReviews: 'OFF' | 'ON' | 'EMAIL';
-        newFollowers: 'OFF' | 'ON' | 'EMAIL';
-        dependencyUpdates: 'OFF' | 'ON' | 'EMAIL';
+        projectUpdates: 'OFF' | 'ON';
+        creatorUploads: 'OFF' | 'ON';
+        newReviews: 'OFF' | 'ON';
+        newFollowers: 'OFF' | 'ON';
+        dependencyUpdates: 'OFF' | 'ON';
     };
     roles?: string[];
     tier?: string;

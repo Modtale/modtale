@@ -88,7 +88,7 @@ public class User implements Serializable {
     }
 
     public enum NotificationLevel {
-        OFF, ON, EMAIL
+        OFF, ON
     }
 
     public enum AccountType {
