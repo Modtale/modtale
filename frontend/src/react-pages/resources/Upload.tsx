@@ -67,6 +67,14 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     }, [currentUser]);
 
     const handleClassificationSelect = (typeId: string) => {
+        if (!currentUser) {
+            setStatusModal({
+                type: 'error',
+                title: 'Sign In Required',
+                msg: "You must be logged in to create a project."
+            });
+            return;
+        }
         setClassification(typeId as Classification);
         setStep(1);
     };

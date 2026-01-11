@@ -392,6 +392,9 @@ public class ModController {
 
     @PutMapping("/projects/{id}")
     public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody Mod updatedMod) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
         try {
             if (updatedMod.getDescription() != null && updatedMod.getDescription().length() > 250) {
                 return ResponseEntity.badRequest().body("Short Summary cannot exceed 250 characters.");
@@ -414,7 +417,7 @@ public class ModController {
     @PutMapping("/projects/{id}/versions/{versionId}")
     public ResponseEntity<?> updateVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
             @SuppressWarnings("unchecked")
             List<String> modIds = (List<String>) body.get("modIds");
@@ -515,6 +518,8 @@ public class ModController {
             @RequestParam(value = "changelog", required = false) String changelog,
             @RequestParam(value = "channel", required = false, defaultValue = "RELEASE") String channel
     ) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
             if (modIds != null && modIds.size() == 1 && modIds.get(0).contains(",")) {
                 modIds = Arrays.stream(modIds.get(0).split(","))

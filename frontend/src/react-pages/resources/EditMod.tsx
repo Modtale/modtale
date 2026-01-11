@@ -45,9 +45,14 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
 
     useEffect(() => {
         const fetchProjectAndPerms = async () => {
-            if (!currentUser) return;
             if (!realId) {
                 setStatusModal({type: 'error', title: 'Error', msg: "Invalid Project Identifier."});
+                setLoading(false);
+                return;
+            }
+
+            if (!currentUser) {
+                setStatusModal({type: 'error', title: 'Unauthorized', msg: "You must be signed in to edit this project."});
                 setLoading(false);
                 return;
             }
@@ -71,7 +76,8 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 );
 
                 if (!isOwner && !isContributor && !isOrgAdmin) {
-                    navigate('/');
+                    setStatusModal({type: 'error', title: 'Unauthorized', msg: "You do not have permission to edit this project."});
+                    setLoading(false);
                     return;
                 }
 
