@@ -88,12 +88,6 @@ public class ModService {
     @Autowired
     private ModService self;
 
-    @Value("${app.demo-mode:false}")
-    private boolean demoMode;
-
-    @Value("#{'${app.seeded-authors}'.split(',')}")
-    private List<String> seededAuthors;
-
     @Value("${app.webhook.url}")
     private String webhookUrl;
 
@@ -268,7 +262,7 @@ public class ModService {
 
         return modRepository.searchMods(
                 search, tags, gameVersion, contentType, minRating, minDownloads, pageable,
-                demoMode, currentUsername, seededAuthors, sortBy, viewCategory,
+                currentUsername, sortBy, viewCategory,
                 dateCutoff, author
         );
     }

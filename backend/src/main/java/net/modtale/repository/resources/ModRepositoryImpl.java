@@ -37,8 +37,8 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
     @Override
     public Page<Mod> searchMods(
             String search, List<String> tags, String gameVersion, String classification,
-            Double minRating, Integer minDownloads, Pageable pageable, boolean demoMode,
-            String currentUsername, List<String> seededAuthors, String sortBy,
+            Double minRating, Integer minDownloads, Pageable pageable,
+            String currentUsername, String sortBy,
             String viewCategory, LocalDate dateCutoff, String author
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
@@ -87,17 +87,6 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
         if (dateCutoff != null) {
             criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
-        }
-
-        if (demoMode && seededAuthors != null && !seededAuthors.isEmpty()) {
-            if (currentUsername == null) {
-                criteriaList.add(Criteria.where("author").in(seededAuthors));
-            } else {
-                criteriaList.add(new Criteria().orOperator(
-                        Criteria.where("author").in(seededAuthors),
-                        Criteria.where("author").is(currentUsername)
-                ));
-            }
         }
 
         Criteria baseCriteria;
