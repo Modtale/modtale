@@ -6,9 +6,10 @@ import rehypeSanitize from 'rehype-sanitize';
 import { Helmet } from 'react-helmet-async';
 import type { Mod, User, ProjectVersion, Review, ModDependency } from '../../types';
 import {
-    MessageSquare, Send, Star, StarHalf, Copy, X,
+    MessageSquare, Send, Star, StarHalf, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
-    Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash
+    Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
+    Code, Paintbrush, Database, Layers, Layout
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -17,7 +18,7 @@ import { extractId, createSlug, getProjectUrl } from '../../utils/slug';
 import { useSSRData } from '../../context/SSRContext';
 import NotFound from '../../components/ui/error/NotFound';
 import { Spinner } from '../../components/ui/Spinner';
-import { getClassificationIcon, compareSemVer, formatTimeAgo } from '../../utils/modHelpers';
+import { compareSemVer, formatTimeAgo } from '../../utils/modHelpers';
 import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
 import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { generateProjectMeta } from '../../utils/meta';
@@ -36,6 +37,23 @@ const getLicenseInfo = (license: string) => {
     if (l.includes('CC0')) return { name: 'CC0', url: 'https://creativecommons.org/publicdomain/zero/1.0/' };
     if (l.includes('ARR') || l.includes('ALLRIGHTS')) return { name: 'All Rights Reserved', url: null };
     return { name: license, url: null };
+};
+
+const getClassificationIcon = (cls: string) => {
+    switch (cls) {
+        case 'PLUGIN': return <Code className="w-3.5 h-3.5" />;
+        case 'ART': return <Paintbrush className="w-3.5 h-3.5" />;
+        case 'DATA': return <Database className="w-3.5 h-3.5" />;
+        case 'SAVE': return <Globe className="w-3.5 h-3.5" />;
+        case 'MODPACK': return <Layers className="w-3.5 h-3.5" />;
+        default: return <Layout className="w-3.5 h-3.5" />;
+    }
+};
+
+const toTitleCase = (str: string) => {
+    if (!str) return '';
+    if (str === 'SAVE') return 'World';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
 const StarRating = ({ rating, size = "w-4 h-4" }: { rating: number, size?: string }) => {
@@ -59,6 +77,8 @@ const ProjectSidebar: React.FC<{
     sourceUrl?: string;
     navigate: (path: string) => void;
 }> = ({ mod, avgRating, totalReviews, dependencies, depMeta, navigate }) => {
+    const [copiedId, setCopiedId] = useState(false);
+
     const licenseInfo = useMemo(() => {
         if (mod.links?.LICENSE) {
             return { name: mod.license || 'Custom License', url: mod.links.LICENSE };
@@ -77,6 +97,12 @@ const ProjectSidebar: React.FC<{
     const getIconUrl = (path?: string) => {
         if (!path) return null;
         return path.startsWith('http') ? path : `${BACKEND_URL}${path}`;
+    };
+
+    const handleCopyId = () => {
+        navigator.clipboard.writeText(mod.id);
+        setCopiedId(true);
+        setTimeout(() => setCopiedId(false), 2000);
     };
 
     return (
@@ -168,7 +194,9 @@ const ProjectSidebar: React.FC<{
             <SidebarSection title="Project ID" icon={Hash}>
                 <div className="flex items-center justify-between group bg-white dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                     <code className="text-xs font-mono text-slate-600 dark:text-slate-300">{mod.id}</code>
-                    <button onClick={() => {navigator.clipboard.writeText(mod.id);}} className="text-slate-400 hover:text-modtale-accent transition-colors"><Copy className="w-4 h-4" /></button>
+                    <button onClick={handleCopyId} className="text-slate-400 hover:text-modtale-accent transition-colors">
+                        {copiedId ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                    </button>
                 </div>
             </SidebarSection>
         </div>
@@ -424,7 +452,7 @@ export const ModDetail: React.FC<{
         return 'text-amber-500 hover:bg-amber-500/10 border-amber-500/20';
     };
 
-    const displayClassification = mod.classification === 'SAVE' ? 'World' : (mod.classification === 'MODPACK' ? 'Modpack' : 'Mod');
+    const displayClassification = toTitleCase(mod.classification || 'PLUGIN');
 
     return (
         <>

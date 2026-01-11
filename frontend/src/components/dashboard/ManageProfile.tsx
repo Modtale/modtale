@@ -253,18 +253,18 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     };
 
     const headerInput = (
-        <div className="space-y-1 w-full">
+        <div className="space-y-1 w-full min-w-0">
             <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Username</label>
                 <div className="flex items-center gap-2">
                     {isEditingUsername ? (
-                        <div className="relative flex-1">
+                        <div className="relative flex-1 max-w-full">
                             <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tighter bg-transparent border-b border-slate-200 dark:border-white/10 focus:border-modtale-accent focus:outline-none w-full placeholder-slate-300 dark:placeholder-white/20" placeholder="Username" autoFocus />
                             <button onClick={() => { setUsername(user.username); setIsEditingUsername(false); }} className="absolute right-2 top-2 text-slate-400 hover:text-red-500"><XCircle className="w-5 h-5" /></button>
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditingUsername(true)}>
-                            <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{user.username}</h1>
+                            <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{user.username}</h1>
                             <Edit3 className="w-5 h-5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     )}
@@ -294,6 +294,8 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
         </div>
     );
 
+    const containerClasses = "w-full mx-auto px-4 sm:px-8 md:px-12 lg:px-16";
+
     return (
         <div className="relative pb-16 space-y-6">
             {error && <ErrorBanner message={error} />}
@@ -310,7 +312,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                 bioInput={bioInput}
             />
 
-            <div className="max-w-6xl mx-auto px-4 mt-6">
+            <div className={containerClasses}>
                 <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-white/5 pb-4">
                         <Lock className="w-4 h-4 text-modtale-accent" />
@@ -446,7 +448,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                 </div>
             </div>
 
-            <div className="max-w-6xl mx-auto px-4">
+            <div className={containerClasses}>
                 <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
                         <Link className="w-4 h-4 text-modtale-accent" />
@@ -463,7 +465,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                 </div>
             </div>
 
-            <div className="max-w-6xl mx-auto px-4">
+            <div className={containerClasses}>
                 <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-3xl p-6 shadow-sm">
                     <div className="flex items-center justify-between">
                         <div>

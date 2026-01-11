@@ -117,12 +117,20 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         }
     };
 
-    const SocialButton = ({ account, compact = false }: { account: any, compact?: boolean }) => {
+    const SocialButton = ({ account, compact = false, isRightMost = false }: { account: any, compact?: boolean, isRightMost?: boolean }) => {
         const { icon: Icon, label, activeClass, btnHover, iconBg, profileBtnBg } = getProviderDetails(account.provider);
         const isOpen = activePopup === account.provider;
         const displayUrl = account.profileUrl || '#';
         const isDiscord = account.provider === 'discord';
         const finalUrl = isDiscord ? `https://discord.com/users/${account.providerId}` : displayUrl;
+
+        const popupPositionClasses = isRightMost
+            ? "md:right-0 md:left-auto md:translate-x-0"
+            : "md:left-1/2 md:-translate-x-1/2";
+
+        const trianglePositionClasses = isRightMost
+            ? "right-3 left-auto translate-x-0"
+            : "left-1/2 -translate-x-1/2";
 
         return (
             <div className="relative inline-block align-middle">
@@ -134,9 +142,9 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 </button>
                 {isOpen && (
                     <>
-                        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setActivePopup(null)} />
+                        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[105] md:hidden" onClick={() => setActivePopup(null)} />
 
-                        <div ref={popupRef} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-xs md:absolute md:bottom-full md:left-1/2 md:-translate-x-1/2 md:top-auto md:translate-y-0 md:mb-3 md:w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-50 animate-in zoom-in-95 duration-200 text-left cursor-default">
+                        <div ref={popupRef} className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-xs md:absolute md:bottom-full md:top-auto md:translate-y-0 md:mb-3 md:w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-[110] animate-in zoom-in-95 duration-200 text-left cursor-default ${popupPositionClasses}`}>
                             <div className="flex justify-between items-start mb-3">
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label} Identity</h4>
                                 <button onClick={() => setActivePopup(null)}><X className="w-3 h-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" /></button>
@@ -156,7 +164,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     <ExternalLink className="w-3 h-3" /> Profile
                                 </a>
                             </div>
-                            <div className="hidden md:block absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-white dark:border-t-slate-800 pointer-events-none"></div>
+                            <div className={`hidden md:block absolute top-full -mt-[1px] border-[6px] border-transparent border-t-white dark:border-t-slate-800 pointer-events-none ${trianglePositionClasses}`}></div>
                         </div>
                     </>
                 )}
@@ -218,7 +226,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-900/90 to-transparent md:to-black/30" />
 
                 {onBack && (
-                    <div className="absolute top-0 left-0 right-0 z-40 mx-auto max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 h-full pointer-events-none">
+                    <div className="absolute top-0 left-0 right-0 z-40 mx-auto w-full px-4 sm:px-8 md:px-12 lg:px-16 h-full pointer-events-none">
                         <div className="pt-6 pointer-events-auto w-fit">
                             <button onClick={onBack} className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
                                 <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
@@ -256,7 +264,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 )}
             </div>
 
-            <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 relative z-50 transition-[max-width,padding] duration-300">
+            <div className="w-full mx-auto px-4 sm:px-8 md:px-12 lg:px-16 relative z-50 transition-[max-width,padding] duration-300">
                 <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start md:-mt-32">
 
                     <div className="hidden md:block flex-shrink-0 self-start md:-mt-24">
@@ -348,7 +356,13 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     </div>
                                 </div>
                                 <div className="hidden md:flex gap-2 flex-wrap justify-end">
-                                    {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} />)}
+                                    {linkedAccounts.map((acc, index) => (
+                                        <SocialButton
+                                            key={acc.provider}
+                                            account={acc}
+                                            isRightMost={index === linkedAccounts.length - 1}
+                                        />
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -357,7 +371,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             </div>
 
             {children && (
-                <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 transition-[max-width,padding] duration-300 mt-0 md:mt-16">
+                <div className="w-full transition-[max-width,padding] duration-300 mt-0 md:mt-16">
                     {children}
                 </div>
             )}

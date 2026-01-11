@@ -214,88 +214,91 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                 isLoggedIn={!!currentUser}
                 onBack={onBack}
             >
-                {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
-                    <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Users className="w-5 h-5 text-purple-500" />
-                            Organization Members
-                        </h2>
-                        <div className="flex flex-wrap gap-4">
-                            {orgMembers.map(member => (
-                                <a
-                                    key={member.id}
-                                    href={`/creator/${member.username}`}
-                                    className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100">
-                                        <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
-                                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                            {creator.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                {/* Padding logic moved here to ensure consistency while keeping layout full width */}
+                <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16">
+                    {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
+                        <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Users className="w-5 h-5 text-purple-500" />
+                                Organization Members
+                            </h2>
+                            <div className="flex flex-wrap gap-4">
+                                {orgMembers.map(member => (
+                                    <a
+                                        key={member.id}
+                                        href={`/creator/${member.username}`}
+                                        className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100">
+                                            <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
                                         </div>
-                                    </div>
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <h2
-                    ref={projectsTitleRef}
-                    className="text-xl font-bold text-slate-900 dark:text-white mb-6"
-                >
-                    Published Work
-                </h2>
-
-                {loadingProjects && page === 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                        {[...Array(itemsPerPage)].map((_, i) => <div key={i} className="h-[280px] bg-white dark:bg-white/5 rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />)}
-                    </div>
-                ) : projects.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 gap-y-8">
-                        {projects.map((project) => (
-                            <div key={project.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <ModCard
-                                    mod={project as Mod}
-                                    path={getProjectPath(project)}
-                                    isFavorite={likedModIds.includes(project.id) || likedModpackIds.includes(project.id)}
-                                    onToggleFavorite={() => { if (project.classification === 'MODPACK') onToggleFavoriteModpack(project.id); else onToggleFavorite(project.id); }}
-                                    isLoggedIn={!!currentUser}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <EmptyState
-                        icon={Package}
-                        title="No projects found"
-                        message="This creator hasn't published any projects yet."
-                    />
-                )}
-
-                {totalPages > 1 && (
-                    <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-4 pb-12 animate-in fade-in">
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => handlePageChange(page - 1)} disabled={page === 0} className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-                            <div className="hidden sm:flex gap-2">
-                                {getPageNumbers().map((p, idx) => (
-                                    typeof p === 'number' ? (
-                                        <button key={p} onClick={() => handlePageChange(p - 1)} className={`w-10 h-10 rounded-lg text-sm font-bold border transition-colors ${page === p - 1 ? 'bg-modtale-accent text-white border-modtale-accent' : 'text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}>{p}</button>
-                                    ) : ( <span key={`dots-${idx}`} className="w-10 h-10 flex items-center justify-center text-slate-400">...</span> )
+                                        <div>
+                                            <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
+                                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                {creator.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                                            </div>
+                                        </div>
+                                    </a>
                                 ))}
                             </div>
-                            <button onClick={() => handlePageChange(page + 1)} disabled={page === totalPages - 1} className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronRight className="w-5 h-5" /></button>
                         </div>
-                        <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-white/10"></div>
-                        <form onSubmit={handleJump} className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-500 uppercase">Go to</span>
-                            <input type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-12 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-1 text-sm font-bold text-center dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent transition-all" placeholder="#" />
-                            <button type="submit" disabled={!jumpPage} className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white dark:hover:bg-modtale-accent text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-50"><CornerDownLeft className="w-4 h-4" /></button>
-                        </form>
-                    </div>
-                )}
+                    )}
+
+                    <h2
+                        ref={projectsTitleRef}
+                        className="text-xl font-bold text-slate-900 dark:text-white mb-6"
+                    >
+                        Published Work
+                    </h2>
+
+                    {loadingProjects && page === 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                            {[...Array(itemsPerPage)].map((_, i) => <div key={i} className="h-[280px] bg-white dark:bg-white/5 rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />)}
+                        </div>
+                    ) : projects.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 gap-y-8">
+                            {projects.map((project) => (
+                                <div key={project.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <ModCard
+                                        mod={project as Mod}
+                                        path={getProjectPath(project)}
+                                        isFavorite={likedModIds.includes(project.id) || likedModpackIds.includes(project.id)}
+                                        onToggleFavorite={() => { if (project.classification === 'MODPACK') onToggleFavoriteModpack(project.id); else onToggleFavorite(project.id); }}
+                                        isLoggedIn={!!currentUser}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <EmptyState
+                            icon={Package}
+                            title="No projects found"
+                            message="This creator hasn't published any projects yet."
+                        />
+                    )}
+
+                    {totalPages > 1 && (
+                        <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-4 pb-12 animate-in fade-in">
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => handlePageChange(page - 1)} disabled={page === 0} className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                                <div className="hidden sm:flex gap-2">
+                                    {getPageNumbers().map((p, idx) => (
+                                        typeof p === 'number' ? (
+                                            <button key={p} onClick={() => handlePageChange(p - 1)} className={`w-10 h-10 rounded-lg text-sm font-bold border transition-colors ${page === p - 1 ? 'bg-modtale-accent text-white border-modtale-accent' : 'text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}>{p}</button>
+                                        ) : ( <span key={`dots-${idx}`} className="w-10 h-10 flex items-center justify-center text-slate-400">...</span> )
+                                    ))}
+                                </div>
+                                <button onClick={() => handlePageChange(page + 1)} disabled={page === totalPages - 1} className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                            </div>
+                            <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-white/10"></div>
+                            <form onSubmit={handleJump} className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-500 uppercase">Go to</span>
+                                <input type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-12 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-1 text-sm font-bold text-center dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent transition-all" placeholder="#" />
+                                <button type="submit" disabled={!jumpPage} className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white dark:hover:bg-modtale-accent text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-50"><CornerDownLeft className="w-4 h-4" /></button>
+                            </form>
+                        </div>
+                    )}
+                </div>
             </ProfileLayout>
         </div>
     );
