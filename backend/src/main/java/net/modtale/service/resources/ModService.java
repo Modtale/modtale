@@ -238,7 +238,7 @@ public class ModService {
             case "rating" -> Sort.by("rating").descending();
             case "downloads" -> Sort.by("downloadCount").descending();
             case "updated" -> Sort.by("updatedAt").descending();
-            case "newest" -> Sort.by("createdAt").descending();
+            case "new", "newest" -> Sort.by("createdAt").descending();
             case "favorites" -> Sort.by("favoriteCount").descending();
             default -> Sort.unsorted();
         };
@@ -353,8 +353,8 @@ public class ModService {
 
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
-        mod.setCreatedAt(LocalDate.now().toString());
-        mod.setUpdatedAt(LocalDate.now().toString());
+        mod.setCreatedAt(LocalDateTime.now().toString());
+        mod.setUpdatedAt(LocalDateTime.now().toString());
         mod.setContributors(new ArrayList<>());
         mod.setPendingInvites(new ArrayList<>());
         mod.setVersions(new ArrayList<>());
@@ -378,7 +378,7 @@ public class ModService {
 
         mod.setStatus("PENDING");
         mod.setExpiresAt(null);
-        mod.setUpdatedAt(LocalDate.now().toString());
+        mod.setUpdatedAt(LocalDateTime.now().toString());
 
         modRepository.save(mod);
     }
@@ -451,7 +451,11 @@ public class ModService {
 
         mod.setStatus("PUBLISHED");
         mod.setExpiresAt(null);
-        mod.setUpdatedAt(LocalDate.now().toString());
+        mod.setUpdatedAt(LocalDateTime.now().toString());
+
+        if (isNewRelease) {
+            mod.setCreatedAt(LocalDateTime.now().toString());
+        }
 
         if (!isRestoration && isAdmin && user != null) {
             mod.setApprovedBy(user.getUsername());
@@ -691,6 +695,8 @@ public class ModService {
 
         if (updatedMod.getLinks() != null) existing.setLinks(updatedMod.getLinks());
         if (updatedMod.getImageUrl() != null) existing.setImageUrl(updatedMod.getImageUrl());
+
+        existing.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(existing);
     }
 
@@ -706,6 +712,7 @@ public class ModService {
         }
         String path = storageService.upload(file, "images");
         mod.setImageUrl(storageService.getPublicUrl(path));
+        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
     }
 
@@ -722,6 +729,7 @@ public class ModService {
 
         String path = storageService.upload(file, "images");
         mod.setBannerUrl(storageService.getPublicUrl(path));
+        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
     }
 
@@ -773,6 +781,7 @@ public class ModService {
         if (isModpack && mod.getVersions().get(0).getId().equals(versionId)) {
             mod.setModIds(simpleModIds);
         }
+        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
     }
 
@@ -859,7 +868,7 @@ public class ModService {
         }
 
         mod.getVersions().add(0, ver);
-        mod.setUpdatedAt(LocalDate.now().toString());
+        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
 
         if("PUBLISHED".equals(mod.getStatus())) {
