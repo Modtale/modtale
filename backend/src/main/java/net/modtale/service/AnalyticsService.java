@@ -3,8 +3,7 @@ package net.modtale.service;
 import net.modtale.model.analytics.*;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ProjectMeta;
-import net.modtale.repository.analytics.DownloadLogRepository;
-import net.modtale.repository.analytics.ViewLogRepository;
+import net.modtale.repository.analytics.ProjectMonthlyStatsRepository;
 import net.modtale.repository.resources.ModRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -12,9 +11,12 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -23,55 +25,93 @@ public class AnalyticsService {
 
     private static final int CHART_BUFFER_DAYS = 14;
 
-    @Autowired private DownloadLogRepository downloadLogRepository;
-    @Autowired private ViewLogRepository viewLogRepository;
+    @Autowired private ProjectMonthlyStatsRepository statsRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private MongoTemplate mongoTemplate;
 
     public void logDownload(String projectId, String versionId, String authorId) {
-        DownloadLog log = new DownloadLog(projectId, versionId, authorId);
-        downloadLogRepository.save(log);
+        LocalDate now = LocalDate.now();
+        int day = now.getDayOfMonth();
+        int month = now.getMonthValue();
+        int year = now.getYear();
+
+        Query query = Query.query(Criteria.where("projectId").is(projectId)
+                .and("year").is(year)
+                .and("month").is(month));
+
+        Update update = new Update()
+                .setOnInsert("authorId", authorId)
+                .inc("totalDownloads", 1)
+                .inc("days." + day + ".d", 1);
+
+        if (versionId != null) {
+            update.inc("versionDownloads." + versionId + "." + day, 1);
+        }
+
+        mongoTemplate.upsert(query, update, ProjectMonthlyStats.class);
     }
 
     public void logView(String projectId, String authorId) {
-        ViewLog log = new ViewLog(projectId, authorId);
-        viewLogRepository.save(log);
+        LocalDate now = LocalDate.now();
+        int day = now.getDayOfMonth();
+        int month = now.getMonthValue();
+        int year = now.getYear();
+
+        Query query = Query.query(Criteria.where("projectId").is(projectId)
+                .and("year").is(year)
+                .and("month").is(month));
+
+        Update update = new Update()
+                .setOnInsert("authorId", authorId)
+                .inc("totalViews", 1)
+                .inc("days." + day + ".v", 1);
+
+        mongoTemplate.upsert(query, update, ProjectMonthlyStats.class);
     }
 
     public CreatorAnalytics getCreatorDashboard(String username, String range, List<String> include) {
         LocalDate end = LocalDate.now();
         LocalDate start = calculateStartDate(range);
 
-        LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
+        LocalDate comparisonEnd = start.minusDays(1);
+        LocalDate comparisonStart = start.minusDays(java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1);
 
-        LocalDate prevStart = start.minusDays(java.time.temporal.ChronoUnit.DAYS.between(start, end));
+        StatsAccumulator currentPeriod = new StatsAccumulator();
+        StatsAccumulator prevPeriod = new StatsAccumulator();
 
-        long periodDownloads = downloadLogRepository.countByAuthorIdAndTimestampBetween(username, start.atStartOfDay(), end.atTime(23, 59, 59));
-        long prevDownloads = downloadLogRepository.countByAuthorIdAndTimestampBetween(username, prevStart.atStartOfDay(), start.minusDays(1).atTime(23, 59, 59));
+        List<ProjectMonthlyStats> allStats = getStatsInMemory(username, comparisonStart, end, false);
 
-        long periodViews = viewLogRepository.countByAuthorIdAndTimestampBetween(username, start.atStartOfDay(), end.atTime(23, 59, 59));
-        long prevViews = viewLogRepository.countByAuthorIdAndTimestampBetween(username, prevStart.atStartOfDay(), start.minusDays(1).atTime(23, 59, 59));
+        for (ProjectMonthlyStats stat : allStats) {
+            accumulate(stat, start, end, currentPeriod);
+            accumulate(stat, comparisonStart, comparisonEnd, prevPeriod);
+        }
 
-        long totalDownloads = downloadLogRepository.countByAuthorId(username);
-        long totalViews = viewLogRepository.countByAuthorId(username);
+        StatsSummary allTime = getAllTimeTotals(username, false);
 
         CreatorAnalytics analytics = new CreatorAnalytics();
-        analytics.setTotalDownloads(totalDownloads);
-        analytics.setTotalViews(totalViews);
-        analytics.setPeriodDownloads(periodDownloads);
-        analytics.setPreviousPeriodDownloads(prevDownloads);
-        analytics.setPeriodViews(periodViews);
-        analytics.setPreviousPeriodViews(prevViews);
+        analytics.setTotalDownloads(allTime.downloads);
+        analytics.setTotalViews(allTime.views);
+        analytics.setPeriodDownloads(currentPeriod.totalDownloads);
+        analytics.setPreviousPeriodDownloads(prevPeriod.totalDownloads);
+        analytics.setPeriodViews(currentPeriod.totalViews);
+        analytics.setPreviousPeriodViews(prevPeriod.totalViews);
 
         List<Mod> projects = modRepository.findByAuthor(username);
         Map<String, ProjectMeta> metaMap = new HashMap<>();
         Map<String, List<AnalyticsDataPoint>> projectDownloads = new HashMap<>();
         Map<String, List<AnalyticsDataPoint>> projectViews = new HashMap<>();
 
+        LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
+
         for (Mod mod : projects) {
             metaMap.put(mod.getId(), new ProjectMeta(mod.getId(), mod.getTitle(), mod.getRating(), mod.getDownloadCount()));
-            projectDownloads.put(mod.getId(), getTimeSeries(mod.getId(), "downloads", chartStart, end, true));
-            projectViews.put(mod.getId(), getTimeSeries(mod.getId(), "views", chartStart, end, true));
+
+            List<ProjectMonthlyStats> modStats = allStats.stream()
+                    .filter(s -> s.getProjectId().equals(mod.getId()))
+                    .toList();
+
+            projectDownloads.put(mod.getId(), buildTimeSeries(modStats, chartStart, end, true));
+            projectViews.put(mod.getId(), buildTimeSeries(modStats, chartStart, end, false));
         }
 
         analytics.setProjectMeta(metaMap);
@@ -84,7 +124,6 @@ public class AnalyticsService {
     public ProjectAnalyticsDetail getProjectAnalytics(String projectId, String username, String range) {
         LocalDate end = LocalDate.now();
         LocalDate start = calculateStartDate(range);
-
         LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
 
         Mod mod = modRepository.findById(projectId).orElse(null);
@@ -94,29 +133,13 @@ public class AnalyticsService {
         detail.setProjectId(projectId);
         detail.setProjectTitle(title);
 
-        detail.setTotalDownloads(downloadLogRepository.countByProjectId(projectId));
-        detail.setTotalViews(viewLogRepository.countByProjectId(projectId));
+        StatsSummary totalStats = getAllTimeTotals(projectId, true);
+        detail.setTotalDownloads(totalStats.downloads);
+        detail.setTotalViews(totalStats.views);
 
-        detail.setViews(getTimeSeries(projectId, "views", chartStart, end, true));
-
-        Map<String, List<AnalyticsDataPoint>> verDownloads = new HashMap<>();
-
-        Aggregation agg = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("projectId").is(projectId).and("timestamp").gte(start.atStartOfDay())),
-                Aggregation.group("versionId").count().as("count"),
-                Aggregation.sort(Sort.Direction.DESC, "count"),
-                Aggregation.limit(10)
-        );
-
-        AggregationResults<Map> results = mongoTemplate.aggregate(agg, "download_logs", Map.class);
-        for (Map result : results.getMappedResults()) {
-            String vid = (String) result.get("_id");
-            if(vid != null) {
-                verDownloads.put(vid, getVersionTimeSeries(projectId, vid, chartStart, end));
-            }
-        }
-        detail.setVersionDownloads(verDownloads);
-
+        List<ProjectMonthlyStats> stats = getStatsInMemory(projectId, chartStart, end, true);
+        detail.setViews(buildTimeSeries(stats, chartStart, end, false));
+        detail.setVersionDownloads(buildVersionBreakdown(stats, start, end));
         detail.setRatingHistory(new ArrayList<>());
 
         return detail;
@@ -129,51 +152,138 @@ public class AnalyticsService {
         return LocalDate.now().minusDays(30);
     }
 
-    private List<AnalyticsDataPoint> getTimeSeries(String id, String type, LocalDate start, LocalDate end, boolean isProject) {
-        String collection = type.equals("downloads") ? "download_logs" : "view_logs";
-        String idField = isProject ? "projectId" : "authorId";
+    private List<ProjectMonthlyStats> getStatsInMemory(String id, LocalDate start, LocalDate end, boolean isProject) {
+        String field = isProject ? "projectId" : "authorId";
 
-        Aggregation agg = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where(idField).is(id).and("timestamp").gte(start.atStartOfDay()).lte(end.atTime(23, 59, 59))),
-                Aggregation.project().and("timestamp").dateAsFormattedString("%Y-%m-%d").as("date"),
-                Aggregation.group("date").count().as("count"),
-                Aggregation.sort(Sort.Direction.ASC, "_id")
-        );
+        int startY = start.getYear();
+        int startM = start.getMonthValue();
 
-        AggregationResults<Map> results = mongoTemplate.aggregate(agg, collection, Map.class);
-        Map<String, Integer> dataMap = new HashMap<>();
-        for (Map r : results.getMappedResults()) {
-            dataMap.put((String) r.get("_id"), ((Number) r.get("count")).intValue());
-        }
+        Criteria criteria = Criteria.where(field).is(id)
+                .orOperator(
+                        Criteria.where("year").gt(startY),
+                        Criteria.where("year").is(startY).and("month").gte(startM)
+                );
 
-        return fillDates(start, end, dataMap);
+        return mongoTemplate.find(Query.query(criteria), ProjectMonthlyStats.class);
     }
 
-    private List<AnalyticsDataPoint> getVersionTimeSeries(String pid, String vid, LocalDate start, LocalDate end) {
-        Aggregation agg = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("projectId").is(pid).and("versionId").is(vid).and("timestamp").gte(start.atStartOfDay()).lte(end.atTime(23, 59, 59))),
-                Aggregation.project().and("timestamp").dateAsFormattedString("%Y-%m-%d").as("date"),
-                Aggregation.group("date").count().as("count"),
-                Aggregation.sort(Sort.Direction.ASC, "_id")
-        );
+    private void accumulate(ProjectMonthlyStats stat, LocalDate start, LocalDate end, StatsAccumulator acc) {
+        YearMonth statMonth = YearMonth.of(stat.getYear(), stat.getMonth());
 
-        AggregationResults<Map> results = mongoTemplate.aggregate(agg, "download_logs", Map.class);
-        Map<String, Integer> dataMap = new HashMap<>();
-        for (Map r : results.getMappedResults()) {
-            dataMap.put((String) r.get("_id"), ((Number) r.get("count")).intValue());
+        if (stat.getDays() == null) return;
+
+        for (Map.Entry<String, ProjectMonthlyStats.DayStats> entry : stat.getDays().entrySet()) {
+            try {
+                int day = Integer.parseInt(entry.getKey());
+                LocalDate date = statMonth.atDay(day);
+                if (!date.isBefore(start) && !date.isAfter(end)) {
+                    acc.totalDownloads += entry.getValue().getD();
+                    acc.totalViews += entry.getValue().getV();
+                }
+            } catch (Exception ignored) {}
         }
-        return fillDates(start, end, dataMap);
     }
 
-    private List<AnalyticsDataPoint> fillDates(LocalDate start, LocalDate end, Map<String, Integer> data) {
+    private List<AnalyticsDataPoint> buildTimeSeries(List<ProjectMonthlyStats> stats, LocalDate start, LocalDate end, boolean downloads) {
+        Map<LocalDate, Integer> map = new HashMap<>();
+
+        for (ProjectMonthlyStats stat : stats) {
+            YearMonth ym = YearMonth.of(stat.getYear(), stat.getMonth());
+            if (stat.getDays() != null) {
+                for (Map.Entry<String, ProjectMonthlyStats.DayStats> entry : stat.getDays().entrySet()) {
+                    try {
+                        int day = Integer.parseInt(entry.getKey());
+                        LocalDate date = ym.atDay(day);
+                        if (!date.isBefore(start) && !date.isAfter(end)) {
+                            int val = downloads ? entry.getValue().getD() : entry.getValue().getV();
+                            map.put(date, val);
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
         List<AnalyticsDataPoint> points = new ArrayList<>();
-        LocalDate curr = start;
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDate curr = start;
         while (!curr.isAfter(end)) {
-            String d = curr.format(fmt);
-            points.add(new AnalyticsDataPoint(d, data.getOrDefault(d, 0)));
+            points.add(new AnalyticsDataPoint(curr.format(fmt), map.getOrDefault(curr, 0)));
             curr = curr.plusDays(1);
         }
         return points;
+    }
+
+    private Map<String, List<AnalyticsDataPoint>> buildVersionBreakdown(List<ProjectMonthlyStats> stats, LocalDate start, LocalDate end) {
+        Map<String, Map<LocalDate, Integer>> versionData = new HashMap<>();
+
+        for (ProjectMonthlyStats stat : stats) {
+            YearMonth ym = YearMonth.of(stat.getYear(), stat.getMonth());
+            if (stat.getVersionDownloads() != null) {
+                for (Map.Entry<String, Map<String, Integer>> vEntry : stat.getVersionDownloads().entrySet()) {
+                    String versionId = vEntry.getKey();
+                    Map<LocalDate, Integer> dateMap = versionData.computeIfAbsent(versionId, k -> new HashMap<>());
+
+                    for (Map.Entry<String, Integer> dayEntry : vEntry.getValue().entrySet()) {
+                        try {
+                            int day = Integer.parseInt(dayEntry.getKey());
+                            LocalDate date = ym.atDay(day);
+                            if (!date.isBefore(start) && !date.isAfter(end)) {
+                                dateMap.merge(date, dayEntry.getValue(), Integer::sum);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        }
+
+        Map<String, Integer> totals = new HashMap<>();
+        for (Map.Entry<String, Map<LocalDate, Integer>> entry : versionData.entrySet()) {
+            totals.put(entry.getKey(), entry.getValue().values().stream().mapToInt(i -> i).sum());
+        }
+
+        List<String> topVersions = totals.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(10)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        Map<String, List<AnalyticsDataPoint>> result = new HashMap<>();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        for (String vid : topVersions) {
+            List<AnalyticsDataPoint> points = new ArrayList<>();
+            Map<LocalDate, Integer> vMap = versionData.get(vid);
+            LocalDate curr = start;
+            while (!curr.isAfter(end)) {
+                points.add(new AnalyticsDataPoint(curr.format(fmt), vMap.getOrDefault(curr, 0)));
+                curr = curr.plusDays(1);
+            }
+            result.put(vid, points);
+        }
+
+        return result;
+    }
+
+    private static class StatsAccumulator {
+        long totalDownloads = 0;
+        long totalViews = 0;
+    }
+
+    private static class StatsSummary {
+        long downloads;
+        long views;
+    }
+
+    private StatsSummary getAllTimeTotals(String id, boolean isProject) {
+        String field = isProject ? "projectId" : "authorId";
+        Aggregation agg = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where(field).is(id)),
+                Aggregation.group()
+                        .sum("totalDownloads").as("downloads")
+                        .sum("totalViews").as("views")
+        );
+        AggregationResults<StatsSummary> res = mongoTemplate.aggregate(agg, ProjectMonthlyStats.class, StatsSummary.class);
+        StatsSummary summary = res.getUniqueMappedResult();
+        return summary != null ? summary : new StatsSummary();
     }
 }
