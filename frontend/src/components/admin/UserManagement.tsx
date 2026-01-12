@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User as UserIcon, Search, Shield, Check, Zap } from 'lucide-react';
+import { User as UserIcon, Search, Shield, Check, Zap, Trash2 } from 'lucide-react';
 import { api } from '../../utils/api';
 
 export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setStatus }) => {
@@ -11,6 +11,9 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
     const [showResults, setShowResults] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteConfirmUsername, setDeleteConfirmUsername] = useState('');
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -35,6 +38,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                     setSearchResults(res.data);
                     setShowResults(true);
                 } catch (e) {
+                    // Silent fail for autocomplete
                     setSearchResults([]);
                 }
             }, 300);
@@ -110,8 +114,54 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         }
     };
 
+    const handleDeleteUser = async () => {
+        if (!foundUser || deleteConfirmUsername !== foundUser.username) return;
+        setLoading(true);
+        try {
+            await api.delete(`/admin/users/${foundUser.username}`);
+            setStatus({ type: 'success', title: 'User Deleted', msg: `User ${foundUser.username} has been permanently deleted.` });
+            setFoundUser(null);
+            setUsername('');
+            setShowDeleteConfirm(false);
+            setDeleteConfirmUsername('');
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Delete Failed', msg: e.response?.data || 'Could not delete user.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-red-500">Danger Zone</h3>
+                        <p className="text-slate-500 mb-6">You are about to delete <strong>{foundUser.username}</strong>. This is irreversible. Type the username to confirm.</p>
+
+                        <input
+                            type="text"
+                            value={deleteConfirmUsername}
+                            onChange={e => setDeleteConfirmUsername(e.target.value)}
+                            placeholder={foundUser.username}
+                            className="w-full p-3 mb-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white"
+                        />
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="flex-1 py-3 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-600 dark:text-slate-300"
+                            >Cancel</button>
+                            <button
+                                onClick={handleDeleteUser}
+                                disabled={deleteConfirmUsername !== foundUser.username || loading}
+                                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50"
+                            >Delete User</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <form onSubmit={handleSearch} className="flex gap-4 mb-10 relative z-50">
                 <div className="relative flex-1 group" ref={wrapperRef}>
                     <UserIcon className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
@@ -207,6 +257,22 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                                     {foundUser.tier === 'ENTERPRISE'
                                         ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.'
                                         : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.'}
+                                </p>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="relative p-8 rounded-3xl border-2 border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-red-500/5 text-left transition-all duration-300 group overflow-hidden"
+                        >
+                            <div className="relative z-10">
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-500">
+                                        <Trash2 className="w-6 h-6" /> Delete Account
+                                    </span>
+                                </div>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                    Permanently delete this user, their projects, and all associated data. This action cannot be undone.
                                 </p>
                             </div>
                         </button>

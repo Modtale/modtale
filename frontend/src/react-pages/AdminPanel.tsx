@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api.ts';
 import { StatusModal } from '../components/ui/StatusModal.tsx';
-import { Shield, Users, LayoutDashboard } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, ShieldAlert, Package } from 'lucide-react';
 import type { Mod } from '../types.ts';
 import { VerificationQueue } from '../components/admin/VerificationQueue';
 import { UserManagement } from '../components/admin/UserManagement';
 import { ReviewInterface } from '../components/admin/ReviewInterface';
+import { ReportQueue } from '../components/admin/ReportQueue';
+import { ProjectManagement } from '../components/admin/ProjectManagement';
 
 interface AdminPanelProps {
     currentUser: any;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
-    const [activeTab, setActiveTab] = useState<'users' | 'verification'>('verification');
+    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects'>('verification');
     const [status, setStatus] = useState<any>(null);
 
     const [pendingProjects, setPendingProjects] = useState<Mod[]>([]);
@@ -21,14 +23,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     const [reviewingProject, setReviewingProject] = useState<any>(null);
     const [loadingReview, setLoadingReview] = useState(false);
 
+    const [reports, setReports] = useState<any[]>([]);
+
     const isAdmin = currentUser?.roles?.includes('ADMIN') || currentUser?.username === 'Villagers654';
     const isSuperAdmin = currentUser?.username === 'Villagers654';
 
     useEffect(() => {
         if (isAdmin) {
             fetchQueue();
+            if (activeTab === 'reports') fetchReports();
         }
-    }, [isAdmin]);
+    }, [isAdmin, activeTab]);
 
     const fetchQueue = async () => {
         setLoadingQueue(true);
@@ -39,6 +44,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
             console.error(e);
         } finally {
             setLoadingQueue(false);
+        }
+    };
+
+    const fetchReports = async () => {
+        try {
+            const res = await api.get('/admin/reports/queue');
+            setReports(res.data);
+        } catch (e) {
+            console.error(e);
         }
     };
 
@@ -90,7 +104,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
         );
     }
 
-    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification', icon: any, label: string, badge?: number }) => (
+    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects', icon: any, label: string, badge?: number }) => (
         <button
             onClick={() => setActiveTab(tab)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${
@@ -144,12 +158,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                                     label="Verification Queue"
                                     badge={pendingProjects.length}
                                 />
+                                <SidebarButton
+                                    tab="reports"
+                                    icon={ShieldAlert}
+                                    label="Reports"
+                                    badge={reports.length}
+                                />
                                 {isSuperAdmin && (
-                                    <SidebarButton
-                                        tab="users"
-                                        icon={Users}
-                                        label="User Management"
-                                    />
+                                    <>
+                                        <SidebarButton
+                                            tab="projects"
+                                            icon={Package}
+                                            label="Project Management"
+                                        />
+                                        <SidebarButton
+                                            tab="users"
+                                            icon={Users}
+                                            label="User Management"
+                                        />
+                                    </>
                                 )}
                             </nav>
                         </div>
@@ -169,6 +196,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                                     reviewingId={reviewingProject?.mod?.id}
                                     onReview={fetchProjectDetails}
                                 />
+                            </div>
+                        )}
+
+                        {activeTab === 'reports' && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="mb-8">
+                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Report Queue</h1>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Handle content violations and user reports.</p>
+                                </div>
+                                <ReportQueue reports={reports} onRefresh={fetchReports} />
+                            </div>
+                        )}
+
+                        {activeTab === 'projects' && isSuperAdmin && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="mb-8">
+                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Project Management</h1>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage, unlist, or delete any project.</p>
+                                </div>
+                                <ProjectManagement setStatus={setStatus} />
                             </div>
                         )}
 

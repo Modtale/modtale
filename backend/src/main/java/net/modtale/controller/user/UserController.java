@@ -15,7 +15,6 @@ import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
@@ -321,6 +320,25 @@ public class UserController {
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete account.");
+        }
+    }
+
+    @DeleteMapping("/admin/users/{username}")
+    public ResponseEntity<?> adminDeleteUser(@PathVariable String username) {
+        User currentUser = userService.getCurrentUser();
+        if (currentUser == null || currentUser.getRoles() == null || !currentUser.getRoles().contains("ADMIN")) {
+            return ResponseEntity.status(403).build();
+        }
+
+        try {
+            User target = userService.getPublicProfile(username);
+            if (target != null) {
+                userService.deleteUser(target.getId());
+                return ResponseEntity.ok().build();
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to delete user: " + e.getMessage());
         }
     }
 

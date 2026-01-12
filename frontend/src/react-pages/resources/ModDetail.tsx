@@ -9,7 +9,7 @@ import {
     MessageSquare, Send, Star, StarHalf, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    Code, Paintbrush, Database, Layers, Layout
+    Code, Paintbrush, Database, Layers, Layout, Flag
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -23,6 +23,7 @@ import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resou
 import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
+import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
@@ -339,6 +340,7 @@ export const ModDetail: React.FC<{
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
     const [showExperimental, setShowExperimental] = useState(false);
     const [showMobileLinks, setShowMobileLinks] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
 
     const reviewsRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -500,6 +502,13 @@ export const ModDetail: React.FC<{
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />
 
+            <ReportModal
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                projectId={mod.id}
+                projectTitle={mod.title}
+            />
+
             {pendingDownloadVer && (
                 <DependencyModal
                     dependencies={pendingDownloadVer.deps}
@@ -570,6 +579,9 @@ export const ModDetail: React.FC<{
                         </button>
                         <button onClick={handleShare} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-blue-400 hover:border-blue-400/30 transition-all" title="Share">
                             <Share2 className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => setShowReportModal(true)} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
+                            <Flag className="w-5 h-5" />
                         </button>
                         {canEdit && (
                             <button onClick={() => navigate(`${getProjectUrl(mod)}/edit`)} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" title="Edit Project">
