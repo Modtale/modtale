@@ -59,7 +59,7 @@ public class RateLimitFilter implements Filter {
             ApiKey apiKey = apiKeyService.resolveKey(apiKeyHeader);
 
             if (apiKey != null) {
-                limitKey = "KEY:" + apiKey.getId();
+                limitKey = "USER:" + apiKey.getUserId();
                 if (apiKey.getTier() == ApiKey.Tier.ENTERPRISE) {
                     capacity = 2000;
                     tierName = "Enterprise";
@@ -83,6 +83,7 @@ public class RateLimitFilter implements Filter {
 
             if (isSessionUser) {
                 User user = (User) auth.getPrincipal();
+                // This matches the format used in the ApiKey block above
                 limitKey = "USER:" + user.getId();
                 capacity = 1000;
                 tierName = "Frontend-User";
