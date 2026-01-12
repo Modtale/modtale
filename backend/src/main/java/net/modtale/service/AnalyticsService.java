@@ -3,6 +3,7 @@ package net.modtale.service;
 import net.modtale.model.analytics.*;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ProjectMeta;
+import net.modtale.repository.analytics.PlatformMonthlyStatsRepository;
 import net.modtale.repository.analytics.ProjectMonthlyStatsRepository;
 import net.modtale.repository.resources.ModRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ public class AnalyticsService {
     private static final int CHART_BUFFER_DAYS = 14;
 
     @Autowired private ProjectMonthlyStatsRepository statsRepository;
+    @Autowired private PlatformMonthlyStatsRepository platformStatsRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private MongoTemplate mongoTemplate;
 
@@ -35,21 +37,29 @@ public class AnalyticsService {
         int month = now.getMonthValue();
         int year = now.getYear();
 
-        Query query = Query.query(Criteria.where("projectId").is(projectId)
+        Query projectQuery = Query.query(Criteria.where("projectId").is(projectId)
                 .and("year").is(year)
                 .and("month").is(month));
 
-        Update update = new Update()
+        Update projectUpdate = new Update()
                 .setOnInsert("authorId", authorId)
                 .inc("totalDownloads", 1)
                 .inc(isApi ? "apiDownloads" : "frontendDownloads", 1)
                 .inc("days." + day + ".d", 1);
 
         if (versionId != null) {
-            update.inc("versionDownloads." + versionId + "." + day, 1);
+            projectUpdate.inc("versionDownloads." + versionId + "." + day, 1);
         }
 
-        mongoTemplate.upsert(query, update, ProjectMonthlyStats.class);
+        mongoTemplate.upsert(projectQuery, projectUpdate, ProjectMonthlyStats.class);
+
+        Query platformQuery = Query.query(Criteria.where("year").is(year).and("month").is(month));
+        Update platformUpdate = new Update()
+                .inc("totalDownloads", 1)
+                .inc(isApi ? "apiDownloads" : "frontendDownloads", 1)
+                .inc("days." + day + ".d", 1);
+
+        mongoTemplate.upsert(platformQuery, platformUpdate, PlatformMonthlyStats.class);
     }
 
     public void logView(String projectId, String authorId) {
@@ -58,16 +68,81 @@ public class AnalyticsService {
         int month = now.getMonthValue();
         int year = now.getYear();
 
-        Query query = Query.query(Criteria.where("projectId").is(projectId)
+        Query projectQuery = Query.query(Criteria.where("projectId").is(projectId)
                 .and("year").is(year)
                 .and("month").is(month));
 
-        Update update = new Update()
+        Update projectUpdate = new Update()
                 .setOnInsert("authorId", authorId)
                 .inc("totalViews", 1)
                 .inc("days." + day + ".v", 1);
 
-        mongoTemplate.upsert(query, update, ProjectMonthlyStats.class);
+        mongoTemplate.upsert(projectQuery, projectUpdate, ProjectMonthlyStats.class);
+
+        Query platformQuery = Query.query(Criteria.where("year").is(year).and("month").is(month));
+        Update platformUpdate = new Update()
+                .inc("totalViews", 1)
+                .inc("days." + day + ".v", 1);
+
+        mongoTemplate.upsert(platformQuery, platformUpdate, PlatformMonthlyStats.class);
+    }
+
+    public PlatformAnalyticsSummary getPlatformAnalytics(String range) {
+        LocalDate end = LocalDate.now();
+        LocalDate start = calculateStartDate(range);
+
+        int startY = start.getYear();
+        int startM = start.getMonthValue();
+
+        Criteria criteria = new Criteria().orOperator(
+                Criteria.where("year").gt(startY),
+                Criteria.where("year").is(startY).and("month").gte(startM)
+        );
+
+        List<PlatformMonthlyStats> stats = mongoTemplate.find(Query.query(criteria), PlatformMonthlyStats.class);
+
+        PlatformAnalyticsSummary summary = new PlatformAnalyticsSummary();
+
+        long totalDownloads = 0;
+        long totalViews = 0;
+        long totalApi = 0;
+        long totalFrontend = 0;
+
+        Map<LocalDate, Integer> downloadSeries = new HashMap<>();
+        Map<LocalDate, Integer> viewSeries = new HashMap<>();
+
+        for (PlatformMonthlyStats stat : stats) {
+            YearMonth ym = YearMonth.of(stat.getYear(), stat.getMonth());
+
+            if (stat.getDays() != null) {
+                for (Map.Entry<String, PlatformMonthlyStats.DayStats> entry : stat.getDays().entrySet()) {
+                    try {
+                        int day = Integer.parseInt(entry.getKey());
+                        LocalDate date = ym.atDay(day);
+                        if (!date.isBefore(start) && !date.isAfter(end)) {
+                            downloadSeries.put(date, entry.getValue().getD());
+                            viewSeries.put(date, entry.getValue().getV());
+
+                            totalDownloads += entry.getValue().getD();
+                            totalViews += entry.getValue().getV();
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            totalApi += stat.getApiDownloads();
+            totalFrontend += stat.getFrontendDownloads();
+        }
+
+        summary.setTotalDownloads(totalDownloads);
+        summary.setTotalViews(totalViews);
+        summary.setApiDownloads(totalApi);
+        summary.setFrontendDownloads(totalFrontend);
+
+        summary.setDownloadsChart(fillDates(start, end, downloadSeries));
+        summary.setViewsChart(fillDates(start, end, viewSeries));
+
+        return summary;
     }
 
     public CreatorAnalytics getCreatorDashboard(String username, String range, List<String> include) {
@@ -206,11 +281,15 @@ public class AnalyticsService {
             }
         }
 
+        return fillDates(start, end, map);
+    }
+
+    private List<AnalyticsDataPoint> fillDates(LocalDate start, LocalDate end, Map<LocalDate, Integer> data) {
         List<AnalyticsDataPoint> points = new ArrayList<>();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         LocalDate curr = start;
         while (!curr.isAfter(end)) {
-            points.add(new AnalyticsDataPoint(curr.format(fmt), map.getOrDefault(curr, 0)));
+            points.add(new AnalyticsDataPoint(curr.format(fmt), data.getOrDefault(curr, 0)));
             curr = curr.plusDays(1);
         }
         return points;
@@ -251,17 +330,9 @@ public class AnalyticsService {
                 .toList();
 
         Map<String, List<AnalyticsDataPoint>> result = new HashMap<>();
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
         for (String vid : topVersions) {
-            List<AnalyticsDataPoint> points = new ArrayList<>();
-            Map<LocalDate, Integer> vMap = versionData.get(vid);
-            LocalDate curr = start;
-            while (!curr.isAfter(end)) {
-                points.add(new AnalyticsDataPoint(curr.format(fmt), vMap.getOrDefault(curr, 0)));
-                curr = curr.plusDays(1);
-            }
-            result.put(vid, points);
+            result.put(vid, fillDates(start, end, versionData.get(vid)));
         }
 
         return result;

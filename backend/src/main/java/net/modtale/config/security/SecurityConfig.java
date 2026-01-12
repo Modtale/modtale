@@ -37,6 +37,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -157,8 +158,12 @@ public class SecurityConfig {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
                             if (isApiKeyUser) return new AuthorizationDecision(false);
-                            String path = context.getRequest().getRequestURI();
+
+                            HttpServletRequest request = context.getRequest();
+                            String path = request.getRequestURI();
+
                             if (path.contains("/analytics/view/")) return new AuthorizationDecision(true);
+
                             return new AuthorizationDecision(authentication.get().isAuthenticated());
                         })
                         .requestMatchers(
