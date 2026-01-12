@@ -25,6 +25,9 @@ public class ProjectMonthlyStats {
     private long totalViews;
     private long totalDownloads;
 
+    private long apiDownloads;
+    private long frontendDownloads;
+
     private Map<String, DayStats> days = new HashMap<>();
 
     private Map<String, Map<String, Integer>> versionDownloads = new HashMap<>();
@@ -51,6 +54,12 @@ public class ProjectMonthlyStats {
 
     public long getTotalDownloads() { return totalDownloads; }
     public void setTotalDownloads(long totalDownloads) { this.totalDownloads = totalDownloads; }
+
+    public long getApiDownloads() { return apiDownloads; }
+    public void setApiDownloads(long apiDownloads) { this.apiDownloads = apiDownloads; }
+
+    public long getFrontendDownloads() { return frontendDownloads; }
+    public void setFrontendDownloads(long frontendDownloads) { this.frontendDownloads = frontendDownloads; }
 
     public Map<String, DayStats> getDays() { return days; }
     public void setDays(Map<String, DayStats> days) { this.days = days; }

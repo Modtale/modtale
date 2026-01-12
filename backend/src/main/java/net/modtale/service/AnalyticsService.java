@@ -29,7 +29,7 @@ public class AnalyticsService {
     @Autowired private ModRepository modRepository;
     @Autowired private MongoTemplate mongoTemplate;
 
-    public void logDownload(String projectId, String versionId, String authorId) {
+    public void logDownload(String projectId, String versionId, String authorId, boolean isApi) {
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
         int month = now.getMonthValue();
@@ -42,6 +42,7 @@ public class AnalyticsService {
         Update update = new Update()
                 .setOnInsert("authorId", authorId)
                 .inc("totalDownloads", 1)
+                .inc(isApi ? "apiDownloads" : "frontendDownloads", 1)
                 .inc("days." + day + ".d", 1);
 
         if (versionId != null) {
@@ -136,6 +137,8 @@ public class AnalyticsService {
         StatsSummary totalStats = getAllTimeTotals(projectId, true);
         detail.setTotalDownloads(totalStats.downloads);
         detail.setTotalViews(totalStats.views);
+        detail.setTotalApiDownloads(totalStats.apiDownloads);
+        detail.setTotalFrontendDownloads(totalStats.frontendDownloads);
 
         List<ProjectMonthlyStats> stats = getStatsInMemory(projectId, chartStart, end, true);
         detail.setViews(buildTimeSeries(stats, chartStart, end, false));
@@ -272,6 +275,8 @@ public class AnalyticsService {
     private static class StatsSummary {
         long downloads;
         long views;
+        long apiDownloads;
+        long frontendDownloads;
     }
 
     private StatsSummary getAllTimeTotals(String id, boolean isProject) {
@@ -281,6 +286,8 @@ public class AnalyticsService {
                 Aggregation.group()
                         .sum("totalDownloads").as("downloads")
                         .sum("totalViews").as("views")
+                        .sum("apiDownloads").as("apiDownloads")
+                        .sum("frontendDownloads").as("frontendDownloads")
         );
         AggregationResults<StatsSummary> res = mongoTemplate.aggregate(agg, ProjectMonthlyStats.class, StatsSummary.class);
         StatsSummary summary = res.getUniqueMappedResult();

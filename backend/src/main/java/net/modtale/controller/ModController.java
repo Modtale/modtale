@@ -11,6 +11,7 @@ import net.modtale.service.security.FileValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Arrays;
@@ -47,6 +49,9 @@ public class ModController {
     @Autowired private AnalyticsService analyticsService;
     @Autowired private FileValidationService validationService;
     @Autowired private UserRepository userRepository;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     private boolean isAdminOrSuper(User user) {
         if (user == null) return false;
@@ -89,7 +94,7 @@ public class ModController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download")
-    public ResponseEntity<Resource> downloadVersion(@PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<Resource> downloadVersion(@PathVariable String id, @PathVariable String version, HttpServletRequest request) {
         try {
             Mod mod = modService.getModById(id);
             if (mod == null) return ResponseEntity.notFound().build();
@@ -103,16 +108,29 @@ public class ModController {
                 }
             }
 
+            boolean isApi = false;
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+            if (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) {
+                isApi = true;
+            } else {
+                String referer = request.getHeader("Referer");
+                if (referer == null || !referer.startsWith(frontendUrl)) {
+                    isApi = true;
+                }
+            }
+
             if ("MODPACK".equals(mod.getClassification())) {
                 ModVersion targetVersion = modService.findVersion(mod, version);
                 if (targetVersion == null) return ResponseEntity.notFound().build();
 
                 modService.incrementDownloadCount(mod.getId());
-                analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor());
+                analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi);
 
                 if (targetVersion.getDependencies() != null) {
                     for (ModDependency dep : targetVersion.getDependencies()) {
                         modService.incrementDownloadCount(dep.getModId());
+                        analyticsService.logDownload(dep.getModId(), null, null, isApi);
                     }
                 }
 
@@ -137,7 +155,7 @@ public class ModController {
             ByteArrayResource resource = new ByteArrayResource(data);
 
             modService.incrementDownloadCount(mod.getId());
-            analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor());
+            analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi);
 
             String originalPath = targetVersion.getFileUrl();
             String filename = originalPath.contains("/") ? originalPath.substring(originalPath.lastIndexOf('/') + 1) : originalPath;
