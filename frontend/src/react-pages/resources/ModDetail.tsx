@@ -30,12 +30,24 @@ const DiscordIcon = ({ className }: { className?: string }) => (
 );
 
 const getLicenseInfo = (license: string) => {
-    const l = license.toUpperCase().replace(/\s+/g, '');
+    const l = license.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
     if (l.includes('MIT')) return { name: 'MIT', url: 'https://opensource.org/licenses/MIT' };
     if (l.includes('APACHE')) return { name: 'Apache 2.0', url: 'https://opensource.org/licenses/Apache-2.0' };
+    if (l.includes('LGPL')) return { name: 'LGPL v3', url: 'https://www.gnu.org/licenses/lgpl-3.0.en.html' };
+    if (l.includes('AGPL')) return { name: 'AGPL v3', url: 'https://www.gnu.org/licenses/agpl-3.0.en.html' };
     if (l.includes('GPL')) return { name: 'GPL v3', url: 'https://www.gnu.org/licenses/gpl-3.0.en.html' };
+    if (l.includes('MPL')) return { name: 'MPL 2.0', url: 'https://opensource.org/licenses/MPL-2.0' };
+    if (l.includes('BSD')) return { name: 'BSD 3-Clause', url: 'https://opensource.org/licenses/BSD-3-Clause' };
     if (l.includes('CC0')) return { name: 'CC0', url: 'https://creativecommons.org/publicdomain/zero/1.0/' };
+    if (l.includes('CCBYNCND')) return { name: 'CC BY-NC-ND 4.0', url: 'https://creativecommons.org/licenses/by-nc-nd/4.0/' };
+    if (l.includes('CCBYNCSA')) return { name: 'CC BY-NC-SA 4.0', url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/' };
+    if (l.includes('CCBYNC')) return { name: 'CC BY-NC 4.0', url: 'https://creativecommons.org/licenses/by-nc/4.0/' };
+    if (l.includes('CCBYSA')) return { name: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/' };
+    if (l.includes('CCBY')) return { name: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' };
+    if (l.includes('UNLICENSE')) return { name: 'The Unlicense', url: 'https://unlicense.org/' };
     if (l.includes('ARR') || l.includes('ALLRIGHTS')) return { name: 'All Rights Reserved', url: null };
+
     return { name: license, url: null };
 };
 
