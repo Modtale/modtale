@@ -353,7 +353,6 @@ public class ModService {
 
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
-        mod.setCreatedAt(LocalDateTime.now().toString());
         mod.setUpdatedAt(LocalDateTime.now().toString());
         mod.setContributors(new ArrayList<>());
         mod.setPendingInvites(new ArrayList<>());
@@ -447,7 +446,7 @@ public class ModService {
             validateForPublishing(mod);
         }
 
-        boolean isNewRelease = "PENDING".equals(mod.getStatus());
+        boolean isNewRelease = "PENDING".equals(mod.getStatus()) || mod.getCreatedAt() == null;
 
         mod.setStatus("PUBLISHED");
         mod.setExpiresAt(null);
@@ -1072,7 +1071,6 @@ public class ModService {
         if (mod != null) {
             mod.setDownloadCount(mod.getDownloadCount() + 1);
             modRepository.save(mod);
-            analyticsService.logDownload(modId, null, mod.getAuthor());
 
             int count = mod.getDownloadCount();
             if (count == 10000 || count == 100000 || count == 1000000 || count == 10000000) {
@@ -1336,7 +1334,7 @@ public class ModService {
             Mod mod = modOpt.get();
             mod.setDownloadCount(mod.getDownloadCount() + 1);
             modRepository.save(mod);
-            analyticsService.logDownload(mod.getId(), null, mod.getAuthor());
+            analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false);
         }
     }
 
