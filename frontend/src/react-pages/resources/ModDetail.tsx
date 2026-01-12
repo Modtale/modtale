@@ -106,16 +106,21 @@ const ProjectSidebar: React.FC<{
     };
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="bg-slate-100 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-white/5 grid grid-cols-2 divide-x divide-slate-200 dark:divide-white/5">
-                <div className="p-6 flex flex-col items-center justify-center text-center">
-                    <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-2">{avgRating}</div>
-                    <StarRating rating={Number(avgRating)} size="w-4 h-4" />
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">{totalReviews} Reviews</div>
+        <div className="flex flex-col gap-8">
+            <div className="grid grid-cols-2 gap-2 py-2">
+                <div className="flex flex-col items-center justify-start">
+                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{avgRating}</div>
+                    <div className="flex items-center justify-center mt-1 h-5 w-full">
+                        <StarRating rating={Number(avgRating)} size="w-4 h-4" />
+                    </div>
                 </div>
-                <div className="p-6 flex flex-col items-center justify-center text-center">
-                    <div className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-2">{mod.downloadCount.toLocaleString()}</div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Download className="w-3 h-3" /> Downloads</div>
+
+                <div className="flex flex-col items-center justify-start border-l border-slate-200 dark:border-white/5">
+                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.downloadCount.toLocaleString()}</div>
+                    <div className="flex items-center gap-1.5 mt-1 h-5">
+                        <Download className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-0.5">Downloads</span>
+                    </div>
                 </div>
             </div>
 
@@ -206,6 +211,7 @@ const ProjectSidebar: React.FC<{
 interface ReviewSectionProps {
     modId: string;
     reviews: Review[];
+    rating: number;
     currentUser: User | null;
     onReviewSubmitted: (newReviews: Review[]) => void;
     onError: (msg: string) => void;
@@ -213,7 +219,7 @@ interface ReviewSectionProps {
     innerRef?: React.RefObject<HTMLDivElement>;
 }
 
-const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, currentUser, onReviewSubmitted, onError, onSuccess, innerRef }) => {
+const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: overallRating, currentUser, onReviewSubmitted, onError, onSuccess, innerRef }) => {
     const [text, setText] = useState('');
     const [rating, setRating] = useState(5);
     const [submitting, setSubmitting] = useState(false);
@@ -236,6 +242,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, currentUs
                 <MessageSquare className="w-6 h-6 text-modtale-accent" /> Community Reviews
             </h2>
 
+            <div className="flex items-center gap-6 mb-10 bg-slate-50 dark:bg-slate-950/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
+                <div className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{overallRating.toFixed(1)}</div>
+                <div className="flex flex-col justify-center">
+                    <StarRating rating={overallRating} size="w-6 h-6" />
+                    <span className="text-sm font-bold text-slate-500 mt-2">{reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}</span>
+                </div>
+            </div>
+
             {currentUser ? (
                 <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
                     <div className="flex gap-2 mb-4">
@@ -255,7 +269,13 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, currentUs
                     <div key={review.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black">{review.user.charAt(0)}</div>
+                                <div className="w-10 h-10 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0">
+                                    {review.userAvatarUrl ? (
+                                        <img src={review.userAvatarUrl} alt={review.user} className="w-full h-full object-cover" />
+                                    ) : (
+                                        review.user.charAt(0)
+                                    )}
+                                </div>
                                 <div><span className="font-bold text-slate-900 dark:text-white block">{review.user}</span><StarRating rating={review.rating} size="w-3 h-3" /></div>
                             </div>
                             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -650,14 +670,6 @@ export const ModDetail: React.FC<{
                         </div>
                     </div>
                 }
-                mainContent={
-                    <>
-                        <div className="prose dark:prose-invert prose-lg max-w-none">
-                            {mod.about ? <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{mod.about}</ReactMarkdown> : <p className="text-slate-500 italic">No description.</p>}
-                        </div>
-                        <ReviewSection modId={mod.id} reviews={mod.reviews || []} currentUser={currentUser} onReviewSubmitted={(r) => { setMod(prev => prev ? {...prev, reviews: r} : null); if(onRefresh) onRefresh(); }} onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})} onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})} innerRef={reviewsRef} />
-                    </>
-                }
                 sidebarContent={
                     <ProjectSidebar
                         mod={mod}
@@ -668,6 +680,14 @@ export const ModDetail: React.FC<{
                         depMeta={depMeta}
                         sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
                     />
+                }
+                mainContent={
+                    <>
+                        <div className="prose dark:prose-invert prose-lg max-w-none">
+                            {mod.about ? <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{mod.about}</ReactMarkdown> : <p className="text-slate-500 italic">No description.</p>}
+                        </div>
+                        <ReviewSection modId={mod.id} rating={mod.rating || 0} reviews={mod.reviews || []} currentUser={currentUser} onReviewSubmitted={(r) => { setMod(prev => prev ? {...prev, reviews: r} : null); if(onRefresh) onRefresh(); }} onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})} onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})} innerRef={reviewsRef} />
+                    </>
                 }
             />
         </>
