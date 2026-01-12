@@ -164,6 +164,61 @@ public class AdminController {
         }
     }
 
+    @DeleteMapping("/projects/{id}")
+    public ResponseEntity<?> deleteProject(@PathVariable String id) {
+        try {
+            modService.adminDeleteProject(id);
+            return ResponseEntity.ok().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/projects/{id}/unlist")
+    public ResponseEntity<?> unlistProject(@PathVariable String id) {
+        try {
+            modService.adminUnlistProject(id);
+            return ResponseEntity.ok().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/projects/{id}/versions/{versionId}")
+    public ResponseEntity<?> deleteProjectVersion(@PathVariable String id, @PathVariable String versionId) {
+        try {
+            modService.adminDeleteVersion(id, versionId);
+            return ResponseEntity.ok().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/projects/search")
+    public ResponseEntity<?> searchProjects(@RequestParam String query) {
+        User currentUser = userService.getCurrentUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        // Admin search uses relevance without other filters
+        return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null).getContent());
+    }
+
+    @GetMapping("/projects/{id}")
+    public ResponseEntity<?> getProjectById(@PathVariable String id) {
+        User currentUser = userService.getCurrentUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        Mod mod = modService.getModById(id);
+        if (mod == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(mod);
+    }
+
     @GetMapping("/projects/{id}/versions/{version}/structure")
     public ResponseEntity<?> getJarStructure(@PathVariable String id, @PathVariable String version) {
         User currentUser = userService.getCurrentUser();

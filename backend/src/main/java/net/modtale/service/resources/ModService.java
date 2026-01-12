@@ -97,6 +97,10 @@ public class ModService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    private boolean isAdmin(User user) {
+        return user != null && user.getRoles() != null && user.getRoles().contains("ADMIN");
+    }
+
     private void ensureEditable(Mod mod) {
         if ("PENDING".equals(mod.getStatus())) {
             throw new IllegalStateException("Pending projects cannot be modified. Please revert to draft first.");
@@ -916,6 +920,48 @@ public class ModService {
 
         ensureEditable(mod);
         performDeletionStrategy(mod);
+    }
+
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    public void adminDeleteProject(String id) {
+        User user = userService.getCurrentUser();
+        if (!isAdmin(user)) throw new SecurityException("Access Denied");
+        Mod mod = getModById(id);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        performDeletionStrategy(mod);
+    }
+
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    public void adminUnlistProject(String id) {
+        User user = userService.getCurrentUser();
+        if (!isAdmin(user)) throw new SecurityException("Access Denied");
+        Mod mod = getModById(id);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        mod.setStatus("UNLISTED");
+        mod.setExpiresAt(null);
+        modRepository.save(mod);
+    }
+
+    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    public void adminDeleteVersion(String modId, String versionId) {
+        User user = userService.getCurrentUser();
+        if (!isAdmin(user)) throw new SecurityException("Access Denied");
+        Mod mod = getModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+
+        boolean removed = mod.getVersions().removeIf(v -> {
+            if (v.getId().equals(versionId)) {
+                if (v.getFileUrl() != null) storageService.deleteFile(v.getFileUrl());
+                return true;
+            }
+            return false;
+        });
+
+        if (removed) {
+            modRepository.save(mod);
+        } else {
+            throw new IllegalArgumentException("Version not found.");
+        }
     }
 
     public void handleUserDeletion(User user) {

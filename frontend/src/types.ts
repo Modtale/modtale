@@ -142,3 +142,15 @@ export interface ProjectAnalyticsDetail {
     views: AnalyticsDataPoint[];
     ratingHistory: AnalyticsDataPoint[];
 }
+
+export interface Report {
+    id: string;
+    reporterId: string;
+    reporterUsername: string;
+    projectId: string;
+    projectTitle: string;
+    reason: string;
+    description: string;
+    status: 'OPEN' | 'RESOLVED' | 'DISMISSED';
+    createdAt: string;
+}
