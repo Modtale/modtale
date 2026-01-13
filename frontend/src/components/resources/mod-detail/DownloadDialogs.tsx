@@ -195,20 +195,38 @@ const CustomDropdown = ({ options, value, onChange, placeholder }: any) => {
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between p-3.5 bg-slate-800 border border-white/10 rounded-xl font-bold text-white hover:border-modtale-accent transition-colors"
             >
-                <span>{value ? `Hytale ${value}` : placeholder}</span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <span>{value ? value : placeholder}</span>
+                <ChevronDown
+                    className={`w-4 h-4 text-slate-400 transition-transform ${
+                        isOpen ? 'rotate-180' : ''
+                    }`}
+                />
             </button>
+
             {isOpen && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden max-h-60 overflow-y-auto custom-scrollbar">
-                    {options.length > 0 ? options.map((opt: string) => (
-                        <button
-                            key={opt}
-                            onClick={() => { onChange(opt); setIsOpen(false); }}
-                            className={`w-full text-left px-4 py-3 hover:bg-white/10 text-sm font-bold ${value === opt ? 'text-modtale-accent bg-white/5' : 'text-slate-200'}`}
-                        >
-                            Hytale {opt}
-                        </button>
-                    )) : <div className="p-4 text-center text-slate-400 text-sm">No versions found</div>}
+                    {options.length > 0 ? (
+                        options.map((opt: string) => (
+                            <button
+                                key={opt}
+                                onClick={() => {
+                                    onChange(opt);
+                                    setIsOpen(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 hover:bg-white/10 text-sm font-bold ${
+                                    value === opt
+                                        ? 'text-modtale-accent bg-white/5'
+                                        : 'text-slate-200'
+                                }`}
+                            >
+                                {opt}
+                            </button>
+                        ))
+                    ) : (
+                        <div className="p-4 text-center text-slate-400 text-sm">
+                            No versions found
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -229,12 +247,32 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
         }
     }, [show, versionsByGame]);
 
+    useEffect(() => {
+        const currentVersions = versionsByGame[selectedGameVer] || [];
+        if (currentVersions.length > 0) {
+            const hasRelease = currentVersions.some((v: any) => !v.channel || v.channel === 'RELEASE');
+            if (!hasRelease && !showExperimental) {
+                onToggleExperimental();
+            }
+        }
+    }, [selectedGameVer, versionsByGame, showExperimental, onToggleExperimental]);
+
     if (!show) return null;
 
     const gameVersions = Object.keys(versionsByGame).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
     const currentVersions = versionsByGame[selectedGameVer] || [];
-    const sortedVersions = [...currentVersions].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+
+    const visibleVersions = currentVersions.filter((v: any) => showExperimental || (!v.channel || v.channel === 'RELEASE'));
+    const sortedVersions = [...visibleVersions].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
     const latestVer = sortedVersions[0];
+
+    const getVersionBadgeColor = (channel: string) => {
+        switch(channel) {
+            case 'BETA': return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
+            case 'ALPHA': return 'bg-orange-500/20 text-orange-200 border-orange-500/30';
+            default: return 'bg-black/20 border-white/10';
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" onClick={onClose}>
@@ -268,13 +306,13 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                         <>
                             <button
                                 onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies)}
-                                className="w-full bg-modtale-accent hover:bg-modtale-accentHover text-white p-5 rounded-2xl shadow-lg shadow-modtale-accent/20 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 mb-6 group"
+                                className="w-full bg-modtale-accent hover:bg-modtale-accentHover text-white p-5 rounded-2xl shadow-lg shadow-modtale-accent/20 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden"
                             >
-                                <span className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform"><Download className="w-6 h-6" /> Download Latest</span>
-                                <span className="text-xs opacity-90 font-mono bg-black/10 px-2 py-0.5 rounded border border-white/10 flex items-center gap-2">
+                                <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
+                                <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
                                     v{latestVer.versionNumber}
-                                    {latestVer.channel !== 'RELEASE' && <ChannelBadge channel={latestVer.channel} />}
-                                </span>
+                                    {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
+                                </div>
                             </button>
 
                             <div className="relative mb-6">
@@ -311,6 +349,11 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                         <div className="text-center py-12 text-slate-500 flex flex-col items-center gap-2">
                             <AlertCircle className="w-8 h-8 opacity-50" />
                             <p className="font-medium">No compatible versions found.</p>
+                            {!showExperimental && currentVersions.length > 0 && (
+                                <button onClick={onToggleExperimental} className="text-xs text-modtale-accent font-bold hover:underline">
+                                    Show Beta/Alpha versions
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
