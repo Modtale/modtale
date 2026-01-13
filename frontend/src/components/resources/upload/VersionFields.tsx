@@ -25,7 +25,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                                                             }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const gameVersions = ['Release 1.1', 'Release 1.0', 'Beta 0.9'];
+    const gameVersions = ['1.0-SNAPSHOT'];
 
     const versionNum = data.versionNumber.trim();
     const isFormatValid = STRICT_VERSION_REGEX.test(versionNum);

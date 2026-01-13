@@ -197,7 +197,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</h3>
                                 </div>
                                 <div className="p-4 space-y-5">
-                                    <FilterDropdown label="Game Version" value={selectedVersion} options={['Any', 'Release 1.1', 'Release 1.0', 'Beta 0.9']} onChange={(val) => {setSelectedVersion(val); setPage(0);}} />
+                                    <FilterDropdown label="Game Version" value={selectedVersion} options={['Any', '1.0-SNAPSHOT']} onChange={(val) => {setSelectedVersion(val); setPage(0);}} />
 
                                     <div>
                                         <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Minimum Rating</label>

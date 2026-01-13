@@ -46,36 +46,6 @@ const ScrollToTop = () => {
     return null;
 };
 
-const GlobalDemoWarning = () => {
-    const [isVisible, setIsVisible] = useState(
-        () => typeof window !== 'undefined' && !sessionStorage.getItem('modtale_demo_warning_dismissed')
-    );
-
-    if (!isVisible) return null;
-
-    return (
-        <div className="bg-amber-100 dark:bg-amber-900 border-b border-amber-200 dark:border-amber-700 text-amber-900 dark:text-amber-100 px-4 py-3 relative z-[100]">
-            <div className="max-w-7xl mx-auto flex items-start md:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 md:mt-0" />
-                    <p className="text-sm font-medium leading-tight">
-                        <strong>Demonstration Only:</strong> The projects shown here are not real.
-                    </p>
-                </div>
-                <button
-                    onClick={() => {
-                        sessionStorage.setItem('modtale_demo_warning_dismissed', 'true');
-                        setIsVisible(false);
-                    }}
-                    className="text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 rounded-lg p-1 transition-colors"
-                >
-                    <X className="w-4 h-4" />
-                </button>
-            </div>
-        </div>
-    );
-};
-
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
@@ -195,7 +165,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
     return (
         <div className={`min-h-screen bg-white dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
-            <ScrollToTop /> <SEOHead /> <GlobalDemoWarning />
+            <ScrollToTop /> <SEOHead />
 
             {globalError && (
                 <StatusModal
