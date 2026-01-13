@@ -19,7 +19,7 @@ public class CacheConfig {
                 "modTags",
                 "projectDetails",
                 "modpackZips",
-                "projectSearch_v3",
+                "projectSearch",
                 "hytaleVersions",
                 "allTags",
                 "creatorAnalytics",

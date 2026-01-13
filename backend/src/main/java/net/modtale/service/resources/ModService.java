@@ -59,7 +59,7 @@ public class ModService {
     );
 
     private static final Set<String> ALLOWED_GAME_VERSIONS = Set.of(
-            "Release 1.1", "Release 1.0", "Beta 0.9"
+            "1.0-SNAPSHOT"
     );
 
     private static final Set<String> ALLOWED_CLASSIFICATIONS = Set.of(
@@ -208,8 +208,8 @@ public class ModService {
             long count = mongoTemplate.count(query, Mod.class);
 
             if (count != idsToCheck.size()) {
-                logger.warn("Cache verification failed for getMods. Invalidating 'projectSearch_v3' and retrying.");
-                Objects.requireNonNull(cacheManager.getCache("projectSearch_v3")).clear();
+                logger.warn("Cache verification failed for getMods. Invalidating 'projectSearch' and retrying.");
+                Objects.requireNonNull(cacheManager.getCache("projectSearch")).clear();
                 return self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
             }
         }
@@ -218,7 +218,7 @@ public class ModService {
     }
 
     @Cacheable(
-            value = "projectSearch_v3",
+            value = "projectSearch",
             key = "{#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minRating, #minDownloads, #viewCategory, #dateRange, #author}",
             condition = "!('Favorites'.equals(#viewCategory))"
     )
@@ -368,7 +368,7 @@ public class ModService {
         return createDraft(title, description, classification, user, ownerName, null);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void submitMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -398,7 +398,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void archiveMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -413,7 +413,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void unlistMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -428,7 +428,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void publishMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -633,7 +633,7 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void addMod(Mod mod) {
         validateTags(mod.getTags());
         validateClassification(mod.getClassification());
@@ -641,7 +641,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void updateMod(String id, Mod updatedMod) {
         User user = userService.getCurrentUser();
         Mod existing = getModById(id);
@@ -698,7 +698,7 @@ public class ModService {
         modRepository.save(existing);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void updateProjectIcon(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
         Mod mod = getModById(id);
@@ -714,7 +714,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = "projectSearch", allEntries = true)
     public void updateProjectBanner(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
         Mod mod = getModById(id);
@@ -737,7 +737,7 @@ public class ModService {
         if ("MODPACK".equals(depMod.getClassification()) || "SAVE".equals(depMod.getClassification())) throw new IllegalArgumentException("Modpacks and Worlds cannot be added as dependencies.");
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = "projectSearch", allEntries = true)
     public void updateVersionDependencies(String modId, String versionId, List<String> modIds) {
         User user = userService.getCurrentUser();
         Mod mod = getModById(modId);
@@ -788,7 +788,7 @@ public class ModService {
         addVersionToMod(modId, versionNumber, gameVersions, file, changelog, modIds, ModVersion.Channel.RELEASE);
     }
 
-    @CacheEvict(value = "projectSearch_v3", allEntries = true)
+    @CacheEvict(value = "projectSearch", allEntries = true)
     public void addVersionToMod(String modId, String versionNumber, List<String> gameVersions,
                                 MultipartFile file, String changelog, List<String> modIds, ModVersion.Channel channel) throws IOException {
         User user = userService.getCurrentUser();
@@ -921,7 +921,7 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void deleteMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -934,7 +934,7 @@ public class ModService {
         performDeletionStrategy(mod);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void adminDeleteProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -943,7 +943,7 @@ public class ModService {
         performDeletionStrategy(mod);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void adminUnlistProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -954,7 +954,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch_v3", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void adminDeleteVersion(String modId, String versionId) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -981,7 +981,7 @@ public class ModService {
         for (Mod mod : userMods) {
             performDeletionStrategy(mod);
         }
-        Objects.requireNonNull(cacheManager.getCache("projectSearch_v3")).clear();
+        Objects.requireNonNull(cacheManager.getCache("projectSearch")).clear();
         Objects.requireNonNull(cacheManager.getCache("sitemapData")).clear();
     }
 

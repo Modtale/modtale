@@ -287,7 +287,7 @@ export const ApiDocs: React.FC = () => {
                             method="GET"
                             path="/api/v1/meta/game-versions"
                             desc="Get supported game target versions."
-                            response={`[ "Release 1.1", "Release 1.0", "Beta 0.9" ]`}
+                            response={`[ "1.0-SNAPSHOT" ]`}
                         />
                     </div>
                 </section>
