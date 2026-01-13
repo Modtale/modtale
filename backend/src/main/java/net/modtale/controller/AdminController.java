@@ -13,6 +13,7 @@ import org.jetbrains.java.decompiler.main.extern.IBytecodeProvider;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
 import org.jetbrains.java.decompiler.main.extern.IResultSaver;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,15 +21,12 @@ import org.springframework.web.bind.annotation.*;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
-import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -53,12 +51,17 @@ public class AdminController {
         return (user != null && user.getRoles() != null && user.getRoles().contains("ADMIN")) || isSuperAdmin(user);
     }
 
+    private User getSafeUser() {
+        try {
+            return userService.getCurrentUser();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @PostMapping("/users/{username}/tier")
-    public ResponseEntity<?> setUserTier(
-            @PathVariable String username,
-            @RequestParam String tier
-    ) {
-        User currentUser = userService.getCurrentUser();
+    public ResponseEntity<?> setUserTier(@PathVariable String username, @RequestParam String tier) {
+        User currentUser = getSafeUser();
         if (!isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Access Denied", "message", "You do not have permission."));
@@ -84,7 +87,7 @@ public class AdminController {
 
     @PostMapping("/users/{username}/role")
     public ResponseEntity<?> addUserRole(@PathVariable String username, @RequestParam String role) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
@@ -102,7 +105,7 @@ public class AdminController {
 
     @DeleteMapping("/users/{username}/role")
     public ResponseEntity<?> removeUserRole(@PathVariable String username, @RequestParam String role) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
@@ -119,7 +122,7 @@ public class AdminController {
 
     @GetMapping("/verification/queue")
     public ResponseEntity<List<Mod>> getVerificationQueue() {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -128,7 +131,7 @@ public class AdminController {
 
     @GetMapping("/projects/{id}/review-details")
     public ResponseEntity<?> getProjectReviewDetails(@PathVariable String id) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -140,8 +143,8 @@ public class AdminController {
         Map<String, Object> authorStats = Map.of(
                 "accountAge", author != null ? author.getCreatedAt() : "Unknown",
                 "tier", author != null ? author.getTier() : "Unknown",
-                "avatarUrl", author != null ? author.getAvatarUrl() : "",
-                "totalProjects", author != null ? modService.getCreatorProjects(author.getUsername(), org.springframework.data.domain.Pageable.unpaged()).getTotalElements() : 0
+                "avatarUrl", author != null ? (author.getAvatarUrl() != null ? author.getAvatarUrl() : "") : "",
+                "totalProjects", author != null ? modService.getCreatorProjects(author.getUsername(), Pageable.unpaged()).getTotalElements() : 0
         );
 
         return ResponseEntity.ok(Map.of(
@@ -152,7 +155,7 @@ public class AdminController {
 
     @PostMapping("/projects/{id}/reject")
     public ResponseEntity<?> rejectProject(@PathVariable String id, @RequestBody Map<String, String> body) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -166,6 +169,8 @@ public class AdminController {
 
     @DeleteMapping("/projects/{id}")
     public ResponseEntity<?> deleteProject(@PathVariable String id) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminDeleteProject(id);
             return ResponseEntity.ok().build();
@@ -178,6 +183,8 @@ public class AdminController {
 
     @PostMapping("/projects/{id}/unlist")
     public ResponseEntity<?> unlistProject(@PathVariable String id) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminUnlistProject(id);
             return ResponseEntity.ok().build();
@@ -190,6 +197,8 @@ public class AdminController {
 
     @DeleteMapping("/projects/{id}/versions/{versionId}")
     public ResponseEntity<?> deleteProjectVersion(@PathVariable String id, @PathVariable String versionId) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminDeleteVersion(id, versionId);
             return ResponseEntity.ok().build();
@@ -202,7 +211,7 @@ public class AdminController {
 
     @GetMapping("/projects/search")
     public ResponseEntity<?> searchProjects(@RequestParam String query) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null).getContent());
@@ -210,7 +219,7 @@ public class AdminController {
 
     @GetMapping("/projects/{id}")
     public ResponseEntity<?> getProjectById(@PathVariable String id) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         Mod mod = modService.getModById(id);
@@ -220,7 +229,7 @@ public class AdminController {
 
     @GetMapping("/projects/{id}/versions/{version}/structure")
     public ResponseEntity<?> getJarStructure(@PathVariable String id, @PathVariable String version) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         try {
@@ -231,8 +240,9 @@ public class AdminController {
             if (targetVer == null || targetVer.getFileUrl() == null) return ResponseEntity.notFound().build();
 
             byte[] jarBytes = storageService.download(targetVer.getFileUrl());
-            List<String> files = new ArrayList<>();
+            if (jarBytes == null) return ResponseEntity.status(500).body("File download failed");
 
+            List<String> files = new ArrayList<>();
             try (JarInputStream jis = new JarInputStream(new ByteArrayInputStream(jarBytes))) {
                 JarEntry entry;
                 while ((entry = jis.getNextJarEntry()) != null) {
@@ -262,7 +272,7 @@ public class AdminController {
             @PathVariable String version,
             @RequestParam String path
     ) {
-        User currentUser = userService.getCurrentUser();
+        User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         try {
@@ -273,6 +283,8 @@ public class AdminController {
             if (targetVer == null || targetVer.getFileUrl() == null) return ResponseEntity.notFound().build();
 
             byte[] jarBytes = storageService.download(targetVer.getFileUrl());
+            if (jarBytes == null) return ResponseEntity.status(500).body("File download failed");
+
             byte[] fileBytes = null;
 
             try (JarInputStream jis = new JarInputStream(new ByteArrayInputStream(jarBytes))) {
@@ -308,9 +320,13 @@ public class AdminController {
     }
 
     private String decompileClass(byte[] classBytes, String originalPath) {
+        Path tempDir = null;
         try {
-            Path tempDir = Files.createTempDirectory("decompile");
+            tempDir = Files.createTempDirectory("decompile");
             String fileName = new File(originalPath).getName();
+            // Basic sanitization
+            fileName = fileName.replaceAll("[^a-zA-Z0-9.-]", "_");
+
             Path classFile = tempDir.resolve(fileName);
             Files.write(classFile, classBytes);
 
@@ -348,13 +364,20 @@ public class AdminController {
             decompiler.addSource(classFile.toFile());
             decompiler.decompileContext();
 
-            try { Files.deleteIfExists(classFile); Files.deleteIfExists(tempDir); } catch(Exception ignored) {}
-
             String output = result.toString();
             return output.isEmpty() ? "// Decompilation failed or produced no output." : output;
 
         } catch (Exception e) {
             return "// Error decompiling file: " + e.getMessage();
+        } finally {
+            if (tempDir != null) {
+                try {
+                    Files.walk(tempDir)
+                            .sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                } catch (IOException ignored) {}
+            }
         }
     }
 }
