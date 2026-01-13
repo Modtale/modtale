@@ -3,18 +3,18 @@ package net.modtale.config.security;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
-import jakarta.servlet.*;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.service.security.ApiKeyService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -24,8 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 1)
-public class RateLimitFilter implements Filter {
+public class RateLimitFilter extends OncePerRequestFilter {
 
     @Autowired
     private ApiKeyService apiKeyService;
@@ -37,12 +36,9 @@ public class RateLimitFilter implements Filter {
     );
 
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        HttpServletRequest req = (HttpServletRequest) request;
-        HttpServletResponse res = (HttpServletResponse) response;
-
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws ServletException, IOException {
         if (!req.getRequestURI().startsWith("/api/v1")) {
-            chain.doFilter(request, response);
+            chain.doFilter(req, res);
             return;
         }
 
@@ -83,7 +79,6 @@ public class RateLimitFilter implements Filter {
 
             if (isSessionUser) {
                 User user = (User) auth.getPrincipal();
-                // This matches the format used in the ApiKey block above
                 limitKey = "USER:" + user.getId();
                 capacity = 1000;
                 tierName = "Frontend-User";
@@ -105,14 +100,15 @@ public class RateLimitFilter implements Filter {
             }
         }
 
-        Bucket bucket = bucketCache.computeIfAbsent(limitKey, k -> createNewBucket(capacity));
+        final long finalCapacity = capacity;
+        Bucket bucket = bucketCache.computeIfAbsent(limitKey, k -> createNewBucket(finalCapacity));
 
-        res.setHeader("X-RateLimit-Limit", String.valueOf(capacity));
+        res.setHeader("X-RateLimit-Limit", String.valueOf(finalCapacity));
         res.setHeader("X-RateLimit-Tier", tierName);
         res.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getAvailableTokens()));
 
         if (bucket.tryConsume(1)) {
-            chain.doFilter(request, response);
+            chain.doFilter(req, res);
         } else {
             res.setStatus(429);
             res.setContentType("application/json");
@@ -126,6 +122,7 @@ public class RateLimitFilter implements Filter {
     }
 
     private boolean isBlockedAgent(String ua) {
+        if (ua == null) return true;
         String lowerUA = ua.toLowerCase();
         return BLOCKED_AGENTS.stream().anyMatch(lowerUA::startsWith);
     }
@@ -140,6 +137,8 @@ public class RateLimitFilter implements Filter {
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
             return xForwardedFor.split(",")[0].trim();
         }
-        return req.getRemoteAddr();
+
+        String remoteAddr = req.getRemoteAddr();
+        return remoteAddr != null ? remoteAddr : "unknown";
     }
 }
