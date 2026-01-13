@@ -253,7 +253,7 @@ public class SecurityConfig {
             OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
             String login = oauthUser.getAttribute("login");
             if (login == null) {
-                login = oauthUser.getAttribute("username"); // fallback
+                login = oauthUser.getAttribute("username");
             }
 
             if (authentication instanceof OAuth2AuthenticationToken) {

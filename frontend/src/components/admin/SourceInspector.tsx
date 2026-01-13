@@ -67,7 +67,6 @@ const FileTreeNode: React.FC<{
     const isExpanded = expanded.has(node.path);
     const isSelected = selectedFile === node.path;
 
-    // Icon Selection
     let Icon = FileText;
     if (node.type === 'folder') Icon = isExpanded ? FolderOpen : Folder;
     else if (node.name.endsWith('.class') || node.name.endsWith('.java')) Icon = FileCode;

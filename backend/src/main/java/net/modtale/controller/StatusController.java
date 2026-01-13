@@ -53,7 +53,7 @@ public class StatusController {
 
         List<Map<String, Object>> services = new ArrayList<>();
         services.add(Map.of("id", "api", "name", "API Gateway", "status", latest.getOverallStatus(), "latency", latest.getApiLatency()));
-        services.add(Map.of("id", "database", "name", "Database (Atlas)", "status", "operational", "latency", latest.getDbLatency())); // Assuming simple mapping, could store individual status in DB if needed
+        services.add(Map.of("id", "database", "name", "Database (Atlas)", "status", "operational", "latency", latest.getDbLatency()));
         services.add(Map.of("id", "storage", "name", "Storage (R2)", "status", "operational", "latency", latest.getStorageLatency()));
 
         LocalDateTime since;

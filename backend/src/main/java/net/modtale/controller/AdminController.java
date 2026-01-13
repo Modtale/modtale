@@ -205,7 +205,6 @@ public class AdminController {
         User currentUser = userService.getCurrentUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        // Admin search uses relevance without other filters
         return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null).getContent());
     }
 

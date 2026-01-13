@@ -2,7 +2,7 @@ import type { Classification } from './categories';
 
 export const DEFAULT_SEO = {
     title: "Modtale - Hytale Mods, Maps & Plugins",
-    description: "The premier community repository for Hytale. Discover, download, and share Hytale mods, plugins, art + data assets, modpacks, and worlds. Join the modding community today.",
+    description: "The premier community repository for Hytale. Discover, download, and share Hytale mods, plugins, art + data assets, modpacks, and worlds.",
     keywords: "hytale mods, hytale modding, download hytale mods, hytale plugins, hytale maps, hytale modpacks, hytale servers, modtale"
 };
 

@@ -97,7 +97,6 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                 return;
             }
 
-            // Login successful (No MFA)
             window.location.href = '/dashboard/profile';
         } catch (err: any) {
             console.error(err);
