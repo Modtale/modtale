@@ -404,7 +404,7 @@ export const ModDetail: React.FC<{
             const gvList = v.gameVersions?.length ? v.gameVersions : ['Unknown'];
             gvList.forEach(gv => {
                 if (!result[gv]) result[gv] = [];
-                if (!v.channel || v.channel === 'RELEASE') result[gv].push(v);
+                result[gv].push(v);
             });
         });
         return result;
