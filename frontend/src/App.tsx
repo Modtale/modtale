@@ -164,83 +164,85 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     );
 
     return (
-        <div className={`min-h-screen bg-white dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
-            <ScrollToTop /> <SEOHead />
+        <NotificationProvider userId={user?.id}>
+            <div className={`min-h-screen bg-white dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
+                <ScrollToTop /> <SEOHead />
 
-            {globalError && (
-                <StatusModal
-                    type="error"
-                    title="Login Failed"
-                    message={globalError}
-                    onClose={() => setGlobalError(null)}
-                />
-            )}
+                {globalError && (
+                    <StatusModal
+                        type="error"
+                        title="Login Failed"
+                        message={globalError}
+                        onClose={() => setGlobalError(null)}
+                    />
+                )}
 
-            <Navbar user={user} onLogout={handleLogout}
-                    currentPage={location.pathname.replace('/', '') || 'home'} onNavigate={handleNavigate}
-                    isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} onAuthorClick={handleAuthorClick} />
-            <div className="flex-1">
-                <Routes>
-                    <Route path="/" element={renderHome()} />
-                    <Route path="/mods" element={<Navigate to="/" replace />} />
-                    <Route path="/plugins" element={renderHome('PLUGIN')} />
-                    <Route path="/modpacks" element={renderHome('MODPACK')} />
-                    <Route path="/worlds" element={renderHome('SAVE')} />
-                    <Route path="/art" element={renderHome('ART')} />
-                    <Route path="/data" element={renderHome('DATA')} />
+                <Navbar user={user} onLogout={handleLogout}
+                        currentPage={location.pathname.replace('/', '') || 'home'} onNavigate={handleNavigate}
+                        isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} onAuthorClick={handleAuthorClick} />
+                <div className="flex-1">
+                    <Routes>
+                        <Route path="/" element={renderHome()} />
+                        <Route path="/mods" element={<Navigate to="/" replace />} />
+                        <Route path="/plugins" element={renderHome('PLUGIN')} />
+                        <Route path="/modpacks" element={renderHome('MODPACK')} />
+                        <Route path="/worlds" element={renderHome('SAVE')} />
+                        <Route path="/art" element={renderHome('ART')} />
+                        <Route path="/data" element={renderHome('DATA')} />
 
-                    <Route path="/upload" element={<Upload onNavigate={handleNavigate} onRefresh={refreshData} currentUser={user} />} />
-                    <Route path="/dashboard/*" element={<Dashboard user={user} onRefreshUser={fetchUser} />} />
-                    <Route path="/analytics/project/:id" element={<Analytics />} />
+                        <Route path="/upload" element={<Upload onNavigate={handleNavigate} onRefresh={refreshData} currentUser={user} />} />
+                        <Route path="/dashboard/*" element={<Dashboard user={user} onRefreshUser={fetchUser} />} />
+                        <Route path="/analytics/project/:id" element={<Analytics />} />
 
-                    <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, false)} downloadedSessionIds={downloadedSessionIds} />} />
-                    <Route path="/mod/:id/edit" element={<EditMod currentUser={user} />} />
+                        <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, false)} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/mod/:id/edit" element={<EditMod currentUser={user} />} />
 
-                    <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModpackIds?.includes(id) || user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, true)} downloadedSessionIds={downloadedSessionIds} />} />
-                    <Route path="/modpack/:id/edit" element={<EditMod currentUser={user} />} />
+                        <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModpackIds?.includes(id) || user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, true)} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/modpack/:id/edit" element={<EditMod currentUser={user} />} />
 
-                    <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, false)} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, false)} downloadedSessionIds={downloadedSessionIds} />} />
 
-                    <Route path="/creator/:username" element={<CreatorProfile onModClick={handleModClick} onModpackClick={handleModpackClick} onBack={() => handleNavigate('home')} likedModIds={user?.likedModIds || []} likedModpackIds={user?.likedModpackIds || []} onToggleFavorite={handleToggleFavorite} onToggleFavoriteModpack={handleToggleFavorite} currentUser={user} onRefreshUser={fetchUser} />} />
+                        <Route path="/creator/:username" element={<CreatorProfile onModClick={handleModClick} onModpackClick={handleModpackClick} onBack={() => handleNavigate('home')} likedModIds={user?.likedModIds || []} likedModpackIds={user?.likedModpackIds || []} onToggleFavorite={handleToggleFavorite} onToggleFavoriteModpack={handleToggleFavorite} currentUser={user} onRefreshUser={fetchUser} />} />
 
-                    <Route path="/verify" element={
-                        <VerifyEmail
-                            user={user}
-                            isDarkMode={isDarkMode}
-                            toggleDarkMode={toggleDarkMode}
-                            onLogout={handleLogout}
-                            onNavigate={handleNavigate}
-                            currentPage={location.pathname.replace('/', '')}
-                            onAuthorClick={handleAuthorClick}
-                        />
-                    } />
+                        <Route path="/verify" element={
+                            <VerifyEmail
+                                user={user}
+                                isDarkMode={isDarkMode}
+                                toggleDarkMode={toggleDarkMode}
+                                onLogout={handleLogout}
+                                onNavigate={handleNavigate}
+                                currentPage={location.pathname.replace('/', '')}
+                                onAuthorClick={handleAuthorClick}
+                            />
+                        } />
 
-                    <Route path="/reset-password" element={<ResetPassword />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
 
-                    <Route path="/mfa" element={
-                        <MfaVerify
-                            user={user}
-                            isDarkMode={isDarkMode}
-                            toggleDarkMode={toggleDarkMode}
-                            onLogout={handleLogout}
-                            onNavigate={handleNavigate}
-                            currentPage={location.pathname.replace('/', '')}
-                            onAuthorClick={handleAuthorClick}
-                        />
-                    } />
+                        <Route path="/mfa" element={
+                            <MfaVerify
+                                user={user}
+                                isDarkMode={isDarkMode}
+                                toggleDarkMode={toggleDarkMode}
+                                onLogout={handleLogout}
+                                onNavigate={handleNavigate}
+                                currentPage={location.pathname.replace('/', '')}
+                                onAuthorClick={handleAuthorClick}
+                            />
+                        } />
 
-                    <Route path="/terms" element={<TermsOfService />} />
-                    <Route path="/privacy" element={<PrivacyPolicy />} />
-                    <Route path="/api-docs" element={<ApiDocs />} />
-                    <Route path="/status" element={<Status />} />
-                    <Route path="/settings/developer" element={<Navigate to="/dashboard/developer" replace />} />
-                    <Route path="/analytics" element={<Navigate to="/dashboard/analytics" replace />} />
-                    <Route path="/admin" element={user ? <AdminPanel currentUser={user} /> : <Navigate to="/" />} />
-                    <Route path="*" element={<NotFound />} />
-                </Routes>
+                        <Route path="/terms" element={<TermsOfService />} />
+                        <Route path="/privacy" element={<PrivacyPolicy />} />
+                        <Route path="/api-docs" element={<ApiDocs />} />
+                        <Route path="/status" element={<Status />} />
+                        <Route path="/settings/developer" element={<Navigate to="/dashboard/developer" replace />} />
+                        <Route path="/analytics" element={<Navigate to="/dashboard/analytics" replace />} />
+                        <Route path="/admin" element={user ? <AdminPanel currentUser={user} /> : <Navigate to="/" />} />
+                        <Route path="*" element={<NotFound />} />
+                    </Routes>
+                </div>
+                <Footer isDarkMode={isDarkMode} />
             </div>
-            <Footer isDarkMode={isDarkMode} />
-        </div>
+        </NotificationProvider>
     );
 };
 
@@ -251,15 +253,11 @@ export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData
                 <ExternalLinkProvider>
                     {import.meta.env.SSR ? (
                         <StaticRouter location={initialPath || "/"}>
-                            <NotificationProvider>
-                                <AppContent initialClassification={initialClassification} />
-                            </NotificationProvider>
+                            <AppContent initialClassification={initialClassification} />
                         </StaticRouter>
                     ) : (
                         <BrowserRouter>
-                            <NotificationProvider>
-                                <AppContent initialClassification={initialClassification} />
-                            </NotificationProvider>
+                            <AppContent initialClassification={initialClassification} />
                         </BrowserRouter>
                     )}
                 </ExternalLinkProvider>
