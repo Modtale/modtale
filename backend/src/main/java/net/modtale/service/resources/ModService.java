@@ -543,9 +543,6 @@ public class ModService {
         }
 
         if("PLUGIN".equals(mod.getClassification())) {
-            if(mod.getRepositoryUrl() == null || mod.getRepositoryUrl().isEmpty()) {
-                throw new IllegalArgumentException("Repository URL is required for Plugins.");
-            }
             validateRepositoryUrl(mod.getRepositoryUrl());
         }
 
