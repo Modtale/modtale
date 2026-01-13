@@ -112,6 +112,7 @@ public class SecurityConfig {
                         .csrfTokenRepository(tokenRepository)
                         .csrfTokenRequestHandler(requestHandler)
                         .ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**")
+                        .ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null)
                 )
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
