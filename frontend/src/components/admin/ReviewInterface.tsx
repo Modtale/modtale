@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
     Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink,
-    AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon
+    AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye
 } from 'lucide-react';
 import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
 import { SourceInspector } from './SourceInspector';
+import type { ScanIssue } from '../../types';
 
 interface ReviewInterfaceProps {
     reviewingProject: any;
@@ -60,8 +61,9 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectPanel, setShowRejectPanel] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
+    const [showScanDetails, setShowScanDetails] = useState(false);
 
-    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[] } | null>(null);
+    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
 
     useEffect(() => {
@@ -87,11 +89,17 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
         fetchMeta();
     }, [reviewingProject]);
 
-    const openInspector = async (version: string) => {
+    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, line?: number) => {
         setLoadingInspector(true);
         try {
             const res = await api.get(`/admin/projects/${reviewingProject.mod.id}/versions/${version}/structure`);
-            setInspectorData({ version, structure: res.data });
+            setInspectorData({
+                version,
+                structure: res.data,
+                issues,
+                initialFile: file,
+                initialLine: line
+            });
         } catch (e) {
             setStatus({ type: 'error', title: 'Error', msg: 'Failed to inspect JAR structure.' });
         } finally {
@@ -119,6 +127,9 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
     };
 
     const mod = reviewingProject.mod;
+    const latestVersion = mod.versions?.[0];
+    const scanResult = latestVersion?.scanResult;
+    const hasScanIssues = scanResult && scanResult.status !== 'CLEAN';
 
     return (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
@@ -127,6 +138,9 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                     modId={mod.id}
                     version={inspectorData.version}
                     structure={inspectorData.structure}
+                    issues={inspectorData.issues}
+                    initialFile={inspectorData.initialFile}
+                    initialLine={inspectorData.initialLine}
                     onClose={() => setInspectorData(null)}
                 />
             )}
@@ -361,16 +375,70 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
 
                         {currentStep === 2 && (
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
-                                <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-4">
-                                    <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
-                                    <div>
-                                        <h4 className="font-bold text-amber-500 mb-1">Manual Verification Required</h4>
-                                        <p className="text-sm text-amber-600/80 dark:text-amber-500/70 font-medium">
-                                            You must manually verify the file structure. No automated scanning is performed.
-                                            Dependencies are external projects and are assumed safe, but you should verify they exist.
-                                        </p>
+
+                                {/* Warden Analysis Dropdown */}
+                                {hasScanIssues && (
+                                    <div className="rounded-2xl border border-red-200 dark:border-red-900/50 overflow-hidden">
+                                        <button
+                                            onClick={() => setShowScanDetails(!showScanDetails)}
+                                            className="w-full flex items-center justify-between p-5 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors text-left"
+                                        >
+                                            <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
+                                                <ShieldAlert className="w-6 h-6" />
+                                                <div>
+                                                    <h4 className="font-bold text-lg">Malware Checks Failed</h4>
+                                                    <p className="text-xs opacity-80 font-medium">Status: {scanResult.status} • Risk Score: {scanResult.riskScore}</p>
+                                                </div>
+                                            </div>
+                                            {showScanDetails ? <ChevronUp className="w-5 h-5 text-red-500"/> : <ChevronDown className="w-5 h-5 text-red-500"/>}
+                                        </button>
+
+                                        {showScanDetails && (
+                                            <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
+                                                {(scanResult.issues || []).map((issue: ScanIssue, idx: number) => (
+                                                    <div key={idx} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
+                                                        <div className="flex-1 min-w-0 pr-4">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wide
+                                                                    ${issue.severity === 'CRITICAL' ? 'bg-red-600 text-white' :
+                                                                    issue.severity === 'HIGH' ? 'bg-orange-500 text-white' :
+                                                                        'bg-yellow-500 text-white'}`}>
+                                                                    {issue.severity}
+                                                                </span>
+                                                                <span className="text-slate-900 dark:text-slate-200 font-bold truncate">
+                                                                    {issue.type}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-slate-500 font-mono text-xs truncate mb-1">
+                                                                <span className="truncate">{issue.filePath}</span>
+                                                                {issue.lineStart > -1 && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-600 dark:text-slate-300">:{issue.lineStart}</span>}
+                                                            </div>
+                                                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => openInspector(latestVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart)}
+                                                            className="shrink-0 flex items-center gap-1.5 text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-2 rounded-lg transition-colors"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5" /> Inspect
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
+                                )}
+
+                                {!hasScanIssues && (
+                                    <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-4">
+                                        <Check className="w-6 h-6 text-emerald-500" />
+                                        <div>
+                                            <h4 className="font-bold text-emerald-500">Automated Checks Passed</h4>
+                                            <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
+                                                Warden found no known malware signatures or suspicious patterns.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="space-y-3">
                                     {mod.versions?.map((v: any) => (
@@ -385,7 +453,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                             <div className="flex gap-2">
                                                 {mod.classification !== 'MODPACK' && (
                                                     <button
-                                                        onClick={() => openInspector(v.versionNumber)}
+                                                        onClick={() => openInspector(v.versionNumber, scanResult?.issues || [])}
                                                         disabled={loadingInspector}
                                                         className="px-5 py-2.5 bg-indigo-500/10 hover:bg-indigo-500 hover:text-white text-indigo-500 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-indigo-500/20"
                                                     >

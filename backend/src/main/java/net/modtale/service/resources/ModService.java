@@ -1,18 +1,15 @@
 package net.modtale.service.resources;
 
-import net.modtale.model.resources.Mod;
-import net.modtale.model.resources.ModVersion;
-import net.modtale.model.resources.ModDependency;
-import net.modtale.model.resources.Review;
+import net.modtale.model.resources.*;
 import net.modtale.model.user.User;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.AnalyticsService;
+import net.modtale.service.security.SanitizationService;
+import net.modtale.service.security.FileValidationService;
+import net.modtale.service.security.WardenClientService;
 import net.modtale.service.user.NotificationService;
 import net.modtale.service.user.UserService;
-import net.modtale.service.security.SanitizationService;
-import net.modtale.service.resources.StorageService;
-import net.modtale.service.security.FileValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,6 +80,7 @@ public class ModService {
     @Autowired private AnalyticsService analyticsService;
     @Autowired private NotificationService notificationService;
     @Autowired private CacheManager cacheManager;
+    @Autowired private WardenClientService wardenService;
 
     @Lazy
     @Autowired
@@ -868,6 +866,23 @@ public class ModService {
                 throw new IllegalArgumentException("Modpack must have at least two valid dependencies.");
             }
             mod.setModIds(simpleModIds);
+        }
+
+        if (file != null && !isModpack) {
+            try {
+                byte[] fileBytes = storageService.download(filePath);
+                ScanResult scanResult = wardenService.scanFile(fileBytes, file.getOriginalFilename());
+                ver.setScanResult(scanResult);
+
+                if ("INFECTED".equals(scanResult.getStatus())) {
+                    logger.warn("Warden detected malware in project {} version {}", mod.getTitle(), versionNumber);
+                }
+            } catch (Exception e) {
+                logger.error("Warden scan failed", e);
+                ScanResult failed = new ScanResult();
+                failed.setStatus("FAILED");
+                ver.setScanResult(failed);
+            }
         }
 
         mod.getVersions().add(0, ver);

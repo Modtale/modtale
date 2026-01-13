@@ -1,6 +1,5 @@
 package net.modtale.model.resources;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class ModVersion {
@@ -11,18 +10,12 @@ public class ModVersion {
     private int downloadCount;
     private String releaseDate;
     private String changelog;
+    private List<ModDependency> dependencies;
+    private Channel channel;
 
-    private Channel channel = Channel.RELEASE;
+    private ScanResult scanResult;
 
-    private List<ModDependency> dependencies = new ArrayList<>();
-
-    public enum Channel {
-        RELEASE,
-        BETA,
-        ALPHA
-    }
-
-    public ModVersion() {}
+    public enum Channel { RELEASE, BETA, ALPHA }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -32,10 +25,6 @@ public class ModVersion {
 
     public List<String> getGameVersions() { return gameVersions; }
     public void setGameVersions(List<String> gameVersions) { this.gameVersions = gameVersions; }
-
-    public String getGameVersion() {
-        return (gameVersions != null && !gameVersions.isEmpty()) ? gameVersions.get(0) : "";
-    }
 
     public String getFileUrl() { return fileUrl; }
     public void setFileUrl(String fileUrl) { this.fileUrl = fileUrl; }
@@ -54,4 +43,7 @@ public class ModVersion {
 
     public Channel getChannel() { return channel; }
     public void setChannel(Channel channel) { this.channel = channel; }
+
+    public ScanResult getScanResult() { return scanResult; }
+    public void setScanResult(ScanResult scanResult) { this.scanResult = scanResult; }
 }
