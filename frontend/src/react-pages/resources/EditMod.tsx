@@ -354,7 +354,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 handleUploadVersion={handleUploadVersion}
                 handleDelete={handleDelete}
                 handleDeleteVersion={handleDeleteVersion}
-                handleRevert={isPending ? handleRevert : undefined}
+                handleRevert={handleRevert}
                 handleArchive={handleArchive}
                 handleUnlist={handleUnlist}
                 handleRestore={handleRestore}

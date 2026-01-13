@@ -8,7 +8,7 @@ import {
     GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
     UserPlus, Scale, Check, Copy, Link2, Edit2, X, Plus, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
-    AlertCircle, Beaker, Zap
+    AlertCircle, Beaker, Zap, Clock, Archive, Globe, EyeOff
 } from 'lucide-react';
 
 import { api } from '../../../utils/api';
@@ -370,6 +370,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                                   modData, setModData, metaData, setMetaData, versionData, setVersionData,
                                                                   bannerPreview, setBannerPreview, setBannerFile,
                                                                   handleSave, handlePublish, handleDelete, handleDeleteVersion, handleUploadVersion,
+                                                                  handleRevert, handleArchive, handleUnlist, handleRestore,
                                                                   isLoading, classification, activeTab, setActiveTab, readOnly, currentUser
                                                               }) => {
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>(readOnly ? 'preview' : 'write');
@@ -507,6 +508,46 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
     return (
         <>
+            {modData?.status === 'PENDING' && (
+                <div className="bg-blue-500/10 border-b border-blue-500/20 px-8 py-3 flex items-center justify-between backdrop-blur-sm sticky top-0 z-50">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                            <Clock className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div>
+                            <div className="font-bold text-blue-500 leading-tight">Pending Verification</div>
+                            <div className="text-[10px] text-blue-500/80 font-bold uppercase tracking-wide">Project is read-only</div>
+                        </div>
+                    </div>
+                    {handleRevert && (
+                        <button onClick={handleRevert} disabled={isLoading} className="bg-blue-500 hover:bg-blue-600 text-white w-40 h-9 rounded-lg text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                            {isLoading ? <Spinner className="w-3 h-3 text-white"/> : <Edit2 className="w-3 h-3"/>}
+                            Revert to Draft
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {modData?.status === 'ARCHIVED' && (
+                <div className="bg-slate-800 border-b border-slate-700 px-8 py-3 flex items-center justify-between backdrop-blur-sm sticky top-0 z-50">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                            <Archive className="w-5 h-5 text-slate-400" />
+                        </div>
+                        <div>
+                            <div className="font-bold text-slate-300 leading-tight">Archived</div>
+                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Project is read-only</div>
+                        </div>
+                    </div>
+                    {handleRestore && (
+                        <button onClick={handleRestore} disabled={isLoading} className="bg-slate-700 hover:bg-slate-600 text-white w-40 h-9 rounded-lg text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                            {isLoading ? <Spinner className="w-3 h-3 text-white"/> : <RefreshCw className="w-3 h-3"/>}
+                            Restore Project
+                        </button>
+                    )}
+                </div>
+            )}
+
             {showPublishConfirm && handlePublish && <StatusModal type="info" title="Submit?" message="Submit for verification?" onClose={() => setShowPublishConfirm(false)} actionLabel="Submit" onAction={() => { setShowPublishConfirm(false); handlePublish(); }} secondaryLabel="Cancel" />}
 
             {showCardPreview && (
@@ -614,6 +655,50 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         {activeTab === 'settings' && (
                             <div className="space-y-6">
                                 <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-2xl border border-slate-200 dark:border-white/10">
+
+                                    {(modData?.status === 'PUBLISHED' || modData?.status === 'UNLISTED') && (
+                                        <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-4"><Eye className="w-4 h-4 text-slate-500" /> Project Visibility</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <button
+                                                    onClick={handleRestore}
+                                                    disabled={isLoading || modData.status === 'PUBLISHED'}
+                                                    className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${modData.status === 'PUBLISHED' ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-green-500 hover:text-green-500'}`}
+                                                >
+                                                    <Globe className="w-6 h-6" />
+                                                    <div className="text-center">
+                                                        <div className="font-bold text-sm">Published</div>
+                                                        <div className="text-[10px] opacity-70">Visible to everyone</div>
+                                                    </div>
+                                                </button>
+
+                                                <button
+                                                    onClick={handleUnlist}
+                                                    disabled={isLoading || modData.status === 'UNLISTED'}
+                                                    className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${modData.status === 'UNLISTED' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-orange-500 hover:text-orange-500'}`}
+                                                >
+                                                    <EyeOff className="w-6 h-6" />
+                                                    <div className="text-center">
+                                                        <div className="font-bold text-sm">Unlisted</div>
+                                                        <div className="text-[10px] opacity-70">Hidden from search</div>
+                                                    </div>
+                                                </button>
+
+                                                <button
+                                                    onClick={handleArchive}
+                                                    disabled={isLoading}
+                                                    className="p-4 rounded-xl border flex flex-col items-center gap-3 transition-all bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-slate-500 hover:text-slate-500"
+                                                >
+                                                    <Archive className="w-6 h-6" />
+                                                    <div className="text-center">
+                                                        <div className="font-bold text-sm">Archived</div>
+                                                        <div className="text-[10px] opacity-70">Read-only state</div>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {modData?.id && (
                                         <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
                                             <div className="flex flex-col gap-2">
