@@ -121,7 +121,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                             Criteria.where("downloadCount").gt(minDl),
                             Criteria.where("downloadCount").lt(maxDl),
                             Criteria.where("rating").gte(4.5),
-                            Criteria.where("reviews.2").exists(true) // At least 3 reviews
+                            Criteria.where("reviews.2").exists(true)
                     )
             ));
         }

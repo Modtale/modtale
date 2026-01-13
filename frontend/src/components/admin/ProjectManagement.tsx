@@ -10,13 +10,11 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const [foundProject, setFoundProject] = useState<Mod | null>(null);
     const [showVersions, setShowVersions] = useState(false);
 
-    // Autocomplete state
     const [searchResults, setSearchResults] = useState<Mod[]>([]);
     const [showResults, setShowResults] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    // Confirmation states
     const [confirmAction, setConfirmAction] = useState<'DELETE' | 'UNLIST' | 'DELETE_VER' | null>(null);
     const [targetVersionId, setTargetVersionId] = useState<string | null>(null);
     const [confirmInput, setConfirmInput] = useState('');

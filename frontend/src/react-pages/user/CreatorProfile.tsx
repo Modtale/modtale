@@ -214,7 +214,6 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                 isLoggedIn={!!currentUser}
                 onBack={onBack}
             >
-                {/* Padding logic moved here to ensure consistency while keeping layout full width */}
                 <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16">
                     {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
                         <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">

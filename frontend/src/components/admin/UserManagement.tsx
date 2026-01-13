@@ -38,7 +38,6 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                     setSearchResults(res.data);
                     setShowResults(true);
                 } catch (e) {
-                    // Silent fail for autocomplete
                     setSearchResults([]);
                 }
             }, 300);

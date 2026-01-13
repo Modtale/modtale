@@ -132,7 +132,7 @@ public class UserService {
     }
 
     public String generatePreAuthToken(String userId) {
-        long expiry = System.currentTimeMillis() + (5 * 60 * 1000); // 5 minutes
+        long expiry = System.currentTimeMillis() + (5 * 60 * 1000);
         String payload = userId + ":" + expiry;
         String signature = hmacSha256(payload, PRE_AUTH_SIGNING_KEY);
         return Base64.getEncoder().encodeToString((payload + ":" + signature).getBytes(StandardCharsets.UTF_8));
