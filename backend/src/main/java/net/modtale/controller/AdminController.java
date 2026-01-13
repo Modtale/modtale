@@ -318,37 +318,18 @@ public class AdminController {
             options.put("rbr", "0");
             options.put("rsy", "0");
             options.put("ind", "    ");
-
+            options.put("lit", "1");
             final StringBuilder result = new StringBuilder();
 
             IResultSaver resultSaver = new IResultSaver() {
-                @Override
-                public void saveFolder(String path) {}
-
-                @Override
-                public void copyFile(String source, String path, String entryName) {}
-
-                @Override
-                public void saveClassFile(String path, String qualifiedName, String entryName, String content, int[] mapping) {
-                    result.append(content);
-                }
-
-                @Override
-                public void createArchive(String path, String archiveName, java.util.jar.Manifest manifest) {}
-
-                @Override
-                public void saveDirEntry(String path, String archiveName, String entryName) {}
-
-                @Override
-                public void copyEntry(String source, String path, String archiveName, String entry) {}
-
-                @Override
-                public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content) {
-                    result.append(content);
-                }
-
-                @Override
-                public void closeArchive(String path, String archiveName) {}
+                @Override public void saveFolder(String path) {}
+                @Override public void copyFile(String source, String path, String entryName) {}
+                @Override public void saveClassFile(String path, String qualifiedName, String entryName, String content, int[] mapping) { result.append(content); }
+                @Override public void createArchive(String path, String archiveName, java.util.jar.Manifest manifest) {}
+                @Override public void saveDirEntry(String path, String archiveName, String entryName) {}
+                @Override public void copyEntry(String source, String path, String archiveName, String entry) {}
+                @Override public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content) { result.append(content); }
+                @Override public void closeArchive(String path, String archiveName) {}
             };
 
             IBytecodeProvider provider = (externalPath, internalPath) -> {
@@ -360,11 +341,8 @@ public class AdminController {
             };
 
             Fernflower decompiler = new Fernflower(provider, resultSaver, options, new IFernflowerLogger() {
-                @Override
-                public void writeMessage(String message, Severity severity) {}
-
-                @Override
-                public void writeMessage(String message, Severity severity, Throwable t) {}
+                @Override public void writeMessage(String message, Severity severity) {}
+                @Override public void writeMessage(String message, Severity severity, Throwable t) {}
             });
 
             decompiler.addSource(classFile.toFile());

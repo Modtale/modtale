@@ -1,11 +1,15 @@
-import React, { useMemo, useState, useCallback } from 'react';
-import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, File } from 'lucide-react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, Eye } from 'lucide-react';
 import { api } from '../../utils/api';
+import type { ScanIssue } from '../../types';
 
 interface SourceInspectorProps {
     modId: string;
     version: string;
     structure: string[];
+    issues?: ScanIssue[];
+    initialFile?: string;
+    initialLine?: number;
     onClose: () => void;
 }
 
@@ -70,7 +74,7 @@ const FileTreeNode: React.FC<{
     let Icon = FileText;
     if (node.type === 'folder') Icon = isExpanded ? FolderOpen : Folder;
     else if (node.name.endsWith('.class') || node.name.endsWith('.java')) Icon = FileCode;
-    else if (node.name.endsWith('.json') || node.name.endsWith('.yml')) Icon = File;
+    else if (node.name.endsWith('.json') || node.name.endsWith('.yml')) Icon = FileText;
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -95,7 +99,7 @@ const FileTreeNode: React.FC<{
                         {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                     </span>
                 )}
-                {node.type === 'file' && <span className="w-3" />} {/* Spacer for alignment */}
+                {node.type === 'file' && <span className="w-3" />}
 
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${node.type === 'folder' ? 'text-blue-400' : ''}`} />
                 <span className="truncate">{node.name}</span>
@@ -120,9 +124,10 @@ const FileTreeNode: React.FC<{
     );
 };
 
-const CodeViewer: React.FC<{ content: any; filename: string }> = ({ content, filename }) => {
+const CodeViewer: React.FC<{ content: any; filename: string; highlightLine?: number }> = ({ content, filename, highlightLine }) => {
     let ext = filename.split('.').pop()?.toLowerCase();
     if (ext === 'class') ext = 'java';
+    const preRef = useRef<HTMLPreElement>(null);
 
     const scrollbarStyles = `
         .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -139,13 +144,12 @@ const CodeViewer: React.FC<{ content: any; filename: string }> = ({ content, fil
         return String(content);
     }, [content]);
 
+    const lines = useMemo(() => safeContent.split('\n').length, [safeContent]);
+
     const highlightedCode = useMemo(() => {
         if (!safeContent) return '';
-
         const entityMap: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-
         let src = safeContent.replace(/[&<>"']/g, (m) => entityMap[m] || m);
-
         if (src.length > 50000) return src;
 
         const tokens: string[] = [];
@@ -156,67 +160,49 @@ const CodeViewer: React.FC<{ content: any; filename: string }> = ({ content, fil
 
         if (ext === 'java') {
             src = src.replace(/(&quot;(\\.|[^&"\\])*&quot;)/g, (m) => saveToken(m, 'text-emerald-400'));
-            src = src.replace(/('(\\.|[^'\\])*')/g, (m) => saveToken(m, 'text-emerald-400'));
             src = src.replace(/(\/\/.*)/g, (m) => saveToken(m, 'text-slate-500 italic'));
-            src = src.replace(/(\/\*[\s\S]*?\*\/)/g, (m) => saveToken(m, 'text-slate-500 italic'));
-
-            src = src.replace(/(@\w+)/g, (m) => saveToken(m, 'text-yellow-400'));
-
-            src = src.replace(/\b(0x[0-9a-fA-F]+|\d+L?|\d*\.\d+f?)\b/g, (m) => saveToken(m, 'text-blue-400'));
-
-            const kwControl = "if|else|switch|case|default|break|continue|return|do|while|for|throw|try|catch|finally";
-            const kwModifiers = "public|private|protected|static|final|abstract|synchronized|volatile|transient|native|strictfp";
-            const kwTypes = "int|long|short|byte|float|double|char|boolean|void|class|interface|enum|var";
-            const kwContext = "this|super|new|instanceof|extends|implements|import|package|throws";
-            const kwConst = "null|true|false";
-
-            const replaceKw = (text: string, pattern: string, style: string) => {
-                return text.replace(new RegExp(`\\b(${pattern})\\b`, 'g'), (m) => saveToken(m, style));
-            };
-
-            src = replaceKw(src, kwControl, 'text-purple-400 font-bold');
-            src = replaceKw(src, kwModifiers, 'text-blue-400 italic');
-            src = replaceKw(src, kwTypes, 'text-orange-400');
-            src = replaceKw(src, kwContext, 'text-cyan-400');
-            src = replaceKw(src, kwConst, 'text-red-400 font-bold');
-
-            src = src.replace(/\b([A-Z]\w*)\b/g, (m) => saveToken(m, 'text-yellow-200'));
-        }
-        else if (ext === 'json') {
-            src = src.replace(/: (&quot;[^&]*&quot;)/g, (match, val) => `: ${saveToken(val, 'text-emerald-400')}`);
-            src = src.replace(/(&quot;[^&]+&quot;)\s*:/g, (match, key) => `${saveToken(key, 'text-indigo-400')}:`);
-            src = src.replace(/\b(true|false|null)\b/g, (m) => saveToken(m, 'text-red-400 font-bold'));
-            src = src.replace(/\b(\d+(\.\d+)?)\b/g, (m) => saveToken(m, 'text-blue-400'));
-        }
-        else if (ext === 'yaml' || ext === 'yml') {
-            src = src.replace(/(#.*)/g, (m) => saveToken(m, 'text-slate-500 italic'));
-            src = src.replace(/^(\s*)([\w.-]+):/gm, (match, space, key) => `${space}${saveToken(key, 'text-indigo-400')}:`);
-            src = src.replace(/: (.+)/g, (match, val) => `: ${saveToken(val, 'text-emerald-400')}`);
+            src = src.replace(/\b(public|private|protected|static|final|class|void|int|boolean|if|else|return|new)\b/g, (m) => saveToken(m, 'text-purple-400 font-bold'));
         }
 
-        tokens.forEach((html, i) => {
-            src = src.split(`___TOKEN${i}___`).join(html);
-        });
-
+        tokens.forEach((html, i) => { src = src.split(`___TOKEN${i}___`).join(html); });
         return src;
     }, [safeContent, ext]);
+
+    useEffect(() => {
+        if (highlightLine && preRef.current) {
+            setTimeout(() => {
+                if (preRef.current) {
+                    const lineHeight = 20;
+                    preRef.current.scrollTop = (highlightLine - 5) * lineHeight;
+                }
+            }, 100);
+        }
+    }, [highlightLine, content]);
 
     return (
         <>
             <style>{scrollbarStyles}</style>
-            <pre className="font-mono text-xs text-slate-300 leading-relaxed whitespace-pre tab-4 p-4 overflow-auto h-full custom-scrollbar">
-                <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
-            </pre>
+            <div className="flex h-full font-mono text-xs overflow-hidden">
+                <div className="w-12 bg-[#0d1117] border-r border-white/5 text-slate-600 text-right py-4 pr-3 select-none overflow-hidden leading-5">
+                    {Array.from({length: lines}).map((_, i) => (
+                        <div key={i} className={(i+1) === highlightLine ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>{i + 1}</div>
+                    ))}
+                </div>
+                <pre ref={preRef} className="flex-1 text-slate-300 leading-5 p-4 pt-4 overflow-auto custom-scrollbar">
+                    <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
+                </pre>
+            </div>
         </>
     );
 };
 
-export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version, structure, onClose }) => {
+export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version, structure, issues = [], initialFile, initialLine, onClose }) => {
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
     const [inspectorContent, setInspectorContent] = useState<any>('');
     const [loadingFile, setLoadingFile] = useState(false);
     const [fileSearch, setFileSearch] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+    const [showIssuesDropdown, setShowIssuesDropdown] = useState(false);
 
     const fileTree = useMemo(() => buildFileTree(structure), [structure]);
 
@@ -242,6 +228,27 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
     };
 
+    const handleJumpToIssue = (file: string, line: number) => {
+        // Expand folders for file
+        const parts = file.split('/');
+        const foldersToExpand = new Set<string>();
+        let currentPath = "";
+        for(let i=0; i<parts.length-1; i++) {
+            currentPath += (i > 0 ? "/" : "") + parts[i];
+            foldersToExpand.add(currentPath);
+        }
+        setExpandedFolders(prev => new Set([...prev, ...foldersToExpand]));
+        loadInspectorFile(file);
+        // CodeViewer handles scroll via prop
+        setShowIssuesDropdown(false);
+    };
+
+    useEffect(() => {
+        if (initialFile) {
+            handleJumpToIssue(initialFile, initialLine || 0);
+        }
+    }, [initialFile]);
+
     const filteredFiles = useMemo(() => {
         if (!fileSearch) return [];
         return structure.filter(f => f.toLowerCase().includes(fileSearch.toLowerCase()));
@@ -256,6 +263,44 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         <h3 className="text-sm font-bold text-white">Source Inspector</h3>
                         <p className="text-[10px] text-slate-400 font-mono">{modId} @ {version}</p>
                     </div>
+
+                    {issues.length > 0 && (
+                        <div className="relative ml-4">
+                            <button
+                                onClick={() => setShowIssuesDropdown(!showIssuesDropdown)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-bold transition-colors border border-red-500/20"
+                            >
+                                <ShieldAlert className="w-3.5 h-3.5" />
+                                {issues.length} Flags Detected
+                                <ChevronDown className="w-3 h-3 opacity-50" />
+                            </button>
+
+                            {showIssuesDropdown && (
+                                <div className="absolute top-full left-0 mt-2 w-96 max-h-96 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2 custom-scrollbar">
+                                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2">Security Issues</h4>
+                                    {issues.map((issue, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart)}
+                                            className="w-full text-left p-2 hover:bg-white/5 rounded-lg group"
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase
+                                                    ${issue.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
+                                                    {issue.severity}
+                                                </span>
+                                                <span className="text-slate-300 text-xs font-bold truncate flex-1">{issue.type}</span>
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
+                                                {issue.filePath.split('/').pop()} :{issue.lineStart}
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 line-clamp-2">{issue.description}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
                     <X className="w-5 h-5" />
@@ -319,7 +364,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                             Decompiling...
                         </div>
                     ) : inspectorFile ? (
-                        <CodeViewer content={inspectorContent} filename={inspectorFile} />
+                        <CodeViewer content={inspectorContent} filename={inspectorFile} highlightLine={inspectorFile === initialFile ? initialLine : undefined} />
                     ) : (
                         <div className="flex h-full items-center justify-center text-slate-600 flex-col gap-4">
                             <Terminal className="w-12 h-12 opacity-50" />

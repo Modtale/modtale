@@ -47,6 +47,22 @@ export interface ModDependency {
     isOptional?: boolean;
 }
 
+export interface ScanIssue {
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    type: string;
+    description: string;
+    filePath: string;
+    lineStart: number;
+    lineEnd: number;
+}
+
+export interface ScanResult {
+    status: 'CLEAN' | 'SUSPICIOUS' | 'INFECTED' | 'FAILED';
+    riskScore: number;
+    issues: ScanIssue[];
+    scanTimestamp: number;
+}
+
 export interface ProjectVersion {
     id: string;
     versionNumber: string;
@@ -58,6 +74,7 @@ export interface ProjectVersion {
     changelog?: string;
     dependencies?: ModDependency[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
+    scanResult?: ScanResult;
 }
 
 export interface Review {
