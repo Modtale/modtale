@@ -404,6 +404,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         { label: 'At least one Tag', met: hasTags },
         { label: 'At least one Version uploaded', met: hasVersion },
         { label: 'License selected', met: hasLicense },
+        { label: 'All changes saved', met: !isDirty }
     ];
 
     if (metaData.repositoryUrl) {
