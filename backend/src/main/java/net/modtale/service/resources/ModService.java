@@ -291,6 +291,16 @@ public class ModService {
 
         if (direct.isPresent()) {
             Mod mod = direct.get();
+            User currentUser = userService.getCurrentUser();
+            boolean isPrivileged = hasEditPermission(mod, currentUser) || isAdmin(currentUser);
+
+            if (!isPrivileged && mod.getVersions() != null) {
+                List<ModVersion> visibleVersions = mod.getVersions().stream()
+                        .filter(v -> v.getReviewStatus() == ModVersion.ReviewStatus.APPROVED)
+                        .collect(Collectors.toList());
+                mod.setVersions(visibleVersions);
+            }
+
             if (mod.getReviews() != null && !mod.getReviews().isEmpty()) {
                 for (Review r : mod.getReviews()) {
                     if (r.getUserAvatarUrl() == null || r.getUserAvatarUrl().isEmpty()) {
@@ -382,6 +392,14 @@ public class ModService {
         mod.setExpiresAt(null);
         mod.setUpdatedAt(LocalDateTime.now().toString());
 
+        if (mod.getVersions() != null) {
+            for (ModVersion version : mod.getVersions()) {
+                if (version.getReviewStatus() == null || version.getReviewStatus() == ModVersion.ReviewStatus.REJECTED) {
+                    version.setReviewStatus(ModVersion.ReviewStatus.PENDING);
+                }
+            }
+        }
+
         modRepository.save(mod);
     }
 
@@ -455,6 +473,14 @@ public class ModService {
         mod.setExpiresAt(null);
         mod.setUpdatedAt(LocalDateTime.now().toString());
 
+        if (mod.getVersions() != null) {
+            mod.getVersions().forEach(v -> {
+                if (v.getReviewStatus() == ModVersion.ReviewStatus.PENDING) {
+                    v.setReviewStatus(ModVersion.ReviewStatus.APPROVED);
+                }
+            });
+        }
+
         if (isNewRelease) {
             mod.setCreatedAt(LocalDateTime.now().toString());
         }
@@ -476,6 +502,54 @@ public class ModService {
             if(author != null) {
                 notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", getProjectLink(saved), saved.getImageUrl());
             }
+        }
+    }
+
+    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    public void approveVersion(String modId, String versionId) {
+        User user = userService.getCurrentUser();
+        if (!isAdmin(user)) throw new SecurityException("Access Denied");
+
+        Mod mod = getModById(modId);
+        if(mod == null) throw new IllegalArgumentException("Project not found");
+
+        ModVersion ver = mod.getVersions().stream()
+                .filter(v -> v.getId().equals(versionId))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("Version not found"));
+
+        ver.setReviewStatus(ModVersion.ReviewStatus.APPROVED);
+        ver.setRejectionReason(null);
+        mod.setUpdatedAt(LocalDateTime.now().toString());
+
+        modRepository.save(mod);
+        notifyUpdates(mod, ver.getVersionNumber());
+        notifyDependents(mod, ver.getVersionNumber());
+    }
+
+    public void rejectVersion(String modId, String versionId, String reason) {
+        User user = userService.getCurrentUser();
+        if (!isAdmin(user)) throw new SecurityException("Access Denied");
+
+        Mod mod = getModById(modId);
+        if(mod == null) throw new IllegalArgumentException("Project not found");
+
+        ModVersion ver = mod.getVersions().stream()
+                .filter(v -> v.getId().equals(versionId))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("Version not found"));
+
+        ver.setReviewStatus(ModVersion.ReviewStatus.REJECTED);
+        ver.setRejectionReason(reason);
+        modRepository.save(mod);
+
+        User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
+        if(author != null) {
+            notificationService.sendNotification(
+                    List.of(author.getId()),
+                    "Version Rejected",
+                    "Version " + ver.getVersionNumber() + " of " + mod.getTitle() + " was rejected. Reason: " + reason,
+                    "/dashboard/projects",
+                    mod.getImageUrl()
+            );
         }
     }
 
@@ -556,10 +630,19 @@ public class ModService {
         }
     }
 
-    public List<Mod> getPendingProjects() {
-        Query query = new Query(Criteria.where("status").is("PENDING"));
-        query.with(Sort.by(Sort.Direction.ASC, "updatedAt"));
-        return mongoTemplate.find(query, Mod.class);
+    public List<Mod> getVerificationQueue() {
+        Query pendingProjectsQuery = new Query(Criteria.where("status").is("PENDING"));
+        List<Mod> pendingProjects = mongoTemplate.find(pendingProjectsQuery, Mod.class);
+
+        Query pendingVersionsQuery = new Query(Criteria.where("status").is("PUBLISHED").and("versions.reviewStatus").is("PENDING"));
+        List<Mod> pendingVersions = mongoTemplate.find(pendingVersionsQuery, Mod.class);
+
+        Set<Mod> combined = new HashSet<>(pendingProjects);
+        combined.addAll(pendingVersions);
+
+        List<Mod> result = new ArrayList<>(combined);
+        result.sort(Comparator.comparing(Mod::getUpdatedAt));
+        return result;
     }
 
     @Scheduled(cron = "0 0 0 * * ?")
@@ -839,6 +922,8 @@ public class ModService {
         ver.setChangelog(sanitizer.sanitizePlainText(changelog));
         ver.setChannel(channel);
 
+        ver.setReviewStatus(ModVersion.ReviewStatus.PENDING);
+
         ver.setDependencies(new ArrayList<>());
         List<String> simpleModIds = new ArrayList<>();
 
@@ -883,7 +968,8 @@ public class ModService {
 
         if (file != null && !isModpack) {
             self.performBackgroundScan(mod.getId(), ver.getId(), filePath, file.getOriginalFilename());
-        }}
+        }
+    }
 
     @Async
     public void performBackgroundScan(String modId, String versionId, String filePath, String originalFilename) {
@@ -891,17 +977,40 @@ public class ModService {
             byte[] fileBytes = storageService.download(filePath);
             ScanResult scanResult = wardenService.scanFile(fileBytes, originalFilename);
 
-            if ("INFECTED".equals(scanResult.getStatus())) {
-                logger.warn("Warden detected malware in project {} version {}", modId, versionId);
+            Mod mod = modRepository.findById(modId).orElse(null);
+            if (mod == null) return;
+
+            Update update = new Update()
+                    .set("versions.$.scanResult", scanResult)
+                    .set("updatedAt", LocalDateTime.now().toString());
+
+            boolean autoApproved = false;
+
+            if ("CLEAN".equals(scanResult.getStatus())) {
+                // AUTO APPROVE
+                update.set("versions.$.reviewStatus", ModVersion.ReviewStatus.APPROVED);
+                autoApproved = true;
+                logger.info("Auto-approved clean version {} for project {}", versionId, modId);
+            } else {
+                if ("INFECTED".equals(scanResult.getStatus())) {
+                    logger.warn("Warden detected malware in project {} version {}", modId, versionId);
+                }
             }
 
             Query query = new Query(Criteria.where("_id").is(modId).and("versions._id").is(versionId));
-            Update update = new Update()
-                    .set("versions.$.scanResult", scanResult)
-                    .set("status", "PENDING")
-                    .set("updatedAt", LocalDateTime.now().toString());
-
             mongoTemplate.updateFirst(query, update, Mod.class);
+
+            if (autoApproved && "PUBLISHED".equals(mod.getStatus())) {
+                ModVersion ver = mod.getVersions().stream()
+                        .filter(v -> v.getId().equals(versionId))
+                        .findFirst()
+                        .orElse(null);
+
+                if (ver != null) {
+                    notifyUpdates(mod, ver.getVersionNumber());
+                    notifyDependents(mod, ver.getVersionNumber());
+                }
+            }
 
         } catch (Exception e) {
             logger.error("Async Warden scan failed for mod " + modId, e);
@@ -910,9 +1019,7 @@ public class ModService {
 
             Query query = new Query(Criteria.where("_id").is(modId).and("versions._id").is(versionId));
             Update update = new Update()
-                    .set("versions.$.scanResult", failed)
-                    .set("status", "PENDING");
-
+                    .set("versions.$.scanResult", failed);
             mongoTemplate.updateFirst(query, update, Mod.class);
         }
     }

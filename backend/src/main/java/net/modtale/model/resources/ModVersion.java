@@ -15,7 +15,12 @@ public class ModVersion {
 
     private ScanResult scanResult;
 
+    // New fields for granular approval
+    private ReviewStatus reviewStatus = ReviewStatus.PENDING;
+    private String rejectionReason;
+
     public enum Channel { RELEASE, BETA, ALPHA }
+    public enum ReviewStatus { PENDING, APPROVED, REJECTED }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -46,4 +51,10 @@ public class ModVersion {
 
     public ScanResult getScanResult() { return scanResult; }
     public void setScanResult(ScanResult scanResult) { this.scanResult = scanResult; }
+
+    public ReviewStatus getReviewStatus() { return reviewStatus; }
+    public void setReviewStatus(ReviewStatus reviewStatus) { this.reviewStatus = reviewStatus; }
+
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 }

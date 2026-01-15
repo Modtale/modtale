@@ -75,6 +75,8 @@ export interface ProjectVersion {
     dependencies?: ModDependency[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     scanResult?: ScanResult;
+    reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    rejectionReason?: string;
 }
 
 export interface Review {
