@@ -29,6 +29,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -866,29 +867,48 @@ public class ModService {
         }
 
         if (file != null && !isModpack) {
-            try {
-                byte[] fileBytes = storageService.download(filePath);
-                ScanResult scanResult = wardenService.scanFile(fileBytes, file.getOriginalFilename());
-                ver.setScanResult(scanResult);
-
-                if ("INFECTED".equals(scanResult.getStatus())) {
-                    logger.warn("Warden detected malware in project {} version {}", mod.getTitle(), versionNumber);
-                }
-            } catch (Exception e) {
-                logger.error("Warden scan failed", e);
-                ScanResult failed = new ScanResult();
-                failed.setStatus("FAILED");
-                ver.setScanResult(failed);
-            }
+            ScanResult pendingScan = new ScanResult();
+            pendingScan.setStatus("SCANNING");
+            ver.setScanResult(pendingScan);
         }
 
         mod.getVersions().add(0, ver);
         mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
 
-        if("PUBLISHED".equals(mod.getStatus())) {
-            notifyUpdates(mod, versionNumber);
-            notifyDependents(mod, versionNumber);
+        if (file != null && !isModpack) {
+            self.performBackgroundScan(mod.getId(), ver.getId(), filePath, file.getOriginalFilename());
+        }}
+
+    @Async
+    public void performBackgroundScan(String modId, String versionId, String filePath, String originalFilename) {
+        try {
+            byte[] fileBytes = storageService.download(filePath);
+            ScanResult scanResult = wardenService.scanFile(fileBytes, originalFilename);
+
+            if ("INFECTED".equals(scanResult.getStatus())) {
+                logger.warn("Warden detected malware in project {} version {}", modId, versionId);
+            }
+
+            Query query = new Query(Criteria.where("_id").is(modId).and("versions._id").is(versionId));
+            Update update = new Update()
+                    .set("versions.$.scanResult", scanResult)
+                    .set("status", "PENDING")
+                    .set("updatedAt", LocalDateTime.now().toString());
+
+            mongoTemplate.updateFirst(query, update, Mod.class);
+
+        } catch (Exception e) {
+            logger.error("Async Warden scan failed for mod " + modId, e);
+            ScanResult failed = new ScanResult();
+            failed.setStatus("FAILED");
+
+            Query query = new Query(Criteria.where("_id").is(modId).and("versions._id").is(versionId));
+            Update update = new Update()
+                    .set("versions.$.scanResult", failed)
+                    .set("status", "PENDING");
+
+            mongoTemplate.updateFirst(query, update, Mod.class);
         }
     }
 
