@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
 import { Helmet } from 'react-helmet-async';
 import type { Mod, User, ProjectVersion, Review, ModDependency } from '../../types';
 import {
@@ -708,7 +709,7 @@ export const ModDetail: React.FC<{
                 mainContent={
                     <>
                         <div className="prose dark:prose-invert prose-lg max-w-none">
-                            {mod.about ? <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{mod.about}</ReactMarkdown> : <p className="text-slate-500 italic">No description.</p>}
+                            {mod.about ? <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeSanitize]}>{mod.about}</ReactMarkdown> : <p className="text-slate-500 italic">No description.</p>}
                         </div>
                         <ReviewSection modId={mod.id} rating={mod.rating || 0} reviews={mod.reviews || []} currentUser={currentUser} onReviewSubmitted={(r) => { setMod(prev => prev ? {...prev, reviews: r} : null); if(onRefresh) onRefresh(); }} onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})} onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})} innerRef={reviewsRef} />
                     </>

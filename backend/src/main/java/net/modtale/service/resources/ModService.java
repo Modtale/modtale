@@ -660,8 +660,13 @@ public class ModService {
         }
 
         existing.setTitle(sanitizer.sanitizePlainText(updatedMod.getTitle()));
-        if (updatedMod.getAbout() != null) existing.setAbout(sanitizer.sanitize(updatedMod.getAbout()));
-        existing.setDescription(sanitizer.sanitize(updatedMod.getDescription()));
+
+        existing.setDescription(sanitizer.sanitizePlainText(updatedMod.getDescription()));
+
+        if (updatedMod.getAbout() != null) {
+            existing.setAbout(updatedMod.getAbout());
+        }
+
         existing.setCategory(updatedMod.getCategory());
         existing.setCategories(updatedMod.getCategories());
 

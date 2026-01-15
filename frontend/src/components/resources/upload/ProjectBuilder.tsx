@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
 import { useDropzone, type Accept } from 'react-dropzone';
 import {
     Save, UploadCloud, Link as LinkIcon, Tag,
@@ -671,7 +672,18 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                 {editorMode === 'write' && !readOnly ? (
                                     <textarea value={metaData.description} onChange={e => { markDirty(); setMetaData({...metaData, description: e.target.value}); }} className="flex-1 w-full h-full min-h-[400px] bg-transparent border-none outline-none text-slate-900 dark:text-slate-300 font-mono text-sm resize-none" placeholder="# Description..." />
                                 ) : (
-                                    <div className="prose dark:prose-invert prose-lg max-w-none min-h-[400px]">{metaData.description ? <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{metaData.description}</ReactMarkdown> : <p className="text-slate-500 italic">No description.</p>}</div>
+                                    <div className="prose dark:prose-invert prose-lg max-w-none min-h-[400px]">
+                                        {metaData.description ? (
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                            >
+                                                {metaData.description}
+                                            </ReactMarkdown>
+                                        ) : (
+                                            <p className="text-slate-500 italic">No description.</p>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
