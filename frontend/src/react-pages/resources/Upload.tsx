@@ -44,7 +44,7 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
     const [versionData, setVersionData] = useState<VersionFormData>({
-        versionNumber: '1.0.0', gameVersions: ['Release 1.1'], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
+        versionNumber: '1.0.0', gameVersions: ['1.0-SNAPSHOT'], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
     });
 
     useEffect(() => {
