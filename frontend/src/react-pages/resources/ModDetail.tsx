@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Helmet } from 'react-helmet-async';
 import type { Mod, User, ProjectVersion, Review, ModDependency } from '../../types';
 import {
@@ -230,7 +232,7 @@ interface ReviewSectionProps {
     onReviewSubmitted: (newReviews: Review[]) => void;
     onError: (msg: string) => void;
     onSuccess: (msg: string) => void;
-    innerRef?: React.RefObject<HTMLDivElement>;
+    innerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: overallRating, currentUser, onReviewSubmitted, onError, onSuccess, innerRef }) => {
@@ -709,7 +711,42 @@ export const ModDetail: React.FC<{
                 mainContent={
                     <>
                         <div className="prose dark:prose-invert prose-lg max-w-none">
-                            {mod.about ? <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeSanitize]}>{mod.about}</ReactMarkdown> : <p className="text-slate-500 italic">No description.</p>}
+                            {mod.about ? (
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                                        ...defaultSchema,
+                                        attributes: {
+                                            ...defaultSchema.attributes,
+                                            code: ['className']
+                                        }
+                                    }]]}
+                                    components={{
+                                        code({node, inline, className, children, ...props}: any) {
+                                            const match = /language-(\w+)/.exec(className || '')
+                                            return !inline && match ? (
+                                                <SyntaxHighlighter
+                                                    {...props}
+                                                    style={vscDarkPlus}
+                                                    language={match[1]}
+                                                    PreTag="div"
+                                                    className="rounded-lg text-sm"
+                                                >
+                                                    {String(children).replace(/\n$/, '')}
+                                                </SyntaxHighlighter>
+                                            ) : (
+                                                <code className={`${className} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                                                    {children}
+                                                </code>
+                                            )
+                                        }
+                                    }}
+                                >
+                                    {mod.about}
+                                </ReactMarkdown>
+                            ) : (
+                                <p className="text-slate-500 italic">No description.</p>
+                            )}
                         </div>
                         <ReviewSection modId={mod.id} rating={mod.rating || 0} reviews={mod.reviews || []} currentUser={currentUser} onReviewSubmitted={(r) => { setMod(prev => prev ? {...prev, reviews: r} : null); if(onRefresh) onRefresh(); }} onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})} onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})} innerRef={reviewsRef} />
                     </>
