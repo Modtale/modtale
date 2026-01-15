@@ -606,9 +606,11 @@ public class ModService {
         if(mod.getVersions().isEmpty() && !"MODPACK".equals(mod.getClassification())) {
             throw new IllegalArgumentException("You must upload at least one version before submitting.");
         }
+
         if(mod.getDescription() == null || mod.getDescription().length() < 10) {
             throw new IllegalArgumentException("Short summary must be at least 10 characters.");
         }
+
         if(mod.getTags() == null || mod.getTags().isEmpty()) {
             throw new IllegalArgumentException("At least one tag is required.");
         }
@@ -987,7 +989,6 @@ public class ModService {
             boolean autoApproved = false;
 
             if ("CLEAN".equals(scanResult.getStatus())) {
-                // AUTO APPROVE
                 update.set("versions.$.reviewStatus", ModVersion.ReviewStatus.APPROVED);
                 autoApproved = true;
                 logger.info("Auto-approved clean version {} for project {}", versionId, modId);
