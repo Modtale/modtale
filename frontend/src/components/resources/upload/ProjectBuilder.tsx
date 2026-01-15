@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useDropzone, type Accept } from 'react-dropzone';
 import {
     Save, UploadCloud, Link as LinkIcon, Tag,
     GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
-    UserPlus, Scale, Check, Copy, Link2, Edit2, X, Plus, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
+    UserPlus, Scale, Check, Copy, Link2, Edit2, X, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
     AlertCircle, Beaker, Zap, Clock, Archive, Globe, EyeOff
 } from 'lucide-react';
 
@@ -46,12 +48,6 @@ export interface VersionFormData {
     file: File | null;
     dependencies: string[];
 }
-
-export const DiscordIcon = ({ className }: { className?: string }) => (
-    <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36" xmlns="http://www.w3.org/2000/svg">
-        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83A72.37,72.37,0,0,0,45.64,0A105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36A77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19a77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-4.2-48.62-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
-    </svg>
-);
 
 export const ScrollStyles = () => (
     <style>{`
@@ -520,6 +516,27 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         galleryImages: []
     };
 
+    const MarkdownComponents = {
+        code({node, inline, className, children, ...props}: any) {
+            const match = /language-(\w+)/.exec(className || '')
+            return !inline && match ? (
+                <SyntaxHighlighter
+                    {...props}
+                    style={vscDarkPlus}
+                    language={match[1]}
+                    PreTag="div"
+                    className="rounded-lg text-sm"
+                >
+                    {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+            ) : (
+                <code className={`${className} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                    {children}
+                </code>
+            )
+        }
+    };
+
     return (
         <>
             {modData?.status === 'PENDING' && (
@@ -676,7 +693,14 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         {metaData.description ? (
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
-                                                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                                                    ...defaultSchema,
+                                                    attributes: {
+                                                        ...defaultSchema.attributes,
+                                                        code: ['className']
+                                                    }
+                                                }]]}
+                                                components={MarkdownComponents}
                                             >
                                                 {metaData.description}
                                             </ReactMarkdown>
