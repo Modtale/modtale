@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
 import { SourceInspector } from './SourceInspector';
-import type { ScanIssue } from '../../types';
+import type { ScanIssue, ProjectVersion } from '../../types';
 
 interface ReviewInterfaceProps {
     reviewingProject: any;
@@ -62,14 +62,22 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
     const [showRejectPanel, setShowRejectPanel] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
     const [showScanDetails, setShowScanDetails] = useState(false);
+    const [actioningVersion, setActioningVersion] = useState<string | null>(null);
 
     const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
 
-    useEffect(() => {
-        if (!reviewingProject?.mod?.versions?.[0]?.dependencies) return;
+    const mod = reviewingProject.mod;
+    const isNewProject = mod.status === 'PENDING';
 
-        const deps = reviewingProject.mod.versions[0].dependencies;
+    const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
+    const scanResult = pendingVersion?.scanResult;
+    const hasScanIssues = scanResult && scanResult.status !== 'CLEAN';
+
+    useEffect(() => {
+        if (!pendingVersion?.dependencies) return;
+
+        const deps = pendingVersion.dependencies;
         const fetchMeta = async () => {
             const newMeta = { ...depMeta };
             await Promise.all(deps.map(async (d: any) => {
@@ -92,14 +100,8 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
     const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, line?: number) => {
         setLoadingInspector(true);
         try {
-            const res = await api.get(`/admin/projects/${reviewingProject.mod.id}/versions/${version}/structure`);
-            setInspectorData({
-                version,
-                structure: res.data,
-                issues,
-                initialFile: file,
-                initialLine: line
-            });
+            const res = await api.get(`/admin/projects/${mod.id}/versions/${version}/structure`);
+            setInspectorData({ version, structure: res.data, issues, initialFile: file, initialLine: line });
         } catch (e) {
             setStatus({ type: 'error', title: 'Error', msg: 'Failed to inspect JAR structure.' });
         } finally {
@@ -126,10 +128,31 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
         return path.startsWith('http') ? path : `${BACKEND_URL}${path}`;
     };
 
-    const mod = reviewingProject.mod;
-    const latestVersion = mod.versions?.[0];
-    const scanResult = latestVersion?.scanResult;
-    const hasScanIssues = scanResult && scanResult.status !== 'CLEAN';
+    const handleVersionApprove = async () => {
+        try {
+            if (isNewProject) {
+                await api.post(`/admin/projects/${mod.id}/publish`);
+            } else {
+                await api.post(`/admin/projects/${mod.id}/versions/${pendingVersion.id}/approve`);
+            }
+            onApprove();
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to approve.' });
+        }
+    };
+
+    const handleVersionReject = async (reason: string) => {
+        try {
+            if (isNewProject) {
+                await api.post(`/admin/projects/${mod.id}/reject`, { reason });
+            } else {
+                await api.post(`/admin/projects/${mod.id}/versions/${pendingVersion.id}/reject`, { reason });
+            }
+            onReject(reason);
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to reject.' });
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
@@ -153,7 +176,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
                                     <Shield className="w-6 h-6 text-red-500" />
-                                    Confirm Rejection
+                                    Reject {isNewProject ? "Project" : "Version " + pendingVersion.versionNumber}
                                 </h3>
                                 <button onClick={() => setShowRejectPanel(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
                                     <X className="w-5 h-5 text-slate-500" />
@@ -188,11 +211,11 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => onReject(rejectReason)}
+                                    onClick={() => handleVersionReject(rejectReason)}
                                     disabled={!rejectReason}
                                     className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
                                 >
-                                    Reject Project
+                                    Confirm Reject
                                 </button>
                             </div>
                         </div>
@@ -200,7 +223,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                 )}
 
                 <div className="w-64 bg-slate-100 dark:bg-slate-950/50 border-r border-slate-200 dark:border-white/5 p-6 flex flex-col">
-                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Review Process</h2>
+                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Reviewing: {isNewProject ? "New Project" : `v${pendingVersion.versionNumber}`}</h2>
                     <div className="space-y-2 flex-1">
                         {WIZARD_STEPS.map((step, idx) => (
                             <div
@@ -416,7 +439,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
                                                         </div>
                                                         <button
-                                                            onClick={() => openInspector(latestVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart)}
+                                                            onClick={() => openInspector(pendingVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart)}
                                                             className="shrink-0 flex items-center gap-1.5 text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-2 rounded-lg transition-colors"
                                                         >
                                                             <Eye className="w-3.5 h-3.5" /> Inspect
@@ -441,42 +464,40 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                 )}
 
                                 <div className="space-y-3">
-                                    {mod.versions?.map((v: any) => (
-                                        <div key={v.id} className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 flex items-center justify-between group hover:border-modtale-accent/30 transition-colors">
-                                            <div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="font-black text-lg text-slate-900 dark:text-white">{v.versionNumber}</span>
-                                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${v.channel === 'RELEASE' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{v.channel}</span>
-                                                </div>
-                                                <p className="text-xs text-slate-400 mt-1 font-bold">Game Versions: <span className="text-slate-600 dark:text-slate-300">{v.gameVersions?.join(', ')}</span></p>
+                                    <div className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 flex items-center justify-between group hover:border-modtale-accent/30 transition-colors">
+                                        <div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-black text-lg text-slate-900 dark:text-white">{pendingVersion.versionNumber}</span>
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${pendingVersion.channel === 'RELEASE' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{pendingVersion.channel}</span>
                                             </div>
-                                            <div className="flex gap-2">
-                                                {mod.classification !== 'MODPACK' && (
-                                                    <button
-                                                        onClick={() => openInspector(v.versionNumber, scanResult?.issues || [])}
-                                                        disabled={loadingInspector}
-                                                        className="px-5 py-2.5 bg-indigo-500/10 hover:bg-indigo-500 hover:text-white text-indigo-500 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-indigo-500/20"
-                                                    >
-                                                        {loadingInspector && inspectorData?.version === v.versionNumber ? 'Loading...' : <><Terminal className="w-4 h-4" /> Inspect Source</>}
-                                                    </button>
-                                                )}
-                                                <a
-                                                    href={`${API_BASE_URL}/projects/${mod.id}/versions/${v.versionNumber}/download`}
-                                                    className="px-5 py-2.5 bg-slate-100 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center gap-2 transition-all"
-                                                    target="_blank" rel="noreferrer"
-                                                >
-                                                    <Download className="w-4 h-4" /> Download
-                                                </a>
-                                            </div>
+                                            <p className="text-xs text-slate-400 mt-1 font-bold">Game Versions: <span className="text-slate-600 dark:text-slate-300">{pendingVersion.gameVersions?.join(', ')}</span></p>
                                         </div>
-                                    ))}
+                                        <div className="flex gap-2">
+                                            {mod.classification !== 'MODPACK' && (
+                                                <button
+                                                    onClick={() => openInspector(pendingVersion.versionNumber, scanResult?.issues || [])}
+                                                    disabled={loadingInspector}
+                                                    className="px-5 py-2.5 bg-indigo-500/10 hover:bg-indigo-500 hover:text-white text-indigo-500 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-indigo-500/20"
+                                                >
+                                                    {loadingInspector && inspectorData?.version === pendingVersion.versionNumber ? 'Loading...' : <><Terminal className="w-4 h-4" /> Inspect Source</>}
+                                                </button>
+                                            )}
+                                            <a
+                                                href={`${API_BASE_URL}/projects/${mod.id}/versions/${pendingVersion.versionNumber}/download`}
+                                                className="px-5 py-2.5 bg-slate-100 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center gap-2 transition-all"
+                                                target="_blank" rel="noreferrer"
+                                            >
+                                                <Download className="w-4 h-4" /> Download
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
                                     <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Dependencies</label>
-                                    {mod.versions?.[0]?.dependencies?.length > 0 ? (
+                                    {pendingVersion.dependencies?.length > 0 ? (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {mod.versions[0].dependencies.map((d: any) => {
+                                            {pendingVersion.dependencies.map((d: any) => {
                                                 const meta = depMeta[d.modId];
                                                 return (
                                                     <a
@@ -574,18 +595,20 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                 <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-500/10">
                                     <Shield className="w-12 h-12 text-emerald-500" />
                                 </div>
-                                <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">Ready to Publish?</h2>
+                                <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+                                    {isNewProject ? "Approve Project?" : "Approve Update?"}
+                                </h2>
                                 <p className="text-slate-500 dark:text-slate-400 font-medium mb-10 text-lg leading-relaxed">
-                                    You have manually verified the files, content, and author details.
-                                    Approving will make this project publicly visible immediately.
+                                    You are about to approve <strong>v{pendingVersion.versionNumber}</strong>.
+                                    {isNewProject ? " This will make the project publicly visible." : " This update will be pushed to users immediately."}
                                 </p>
 
                                 <div className="flex flex-col gap-4">
                                     <button
-                                        onClick={onApprove}
+                                        onClick={handleVersionApprove}
                                         className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95"
                                     >
-                                        Approve & Publish Project
+                                        Approve & Publish
                                     </button>
                                 </div>
                             </div>

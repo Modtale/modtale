@@ -126,7 +126,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(modService.getPendingProjects());
+        return ResponseEntity.ok(modService.getVerificationQueue());
     }
 
     @GetMapping("/projects/{id}/review-details")
@@ -151,6 +151,42 @@ public class AdminController {
                 "mod", mod,
                 "authorStats", authorStats
         ));
+    }
+
+    @PostMapping("/projects/{id}/publish")
+    public ResponseEntity<?> publishProject(@PathVariable String id) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.publishMod(id, currentUser.getUsername());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/projects/{id}/versions/{versionId}/approve")
+    public ResponseEntity<?> approveVersion(@PathVariable String id, @PathVariable String versionId) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.approveVersion(id, versionId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/projects/{id}/versions/{versionId}/reject")
+    public ResponseEntity<?> rejectVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody Map<String, String> body) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.rejectVersion(id, versionId, body.get("reason"));
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PostMapping("/projects/{id}/reject")
@@ -237,6 +273,11 @@ public class AdminController {
             if (mod == null) return ResponseEntity.notFound().build();
 
             ModVersion targetVer = modService.findVersion(mod, version);
+
+            if (targetVer == null) {
+                targetVer = mod.getVersions().stream().filter(v -> v.getId().equals(version)).findFirst().orElse(null);
+            }
+
             if (targetVer == null || targetVer.getFileUrl() == null) return ResponseEntity.notFound().build();
 
             byte[] jarBytes = storageService.download(targetVer.getFileUrl());
@@ -280,6 +321,11 @@ public class AdminController {
             if (mod == null) return ResponseEntity.notFound().build();
 
             ModVersion targetVer = modService.findVersion(mod, version);
+
+            if (targetVer == null) {
+                targetVer = mod.getVersions().stream().filter(v -> v.getId().equals(version)).findFirst().orElse(null);
+            }
+
             if (targetVer == null || targetVer.getFileUrl() == null) return ResponseEntity.notFound().build();
 
             byte[] jarBytes = storageService.download(targetVer.getFileUrl());
