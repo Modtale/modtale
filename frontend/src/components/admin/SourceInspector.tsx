@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, Eye } from 'lucide-react';
+import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, Eye, CheckCircle2, Square } from 'lucide-react';
 import { api } from '../../utils/api';
 import type { ScanIssue } from '../../types';
 
@@ -124,7 +124,7 @@ const FileTreeNode: React.FC<{
     );
 };
 
-const CodeViewer: React.FC<{ content: any; filename: string; highlightLine?: number }> = ({ content, filename, highlightLine }) => {
+const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number }> = ({ content, filename, startLine, endLine }) => {
     let ext = filename.split('.').pop()?.toLowerCase();
     if (ext === 'class') ext = 'java';
     const preRef = useRef<HTMLPreElement>(null);
@@ -144,7 +144,7 @@ const CodeViewer: React.FC<{ content: any; filename: string; highlightLine?: num
         return String(content);
     }, [content]);
 
-    const lines = useMemo(() => safeContent.split('\n').length, [safeContent]);
+    const lines = useMemo(() => safeContent.split('\n'), [safeContent]);
 
     const highlightedCode = useMemo(() => {
         if (!safeContent) return '';
@@ -169,27 +169,27 @@ const CodeViewer: React.FC<{ content: any; filename: string; highlightLine?: num
     }, [safeContent, ext]);
 
     useEffect(() => {
-        if (highlightLine && preRef.current) {
+        if (startLine && preRef.current) {
             setTimeout(() => {
                 if (preRef.current) {
-                    const lineHeight = 20;
-                    preRef.current.scrollTop = (highlightLine - 5) * lineHeight;
+                    const lineHeight = 20; // Approx
+                    preRef.current.scrollTop = (startLine - 5) * lineHeight;
                 }
             }, 100);
         }
-    }, [highlightLine, content]);
+    }, [startLine, content]);
 
     return (
         <>
             <style>{scrollbarStyles}</style>
             <div className="flex h-full font-mono text-xs overflow-hidden">
                 <div className="w-12 bg-[#0d1117] border-r border-white/5 text-slate-600 text-right py-4 pr-3 select-none overflow-hidden leading-5">
-                    {Array.from({length: lines}).map((_, i) => (
-                        <div key={i} className={(i+1) === highlightLine ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>{i + 1}</div>
+                    {lines.map((_, i) => (
+                        <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>{i + 1}</div>
                     ))}
                 </div>
                 <pre ref={preRef} className="flex-1 text-slate-300 leading-5 p-4 pt-4 overflow-auto custom-scrollbar">
-                    <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
+                     <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
                 </pre>
             </div>
         </>
@@ -203,6 +203,10 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     const [fileSearch, setFileSearch] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const [showIssuesDropdown, setShowIssuesDropdown] = useState(false);
+    const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set()); // Track local resolution by index
+
+    const [activeIssueLineStart, setActiveIssueLineStart] = useState<number | undefined>(undefined);
+    const [activeIssueLineEnd, setActiveIssueLineEnd] = useState<number | undefined>(undefined);
 
     const fileTree = useMemo(() => buildFileTree(structure), [structure]);
 
@@ -214,6 +218,16 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             return next;
         });
     }, []);
+
+    const toggleResolved = (idx: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setResolvedIssues(prev => {
+            const next = new Set(prev);
+            if (next.has(idx)) next.delete(idx);
+            else next.add(idx);
+            return next;
+        });
+    };
 
     const loadInspectorFile = async (path: string) => {
         setInspectorFile(path);
@@ -228,9 +242,14 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
     };
 
-    const handleJumpToIssue = (file: string, line: number) => {
+    const handleJumpToIssue = (file: string, lineStart: number, lineEnd: number) => {
+        let targetFile = file;
+        if (!structure.includes(targetFile) && structure.includes(targetFile + ".class")) {
+            targetFile = targetFile + ".class";
+        }
+
         // Expand folders for file
-        const parts = file.split('/');
+        const parts = targetFile.split('/');
         const foldersToExpand = new Set<string>();
         let currentPath = "";
         for(let i=0; i<parts.length-1; i++) {
@@ -238,14 +257,17 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             foldersToExpand.add(currentPath);
         }
         setExpandedFolders(prev => new Set([...prev, ...foldersToExpand]));
-        loadInspectorFile(file);
-        // CodeViewer handles scroll via prop
+
+        loadInspectorFile(targetFile);
+        setActiveIssueLineStart(lineStart);
+        setActiveIssueLineEnd(lineEnd);
         setShowIssuesDropdown(false);
     };
 
     useEffect(() => {
         if (initialFile) {
-            handleJumpToIssue(initialFile, initialLine || 0);
+            const issue = issues.find(i => i.filePath === initialFile && i.lineStart === initialLine);
+            handleJumpToIssue(initialFile, initialLine || 0, issue?.lineEnd || initialLine || 0);
         }
     }, [initialFile]);
 
@@ -276,27 +298,50 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                             </button>
 
                             {showIssuesDropdown && (
-                                <div className="absolute top-full left-0 mt-2 w-96 max-h-96 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2 custom-scrollbar">
-                                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2">Security Issues</h4>
-                                    {issues.map((issue, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart)}
-                                            className="w-full text-left p-2 hover:bg-white/5 rounded-lg group"
-                                        >
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase
-                                                    ${issue.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
-                                                    {issue.severity}
-                                                </span>
-                                                <span className="text-slate-300 text-xs font-bold truncate flex-1">{issue.type}</span>
+                                <div className="absolute top-full left-0 mt-2 w-[500px] max-h-[600px] overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2 custom-scrollbar">
+                                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2 flex justify-between">
+                                        <span>Security Issues</span>
+                                        <span>{resolvedIssues.size}/{issues.length} Resolved</span>
+                                    </h4>
+                                    {issues.map((issue, idx) => {
+                                        const isResolved = resolvedIssues.has(idx);
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={`w-full text-left p-3 hover:bg-white/5 rounded-lg group border border-transparent hover:border-white/5 transition-all mb-1 ${isResolved ? 'opacity-50' : ''}`}
+                                            >
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="flex-1 cursor-pointer" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd)}>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase
+                                                                ${issue.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
+                                                                {issue.severity}
+                                                            </span>
+                                                            <span className={`text-xs font-bold truncate flex-1 ${isResolved ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{issue.type}</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
+                                                            {issue.filePath.split('/').pop()} :{issue.lineStart} - {issue.lineEnd}
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400 line-clamp-2 mb-2">{issue.description}</p>
+
+                                                        {issue.snippet && (
+                                                            <div className="bg-black/30 p-2 rounded border border-white/5 font-mono text-[10px] text-slate-400 overflow-x-auto whitespace-pre">
+                                                                {issue.snippet}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <button
+                                                        onClick={(e) => toggleResolved(idx, e)}
+                                                        className={`shrink-0 p-1 rounded hover:bg-white/10 transition-colors ${isResolved ? 'text-emerald-500' : 'text-slate-600'}`}
+                                                        title="Mark as Resolved"
+                                                    >
+                                                        {isResolved ? <CheckCircle2 className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
-                                                {issue.filePath.split('/').pop()} :{issue.lineStart}
-                                            </div>
-                                            <p className="text-[10px] text-slate-400 line-clamp-2">{issue.description}</p>
-                                        </button>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -364,7 +409,12 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                             Decompiling...
                         </div>
                     ) : inspectorFile ? (
-                        <CodeViewer content={inspectorContent} filename={inspectorFile} highlightLine={inspectorFile === initialFile ? initialLine : undefined} />
+                        <CodeViewer
+                            content={inspectorContent}
+                            filename={inspectorFile}
+                            startLine={inspectorFile.includes(initialFile || '') ? activeIssueLineStart : undefined}
+                            endLine={inspectorFile.includes(initialFile || '') ? activeIssueLineEnd : undefined}
+                        />
                     ) : (
                         <div className="flex h-full items-center justify-center text-slate-600 flex-col gap-4">
                             <Terminal className="w-12 h-12 opacity-50" />
