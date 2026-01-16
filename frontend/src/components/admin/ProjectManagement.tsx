@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash } from 'lucide-react';
-import { api } from '../../utils/api';
-import type { Mod } from '../../types';
+import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download } from 'lucide-react';
+import { api, API_BASE_URL } from '../../utils/api';
+import type { Mod, ScanIssue } from '../../types';
+import { SourceInspector } from "@/components/admin/SourceInspector.tsx";
 
 export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setStatus }) => {
     const [query, setQuery] = useState('');
@@ -18,6 +19,9 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const [confirmAction, setConfirmAction] = useState<'DELETE' | 'UNLIST' | 'DELETE_VER' | null>(null);
     const [targetVersionId, setTargetVersionId] = useState<string | null>(null);
     const [confirmInput, setConfirmInput] = useState('');
+
+    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number } | null>(null);
+    const [loadingInspector, setLoadingInspector] = useState(false);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -108,8 +112,31 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
         }
     };
 
+    const openInspector = async (version: string, issues: ScanIssue[] = []) => {
+        if (!foundProject) return;
+        setLoadingInspector(true);
+        try {
+            const res = await api.get(`/admin/projects/${foundProject.id}/versions/${version}/structure`);
+            setInspectorData({ version, structure: res.data, issues });
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Failed to inspect JAR structure.' });
+        } finally {
+            setLoadingInspector(false);
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
+            {inspectorData && foundProject && (
+                <SourceInspector
+                    modId={foundProject.id}
+                    version={inspectorData.version}
+                    structure={inspectorData.structure}
+                    issues={inspectorData.issues}
+                    onClose={() => setInspectorData(null)}
+                />
+            )}
+
             <div className="flex flex-col md:flex-row gap-4 mb-10 relative z-50">
                 <div className="relative flex-1 group" ref={wrapperRef}>
                     <Package className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
@@ -219,13 +246,31 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                                             </p>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => { setTargetVersionId(ver.id); setConfirmAction('DELETE_VER'); }}
-                                        className="p-2 hover:bg-red-500 hover:text-white text-slate-400 rounded-lg transition-colors"
-                                        title="Delete Version"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => openInspector(ver.versionNumber, ver.scanResult?.issues || [])}
+                                            disabled={loadingInspector}
+                                            className="px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500 hover:text-white text-indigo-500 rounded-lg text-xs font-bold transition-colors border border-indigo-500/20 flex items-center gap-2"
+                                        >
+                                            <Terminal className="w-3.5 h-3.5" /> Inspect
+                                        </button>
+                                        <a
+                                            href={`${API_BASE_URL}/projects/${foundProject.id}/versions/${ver.versionNumber}/download`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 rounded-lg transition-colors"
+                                            title="Download Jar"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                        </a>
+                                        <button
+                                            onClick={() => { setTargetVersionId(ver.id); setConfirmAction('DELETE_VER'); }}
+                                            className="p-2 hover:bg-red-500 hover:text-white text-slate-400 rounded-lg transition-colors"
+                                            title="Delete Version"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
