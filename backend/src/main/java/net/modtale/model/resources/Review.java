@@ -7,6 +7,9 @@ public class Review {
     private String comment;
     private int rating;
     private String date;
+    private String updatedAt;
+    private String developerReply;
+    private String developerReplyDate;
 
     public Review() {}
 
@@ -22,4 +25,13 @@ public class Review {
     public void setRating(int rating) { this.rating = rating; }
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }
+
+    public String getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getDeveloperReply() { return developerReply; }
+    public void setDeveloperReply(String developerReply) { this.developerReply = developerReply; }
+
+    public String getDeveloperReplyDate() { return developerReplyDate; }
+    public void setDeveloperReplyDate(String developerReplyDate) { this.developerReplyDate = developerReplyDate; }
 }

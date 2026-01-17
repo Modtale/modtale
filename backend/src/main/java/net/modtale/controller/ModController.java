@@ -394,8 +394,45 @@ public class ModController {
         String comment = (String) body.get("comment");
         int rating = (int) body.get("rating");
         String version = (String) body.get("version");
-        modService.addReview(id, user.getUsername(), comment, rating, version);
-        return ResponseEntity.ok().build();
+        try {
+            modService.addReview(id, user.getUsername(), comment, rating, version);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/projects/{id}/reviews/{reviewId}")
+    public ResponseEntity<?> editReview(@PathVariable String id, @PathVariable String reviewId, @RequestBody Map<String, Object> body) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        String comment = (String) body.get("comment");
+        int rating = (int) body.get("rating");
+        try {
+            modService.editReview(id, reviewId, user.getUsername(), comment, rating);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/projects/{id}/reviews/{reviewId}/reply")
+    public ResponseEntity<?> replyToReview(@PathVariable String id, @PathVariable String reviewId, @RequestBody Map<String, Object> body) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        String reply = (String) body.get("reply");
+        try {
+            modService.replyToReview(id, reviewId, reply, user.getUsername());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     @PostMapping("/projects")

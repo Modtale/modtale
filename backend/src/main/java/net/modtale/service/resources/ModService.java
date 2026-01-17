@@ -301,6 +301,10 @@ public class ModService {
                 mod.setVersions(visibleVersions);
             }
 
+            if (!mod.isAllowReviews() && !isPrivileged) {
+                mod.setReviews(new ArrayList<>());
+            }
+
             if (mod.getReviews() != null && !mod.getReviews().isEmpty()) {
                 for (Review r : mod.getReviews()) {
                     if (r.getUserAvatarUrl() == null || r.getUserAvatarUrl().isEmpty()) {
@@ -371,6 +375,7 @@ public class ModService {
         mod.setPendingInvites(new ArrayList<>());
         mod.setVersions(new ArrayList<>());
         mod.setAllowModpacks(true);
+        mod.setAllowReviews(true);
 
         return modRepository.save(mod);
     }
@@ -779,6 +784,7 @@ public class ModService {
         existing.setRepositoryUrl(updatedMod.getRepositoryUrl());
         existing.setTypes(updatedMod.getTypes());
         existing.setAllowModpacks(updatedMod.isAllowModpacks());
+        existing.setAllowReviews(updatedMod.isAllowReviews());
 
         if (updatedMod.getLinks() != null) existing.setLinks(updatedMod.getLinks());
         if (updatedMod.getImageUrl() != null) existing.setImageUrl(updatedMod.getImageUrl());
@@ -1413,6 +1419,14 @@ public class ModService {
     public void addReview(String modId, String username, String comment, int rating, String version) {
         Mod mod = getModById(modId);
         if (mod != null) {
+            if (!mod.isAllowReviews()) {
+                throw new IllegalStateException("Reviews are disabled for this project.");
+            }
+
+            if (mod.getReviews() != null && mod.getReviews().stream().anyMatch(r -> r.getUser().equalsIgnoreCase(username))) {
+                throw new IllegalArgumentException("You have already reviewed this project. You can edit your existing review.");
+            }
+
             Review review = new Review();
             review.setId(UUID.randomUUID().toString());
             review.setUser(username);
@@ -1433,6 +1447,61 @@ public class ModService {
                         List.of(author.getId()),
                         "New Review: " + rating + "/5",
                         username + " reviewed " + mod.getTitle(),
+                        getProjectLink(mod),
+                        mod.getImageUrl()
+                );
+            }
+        }
+    }
+
+    public void editReview(String modId, String reviewId, String username, String newComment, int newRating) {
+        Mod mod = getModById(modId);
+        if (mod != null) {
+            Review review = mod.getReviews().stream()
+                    .filter(r -> r.getId().equals(reviewId))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Review not found"));
+
+            if (!review.getUser().equalsIgnoreCase(username)) {
+                throw new SecurityException("You can only edit your own reviews.");
+            }
+
+            review.setComment(sanitizer.sanitizePlainText(newComment));
+            review.setRating(newRating);
+            review.setUpdatedAt(LocalDateTime.now().toString());
+
+            double avg = mod.getReviews().stream().mapToInt(Review::getRating).average().orElse(0.0);
+            mod.setRating(Math.round(avg * 10.0) / 10.0);
+            modRepository.save(mod);
+        }
+    }
+
+    public void replyToReview(String modId, String reviewId, String reply, String username) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Mod mod = getModById(modId);
+
+        if (mod != null) {
+            if (!hasEditPermission(mod, user)) {
+                throw new SecurityException("Only the project creator can reply to reviews.");
+            }
+
+            Review review = mod.getReviews().stream()
+                    .filter(r -> r.getId().equals(reviewId))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Review not found"));
+
+            // Allow editing reply if it exists, or adding new one
+            review.setDeveloperReply(sanitizer.sanitizePlainText(reply));
+            review.setDeveloperReplyDate(LocalDateTime.now().toString());
+
+            modRepository.save(mod);
+
+            User reviewer = userRepository.findByUsername(review.getUser()).orElse(null);
+            if (reviewer != null) {
+                notificationService.sendNotification(
+                        List.of(reviewer.getId()),
+                        "Developer Reply",
+                        mod.getAuthor() + " replied to your review on " + mod.getTitle(),
                         getProjectLink(mod),
                         mod.getImageUrl()
                 );
