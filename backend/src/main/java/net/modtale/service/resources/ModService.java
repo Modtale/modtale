@@ -1148,6 +1148,8 @@ public class ModService {
             modRepository.save(mod);
         } else {
             logger.info("Hard deleting project " + mod.getId());
+            analyticsService.deleteProjectAnalytics(mod.getId()); // Cleanup analytics
+
             Set<String> dependencyIds = new HashSet<>();
             if (mod.getVersions() != null) {
                 for (ModVersion v : mod.getVersions()) {
@@ -1525,7 +1527,7 @@ public class ModService {
             Mod mod = modOpt.get();
             mod.setDownloadCount(mod.getDownloadCount() + 1);
             modRepository.save(mod);
-            analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false);
+            analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false, "internal");
         }
     }
 

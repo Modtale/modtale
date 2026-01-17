@@ -59,6 +59,14 @@ public class ModController {
         return user.getRoles() != null && user.getRoles().contains("ADMIN");
     }
 
+    private String getClientIp(HttpServletRequest request) {
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader == null) {
+            return request.getRemoteAddr();
+        }
+        return xfHeader.split(",")[0];
+    }
+
     @PutMapping("/projects/{id}/icon")
     public ResponseEntity<?> updateProjectIcon(@PathVariable String id, @RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
@@ -120,17 +128,19 @@ public class ModController {
                 }
             }
 
+            String clientIp = getClientIp(request);
+
             if ("MODPACK".equals(mod.getClassification())) {
                 ModVersion targetVersion = modService.findVersion(mod, version);
                 if (targetVersion == null) return ResponseEntity.notFound().build();
 
                 modService.incrementDownloadCount(mod.getId());
-                analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi);
+                analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
                 if (targetVersion.getDependencies() != null) {
                     for (ModDependency dep : targetVersion.getDependencies()) {
                         modService.incrementDownloadCount(dep.getModId());
-                        analyticsService.logDownload(dep.getModId(), null, null, isApi);
+                        analyticsService.logDownload(dep.getModId(), null, null, isApi, clientIp);
                     }
                 }
 
@@ -155,7 +165,7 @@ public class ModController {
             ByteArrayResource resource = new ByteArrayResource(data);
 
             modService.incrementDownloadCount(mod.getId());
-            analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi);
+            analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
             String originalPath = targetVersion.getFileUrl();
             String filename = originalPath.contains("/") ? originalPath.substring(originalPath.lastIndexOf('/') + 1) : originalPath;
@@ -234,7 +244,7 @@ public class ModController {
     }
 
     @GetMapping("/projects/{id}")
-    public ResponseEntity<?> getProject(@PathVariable String id, HttpServletResponse response) {
+    public ResponseEntity<?> getProject(@PathVariable String id, HttpServletRequest request) {
         Mod mod = modService.getModById(id);
         if (mod == null) return ResponseEntity.notFound().build();
 
@@ -253,7 +263,6 @@ public class ModController {
             mod.setIsOwner(modService.isOwner(mod, user));
         }
 
-        analyticsService.logView(mod.getId(), mod.getAuthor());
         return ResponseEntity.ok(mod);
     }
 

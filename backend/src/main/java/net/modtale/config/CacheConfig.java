@@ -24,12 +24,13 @@ public class CacheConfig {
                 "allTags",
                 "creatorAnalytics",
                 "projectAnalytics",
-                "sitemapData"
+                "sitemapData",
+                "analyticsDebounce"
         );
 
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(60, TimeUnit.MINUTES)
-                .maximumSize(2000)
+                .maximumSize(10000)
                 .recordStats());
 
         return cacheManager;

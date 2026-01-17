@@ -7,6 +7,8 @@ import net.modtale.repository.analytics.PlatformMonthlyStatsRepository;
 import net.modtale.repository.analytics.ProjectMonthlyStatsRepository;
 import net.modtale.repository.resources.ModRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -30,8 +32,24 @@ public class AnalyticsService {
     @Autowired private PlatformMonthlyStatsRepository platformStatsRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private MongoTemplate mongoTemplate;
+    @Autowired private CacheManager cacheManager;
 
-    public void logDownload(String projectId, String versionId, String authorId, boolean isApi) {
+    private boolean isDebounced(String projectId, String clientIp, String type) {
+        if (clientIp == null || clientIp.isEmpty()) return false;
+        Cache cache = cacheManager.getCache("analyticsDebounce");
+        if (cache != null) {
+            String key = type + ":" + projectId + ":" + clientIp;
+            if (cache.get(key) != null) {
+                return true;
+            }
+            cache.put(key, Boolean.TRUE);
+        }
+        return false;
+    }
+
+    public void logDownload(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {
+        if (isDebounced(projectId, clientIp, "download")) return;
+
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
         int month = now.getMonthValue();
@@ -62,7 +80,9 @@ public class AnalyticsService {
         mongoTemplate.upsert(platformQuery, platformUpdate, PlatformMonthlyStats.class);
     }
 
-    public void logView(String projectId, String authorId) {
+    public void logView(String projectId, String authorId, String clientIp) {
+        if (isDebounced(projectId, clientIp, "view")) return;
+
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
         int month = now.getMonthValue();
