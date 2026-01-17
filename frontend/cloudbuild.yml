@@ -16,12 +16,12 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'modtale-frontend' # Your Cloud Run service name
+      - 'modtale-frontend'
       - '--image'
       - 'gcr.io/$PROJECT_ID/modtale-frontend'
       - '--region'
       - 'us-central1'
-      - '--allow-unauthenticated' # Allows public access to the frontend
+      - '--allow-unauthenticated'
 
 substitutions:
   _PUBLIC_API_URL: https://api.modtale.net/api/v1

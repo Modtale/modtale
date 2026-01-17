@@ -26,7 +26,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [project, setProject] = useState<Mod | null>(null);
 
-    const [activeTab, setActiveTab] = useState<'details' | 'files' | 'settings'>(() => {
+    const [activeTab, setActiveTab] = useState<'details' | 'files' | 'gallery' | 'settings'>(() => {
         const params = new URLSearchParams(location.search);
         return params.get('tab') === 'files' ? 'files' : 'details';
     });
@@ -198,6 +198,35 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
         }
     };
 
+    const handleGalleryUpload = async (file: File) => {
+        const currentProject = project;
+        if (!currentProject) return;
+        setIsLoading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            await api.post(`/projects/${currentProject.id}/gallery`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+            const res = await api.get(`/projects/${currentProject.id}`);
+            setProject(res.data);
+            setStatusModal({type: 'success', title: 'Uploaded', msg: 'Image added to gallery.'});
+        } catch (e: any) {
+            setStatusModal({type: 'error', title: 'Error', msg: e.response?.data?.message || 'Upload failed.'});
+        } finally { setIsLoading(false); }
+    };
+
+    const handleGalleryDelete = async (url: string) => {
+        const currentProject = project;
+        if (!currentProject) return;
+        setIsLoading(true);
+        try {
+            await api.delete(`/projects/${currentProject.id}/gallery`, { params: { imageUrl: url } });
+            const res = await api.get(`/projects/${currentProject.id}`);
+            setProject(res.data);
+        } catch (e: any) {
+            setStatusModal({type: 'error', title: 'Error', msg: 'Failed to delete image.'});
+        } finally { setIsLoading(false); }
+    };
+
     const handlePublish = async () => {
         const currentProject = project;
         if(!currentProject) return;
@@ -358,6 +387,8 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 handleArchive={handleArchive}
                 handleUnlist={handleUnlist}
                 handleRestore={handleRestore}
+                handleGalleryUpload={handleGalleryUpload}
+                handleGalleryDelete={handleGalleryDelete}
                 isLoading={isLoading}
                 classification={project?.classification || 'PLUGIN'}
                 currentUser={currentUser}
