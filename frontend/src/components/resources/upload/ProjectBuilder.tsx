@@ -442,7 +442,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     useEffect(() => { checkRepoUrl(metaData.repositoryUrl || ''); }, [metaData.repositoryUrl, checkRepoUrl]);
 
     useEffect(() => {
-        if ((isPlugin || isModpack) && !manualRepo && !readOnly) {
+        if (!manualRepo && !readOnly) {
             fetchRepos();
         }
     }, [classification, provider, manualRepo, readOnly]);
@@ -855,46 +855,44 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             <p className="text-center text-[10px] text-slate-500 mt-2">Click to expand</p>
                         </SidebarSection>
 
-                        {(isPlugin || isModpack) && (
-                            <SidebarSection title="Repository Source" icon={GitMerge}>
-                                <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2">
-                                    <div className="flex bg-slate-200 dark:bg-black/40 rounded-lg p-1 mb-3">
-                                        <button onClick={() => { setManualRepo(false); if (hasGithub) { if (provider !== 'github') setRepos([]); setProvider('github'); } }} disabled={readOnly || !hasGithub} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'github' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitHub</button>
-                                        <button onClick={() => { setManualRepo(false); if (hasGitlab) { if (provider !== 'gitlab') setRepos([]); setProvider('gitlab'); } }} disabled={readOnly || !hasGitlab} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'gitlab' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitLab</button>
-                                        <button onClick={() => setManualRepo(true)} disabled={readOnly} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${manualRepo ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>Link URL</button>
-                                    </div>
-
-                                    {manualRepo ? (
-                                        <div className="relative">
-                                            <input value={metaData.repositoryUrl} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, repositoryUrl: e.target.value}); checkRepoUrl(e.target.value); }} className={`w-full bg-slate-100 dark:bg-slate-900 border rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white outline-none transition-all pr-8 ${!repoValid && metaData.repositoryUrl ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`} placeholder="https://github.com/..." />
-                                            {metaData.repositoryUrl && <div className="absolute right-3 top-2.5">{repoValid ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <X className="w-3.5 h-3.5 text-red-500" />}</div>}
-                                        </div>
-                                    ) : (!hasGithub && !hasGitlab) ? (
-                                        <div className="text-center py-4 text-xs text-slate-500">Link account in settings.</div>
-                                    ) : (
-                                        <div className="relative" ref={repoDropdownRef}>
-                                            <button disabled={readOnly} onClick={() => setRepoDropdownOpen(!repoDropdownOpen)} className={`w-full flex items-center justify-between bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white transition-colors ${!readOnly ? 'hover:border-modtale-accent' : 'opacity-50 cursor-not-allowed'}`}>
-                                                <span className="truncate">{metaData.repositoryUrl || "Select Repo..."}</span>
-                                                <ChevronDown className="w-3 h-3 text-slate-500" />
-                                            </button>
-                                            {repoDropdownOpen && !readOnly && (
-                                                <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
-                                                    <div className="p-2 border-b border-slate-200 dark:border-white/5 flex gap-2">
-                                                        <input autoFocus value={repoSearch} onChange={e => setRepoSearch(e.target.value)} className="flex-1 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-md px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none" placeholder="Filter..." />
-                                                        <button onClick={fetchRepos} className="p-1 bg-slate-100 dark:bg-white/5 rounded hover:bg-slate-200 dark:hover:bg-white/10"><RefreshCw className={`w-3 h-3 text-slate-400 ${loadingRepos ? 'animate-spin' : ''}`} /></button>
-                                                    </div>
-                                                    <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
-                                                        {loadingRepos ? <div className="p-4 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-modtale-accent" /></div> : filteredRepos.length > 0 ? filteredRepos.map(r => (
-                                                            <button key={r.url} onClick={() => { markDirty(); setMetaData({...metaData, repositoryUrl: r.html_url || r.url}); checkRepoUrl(r.html_url || r.url); setRepoDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-xs text-slate-600 dark:text-slate-300 flex justify-between items-center group"><span className="font-mono">{r.name}</span>{metaData.repositoryUrl === (r.html_url || r.url) && <Check className="w-3 h-3 text-modtale-accent" />}</button>
-                                                        )) : <div className="p-2 text-center text-[10px] text-slate-500">No repos found</div>}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                        <SidebarSection title="Repository Source" icon={GitMerge}>
+                            <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2">
+                                <div className="flex bg-slate-200 dark:bg-black/40 rounded-lg p-1 mb-3">
+                                    <button onClick={() => { setManualRepo(false); if (hasGithub) { if (provider !== 'github') setRepos([]); setProvider('github'); } }} disabled={readOnly || !hasGithub} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'github' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitHub</button>
+                                    <button onClick={() => { setManualRepo(false); if (hasGitlab) { if (provider !== 'gitlab') setRepos([]); setProvider('gitlab'); } }} disabled={readOnly || !hasGitlab} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'gitlab' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitLab</button>
+                                    <button onClick={() => setManualRepo(true)} disabled={readOnly} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${manualRepo ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>Link URL</button>
                                 </div>
-                            </SidebarSection>
-                        )}
+
+                                {manualRepo ? (
+                                    <div className="relative">
+                                        <input value={metaData.repositoryUrl} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, repositoryUrl: e.target.value}); checkRepoUrl(e.target.value); }} className={`w-full bg-slate-100 dark:bg-slate-900 border rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white outline-none transition-all pr-8 ${!repoValid && metaData.repositoryUrl ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`} placeholder="https://github.com/..." />
+                                        {metaData.repositoryUrl && <div className="absolute right-3 top-2.5">{repoValid ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <X className="w-3.5 h-3.5 text-red-500" />}</div>}
+                                    </div>
+                                ) : (!hasGithub && !hasGitlab) ? (
+                                    <div className="text-center py-4 text-xs text-slate-500">Link account in settings.</div>
+                                ) : (
+                                    <div className="relative" ref={repoDropdownRef}>
+                                        <button disabled={readOnly} onClick={() => setRepoDropdownOpen(!repoDropdownOpen)} className={`w-full flex items-center justify-between bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white transition-colors ${!readOnly ? 'hover:border-modtale-accent' : 'opacity-50 cursor-not-allowed'}`}>
+                                            <span className="truncate">{metaData.repositoryUrl || "Select Repo..."}</span>
+                                            <ChevronDown className="w-3 h-3 text-slate-500" />
+                                        </button>
+                                        {repoDropdownOpen && !readOnly && (
+                                            <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                                                <div className="p-2 border-b border-slate-200 dark:border-white/5 flex gap-2">
+                                                    <input autoFocus value={repoSearch} onChange={e => setRepoSearch(e.target.value)} className="flex-1 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-md px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none" placeholder="Filter..." />
+                                                    <button onClick={fetchRepos} className="p-1 bg-slate-100 dark:bg-white/5 rounded hover:bg-slate-200 dark:hover:bg-white/10"><RefreshCw className={`w-3 h-3 text-slate-400 ${loadingRepos ? 'animate-spin' : ''}`} /></button>
+                                                </div>
+                                                <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
+                                                    {loadingRepos ? <div className="p-4 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-modtale-accent" /></div> : filteredRepos.length > 0 ? filteredRepos.map(r => (
+                                                        <button key={r.url} onClick={() => { markDirty(); setMetaData({...metaData, repositoryUrl: r.html_url || r.url}); checkRepoUrl(r.html_url || r.url); setRepoDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-xs text-slate-600 dark:text-slate-300 flex justify-between items-center group"><span className="font-mono">{r.name}</span>{metaData.repositoryUrl === (r.html_url || r.url) && <Check className="w-3 h-3 text-modtale-accent" />}</button>
+                                                    )) : <div className="p-2 text-center text-[10px] text-slate-500">No repos found</div>}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </SidebarSection>
 
                         {!isModpack && (
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
