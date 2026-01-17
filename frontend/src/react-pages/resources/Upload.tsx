@@ -35,7 +35,7 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     const ownerDropdownRef = useRef<HTMLDivElement>(null);
 
     const [modData, setModData] = useState<Mod | null>(null);
-    const [activeTab, setActiveTab] = useState<'details' | 'files' | 'settings'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'files' | 'gallery' | 'settings'>('details');
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
         title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, license: '', slug: ''
@@ -213,6 +213,33 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleGalleryUpload = async (file: File) => {
+        if (!draftId) return;
+        setIsLoading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            await api.post(`/projects/${draftId}/gallery`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+            const res = await api.get(`/projects/${draftId}`);
+            setModData(res.data);
+            setStatusModal({type: 'success', title: 'Uploaded', msg: 'Image added to gallery.'});
+        } catch (e: any) {
+            setStatusModal({type: 'error', title: 'Error', msg: e.response?.data?.message || 'Upload failed.'});
+        } finally { setIsLoading(false); }
+    };
+
+    const handleGalleryDelete = async (url: string) => {
+        if (!draftId) return;
+        setIsLoading(true);
+        try {
+            await api.delete(`/projects/${draftId}/gallery`, { params: { imageUrl: url } });
+            const res = await api.get(`/projects/${draftId}`);
+            setModData(res.data);
+        } catch (e: any) {
+            setStatusModal({type: 'error', title: 'Error', msg: 'Failed to delete image.'});
+        } finally { setIsLoading(false); }
     };
 
     const handlePublish = async () => {
@@ -409,6 +436,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 handleUploadVersion={handleUploadVersion}
                 handleDeleteVersion={handleDeleteVersion}
                 handleDelete={handleDelete}
+                handleGalleryUpload={handleGalleryUpload}
+                handleGalleryDelete={handleGalleryDelete}
                 isLoading={isLoading}
                 classification={classification || 'PLUGIN'}
                 currentUser={currentUser}
