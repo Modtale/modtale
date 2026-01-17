@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import jakarta.servlet.http.HttpServletRequest;
 import net.modtale.model.user.User;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.analytics.ProjectAnalyticsDetail;
@@ -30,6 +31,14 @@ public class AnalyticsController {
     @Autowired private ModService modService;
     @Autowired private UserRepository userRepository;
     @Autowired private MongoTemplate mongoTemplate;
+
+    private String getClientIp(HttpServletRequest request) {
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader == null) {
+            return request.getRemoteAddr();
+        }
+        return xfHeader.split(",")[0];
+    }
 
     @GetMapping("/user/analytics")
     public ResponseEntity<?> getCreatorAnalytics(
@@ -92,11 +101,11 @@ public class AnalyticsController {
     }
 
     @PostMapping("/analytics/view/{id}")
-    public ResponseEntity<Void> trackView(@PathVariable String id) {
+    public ResponseEntity<Void> trackView(@PathVariable String id, HttpServletRequest request) {
         Mod mod = modService.getModById(id);
 
         if (mod != null) {
-            analyticsService.logView(id, mod.getAuthor());
+            analyticsService.logView(mod.getId(), mod.getAuthor(), getClientIp(request));
             return ResponseEntity.ok().build();
         }
 

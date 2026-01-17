@@ -355,6 +355,12 @@ export const ModDetail: React.FC<{
     const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
 
     useEffect(() => {
+        if (mod && mod.id) {
+            api.post(`/analytics/view/${mod.id}`).catch(() => {});
+        }
+    }, [mod?.id]);
+
+    useEffect(() => {
         if (mod && extractId(mod.id) === realId) {
             setLoading(false);
             if(currentUser?.followingIds) setIsFollowing(currentUser.followingIds.includes(mod.author));
