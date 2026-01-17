@@ -83,7 +83,8 @@ public class AnalyticsController {
             }
         }
 
-        ProjectAnalyticsDetail data = analyticsService.getProjectAnalytics(id, user != null ? user.getUsername() : "anon", range);
+        String projectId = (mod != null) ? mod.getId() : id;
+        ProjectAnalyticsDetail data = analyticsService.getProjectAnalytics(projectId, user != null ? user.getUsername() : "anon", range);
 
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate())
