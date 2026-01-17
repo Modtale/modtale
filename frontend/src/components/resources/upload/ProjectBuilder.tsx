@@ -11,7 +11,7 @@ import {
     GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
     UserPlus, Scale, Check, Copy, Link2, Edit2, X, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
-    AlertCircle, Clock, Archive, Globe, EyeOff, Image
+    AlertCircle, Clock, Archive, Globe, EyeOff, Image, MessageSquare
 } from 'lucide-react';
 
 import { api, BACKEND_URL } from '../../../utils/api';
@@ -546,6 +546,11 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     <div className="flex items-center justify-between mb-4">
                                         <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Modpacks</h3><p className="text-xs text-slate-500">Allow inclusion in modpacks?</p></div>
                                         <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowModpacks: !prev.allowModpacks} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowModpacks ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowModpacks ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Reviews</h3><p className="text-xs text-slate-500">Enable community reviews?</p></div>
+                                        <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowReviews: !prev.allowReviews} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowReviews ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowReviews ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
                                     <div className="pt-4 border-t border-slate-200 dark:border-white/5">

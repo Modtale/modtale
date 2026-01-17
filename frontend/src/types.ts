@@ -89,6 +89,9 @@ export interface Review {
     rating: number;
     date: string;
     version: string;
+    updatedAt?: string;
+    developerReply?: string;
+    developerReplyDate?: string;
 }
 
 export interface Mod {
@@ -122,6 +125,7 @@ export interface Mod {
     pendingInvites?: string[];
     lastTrendingNotification?: string;
     allowModpacks?: boolean;
+    allowReviews?: boolean;
     status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
 }

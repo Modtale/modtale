@@ -12,7 +12,7 @@ import {
     MessageSquare, Send, Star, StarHalf, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    Code, Paintbrush, Database, Layers, Layout, Flag
+    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, MessageCircle
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -229,34 +229,92 @@ interface ReviewSectionProps {
     reviews: Review[];
     rating: number;
     currentUser: User | null;
+    isCreator: boolean;
     onReviewSubmitted: (newReviews: Review[]) => void;
     onError: (msg: string) => void;
     onSuccess: (msg: string) => void;
     innerRef?: React.RefObject<HTMLDivElement | null>;
+    reviewsDisabled?: boolean;
 }
 
-const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: overallRating, currentUser, onReviewSubmitted, onError, onSuccess, innerRef }) => {
+const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: overallRating, currentUser, isCreator, onReviewSubmitted, onError, onSuccess, innerRef, reviewsDisabled }) => {
     const [text, setText] = useState('');
     const [rating, setRating] = useState(5);
     const [submitting, setSubmitting] = useState(false);
+
+    const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+    const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null);
+    const [replyText, setReplyText] = useState('');
+
+    const userReview = useMemo(() => {
+        if (!currentUser || !reviews) return null;
+        return reviews.find(r => r.user.toLowerCase() === currentUser.username.toLowerCase());
+    }, [currentUser, reviews]);
+
+    const startEditing = () => {
+        if (userReview) {
+            setText(userReview.comment);
+            setRating(userReview.rating);
+            setEditingReviewId(userReview.id);
+        }
+    };
+
+    const cancelEdit = () => {
+        setEditingReviewId(null);
+        setText('');
+        setRating(5);
+    };
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            await api.post(`/projects/${modId}/reviews`, { comment: text, rating: rating, version: 'latest' });
+            if (editingReviewId) {
+                await api.put(`/projects/${modId}/reviews/${editingReviewId}`, { comment: text, rating: rating });
+                onSuccess('Review updated!');
+            } else {
+                await api.post(`/projects/${modId}/reviews`, { comment: text, rating: rating, version: 'latest' });
+                onSuccess('Review posted!');
+            }
             const res = await api.get(`/projects/${modId}`);
             onReviewSubmitted(res.data.reviews || []);
+            setEditingReviewId(null);
             setText('');
-            onSuccess('Review posted!');
-        } catch (err) { onError('Failed to post review.'); } finally { setSubmitting(false); }
+        } catch (err: any) { onError(err.response?.data || 'Failed to post review.'); } finally { setSubmitting(false); }
     };
+
+    const startReplying = (review: Review) => {
+        setReplyingReviewId(review.id);
+        setReplyText(review.developerReply || '');
+    };
+
+    const submitReply = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!replyingReviewId) return;
+        setSubmitting(true);
+        try {
+            await api.post(`/projects/${modId}/reviews/${replyingReviewId}/reply`, { reply: replyText });
+            const res = await api.get(`/projects/${modId}`);
+            onReviewSubmitted(res.data.reviews || []);
+            setReplyingReviewId(null);
+            setReplyText('');
+            onSuccess('Reply posted!');
+        } catch (err: any) { onError(err.response?.data || 'Failed to post reply.'); } finally { setSubmitting(false); }
+    };
+
+    if (reviewsDisabled && !isCreator) return null;
 
     return (
         <div ref={innerRef} className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
                 <MessageSquare className="w-6 h-6 text-modtale-accent" /> Community Reviews
             </h2>
+
+            {reviewsDisabled && (
+                <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 text-orange-500 rounded-xl flex items-center gap-2 text-sm font-bold">
+                    <Flag className="w-4 h-4"/> Reviews are currently disabled for this project. Only you can see them.
+                </div>
+            )}
 
             <div className="flex items-center gap-6 mb-10 bg-slate-50 dark:bg-slate-950/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
                 <div className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{overallRating.toFixed(1)}</div>
@@ -267,21 +325,44 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: o
             </div>
 
             {currentUser ? (
-                <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
-                    <div className="flex gap-2 mb-4">
-                        {[1, 2, 3, 4, 5].map(star => (
-                            <button key={star} type="button" onClick={() => setRating(star)} className="hover:scale-110 transition-transform focus:outline-none">
-                                <Star className={`w-8 h-8 ${star <= rating ? 'fill-yellow-500 text-yellow-500' : 'text-slate-300 dark:text-slate-700'}`} />
-                            </button>
-                        ))}
-                    </div>
-                    <textarea value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[120px]" placeholder="Share your experience..." required />
-                    <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50"><Send className="w-4 h-4" /> Post Review</button>
-                </form>
+                (!userReview || editingReviewId) && (
+                    <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
+                        <div className="flex justify-between mb-4">
+                            <h3 className="font-bold text-slate-900 dark:text-white">{editingReviewId ? 'Edit your review' : 'Write a review'}</h3>
+                            {editingReviewId && <button type="button" onClick={cancelEdit} className="text-xs text-slate-500 hover:text-red-500 font-bold">Cancel</button>}
+                        </div>
+                        <div className="flex gap-2 mb-4">
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <button key={star} type="button" onClick={() => setRating(star)} className="hover:scale-110 transition-transform focus:outline-none">
+                                    <Star className={`w-8 h-8 ${star <= rating ? 'fill-yellow-500 text-yellow-500' : 'text-slate-300 dark:text-slate-700'}`} />
+                                </button>
+                            ))}
+                        </div>
+                        <textarea value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[120px]" placeholder="Share your experience..." required />
+                        <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50">
+                            <Send className="w-4 h-4" /> {editingReviewId ? 'Update Review' : 'Post Review'}
+                        </button>
+                    </form>
+                )
             ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/5">Log in to review.</div>}
 
+            {userReview && !editingReviewId && (
+                <div className="mb-8 p-6 bg-modtale-accent/5 border border-modtale-accent/20 rounded-2xl">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <span className="font-bold text-modtale-accent">Your Review</span>
+                            <StarRating rating={userReview.rating} size="w-3 h-3" />
+                        </div>
+                        <button onClick={startEditing} className="text-xs font-bold bg-white dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-white/10 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 transition-colors flex items-center gap-1">
+                            <Edit className="w-3 h-3"/> Edit
+                        </button>
+                    </div>
+                    <p className="text-slate-700 dark:text-slate-300">{userReview.comment}</p>
+                </div>
+            )}
+
             <div className="space-y-4">
-                {reviews?.length > 0 ? reviews.map((review) => (
+                {reviews?.length > 0 ? reviews.filter(r => r.id !== userReview?.id || editingReviewId).map((review) => (
                     <div key={review.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex items-center gap-4">
@@ -294,11 +375,43 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: o
                                 </div>
                                 <div><span className="font-bold text-slate-900 dark:text-white block">{review.user}</span><StarRating rating={review.rating} size="w-3 h-3" /></div>
                             </div>
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                {new Date(review.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    {new Date(review.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                </div>
+                                {isCreator && (
+                                    <button onClick={() => startReplying(review)} className="text-xs text-modtale-accent font-bold hover:underline">
+                                        {review.developerReply ? 'Edit Reply' : 'Reply'}
+                                    </button>
+                                )}
                             </div>
                         </div>
-                        <p className="text-slate-700 dark:text-slate-300 pl-14">{review.comment}</p>
+                        <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{review.comment}</p>
+
+                        {replyingReviewId === review.id ? (
+                            <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
+                                <textarea
+                                    value={replyText}
+                                    onChange={e => setReplyText(e.target.value)}
+                                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-2 text-sm mb-2 focus:outline-none focus:border-modtale-accent"
+                                    placeholder="Write a reply..."
+                                    rows={3}
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <button type="button" onClick={() => setReplyingReviewId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white">Cancel</button>
+                                    <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1">
+                                        <CornerDownRight className="w-3 h-3"/> Post Reply
+                                    </button>
+                                </div>
+                            </form>
+                        ) : review.developerReply && (
+                            <div className="mt-4 ml-14 bg-modtale-accent/5 p-4 rounded-xl border border-modtale-accent/10">
+                                <div className="flex items-center gap-2 mb-1 text-xs font-bold text-modtale-accent">
+                                    <MessageCircle className="w-3 h-3" /> Developer Response
+                                </div>
+                                <p className="text-sm text-slate-600 dark:text-slate-300">{review.developerReply}</p>
+                            </div>
+                        )}
                     </div>
                 )) : <div className="text-center py-12 text-slate-500 italic">No reviews yet.</div>}
             </div>
@@ -752,7 +865,18 @@ export const ModDetail: React.FC<{
                                 <p className="text-slate-500 italic">No description.</p>
                             )}
                         </div>
-                        <ReviewSection modId={mod.id} rating={mod.rating || 0} reviews={mod.reviews || []} currentUser={currentUser} onReviewSubmitted={(r) => { setMod(prev => prev ? {...prev, reviews: r} : null); if(onRefresh) onRefresh(); }} onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})} onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})} innerRef={reviewsRef} />
+                        <ReviewSection
+                            modId={mod.id}
+                            rating={mod.rating || 0}
+                            reviews={mod.reviews || []}
+                            currentUser={currentUser}
+                            isCreator={Boolean(canEdit)}
+                            reviewsDisabled={mod.allowReviews === false}
+                            onReviewSubmitted={(r) => { setMod(prev => prev ? {...prev, reviews: r} : null); if(onRefresh) onRefresh(); }}
+                            onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})}
+                            onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})}
+                            innerRef={reviewsRef}
+                        />
                     </>
                 }
             />
