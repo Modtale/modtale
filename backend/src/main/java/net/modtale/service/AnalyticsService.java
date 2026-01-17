@@ -107,6 +107,11 @@ public class AnalyticsService {
         mongoTemplate.upsert(platformQuery, platformUpdate, PlatformMonthlyStats.class);
     }
 
+    public void deleteProjectAnalytics(String projectId) {
+        Query query = Query.query(Criteria.where("projectId").is(projectId));
+        mongoTemplate.remove(query, ProjectMonthlyStats.class);
+    }
+
     public PlatformAnalyticsSummary getPlatformAnalytics(String range) {
         LocalDate end = LocalDate.now();
         LocalDate start = calculateStartDate(range);

@@ -373,8 +373,6 @@ export const ModDetail: React.FC<{
                 setMod(res.data);
                 if (currentUser?.followingIds?.includes(res.data.author)) setIsFollowing(true);
             }).catch(() => setIsNotFound(true)).finally(() => setLoading(false));
-
-            api.post(`/analytics/view/${realId}`).catch(() => {});
         }
     }, [realId, currentUser]);
 
