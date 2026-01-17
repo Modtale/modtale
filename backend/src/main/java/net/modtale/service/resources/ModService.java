@@ -619,9 +619,7 @@ public class ModService {
             validateSlug(mod.getSlug());
         }
 
-        if("PLUGIN".equals(mod.getClassification())) {
-            validateRepositoryUrl(mod.getRepositoryUrl());
-        }
+        validateRepositoryUrl(mod.getRepositoryUrl());
 
         if (!"MODPACK".equals(mod.getClassification())) {
             if (mod.getLicense() == null || mod.getLicense().isEmpty()) {
