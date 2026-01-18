@@ -420,7 +420,13 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
                                     {ver.changelog ? (
                                         <div className="mt-2">
                                             <div className={`prose prose-sm dark:prose-invert max-w-none text-slate-400 ${expandedChangelog === ver.id ? '' : 'line-clamp-3'}`}>
-                                                <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{ver.changelog}</ReactMarkdown>
+                                                <ReactMarkdown
+                                                    rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                                    components={{
+                                                        li: ({children, ...props}: any) => <li className="my-0.5 [&>p]:my-0" {...props}>{children}</li>,
+                                                        p: ({children, ...props}: any) => <p className="my-1" {...props}>{children}</p>
+                                                    }}
+                                                >{ver.changelog}</ReactMarkdown>
                                             </div>
                                             {isLong && (
                                                 <button onClick={() => setExpandedChangelog(expandedChangelog === ver.id ? null : ver.id)} className="mt-3 text-xs font-bold text-modtale-accent hover:underline flex items-center gap-1">
