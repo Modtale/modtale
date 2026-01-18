@@ -180,7 +180,7 @@ public class AnalyticsService {
         StatsAccumulator currentPeriod = new StatsAccumulator();
         StatsAccumulator prevPeriod = new StatsAccumulator();
 
-        List<ProjectMonthlyStats> allStats = getStatsInMemory(username, comparisonStart, end, false);
+        List<ProjectMonthlyStats> allStats = getStatsInMemory(username, comparisonStart, end, false, true);
 
         for (ProjectMonthlyStats stat : allStats) {
             accumulate(stat, start, end, currentPeriod);
@@ -197,7 +197,7 @@ public class AnalyticsService {
         analytics.setPeriodViews(currentPeriod.totalViews);
         analytics.setPreviousPeriodViews(prevPeriod.totalViews);
 
-        List<Mod> projects = modRepository.findByAuthor(username);
+        List<Mod> projects = modRepository.findMetaByAuthor(username);
         Map<String, ProjectMeta> metaMap = new HashMap<>();
         Map<String, List<AnalyticsDataPoint>> projectDownloads = new HashMap<>();
         Map<String, List<AnalyticsDataPoint>> projectViews = new HashMap<>();
@@ -240,7 +240,7 @@ public class AnalyticsService {
         detail.setTotalApiDownloads(totalStats.apiDownloads);
         detail.setTotalFrontendDownloads(totalStats.frontendDownloads);
 
-        List<ProjectMonthlyStats> stats = getStatsInMemory(projectId, chartStart, end, true);
+        List<ProjectMonthlyStats> stats = getStatsInMemory(projectId, chartStart, end, true, false);
         detail.setViews(buildTimeSeries(stats, chartStart, end, false));
         detail.setVersionDownloads(buildVersionBreakdown(stats, start, end));
         detail.setRatingHistory(new ArrayList<>());
@@ -255,7 +255,7 @@ public class AnalyticsService {
         return LocalDate.now().minusDays(30);
     }
 
-    private List<ProjectMonthlyStats> getStatsInMemory(String id, LocalDate start, LocalDate end, boolean isProject) {
+    private List<ProjectMonthlyStats> getStatsInMemory(String id, LocalDate start, LocalDate end, boolean isProject, boolean excludeVersions) {
         String field = isProject ? "projectId" : "authorId";
 
         int startY = start.getYear();
@@ -267,7 +267,13 @@ public class AnalyticsService {
                         Criteria.where("year").is(startY).and("month").gte(startM)
                 );
 
-        return mongoTemplate.find(Query.query(criteria), ProjectMonthlyStats.class);
+        Query query = Query.query(criteria);
+
+        if (excludeVersions) {
+            query.fields().exclude("versionDownloads");
+        }
+
+        return mongoTemplate.find(query, ProjectMonthlyStats.class);
     }
 
     private void accumulate(ProjectMonthlyStats stat, LocalDate start, LocalDate end, StatsAccumulator acc) {
