@@ -50,6 +50,10 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
     useEffect(() => {
         if (currentUser) {
+            if (!owner) {
+                setOwner(currentUser.username);
+            }
+
             api.get('/user/orgs').then(res => {
                 const adminOrgs = res.data.filter((o: User) =>
                     o.organizationMembers?.some(m => m.userId === currentUser.id && m.role === 'ADMIN')
@@ -84,13 +88,21 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         if (!title.trim() || !summary.trim() || !classification) {
             setError("Please fill in all fields."); return;
         }
+
+        // Safety check to ensure owner is set before submitting
+        const effectiveOwner = owner || currentUser?.username;
+        if (!effectiveOwner) {
+            setError("Unable to determine project owner. Please refresh and try again.");
+            return;
+        }
+
         setIsLoading(true);
         try {
             const formData = new FormData();
             formData.append('title', title);
             formData.append('classification', classification);
             formData.append('description', summary);
-            formData.append('owner', owner);
+            formData.append('owner', effectiveOwner);
 
             const uploadConfig = {
                 headers: { 'Content-Type': 'multipart/form-data' }
