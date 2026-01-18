@@ -1033,7 +1033,6 @@ public class ModService {
         }
 
         mod.getVersions().add(0, ver);
-        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
 
         if (file != null && !isModpack) {
@@ -1051,13 +1050,13 @@ public class ModService {
             if (mod == null) return;
 
             Update update = new Update()
-                    .set("versions.$.scanResult", scanResult)
-                    .set("updatedAt", LocalDateTime.now().toString());
+                    .set("versions.$.scanResult", scanResult);
 
             boolean autoApproved = false;
 
             if ("CLEAN".equals(scanResult.getStatus())) {
                 update.set("versions.$.reviewStatus", ModVersion.ReviewStatus.APPROVED);
+                update.set("updatedAt", LocalDateTime.now().toString());
                 autoApproved = true;
                 logger.info("Auto-approved clean version {} for project {}", versionId, modId);
             } else {
