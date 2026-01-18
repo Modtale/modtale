@@ -3,8 +3,10 @@ package net.modtale.service.user;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.BannedEmail;
 import net.modtale.model.user.User;
 import net.modtale.model.user.Notification;
+import net.modtale.repository.user.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.NotificationRepository;
@@ -14,6 +16,7 @@ import net.modtale.service.security.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -49,6 +52,7 @@ public class UserService {
     @Autowired private UserRepository userRepository;
     @Autowired private ApiKeyRepository apiKeyRepository;
     @Autowired private NotificationRepository notificationRepository;
+    @Autowired private BannedEmailRepository bannedEmailRepository;
     @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
     @Autowired private AnalyticsService analyticsService;
     @Autowired private MongoTemplate mongoTemplate;
@@ -59,6 +63,34 @@ public class UserService {
 
     private final String PRE_AUTH_SIGNING_KEY = UUID.randomUUID().toString();
 
+    public void banEmail(String email, String reason, String bannedBy) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new IllegalArgumentException("Invalid email format.");
+        }
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("Email is already banned.");
+        }
+
+        bannedEmailRepository.save(new BannedEmail(email, reason, bannedBy));
+
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            if (!user.isDeleted()) {
+                deleteUser(user.getId());
+                logger.info("Automatically deleted user " + user.getUsername() + " due to email ban on " + email);
+            }
+        }
+    }
+
+    public void unbanEmail(String email) {
+        bannedEmailRepository.findByEmailIgnoreCase(email).ifPresent(bannedEmailRepository::delete);
+    }
+
+    public List<BannedEmail> getBannedEmails() {
+        return bannedEmailRepository.findAll(Sort.by(Sort.Direction.DESC, "bannedAt"));
+    }
+
     public User registerUser(String username, String email, String password) {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
             throw new IllegalArgumentException("Invalid username. Must be at least 3 characters and alphanumeric.");
@@ -66,6 +98,10 @@ public class UserService {
 
         if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
             throw new IllegalArgumentException("Invalid email address format.");
+        }
+
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("This email address is prohibited from registration.");
         }
 
         if (password == null || password.length() < 6) {
@@ -109,6 +145,10 @@ public class UserService {
 
         if (user.isDeleted()) {
             throw new IllegalArgumentException("Account deleted.");
+        }
+
+        if (bannedEmailRepository.existsByEmailIgnoreCase(user.getEmail())) {
+            throw new SecurityException("This account has been suspended.");
         }
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
@@ -187,6 +227,10 @@ public class UserService {
             throw new IllegalArgumentException("Password must be at least 6 characters.");
         }
 
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("This email address is not allowed.");
+        }
+
         if (!email.equalsIgnoreCase(user.getEmail())) {
             Optional<User> existing = userRepository.findByEmail(email);
             if (existing.isPresent() && !existing.get().getId().equals(userId)) {
@@ -231,6 +275,10 @@ public class UserService {
             throw new IllegalArgumentException("Verification link has expired. Please request a new one.");
         }
 
+        if (bannedEmailRepository.existsByEmailIgnoreCase(user.getEmail())) {
+            throw new SecurityException("This email address is suspended.");
+        }
+
         user.setEmailVerified(true);
         user.setVerificationToken(null);
         user.setVerificationTokenExpiry(null);
@@ -250,6 +298,8 @@ public class UserService {
     }
 
     public void initiatePasswordReset(String email) {
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) return;
+
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
             try { Thread.sleep(200); } catch (InterruptedException ignored) {}
@@ -661,6 +711,10 @@ public class UserService {
 
         boolean isVisible = !"google".equals(provider);
         User user = null;
+
+        if (email != null && bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("Account suspended.");
+        }
 
         Optional<User> linkedUser = userRepository.findByConnectedAccountsProviderId(providerId);
         if (linkedUser.isPresent()) {

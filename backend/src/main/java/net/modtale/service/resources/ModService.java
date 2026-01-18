@@ -302,7 +302,7 @@ public class ModService {
 
         if (direct.isPresent()) {
             Mod mod = direct.get();
-            if (mod.getDeletedAt() != null) return null; // Hide deleted mods from public view
+            if (mod.getDeletedAt() != null) return null;
 
             User currentUser = userService.getCurrentUser();
             boolean isPrivileged = hasEditPermission(mod, currentUser) || isAdmin(currentUser);
@@ -1588,6 +1588,7 @@ public class ModService {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Review not found"));
 
+            // Allow editing reply if it exists, or adding new one
             review.setDeveloperReply(sanitizer.sanitizePlainText(reply));
             review.setDeveloperReplyDate(LocalDateTime.now().toString());
 

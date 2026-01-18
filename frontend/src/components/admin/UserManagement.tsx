@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User as UserIcon, Search, Shield, Check, Zap, Trash2 } from 'lucide-react';
+import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail } from 'lucide-react';
 import { api } from '../../utils/api';
 
 export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setStatus }) => {
+    const [viewMode, setViewMode] = useState<'users' | 'bans'>('users');
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUser, setFoundUser] = useState<any>(null);
@@ -15,6 +16,20 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmUsername, setDeleteConfirmUsername] = useState('');
 
+    const [bannedEmails, setBannedEmails] = useState<any[]>([]);
+    const [banEmailInput, setBanEmailInput] = useState('');
+    const [banReasonInput, setBanReasonInput] = useState('');
+
+    const [showBanConfirm, setShowBanConfirm] = useState(false);
+    const [banConfirmInput, setBanConfirmInput] = useState(''); // To confirm email
+    const [banUserReason, setBanUserReason] = useState('');
+
+    useEffect(() => {
+        if (viewMode === 'bans') {
+            fetchBannedEmails();
+        }
+    }, [viewMode]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -24,6 +39,68 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const fetchBannedEmails = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/admin/users/bans');
+            setBannedEmails(res.data);
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch banned emails' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBanEmail = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!banEmailInput || !banReasonInput) return;
+        setLoading(true);
+        try {
+            await api.post('/admin/users/bans', { email: banEmailInput, reason: banReasonInput });
+            setStatus({ type: 'success', title: 'Banned', msg: `Email ${banEmailInput} has been banned.` });
+            setBanEmailInput('');
+            setBanReasonInput('');
+            fetchBannedEmails();
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to ban email.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBanUserEmail = async () => {
+        if (!foundUser || !foundUser.email) return;
+        if (banConfirmInput !== foundUser.email) return;
+
+        setLoading(true);
+        try {
+            await api.post('/admin/users/bans', { email: foundUser.email, reason: banUserReason || "Banned from user management" });
+            setStatus({ type: 'success', title: 'User Banned', msg: `Email ${foundUser.email} banned and account deleted.` });
+            setFoundUser(null);
+            setUsername('');
+            setShowBanConfirm(false);
+            setBanUserReason('');
+            setBanConfirmInput('');
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Ban Failed', msg: e.response?.data || 'Could not ban email.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUnbanEmail = async (email: string) => {
+        setLoading(true);
+        try {
+            await api.delete('/admin/users/bans', { params: { email } });
+            setStatus({ type: 'success', title: 'Unbanned', msg: 'Email unbanned successfully.' });
+            fetchBannedEmails();
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Failed to unban email.' });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
@@ -132,149 +209,303 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
 
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-red-500">Danger Zone</h3>
-                        <p className="text-slate-500 mb-6">You are about to delete <strong>{foundUser.username}</strong>. This is irreversible. Type the username to confirm.</p>
-
-                        <input
-                            type="text"
-                            value={deleteConfirmUsername}
-                            onChange={e => setDeleteConfirmUsername(e.target.value)}
-                            placeholder={foundUser.username}
-                            className="w-full p-3 mb-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white"
-                        />
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="flex-1 py-3 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-600 dark:text-slate-300"
-                            >Cancel</button>
-                            <button
-                                onClick={handleDeleteUser}
-                                disabled={deleteConfirmUsername !== foundUser.username || loading}
-                                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50"
-                            >Delete User</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <form onSubmit={handleSearch} className="flex gap-4 mb-10 relative z-50">
-                <div className="relative flex-1 group" ref={wrapperRef}>
-                    <UserIcon className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
-                    <input
-                        type="text"
-                        placeholder="Enter Username to manage..."
-                        className="w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium"
-                        value={username}
-                        onChange={handleInputChange}
-                        onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
-                    />
-
-                    {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
-                            {searchResults.map(user => (
-                                <button
-                                    key={user.id}
-                                    type="button"
-                                    onClick={() => handleSelectUser(user)}
-                                    className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
-                                >
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0">
-                                        <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-900 dark:text-white">{user.username}</p>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
+            <div className="flex gap-4 mb-8 border-b border-slate-200 dark:border-white/5 pb-4">
                 <button
-                    type="submit"
-                    disabled={loading || !username}
-                    className="bg-modtale-accent text-white px-10 rounded-2xl font-black hover:bg-modtale-accentHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-xl shadow-modtale-accent/20"
+                    onClick={() => setViewMode('users')}
+                    className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'users' ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}
                 >
-                    {loading ? '...' : <><Search className="w-5 h-5" /> Search</>}
+                    User Search
                 </button>
-            </form>
+                <button
+                    onClick={() => setViewMode('bans')}
+                    className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'bans' ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                >
+                    Email Bans
+                </button>
+            </div>
 
-            {foundUser && (
-                <div className="border border-slate-200 dark:border-white/10 rounded-3xl p-8 bg-slate-50/50 dark:bg-white/[0.02] animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex items-center gap-8 mb-10">
-                        <div className="p-1 bg-white dark:bg-white/10 rounded-3xl shadow-lg">
-                            <img src={foundUser.avatarUrl} alt={foundUser.username} className="w-24 h-24 rounded-2xl object-cover" />
-                        </div>
-                        <div>
-                            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{foundUser.username}</h3>
-                            <div className="flex items-center gap-3 mt-3">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Roles</span>
-                                <div className="flex gap-2">
-                                    {foundUser.roles && foundUser.roles.length > 0 ? foundUser.roles.map((r: string) => (
-                                        <span key={r} className="px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black rounded-lg border border-blue-500/20">{r}</span>
-                                    )) : <span className="text-xs text-slate-400 italic font-medium">No special roles</span>}
+            {viewMode === 'users' && (
+                <>
+                    {showBanConfirm && foundUser?.email && (
+                        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-red-500 flex items-center gap-2">
+                                    <Ban className="w-5 h-5"/> Ban Email & Delete Account
+                                </h3>
+                                <p className="text-slate-500 mb-4 text-sm">
+                                    This will ban <strong>{foundUser.email}</strong> and permanently delete the user <strong>{foundUser.username}</strong>.
+                                </p>
+
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Reason</label>
+                                <input
+                                    type="text"
+                                    value={banUserReason}
+                                    onChange={e => setBanUserReason(e.target.value)}
+                                    placeholder="e.g. Spam, Violation of TOS..."
+                                    className="w-full p-3 mb-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm"
+                                />
+
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Confirm Email</label>
+                                <input
+                                    type="email"
+                                    value={banConfirmInput}
+                                    onChange={e => setBanConfirmInput(e.target.value)}
+                                    placeholder={foundUser.email}
+                                    className="w-full p-3 mb-6 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white"
+                                />
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowBanConfirm(false)}
+                                        className="flex-1 py-3 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-600 dark:text-slate-300"
+                                    >Cancel</button>
+                                    <button
+                                        onClick={handleBanUserEmail}
+                                        disabled={banConfirmInput !== foundUser.email || loading || !banUserReason}
+                                        className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50"
+                                    >Confirm Ban</button>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {showDeleteConfirm && (
+                        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-red-500">Danger Zone</h3>
+                                <p className="text-slate-500 mb-6">You are about to delete <strong>{foundUser.username}</strong>. This is irreversible. Type the username to confirm.</p>
+
+                                <input
+                                    type="text"
+                                    value={deleteConfirmUsername}
+                                    onChange={e => setDeleteConfirmUsername(e.target.value)}
+                                    placeholder={foundUser.username}
+                                    className="w-full p-3 mb-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white"
+                                />
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowDeleteConfirm(false)}
+                                        className="flex-1 py-3 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-600 dark:text-slate-300"
+                                    >Cancel</button>
+                                    <button
+                                        onClick={handleDeleteUser}
+                                        disabled={deleteConfirmUsername !== foundUser.username || loading}
+                                        className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50"
+                                    >Delete User</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSearch} className="flex gap-4 mb-10 relative z-50">
+                        <div className="relative flex-1 group" ref={wrapperRef}>
+                            <UserIcon className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Enter Username to manage..."
+                                className="w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium"
+                                value={username}
+                                onChange={handleInputChange}
+                                onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
+                            />
+
+                            {showResults && searchResults.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                                    {searchResults.map(user => (
+                                        <button
+                                            key={user.id}
+                                            type="button"
+                                            onClick={() => handleSelectUser(user)}
+                                            className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0">
+                                                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white">{user.username}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         <button
-                            onClick={handleToggleAdmin}
-                            disabled={loading}
-                            className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.roles?.includes('ADMIN') ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
+                            type="submit"
+                            disabled={loading || !username}
+                            className="bg-modtale-accent text-white px-10 rounded-2xl font-black hover:bg-modtale-accentHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-xl shadow-modtale-accent/20"
                         >
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-4">
+                            {loading ? '...' : <><Search className="w-5 h-5" /> Search</>}
+                        </button>
+                    </form>
+
+                    {foundUser && (
+                        <div className="border border-slate-200 dark:border-white/10 rounded-3xl p-8 bg-slate-50/50 dark:bg-white/[0.02] animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="flex items-center gap-8 mb-10">
+                                <div className="p-1 bg-white dark:bg-white/10 rounded-3xl shadow-lg">
+                                    <img src={foundUser.avatarUrl} alt={foundUser.username} className="w-24 h-24 rounded-2xl object-cover" />
+                                </div>
+                                <div>
+                                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{foundUser.username}</h3>
+                                    <div className="flex items-center gap-3 mt-3">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Roles</span>
+                                        <div className="flex gap-2">
+                                            {foundUser.roles && foundUser.roles.length > 0 ? foundUser.roles.map((r: string) => (
+                                                <span key={r} className="px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black rounded-lg border border-blue-500/20">{r}</span>
+                                            )) : <span className="text-xs text-slate-400 italic font-medium">No special roles</span>}
+                                        </div>
+                                    </div>
+                                    {foundUser.email && (
+                                        <div className="mt-2 text-sm text-slate-500 flex items-center gap-2">
+                                            <Mail className="w-4 h-4" />
+                                            {foundUser.email}
+                                            {foundUser.emailVerified && (
+                                                <span title="Verified">
+                                                    <Check className="w-4 h-4 text-emerald-500" />
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <button
+                                    onClick={handleToggleAdmin}
+                                    disabled={loading}
+                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.roles?.includes('ADMIN') ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
+                                >
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-4">
                                                 <span className={`font-black text-xl flex items-center gap-3 ${foundUser.roles?.includes('ADMIN') ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400'}`}>
                                                     <Shield className="w-6 h-6" /> Admin Privileges
                                                 </span>
-                                    {foundUser.roles?.includes('ADMIN') && <Check className="w-8 h-8 text-red-500 bg-red-100 dark:bg-red-900/30 p-1.5 rounded-full" />}
-                                </div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                                    {foundUser.roles?.includes('ADMIN')
-                                        ? 'User currently has full administrative access. Click to revoke immediately.'
-                                        : 'Granting Admin access will allow this user to approve projects, manage users, and modify content.'}
-                                </p>
-                            </div>
-                        </button>
+                                            {foundUser.roles?.includes('ADMIN') && <Check className="w-8 h-8 text-red-500 bg-red-100 dark:bg-red-900/30 p-1.5 rounded-full" />}
+                                        </div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                            {foundUser.roles?.includes('ADMIN')
+                                                ? 'User currently has full administrative access. Click to revoke immediately.'
+                                                : 'Granting Admin access will allow this user to approve projects, manage users, and modify content.'}
+                                        </p>
+                                    </div>
+                                </button>
 
-                        <button
-                            onClick={() => handleUpdateTier(foundUser.tier === 'ENTERPRISE' ? 'USER' : 'ENTERPRISE')}
-                            disabled={loading}
-                            className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.tier === 'ENTERPRISE' ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10' : 'border-slate-200 dark:border-white/5 hover:border-purple-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
-                        >
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-4">
+                                <button
+                                    onClick={() => handleUpdateTier(foundUser.tier === 'ENTERPRISE' ? 'USER' : 'ENTERPRISE')}
+                                    disabled={loading}
+                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.tier === 'ENTERPRISE' ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10' : 'border-slate-200 dark:border-white/5 hover:border-purple-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
+                                >
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-4">
                                                 <span className={`font-black text-xl flex items-center gap-3 ${foundUser.tier === 'ENTERPRISE' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400'}`}>
                                                     <Zap className="w-6 h-6" /> Enterprise Tier
                                                 </span>
-                                    {foundUser.tier === 'ENTERPRISE' && <Check className="w-8 h-8 text-purple-500 bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-full" />}
-                                </div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                                    {foundUser.tier === 'ENTERPRISE'
-                                        ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.'
-                                        : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.'}
-                                </p>
-                            </div>
-                        </button>
+                                            {foundUser.tier === 'ENTERPRISE' && <Check className="w-8 h-8 text-purple-500 bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-full" />}
+                                        </div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                            {foundUser.tier === 'ENTERPRISE'
+                                                ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.'
+                                                : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.'}
+                                        </p>
+                                    </div>
+                                </button>
 
-                        <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            className="relative p-8 rounded-3xl border-2 border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-red-500/5 text-left transition-all duration-300 group overflow-hidden"
-                        >
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-500">
-                                        <Trash2 className="w-6 h-6" /> Delete Account
-                                    </span>
-                                </div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                                    Permanently delete this user, their projects, and all associated data. This action cannot be undone.
-                                </p>
+                                <button
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    className="relative p-8 rounded-3xl border-2 border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-red-500/5 text-left transition-all duration-300 group overflow-hidden"
+                                >
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-500">
+                                                <Trash2 className="w-6 h-6" /> Delete Account
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                            Permanently delete this user, their projects, and all associated data. This action cannot be undone.
+                                        </p>
+                                    </div>
+                                </button>
+
+                                {foundUser.email && foundUser.emailVerified && (
+                                    <button
+                                        onClick={() => setShowBanConfirm(true)}
+                                        className="relative p-8 rounded-3xl border-2 border-red-500/20 hover:border-red-600 hover:bg-red-600/10 text-left transition-all duration-300 group overflow-hidden"
+                                    >
+                                        <div className="relative z-10">
+                                            <div className="flex justify-between items-start mb-4">
+                                            <span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-600">
+                                                <Ban className="w-6 h-6" /> Ban Email & Delete
+                                            </span>
+                                            </div>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                                Ban <strong>{foundUser.email}</strong> from ever registering again and immediately delete this account.
+                                            </p>
+                                        </div>
+                                    </button>
+                                )}
                             </div>
-                        </button>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {viewMode === 'bans' && (
+                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                    <form onSubmit={handleBanEmail} className="mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                        <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Ban className="w-5 h-5 text-red-500" /> Ban New Email
+                        </h3>
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1">
+                                <input
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={banEmailInput}
+                                    onChange={e => setBanEmailInput(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-red-500 outline-none"
+                                />
+                            </div>
+                            <div className="flex-[2]">
+                                <input
+                                    type="text"
+                                    placeholder="Reason for ban..."
+                                    value={banReasonInput}
+                                    onChange={e => setBanReasonInput(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-red-500 outline-none"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={loading || !banEmailInput || !banReasonInput}
+                                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 disabled:opacity-50 transition-all"
+                            >
+                                Ban Email
+                            </button>
+                        </div>
+                    </form>
+
+                    <div className="space-y-3">
+                        {bannedEmails.length === 0 ? (
+                            <div className="text-center py-12 text-slate-500 font-medium">No banned emails found.</div>
+                        ) : (
+                            bannedEmails.map((ban: any) => (
+                                <div key={ban.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl hover:border-red-500/30 transition-all group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center text-red-500">
+                                            <Mail className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-900 dark:text-white">{ban.email}</p>
+                                            <p className="text-xs text-slate-500">Reason: {ban.reason} • By: {ban.bannedBy}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleUnbanEmail(ban.email)}
+                                        className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
+                                    >
+                                        Unban
+                                    </button>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             )}

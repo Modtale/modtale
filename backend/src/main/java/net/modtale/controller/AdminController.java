@@ -2,6 +2,7 @@ package net.modtale.controller;
 
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
+import net.modtale.model.user.BannedEmail;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ModVersion;
 import net.modtale.service.user.UserService;
@@ -57,6 +58,41 @@ public class AdminController {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    @GetMapping("/users/bans")
+    public ResponseEntity<List<BannedEmail>> getBannedEmails() {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(userService.getBannedEmails());
+    }
+
+    @PostMapping("/users/bans")
+    public ResponseEntity<?> banEmail(@RequestBody Map<String, String> body) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        String email = body.get("email");
+        String reason = body.get("reason");
+        try {
+            userService.banEmail(email, reason, currentUser.getUsername());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/users/bans")
+    public ResponseEntity<?> unbanEmail(@RequestParam String email) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        userService.unbanEmail(email);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/users/{username}/tier")
