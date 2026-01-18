@@ -21,6 +21,9 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
 
     List<Mod> findByAuthor(String author);
 
+    @Query(value = "{ 'author': ?0 }", fields = "{ 'title': 1, 'rating': 1, 'downloadCount': 1 }")
+    List<Mod> findMetaByAuthor(String author);
+
     Optional<Mod> findBySlug(String slug);
 
     boolean existsBySlug(String slug);
