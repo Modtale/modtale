@@ -21,7 +21,7 @@ public class FileValidationService {
     private static final byte[] RIFF_HEADER = new byte[]{0x52, 0x49, 0x46, 0x46};
 
     private static final List<String> STRICT_BLOCKLIST = Arrays.asList(
-            ".exe", ".dll", ".so", ".dylib", ".bin",
+            ".exe", ".dll", ".so", ".dylib",
             ".sh", ".bat", ".cmd", ".ps1", ".vbs",
             ".js", ".jsp", ".php", ".py", ".pl",
             ".html", ".htm", ".svg", ".hta"
