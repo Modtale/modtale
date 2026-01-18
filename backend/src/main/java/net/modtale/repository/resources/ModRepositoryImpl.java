@@ -138,10 +138,15 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
             pipeline.add(Aggregation.addFields()
                     .addField("logDate")
-                    .withValue(DateOperators.DateFromParts.dateFromParts()
-                            .year("monthly_stats.year")
-                            .month("monthly_stats.month")
-                            .day(ConvertOperators.ToInt.toInt("$daysArray.k"))
+                    .withValue(
+                            ConditionalOperators.when(Criteria.where("daysArray").ne(null))
+                                    .then(
+                                            DateOperators.DateFromParts.dateFromParts()
+                                                    .year("monthly_stats.year")
+                                                    .month("monthly_stats.month")
+                                                    .day(ConvertOperators.ToInt.toInt("$daysArray.k"))
+                                    )
+                                    .otherwise(null)
                     )
                     .build());
 
@@ -151,10 +156,14 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             pipeline.add(Aggregation.group("_id")
                     .first("$$ROOT").as("doc")
                     .sum(ConditionalOperators.when(
-                            Criteria.where("logDate").gte(date7DaysAgo)
+                            new Criteria().andOperator(
+                                    Criteria.where("logDate").ne(null),
+                                    Criteria.where("logDate").gte(date7DaysAgo)
+                            )
                     ).then("$daysArray.v.d").otherwise(0)).as("currentWeekDownloads")
                     .sum(ConditionalOperators.when(
                             new Criteria().andOperator(
+                                    Criteria.where("logDate").ne(null),
                                     Criteria.where("logDate").gte(date14DaysAgo),
                                     Criteria.where("logDate").lt(date7DaysAgo)
                             )
@@ -236,6 +245,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
+        // OPTIMIZATION: Exclude heavy fields for list views
         pipeline.add(Aggregation.project().andExclude("about", "reviews", "galleryImages"));
 
         Aggregation mainAgg = Aggregation.newAggregation(Mod.class, pipeline);
@@ -244,6 +254,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         long total;
         if ("hidden_gems".equals(viewCategory)) {
             List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
+            // Remove sort/skip/limit and the projection we just added to ensure accurate counting
             countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation);
             countPipeline.add(Aggregation.count().as("total"));
 
