@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,6 +50,8 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
 
     @Query(value = "{ 'status': 'PUBLISHED' }", fields = "{ 'id': 1, 'title': 1, 'slug': 1, 'updatedAt': 1, 'classification': 1, 'author': 1 }")
     List<Mod> findAllForSitemap();
+
+    List<Mod> findByDeletedAtBefore(LocalDateTime date);
 
     void deleteByStatusAndExpiresAtBefore(String status, String date);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download } from 'lucide-react';
+import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw } from 'lucide-react';
 import { api, API_BASE_URL } from '../../utils/api';
 import type { Mod, ScanIssue } from '../../types';
 import { SourceInspector } from "@/components/admin/SourceInspector.tsx";
@@ -16,7 +16,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    const [confirmAction, setConfirmAction] = useState<'DELETE' | 'UNLIST' | 'DELETE_VER' | null>(null);
+    const [confirmAction, setConfirmAction] = useState<'DELETE' | 'UNLIST' | 'DELETE_VER' | 'RESTORE' | null>(null);
     const [targetVersionId, setTargetVersionId] = useState<string | null>(null);
     const [confirmInput, setConfirmInput] = useState('');
 
@@ -88,10 +88,12 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
             if (confirmAction === 'DELETE') {
                 if (confirmInput !== foundProject.id) return;
                 await api.delete(`/admin/projects/${foundProject.id}`);
-                setStatus({ type: 'success', title: 'Deleted', msg: 'Project permanently deleted.' });
-                setFoundProject(null);
-                setQuery('');
-                setIdQuery('');
+                setStatus({ type: 'success', title: 'Deleted', msg: 'Project soft-deleted. It will be permanently removed in 30 days.' });
+                setFoundProject({ ...foundProject, status: 'DELETED' });
+            } else if (confirmAction === 'RESTORE') {
+                await api.post(`/admin/projects/${foundProject.id}/restore`);
+                setStatus({ type: 'success', title: 'Restored', msg: 'Project successfully restored.' });
+                setFoundProject({ ...foundProject, status: 'PUBLISHED' });
             } else if (confirmAction === 'UNLIST') {
                 await api.post(`/admin/projects/${foundProject.id}/unlist`);
                 setStatus({ type: 'success', title: 'Unlisted', msg: 'Project is now unlisted.' });
@@ -200,7 +202,8 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                                 <span className={`inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
                                     foundProject.status === 'PUBLISHED' ? 'bg-emerald-500/10 text-emerald-500' :
                                         foundProject.status === 'UNLISTED' ? 'bg-amber-500/10 text-amber-500' :
-                                            'bg-slate-500/10 text-slate-500'
+                                            foundProject.status === 'DELETED' ? 'bg-red-500/10 text-red-500' :
+                                                'bg-slate-500/10 text-slate-500'
                                 }`}>
                                     {foundProject.status}
                                 </span>
@@ -208,13 +211,22 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                         </div>
 
                         <div className="flex gap-4">
-                            <button
-                                onClick={() => setConfirmAction('DELETE')}
-                                className="flex-1 py-3 border-2 border-red-500/20 hover:border-red-500 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
-                            >
-                                <Trash2 className="w-4 h-4" /> Delete Project
-                            </button>
-                            {foundProject.status !== 'UNLISTED' && (
+                            {foundProject.status === 'DELETED' ? (
+                                <button
+                                    onClick={() => setConfirmAction('RESTORE')}
+                                    className="flex-1 py-3 border-2 border-emerald-500/20 hover:border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
+                                >
+                                    <RotateCcw className="w-4 h-4" /> Restore Project
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setConfirmAction('DELETE')}
+                                    className="flex-1 py-3 border-2 border-red-500/20 hover:border-red-500 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Delete Project
+                                </button>
+                            )}
+                            {foundProject.status !== 'UNLISTED' && foundProject.status !== 'DELETED' && (
                                 <button
                                     onClick={() => setConfirmAction('UNLIST')}
                                     className="flex-1 py-3 border-2 border-amber-500/20 hover:border-amber-500 bg-amber-500/5 hover:bg-amber-500/10 text-amber-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
@@ -279,15 +291,16 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                     {confirmAction && (
                         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
-                                <div className="flex items-center gap-3 mb-4 text-red-500">
-                                    <AlertTriangle className="w-6 h-6" />
-                                    <h3 className="text-xl font-black">Confirm Action</h3>
+                                <div className={`flex items-center gap-3 mb-4 ${confirmAction === 'RESTORE' ? 'text-emerald-500' : 'text-red-500'}`}>
+                                    {confirmAction === 'RESTORE' ? <RotateCcw className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+                                    <h3 className="text-xl font-black">{confirmAction === 'RESTORE' ? 'Confirm Restoration' : 'Confirm Action'}</h3>
                                 </div>
 
                                 <p className="text-slate-600 dark:text-slate-300 font-medium mb-6">
-                                    {confirmAction === 'DELETE' && "Permanently delete this project? This cannot be undone."}
+                                    {confirmAction === 'DELETE' && "Permanently delete this project? It will be recoverable for 30 days."}
                                     {confirmAction === 'UNLIST' && "Hide this project from public listings? Direct links will still work."}
                                     {confirmAction === 'DELETE_VER' && "Delete this specific version? It will be removed from the project history."}
+                                    {confirmAction === 'RESTORE' && "Restore this project to published status?"}
                                 </p>
 
                                 {confirmAction === 'DELETE' && (
@@ -312,8 +325,12 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                                     >Cancel</button>
                                     <button
                                         onClick={handleAction}
-                                        disabled={confirmAction === 'DELETE' && confirmInput !== foundProject.id || loading}
-                                        className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50 transition-colors shadow-lg shadow-red-500/20"
+                                        disabled={(confirmAction === 'DELETE' && confirmInput !== foundProject.id) || loading}
+                                        className={`flex-1 py-3 font-bold rounded-xl disabled:opacity-50 transition-colors shadow-lg ${
+                                            confirmAction === 'RESTORE'
+                                                ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
+                                                : 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
+                                        }`}
                                     >
                                         {loading ? 'Processing...' : 'Confirm'}
                                     </button>

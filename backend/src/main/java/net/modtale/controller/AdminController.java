@@ -217,6 +217,18 @@ public class AdminController {
         }
     }
 
+    @PostMapping("/projects/{id}/restore")
+    public ResponseEntity<?> restoreProject(@PathVariable String id) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.adminRestoreProject(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/projects/{id}/unlist")
     public ResponseEntity<?> unlistProject(@PathVariable String id) {
         User currentUser = getSafeUser();

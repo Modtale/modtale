@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -106,6 +107,10 @@ public class UserService {
                 .or(() -> userRepository.findByEmail(login))
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
+        if (user.isDeleted()) {
+            throw new IllegalArgumentException("Account deleted.");
+        }
+
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new IllegalArgumentException("Invalid credentials");
         }
@@ -153,7 +158,9 @@ public class UserService {
             String expectedSignature = hmacSha256(userId + ":" + expiry, PRE_AUTH_SIGNING_KEY);
             if (!expectedSignature.equals(providedSignature)) return null;
 
-            return userRepository.findById(userId).orElse(null);
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.isDeleted()) return null;
+            return user;
         } catch (Exception e) {
             return null;
         }
@@ -250,7 +257,7 @@ public class UserService {
         }
 
         User user = userOpt.get();
-        if (user.getPassword() == null && user.getConnectedAccounts().isEmpty()) {
+        if (user.isDeleted() || (user.getPassword() == null && user.getConnectedAccounts().isEmpty())) {
             return;
         }
 
@@ -285,36 +292,68 @@ public class UserService {
 
     public List<User> searchUsers(String query) {
         if (query == null || query.length() < 2) return new ArrayList<>();
-        Query dbQuery = new Query(Criteria.where("username").regex(query, "i")).limit(10);
+        Query dbQuery = new Query(Criteria.where("username").regex(query, "i").and("deletedAt").is(null)).limit(10);
         dbQuery.fields().include("username", "avatarUrl", "accountType");
         return mongoTemplate.find(dbQuery, User.class);
     }
 
     public User getPublicProfile(String username) {
-        return userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        if (user != null && user.isDeleted()) return null;
+        return user;
     }
 
     public void deleteUser(String userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setDeletedAt(LocalDateTime.now());
 
         apiKeyRepository.deleteByUserId(userId);
+        user.setGithubAccessToken(null);
+        user.setGitlabAccessToken(null);
+        user.setGitlabRefreshToken(null);
 
-        mongoTemplate.remove(new Query(Criteria.where("userId").is(userId)), Notification.class);
+        userRepository.save(user);
+        logger.info("Soft deleted user account: " + user.getUsername() + " (" + userId + ")");
+    }
+
+    public void recoverUser(String userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!user.isDeleted()) return;
+        user.setDeletedAt(null);
+        userRepository.save(user);
+        logger.info("Recovered user account: " + user.getUsername() + " (" + userId + ")");
+    }
+
+    private void performHardDelete(User user) {
+        mongoTemplate.remove(new Query(Criteria.where("userId").is(user.getId())), Notification.class);
 
         mongoTemplate.updateMulti(
-                new Query(Criteria.where("followerIds").is(userId)),
-                new Update().pull("followerIds", userId),
+                new Query(Criteria.where("followerIds").is(user.getId())),
+                new Update().pull("followerIds", user.getId()),
                 User.class
         );
         mongoTemplate.updateMulti(
-                new Query(Criteria.where("followingIds").is(userId)),
-                new Update().pull("followingIds", userId),
+                new Query(Criteria.where("followingIds").is(user.getId())),
+                new Update().pull("followingIds", user.getId()),
                 User.class
         );
 
-        userRepository.deleteById(userId);
+        userRepository.deleteById(user.getId());
+        logger.info("Permanently deleted user account: " + user.getUsername() + " (" + user.getId() + ")");
+    }
 
-        logger.info("Deleted user account: " + user.getUsername() + " (" + userId + ")");
+    @Scheduled(cron = "0 0 0 * * ?")
+    public void cleanupDeletedUsers() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
+        List<User> expiredUsers = userRepository.findByDeletedAtBefore(cutoff);
+
+        for (User user : expiredUsers) {
+            try {
+                performHardDelete(user);
+            } catch (Exception e) {
+                logger.error("Failed to hard delete user " + user.getId(), e);
+            }
+        }
     }
 
     public User createOrganization(String name, User owner) {
@@ -534,17 +573,20 @@ public class UserService {
         User org = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
         if (org.getOrganizationMembers() == null || org.getOrganizationMembers().isEmpty()) return new ArrayList<>();
 
+        if (org.isDeleted()) return new ArrayList<>();
+
         List<String> memberIds = org.getOrganizationMembers().stream()
                 .map(User.OrganizationMember::getUserId)
                 .collect(Collectors.toList());
 
-        Query query = new Query(Criteria.where("_id").in(memberIds));
+        Query query = new Query(Criteria.where("_id").in(memberIds).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id", "bio");
         return mongoTemplate.find(query, User.class);
     }
 
     public List<User> getUserOrganizations(String userId) {
-        return userRepository.findOrganizationsByMemberId(userId);
+        List<User> orgs = userRepository.findOrganizationsByMemberId(userId);
+        return orgs.stream().filter(o -> !o.isDeleted()).collect(Collectors.toList());
     }
 
     public DefaultOAuth2User linkAccountToOrg(String orgId, String provider, OAuth2User oauthUser, String accessToken) {
@@ -636,6 +678,10 @@ public class UserService {
         }
 
         if (user != null) {
+            if (user.isDeleted()) {
+                throw new IllegalArgumentException("Account deleted.");
+            }
+
             if (user.getAvatarUrl() == null || user.getAvatarUrl().isEmpty()) {
                 if (("github".equals(provider) || "gitlab".equals(provider) || "bluesky".equals(provider) || "google".equals(provider)) && avatarUrl != null) {
                     user.setAvatarUrl(avatarUrl);
@@ -829,7 +875,8 @@ public class UserService {
                 username = ((OAuth2User) principal).getAttribute("login");
             }
             if (username != null) {
-                return userRepository.findByUsername(username).orElse(null);
+                User user = userRepository.findByUsername(username).orElse(null);
+                if (user != null && !user.isDeleted()) return user;
             }
         } catch (Exception e) { logger.error("Error retrieving current user", e); }
         return null;
@@ -888,6 +935,8 @@ public class UserService {
         User target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new IllegalArgumentException("Target not found"));
         if (target.getId().equals(currentUserId)) throw new IllegalArgumentException("Cannot follow yourself.");
 
+        if (target.isDeleted()) throw new IllegalArgumentException("Target user not found.");
+
         User currentUser = userRepository.findById(currentUserId).orElseThrow();
 
         if (currentUser.getFollowingIds() == null) currentUser.setFollowingIds(new ArrayList<>());
@@ -929,9 +978,12 @@ public class UserService {
     public List<User> getFollowing(String username) {
         Optional<User> userOpt = userRepository.findByUsername(username);
         if (userOpt.isEmpty()) return new ArrayList<>();
+
+        if (userOpt.get().isDeleted()) return new ArrayList<>();
+
         List<String> ids = userOpt.get().getFollowingIds();
         if (ids == null || ids.isEmpty()) return new ArrayList<>();
-        Query query = new Query(Criteria.where("_id").in(ids));
+        Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id");
         return mongoTemplate.find(query, User.class);
     }
@@ -939,9 +991,12 @@ public class UserService {
     public List<User> getFollowers(String username) {
         Optional<User> userOpt = userRepository.findByUsername(username);
         if (userOpt.isEmpty()) return new ArrayList<>();
+
+        if (userOpt.get().isDeleted()) return new ArrayList<>();
+
         List<String> ids = userOpt.get().getFollowerIds();
         if (ids == null || ids.isEmpty()) return new ArrayList<>();
-        Query query = new Query(Criteria.where("_id").in(ids));
+        Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id");
         return mongoTemplate.find(query, User.class);
     }

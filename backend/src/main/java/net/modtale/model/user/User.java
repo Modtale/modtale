@@ -50,6 +50,8 @@ public class User implements Serializable {
     private String bio;
     private String createdAt;
 
+    private LocalDateTime deletedAt;
+
     private ApiKey.Tier tier;
     private List<String> roles;
 
@@ -85,6 +87,11 @@ public class User implements Serializable {
 
     public boolean getHasPassword() {
         return this.password != null && !this.password.isEmpty();
+    }
+
+    @JsonIgnore
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
     public enum NotificationLevel {
@@ -204,6 +211,9 @@ public class User implements Serializable {
     public void setBio(String bio) { this.bio = bio; }
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 
     public ApiKey.Tier getTier() { return tier != null ? tier : ApiKey.Tier.USER; }
     public void setTier(ApiKey.Tier tier) { this.tier = tier; }

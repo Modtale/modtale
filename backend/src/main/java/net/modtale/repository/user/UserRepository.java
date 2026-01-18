@@ -4,6 +4,7 @@ import net.modtale.model.user.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,8 @@ public interface UserRepository extends MongoRepository<User, String> {
     Optional<User> findByVerificationToken(String token);
 
     Optional<User> findByPasswordResetToken(String token);
+
+    List<User> findByDeletedAtBefore(LocalDateTime dateTime);
 
     @Query("{ 'connectedAccounts.providerId': ?0 }")
     Optional<User> findByConnectedAccountsProviderId(String providerId);
