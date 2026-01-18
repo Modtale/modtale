@@ -29,6 +29,8 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         );
     }
 
+    const sortedProjects = [...pendingProjects].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+
     const renderQueueItem = (mod: Mod) => {
         const isProjectPending = mod.status === 'PENDING';
 
@@ -98,7 +100,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     return (
         <div className="grid gap-4">
-            {pendingProjects.map(renderQueueItem)}
+            {sortedProjects.map(renderQueueItem)}
         </div>
     );
 };
