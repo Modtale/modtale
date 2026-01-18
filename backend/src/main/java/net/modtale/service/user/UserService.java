@@ -406,6 +406,34 @@ public class UserService {
         }
     }
 
+    public void banEmail(String email, String reason, String bannedBy) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new IllegalArgumentException("Invalid email format.");
+        }
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("Email is already banned.");
+        }
+
+        bannedEmailRepository.save(new BannedEmail(email, reason, bannedBy));
+
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            if (!user.isDeleted()) {
+                deleteUser(user.getId());
+                logger.info("Automatically deleted user " + user.getUsername() + " due to email ban on " + email);
+            }
+        }
+    }
+
+    public void unbanEmail(String email) {
+        bannedEmailRepository.findByEmailIgnoreCase(email).ifPresent(bannedEmailRepository::delete);
+    }
+
+    public List<BannedEmail> getBannedEmails() {
+        return bannedEmailRepository.findAll(Sort.by(Sort.Direction.DESC, "bannedAt"));
+    }
+
     public User createOrganization(String name, User owner) {
         String cleanName = name.trim();
 
