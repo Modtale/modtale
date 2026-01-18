@@ -60,9 +60,7 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
 
     {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
 
-    <script define:vars={{ initialData }}>
-        window.INITIAL_DATA = initialData;
-    </script>
+    <script is:inline set:html={`window.INITIAL_DATA = ${initialDataString};`}></script>
 
     <script is:inline>
         (function() {
