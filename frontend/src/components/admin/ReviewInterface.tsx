@@ -167,6 +167,8 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
         }
     };
 
+    const licenseLink = mod.links?.LICENSE || mod.links?.license;
+
     return (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
             {inspectorData && (
@@ -303,8 +305,8 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                             <p className="font-bold text-lg dark:text-white mt-1 flex items-center gap-2">
                                                 <FileText className="w-4 h-4 text-slate-500"/>
                                                 {mod.license}
-                                                {mod.links?.license && (
-                                                    <a href={mod.links.license} target="_blank" rel="noreferrer" className="ml-2 text-modtale-accent hover:underline text-xs flex items-center gap-1">
+                                                {licenseLink && (
+                                                    <a href={licenseLink} target="_blank" rel="noreferrer" className="ml-2 text-modtale-accent hover:underline text-xs flex items-center gap-1">
                                                         <ExternalLink className="w-3 h-3"/> View License
                                                     </a>
                                                 )}
