@@ -278,6 +278,17 @@ public class ModService {
         return modRepository.findAllForSitemap();
     }
 
+    public Mod getRawModById(String identifier) {
+        Optional<Mod> direct = Optional.empty();
+        if (identifier != null) {
+            direct = modRepository.findById(identifier);
+        }
+        if (direct.isEmpty() && identifier != null) {
+            direct = modRepository.findBySlug(identifier.toLowerCase());
+        }
+        return direct.orElse(null);
+    }
+
     public Mod getModById(String identifier) {
         Optional<Mod> direct = Optional.empty();
 
@@ -408,7 +419,7 @@ public class ModService {
     }
 
     public void submitMod(String id, String username) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
         if(mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
 
@@ -431,7 +442,7 @@ public class ModService {
     }
 
     public void revertModToDraft(String id, String username) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
         if (mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
 
@@ -446,7 +457,7 @@ public class ModService {
 
     @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void archiveMod(String id, String username) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
         if (mod == null || !isOwner(mod, user)) throw new SecurityException("Permission denied.");
 
@@ -461,7 +472,7 @@ public class ModService {
 
     @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void unlistMod(String id, String username) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
         if (mod == null || !isOwner(mod, user)) throw new SecurityException("Permission denied.");
 
@@ -476,7 +487,7 @@ public class ModService {
 
     @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void publishMod(String id, String username) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
 
         if (mod == null) throw new IllegalArgumentException("Project not found");
@@ -536,7 +547,7 @@ public class ModService {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
 
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if(mod == null) throw new IllegalArgumentException("Project not found");
 
         ModVersion ver = mod.getVersions().stream()
@@ -556,7 +567,7 @@ public class ModService {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
 
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if(mod == null) throw new IllegalArgumentException("Project not found");
 
         ModVersion ver = mod.getVersions().stream()
@@ -604,7 +615,7 @@ public class ModService {
     }
 
     public void rejectMod(String id, String reason) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
 
         if (user == null || user.getRoles() == null || !user.getRoles().contains("ADMIN")) {
@@ -680,7 +691,7 @@ public class ModService {
     }
 
     public void requestTransfer(String modId, String targetUsername, User requester) {
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (!isOwner(mod, requester)) throw new SecurityException("Only the owner can transfer ownership.");
         ensureEditable(mod);
@@ -707,7 +718,7 @@ public class ModService {
     }
 
     public void resolveTransfer(String modId, boolean accept, User responder) {
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (mod.getPendingTransferTo() == null) throw new IllegalArgumentException("No pending transfer request.");
 
@@ -755,7 +766,7 @@ public class ModService {
 
     public void updateMod(String id, Mod updatedMod) {
         User user = userService.getCurrentUser();
-        Mod existing = getModById(id);
+        Mod existing = getRawModById(id);
         if (existing == null || !hasEditPermission(existing, user)) {
             throw new SecurityException("You do not have permission to edit this project.");
         }
@@ -825,7 +836,7 @@ public class ModService {
 
     public void updateProjectIcon(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         if (mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
         ensureEditable(mod);
 
@@ -840,7 +851,7 @@ public class ModService {
 
     public void updateProjectBanner(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         if (mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
         ensureEditable(mod);
 
@@ -862,7 +873,7 @@ public class ModService {
 
     public void updateVersionDependencies(String modId, String versionId, List<String> modIds) {
         User user = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (!hasEditPermission(mod, user)) throw new SecurityException("No permission.");
         ensureEditable(mod);
@@ -883,7 +894,7 @@ public class ModService {
 
                 boolean isOptional = !isModpack && parts.length >= 3 && "optional".equalsIgnoreCase(parts[2].trim());
 
-                Mod depMod = getModById(depId);
+                Mod depMod = getRawModById(depId);
                 if (depMod == null) throw new IllegalArgumentException("Dependency not found: " + depId);
                 validateDependency(mod, depMod);
                 boolean exists = depMod.getVersions().stream().anyMatch(v -> v.getVersionNumber().equalsIgnoreCase(depVer));
@@ -913,7 +924,7 @@ public class ModService {
     public void addVersionToMod(String modId, String versionNumber, List<String> gameVersions,
                                 MultipartFile file, String changelog, List<String> modIds, ModVersion.Channel channel) throws IOException {
         User user = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (!hasEditPermission(mod, user)) throw new SecurityException("You do not have permission to update this project.");
         ensureEditable(mod);
@@ -968,7 +979,7 @@ public class ModService {
 
                 boolean isOptional = !isModpack && parts.length >= 3 && "optional".equalsIgnoreCase(parts[2].trim());
 
-                Mod depMod = getModById(depId);
+                Mod depMod = getRawModById(depId);
 
                 if (depMod == null || "DRAFT".equals(depMod.getStatus())) throw new IllegalArgumentException("Dependency not found or not published: " + depId);
                 validateDependency(mod, depMod);
@@ -1057,7 +1068,7 @@ public class ModService {
 
     public void deleteVersion(String modId, String versionId, String username) {
         User user = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         ensureEditable(mod);
 
@@ -1086,7 +1097,7 @@ public class ModService {
 
     @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void deleteMod(String id, String username) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
 
         if (mod == null || !isOwner(mod, user)) {
@@ -1101,7 +1112,7 @@ public class ModService {
     public void adminDeleteProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         performDeletionStrategy(mod);
     }
@@ -1110,7 +1121,7 @@ public class ModService {
     public void adminUnlistProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         mod.setStatus("UNLISTED");
         mod.setExpiresAt(null);
@@ -1120,7 +1131,7 @@ public class ModService {
     public void adminDeleteVersion(String modId, String versionId) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
 
         boolean removed = mod.getVersions().removeIf(v -> {
@@ -1217,7 +1228,7 @@ public class ModService {
     }
 
     private void cleanupOrphanedDependency(String modId) {
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null && "DELETED".equals(mod.getStatus())) {
             List<Mod> remainingDependents = modRepository.findByDependency(modId);
 
@@ -1247,7 +1258,7 @@ public class ModService {
             zos.closeEntry();
 
             for (ModDependency dep : version.getDependencies()) {
-                Mod depMod = getModById(dep.getModId());
+                Mod depMod = getRawModById(dep.getModId());
                 if (depMod == null) continue;
 
                 ModVersion depVer = depMod.getVersions().stream()
@@ -1289,7 +1300,7 @@ public class ModService {
     }
 
     public void incrementDownloadCount(String modId) {
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null) {
             mod.setDownloadCount(mod.getDownloadCount() + 1);
             modRepository.save(mod);
@@ -1390,7 +1401,7 @@ public class ModService {
 
     public void inviteContributor(String modId, String usernameToInvite) {
         User currentUser = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (!isOwner(mod, currentUser)) throw new SecurityException("Only the owner can manage contributors.");
         ensureEditable(mod);
@@ -1406,7 +1417,7 @@ public class ModService {
 
     public void removeContributor(String modId, String usernameToRemove) {
         User currentUser = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null && isOwner(mod, currentUser)) {
             ensureEditable(mod);
             mod.getContributors().remove(usernameToRemove);
@@ -1416,7 +1427,7 @@ public class ModService {
 
     public void acceptInvite(String modId) {
         User currentUser = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null && mod.getPendingInvites().remove(currentUser.getUsername())) {
             mod.getContributors().add(currentUser.getUsername());
             modRepository.save(mod);
@@ -1435,14 +1446,14 @@ public class ModService {
 
     public void declineInvite(String modId) {
         User currentUser = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null && mod.getPendingInvites().remove(currentUser.getUsername())) {
             modRepository.save(mod);
         }
     }
 
     public void addReview(String modId, String username, String comment, int rating, String version) {
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null) {
             if (!mod.isAllowReviews()) {
                 throw new IllegalStateException("Reviews are disabled for this project.");
@@ -1480,7 +1491,7 @@ public class ModService {
     }
 
     public void editReview(String modId, String reviewId, String username, String newComment, int newRating) {
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null) {
             Review review = mod.getReviews().stream()
                     .filter(r -> r.getId().equals(reviewId))
@@ -1503,7 +1514,7 @@ public class ModService {
 
     public void replyToReview(String modId, String reviewId, String reply, String username) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
 
         if (mod != null) {
             if (!hasEditPermission(mod, user)) {
@@ -1535,7 +1546,7 @@ public class ModService {
 
     public void toggleFavorite(String modId, String username) {
         User user = userRepository.findByUsername(username).orElse(null);
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (user != null && mod != null) {
             List<String> likes = user.getLikedModIds();
             if (likes == null) { likes = new ArrayList<>(); user.setLikedModIds(likes); }
@@ -1552,7 +1563,7 @@ public class ModService {
     }
 
     public void addGalleryImage(String id, String imageUrl) {
-        Mod mod = getModById(id);
+        Mod mod = getRawModById(id);
         if (mod != null) {
             ensureEditable(mod);
             mod.getGalleryImages().add(imageUrl);
@@ -1562,7 +1573,7 @@ public class ModService {
 
     public void removeGalleryImage(String modId, String imageUrl, String username) {
         User user = userService.getCurrentUser();
-        Mod mod = getModById(modId);
+        Mod mod = getRawModById(modId);
         if (mod != null && hasEditPermission(mod, user)) {
             ensureEditable(mod);
             mod.getGalleryImages().remove(imageUrl);
