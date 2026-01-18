@@ -1039,6 +1039,22 @@ public class ModService {
                 if ("INFECTED".equals(scanResult.getStatus())) {
                     logger.warn("Warden detected malware in project {} version {}", modId, versionId);
                 }
+                User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
+                if (author != null) {
+                    ModVersion ver = mod.getVersions().stream()
+                            .filter(v -> v.getId().equals(versionId))
+                            .findFirst()
+                            .orElse(null);
+                    String versionNumber = ver != null ? ver.getVersionNumber() : "New";
+
+                    notificationService.sendNotification(
+                            List.of(author.getId()),
+                            "Version Under Review",
+                            "Version " + versionNumber + " was flagged by our security scanner and is pending manual verification.",
+                            "/dashboard/projects",
+                            mod.getImageUrl()
+                    );
+                }
             }
 
             Query query = new Query(Criteria.where("_id").is(modId).and("versions._id").is(versionId));
