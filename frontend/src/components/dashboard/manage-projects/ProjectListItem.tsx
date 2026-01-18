@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import type { Mod } from '../../../types';
-import { Download, Eye, BarChart2, Edit, ArrowRightLeft, Trash2, Building2, User as UserIcon, Undo2, Clock, AlertCircle } from 'lucide-react';
+import { Download, Eye, BarChart2, Edit, ArrowRightLeft, Trash2, Building2, User as UserIcon, Undo2, Clock, AlertCircle, ExternalLink } from 'lucide-react';
 
 interface ProjectListItemProps {
     project: Mod;
@@ -17,9 +17,18 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
                                                                     project, isOwner = false, canManage, showAuthor = false, onTransfer, onDelete, onRevert
                                                                 }) => {
 
-    // Check if any version is pending or rejected
     const pendingVersion = project.versions?.find(v => v.reviewStatus === 'PENDING');
     const rejectedVersion = project.versions?.find(v => v.reviewStatus === 'REJECTED');
+
+    let projectLink = `/mod/${project.id}`;
+    if (project.classification === 'MODPACK') projectLink = `/modpack/${project.id}`;
+    if (project.classification === 'SAVE') projectLink = `/world/${project.id}`;
+
+    if (project.slug) {
+        if (project.classification === 'MODPACK') projectLink = `/modpack/${project.slug}`;
+        else if (project.classification === 'SAVE') projectLink = `/world/${project.slug}`;
+        else projectLink = `/mod/${project.slug}`;
+    }
 
     return (
         <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-4 group relative overflow-hidden">
@@ -29,7 +38,10 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
 
             <div className="flex-1 text-center sm:text-left">
                 <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                    <h3 className="font-bold text-slate-900 dark:text-white text-lg">{project.title}</h3>
+                    <Link to={projectLink} className="font-bold text-slate-900 dark:text-white text-lg hover:underline decoration-2 underline-offset-2 flex items-center gap-2">
+                        {project.title}
+                        <ExternalLink className="w-3.5 h-3.5 opacity-50" />
+                    </Link>
 
                     {project.status === 'DRAFT' && <span className="text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 px-2 py-0.5 rounded font-bold uppercase">Draft</span>}
                     {project.status === 'PENDING' && <span className="text-[10px] bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200 px-2 py-0.5 rounded font-bold uppercase">Pending Approval</span>}
