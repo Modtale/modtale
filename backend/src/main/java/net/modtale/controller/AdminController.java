@@ -440,6 +440,19 @@ public class AdminController {
         }
     }
 
+    @PostMapping("/projects/{id}/versions/{versionId}/scan")
+    public ResponseEntity<?> rescanVersion(@PathVariable String id, @PathVariable String versionId) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.triggerRescan(id, versionId);
+            logAction(currentUser.getUsername(), "RESCAN_VERSION", id, "VERSION", "VerID: " + versionId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     private boolean isTextFile(String path) {
         String lower = path.toLowerCase();
         return lower.endsWith(".json") || lower.endsWith(".yml") || lower.endsWith(".yaml") ||
