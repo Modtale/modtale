@@ -29,14 +29,10 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         );
     }
 
-    // Filter to find the actual pending item (Project or Version)
     const renderQueueItem = (mod: Mod) => {
         const isProjectPending = mod.status === 'PENDING';
 
-        // Find versions that are pending
         const pendingVersions = mod.versions.filter(v => v.reviewStatus === 'PENDING');
-        // If project is pending, we usually look at the latest version anyway.
-        // If project is published, we specifically look at the pending updates.
 
         const targetVersion = pendingVersions[0] || mod.versions[0];
         const scan = targetVersion?.scanResult;

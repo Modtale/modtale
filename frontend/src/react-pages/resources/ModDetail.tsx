@@ -464,6 +464,9 @@ export const ModDetail: React.FC<{
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
     const canEdit = currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username));
 
+    const analyticsFired = useRef(false);
+    const fetchedDepMeta = useRef<Set<string>>(new Set());
+
     const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
     const breadcrumbSchema = useMemo(() => mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null, [mod]);
     const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
@@ -476,7 +479,8 @@ export const ModDetail: React.FC<{
     }, []);
 
     useEffect(() => {
-        if (mod && mod.id) {
+        if (mod && mod.id && !analyticsFired.current) {
+            analyticsFired.current = true;
             api.post(`/analytics/view/${mod.id}`).catch(() => {});
         }
     }, [mod?.id]);
@@ -546,16 +550,25 @@ export const ModDetail: React.FC<{
     useEffect(() => {
         if (!latestDependencies.length) return;
         const fetchMeta = async () => {
-            const missing = latestDependencies.filter(d => !depMeta[d.modId]);
+            const missing = latestDependencies.filter(d =>
+                !depMeta[d.modId] && !fetchedDepMeta.current.has(d.modId)
+            );
+
             if (!missing.length) return;
+
+            missing.forEach(d => fetchedDepMeta.current.add(d.modId));
+
             const newMeta = { ...depMeta };
             await Promise.all(missing.map(async (d) => {
                 try {
                     const res = await api.get(`/projects/${d.modId}/meta`);
                     newMeta[d.modId] = { icon: res.data.icon, title: res.data.title };
-                } catch (e) { newMeta[d.modId] = { icon: '', title: d.modTitle || d.modId }; }
+                } catch (e) {
+                    newMeta[d.modId] = { icon: '', title: d.modTitle || d.modId };
+                }
             }));
-            setDepMeta(newMeta);
+
+            setDepMeta(prev => ({...prev, ...newMeta}));
         };
         fetchMeta();
     }, [latestDependencies]);

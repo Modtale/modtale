@@ -203,15 +203,19 @@ public class ModService {
     ) {
         Page<Mod> results = self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
 
-        if (results != null && !results.isEmpty()) {
+        if (results != null && results.hasContent()) {
             List<String> idsToCheck = results.getContent().stream().map(Mod::getId).collect(Collectors.toList());
             Query query = new Query(Criteria.where("id").in(idsToCheck));
             long count = mongoTemplate.count(query, Mod.class);
 
             if (count != idsToCheck.size()) {
-                logger.warn("Cache verification failed for getMods. Invalidating 'projectSearch' and retrying.");
+                logger.warn("Cache verification failed for getMods (Stale Data Detected). Invalidating 'projectSearch' and retrying.");
                 Objects.requireNonNull(cacheManager.getCache("projectSearch")).clear();
-                return self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
+                results = self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
+            }
+
+            if (results != null && results.hasContent()) {
+                results.getContent().forEach(mod -> mod.setReviews(null));
             }
         }
 
@@ -306,10 +310,33 @@ public class ModService {
             }
 
             if (mod.getReviews() != null && !mod.getReviews().isEmpty()) {
+                Set<String> reviewersToFetch = new HashSet<>();
                 for (Review r : mod.getReviews()) {
                     if (r.getUserAvatarUrl() == null || r.getUserAvatarUrl().isEmpty()) {
-                        userRepository.findByUsername(r.getUser())
-                                .ifPresent(u -> r.setUserAvatarUrl(u.getAvatarUrl()));
+                        reviewersToFetch.add(r.getUser());
+                    }
+                }
+
+                if (!reviewersToFetch.isEmpty()) {
+                    try {
+                        List<User> users = userRepository.findByUsernameIn(reviewersToFetch);
+                        Map<String, String> avatarMap = users.stream()
+                                .collect(Collectors.toMap(
+                                        u -> u.getUsername().toLowerCase(),
+                                        u -> u.getAvatarUrl() != null ? u.getAvatarUrl() : "",
+                                        (existing, replacement) -> existing
+                                ));
+
+                        for (Review r : mod.getReviews()) {
+                            if (r.getUserAvatarUrl() == null || r.getUserAvatarUrl().isEmpty()) {
+                                String avatar = avatarMap.get(r.getUser().toLowerCase());
+                                if (avatar != null && !avatar.isEmpty()) {
+                                    r.setUserAvatarUrl(avatar);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to batch load avatars for reviews", e);
                     }
                 }
             }
@@ -384,7 +411,6 @@ public class ModService {
         return createDraft(title, description, classification, user, ownerName, null);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void submitMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -422,7 +448,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void archiveMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -437,7 +463,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void unlistMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -452,7 +478,7 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void publishMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -510,7 +536,6 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void approveVersion(String modId, String versionId) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -722,7 +747,7 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void addMod(Mod mod) {
         validateTags(mod.getTags());
         validateClassification(mod.getClassification());
@@ -730,7 +755,6 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void updateMod(String id, Mod updatedMod) {
         User user = userService.getCurrentUser();
         Mod existing = getModById(id);
@@ -738,6 +762,8 @@ public class ModService {
             throw new SecurityException("You do not have permission to edit this project.");
         }
         ensureEditable(existing);
+
+        boolean slugChanged = false;
 
         if (updatedMod.getTags() != null) {
             existing.setTags(updatedMod.getTags());
@@ -763,6 +789,7 @@ public class ModService {
 
             if (newSlug.isEmpty()) {
                 existing.setSlug(null);
+                slugChanged = true;
             } else if (!newSlug.equals(existing.getSlug())) {
                 validateSlug(newSlug);
 
@@ -772,6 +799,7 @@ public class ModService {
                 }
 
                 existing.setSlug(newSlug);
+                slugChanged = true;
             }
         }
 
@@ -791,9 +819,12 @@ public class ModService {
 
         existing.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(existing);
+
+        if (slugChanged) {
+            Objects.requireNonNull(cacheManager.getCache("sitemapData")).clear();
+        }
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void updateProjectIcon(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
         Mod mod = getModById(id);
@@ -809,7 +840,6 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = "projectSearch", allEntries = true)
     public void updateProjectBanner(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
         Mod mod = getModById(id);
@@ -832,7 +862,6 @@ public class ModService {
         if ("MODPACK".equals(depMod.getClassification()) || "SAVE".equals(depMod.getClassification())) throw new IllegalArgumentException("Modpacks and Worlds cannot be added as dependencies.");
     }
 
-    @CacheEvict(value = "projectSearch", allEntries = true)
     public void updateVersionDependencies(String modId, String versionId, List<String> modIds) {
         User user = userService.getCurrentUser();
         Mod mod = getModById(modId);
@@ -883,7 +912,6 @@ public class ModService {
         addVersionToMod(modId, versionNumber, gameVersions, file, changelog, modIds, ModVersion.Channel.RELEASE);
     }
 
-    @CacheEvict(value = "projectSearch", allEntries = true)
     public void addVersionToMod(String modId, String versionNumber, List<String> gameVersions,
                                 MultipartFile file, String changelog, List<String> modIds, ModVersion.Channel channel) throws IOException {
         User user = userService.getCurrentUser();
@@ -1058,7 +1086,7 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void deleteMod(String id, String username) {
         Mod mod = getModById(id);
         User user = userService.getCurrentUser();
@@ -1071,7 +1099,7 @@ public class ModService {
         performDeletionStrategy(mod);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void adminDeleteProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -1080,7 +1108,7 @@ public class ModService {
         performDeletionStrategy(mod);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void adminUnlistProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -1091,7 +1119,6 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"projectSearch", "sitemapData"}, allEntries = true)
     public void adminDeleteVersion(String modId, String versionId) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -1568,7 +1595,9 @@ public class ModService {
     }
 
     public List<User> searchCreators(String query) {
-        return userRepository.findAll().stream().filter(u -> u.getUsername().toLowerCase().contains(query.toLowerCase())).limit(10).collect(Collectors.toList());
+        // Optimized: Use database regex instead of fetching all users into memory
+        List<User> creators = userRepository.findByUsernameContainingIgnoreCase(query, PageRequest.of(0, 10));
+        return creators;
     }
 
     public boolean verifyFileExistsInDb(String fileUrl) {
