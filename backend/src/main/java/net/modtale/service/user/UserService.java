@@ -63,34 +63,6 @@ public class UserService {
 
     private final String PRE_AUTH_SIGNING_KEY = UUID.randomUUID().toString();
 
-    public void banEmail(String email, String reason, String bannedBy) {
-        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
-            throw new IllegalArgumentException("Invalid email format.");
-        }
-        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
-            throw new IllegalArgumentException("Email is already banned.");
-        }
-
-        bannedEmailRepository.save(new BannedEmail(email, reason, bannedBy));
-
-        Optional<User> existingUser = userRepository.findByEmail(email);
-        if (existingUser.isPresent()) {
-            User user = existingUser.get();
-            if (!user.isDeleted()) {
-                deleteUser(user.getId());
-                logger.info("Automatically deleted user " + user.getUsername() + " due to email ban on " + email);
-            }
-        }
-    }
-
-    public void unbanEmail(String email) {
-        bannedEmailRepository.findByEmailIgnoreCase(email).ifPresent(bannedEmailRepository::delete);
-    }
-
-    public List<BannedEmail> getBannedEmails() {
-        return bannedEmailRepository.findAll(Sort.by(Sort.Direction.DESC, "bannedAt"));
-    }
-
     public User registerUser(String username, String email, String password) {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
             throw new IllegalArgumentException("Invalid username. Must be at least 3 characters and alphanumeric.");
@@ -732,10 +704,12 @@ public class UserService {
 
     public DefaultOAuth2User processUserLogin(String provider, OAuth2User oauthUser, String accessToken) {
         String providerId = extractProviderId(provider, oauthUser);
-        String username = extractUsername(provider, oauthUser);
+
+        String oauthUsername = extractUsername(provider, oauthUser);
+        String oauthAvatar = extractAvatarUrl(provider, oauthUser, providerId);
+
         String email = oauthUser.getAttribute("email");
-        String avatarUrl = extractAvatarUrl(provider, oauthUser, providerId);
-        String profileUrl = extractProfileUrl(provider, oauthUser, username, providerId);
+        String profileUrl = extractProfileUrl(provider, oauthUser, oauthUsername, providerId);
 
         boolean isVisible = !"google".equals(provider);
         User user = null;
@@ -759,54 +733,63 @@ public class UserService {
             }
         }
 
-        if (user != null) {
-            if (user.isDeleted()) {
-                throw new IllegalArgumentException("Account deleted.");
-            }
+        boolean isNewUser = false;
 
-            if (user.getAvatarUrl() == null || user.getAvatarUrl().isEmpty()) {
-                if (("github".equals(provider) || "gitlab".equals(provider) || "bluesky".equals(provider) || "google".equals(provider)) && avatarUrl != null) {
-                    user.setAvatarUrl(avatarUrl);
+        if (user != null) {
+            if (user.isDeleted()) throw new IllegalArgumentException("Account deleted.");
+
+            if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
+            if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
+
+            updateConnectedAccount(user, provider, providerId, oauthUsername, profileUrl, isVisible);
+            userRepository.save(user);
+        }
+        else {
+            isNewUser = true;
+
+            user = new User();
+            user.setEmail(email);
+            user.setCreatedAt(LocalDate.now().toString());
+            user.setEmailVerified(true);
+
+            if ("google".equalsIgnoreCase(provider)) {
+                String randomHandle = "user_" + UUID.randomUUID().toString().substring(0, 5);
+                while (userRepository.existsByUsernameIgnoreCase(randomHandle)) {
+                    randomHandle = "user_" + UUID.randomUUID().toString().substring(0, 5);
                 }
+                user.setUsername(randomHandle);
+                user.setAvatarUrl("https://ui-avatars.com/api/?name=" + randomHandle + "&background=random&length=1");
+            } else {
+                String finalUsername = oauthUsername;
+                if (userRepository.existsByUsernameIgnoreCase(finalUsername)) {
+                    int suffix = 1;
+                    while (userRepository.existsByUsernameIgnoreCase(finalUsername + "_" + suffix)) {
+                        suffix++;
+                    }
+                    finalUsername = finalUsername + "_" + suffix;
+                }
+                user.setUsername(finalUsername);
+                user.setAvatarUrl(oauthAvatar != null ? oauthAvatar : "https://ui-avatars.com/api/?name=" + finalUsername + "&background=random");
             }
 
             if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
             if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
 
-            updateConnectedAccount(user, provider, providerId, username, profileUrl, isVisible);
+            updateConnectedAccount(user, provider, providerId, oauthUsername, profileUrl, isVisible);
             userRepository.save(user);
-
-            Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
-            attributes.put("login", user.getUsername());
-            attributes.remove("is_linking");
-            return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
         }
-
-        String finalUsername = username;
-        if (userRepository.existsByUsernameIgnoreCase(finalUsername)) {
-            int suffix = 1;
-            while (userRepository.existsByUsernameIgnoreCase(finalUsername + "_" + suffix)) {
-                suffix++;
-            }
-            finalUsername = finalUsername + "_" + suffix;
-        }
-
-        user = new User();
-        user.setUsername(finalUsername);
-        user.setEmail(email);
-        user.setAvatarUrl(avatarUrl);
-        user.setCreatedAt(LocalDate.now().toString());
-        user.setEmailVerified(true);
-
-        if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
-        if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
-
-        updateConnectedAccount(user, provider, providerId, username, profileUrl, isVisible);
-        userRepository.save(user);
 
         Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
         attributes.put("login", user.getUsername());
+        attributes.put("id", user.getId());
         attributes.remove("is_linking");
+
+        if (isNewUser && "google".equalsIgnoreCase(provider)) {
+            attributes.put("is_new_account", true);
+            if (oauthUsername != null) attributes.put("suggested_username", oauthUsername);
+            if (oauthAvatar != null) attributes.put("suggested_avatar", oauthAvatar);
+        }
+
         return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
     }
 

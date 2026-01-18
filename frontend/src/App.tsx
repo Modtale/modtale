@@ -27,10 +27,10 @@ import { SEOHead } from './components/SEOHead';
 import NotFound from './components/ui/error/NotFound.tsx';
 import { Spinner } from './components/ui/Spinner';
 import { StatusModal } from './components/ui/StatusModal';
+import { OnboardingModal } from './components/user/OnboardingModal';
 
 import type { Mod, Modpack, World, User } from './types';
 import { createSlug } from './utils/slug';
-import { AlertTriangle, X } from 'lucide-react';
 import type { Classification } from './data/categories';
 import { SSRProvider } from './context/SSRContext';
 import { ExternalLinkProvider } from './context/ExternalLinkContext';
@@ -54,6 +54,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const [worlds, setWorlds] = useState<World[]>([]);
     const [downloadedSessionIds, setDownloadedSessionIds] = useState<Set<string>>(new Set());
     const [globalError, setGlobalError] = useState<string | null>(null);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (import.meta.env.SSR) return true;
@@ -110,6 +111,10 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             setUser(res.data);
+
+            if (res.data && (res.data as any).is_new_account) {
+                setShowOnboarding(true);
+            }
         } catch (e) {
             console.error("Failed to refresh user", e);
         }
@@ -174,6 +179,17 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                         title="Login Failed"
                         message={globalError}
                         onClose={() => setGlobalError(null)}
+                    />
+                )}
+
+                {user && (
+                    <OnboardingModal
+                        isOpen={showOnboarding}
+                        onClose={() => setShowOnboarding(false)}
+                        currentUsername={user.username}
+                        currentAvatar={user.avatarUrl}
+                        suggestedUsername={(user as any).suggested_username}
+                        suggestedAvatar={(user as any).suggested_avatar}
                     />
                 )}
 
