@@ -10,7 +10,7 @@ import { api } from '../utils/api';
 import { captureError } from '../utils/errorTracking';
 import { PROJECT_TYPES, BROWSE_VIEWS } from '../data/categories';
 import type { Classification } from '../data/categories';
-import { createSlug } from '../utils/slug';
+import { getProjectUrl } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getCategorySEO } from '../data/seo-constants';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
@@ -213,10 +213,7 @@ export const Home: React.FC<HomeProps> = ({
     };
 
     const getProjectPath = (item: Mod | Modpack | World) => {
-        const slug = createSlug(item.title, item.id);
-        if (item.classification === 'MODPACK') return `/modpack/${slug}`;
-        if (item.classification === 'SAVE') return `/world/${slug}`;
-        return `/mod/${slug}`;
+        return getProjectUrl(item);
     };
 
     const getPageTitle = () => {
