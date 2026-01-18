@@ -616,6 +616,31 @@ public class ModService {
         }).start();
     }
 
+    public void triggerRescan(String modId, String versionId) {
+        Mod mod = getRawModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+
+        ModVersion version = mod.getVersions().stream()
+                .filter(v -> v.getId().equals(versionId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Version not found"));
+
+        if (version.getFileUrl() == null) throw new IllegalArgumentException("Version has no file to scan");
+
+        ScanResult pending = new ScanResult();
+        pending.setStatus("SCANNING");
+        version.setScanResult(pending);
+
+        modRepository.save(mod);
+
+        String originalFilename = version.getFileUrl().substring(version.getFileUrl().lastIndexOf('/') + 1);
+        if (originalFilename.length() > 37 && originalFilename.charAt(36) == '-') {
+            originalFilename = originalFilename.substring(37);
+        }
+
+        self.performBackgroundScan(modId, versionId, version.getFileUrl(), originalFilename);
+    }
+
     public void rejectMod(String id, String reason) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
@@ -1147,7 +1172,7 @@ public class ModService {
             throw new IllegalArgumentException("Project is not in a recoverable state.");
         }
 
-        mod.setStatus("PUBLISHED");
+        mod.setStatus("PUBLISHED"); // Restore to published state
         mod.setDeletedAt(null);
         modRepository.save(mod);
         logger.info("Project " + mod.getId() + " restored by admin " + user.getUsername());
@@ -1666,6 +1691,7 @@ public class ModService {
     }
 
     public List<User> searchCreators(String query) {
+        // Optimized: Use database regex instead of fetching all users into memory
         List<User> creators = userRepository.findByUsernameContainingIgnoreCase(query, PageRequest.of(0, 10));
         return creators;
     }

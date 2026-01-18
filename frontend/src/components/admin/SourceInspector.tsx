@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, Eye, CheckCircle2, Square } from 'lucide-react';
+import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, Eye, CheckCircle2, Square, RefreshCw } from 'lucide-react';
 import { api } from '../../utils/api';
 import type { ScanIssue } from '../../types';
 
 interface SourceInspectorProps {
     modId: string;
+    versionId: string;
     version: string;
     structure: string[];
     issues?: ScanIssue[];
@@ -196,14 +197,15 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     );
 };
 
-export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version, structure, issues = [], initialFile, initialLine, onClose }) => {
+export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, version, structure, issues = [], initialFile, initialLine, onClose }) => {
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
     const [inspectorContent, setInspectorContent] = useState<any>('');
     const [loadingFile, setLoadingFile] = useState(false);
     const [fileSearch, setFileSearch] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const [showIssuesDropdown, setShowIssuesDropdown] = useState(false);
-    const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set()); // Track local resolution by index
+    const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set());
+    const [isScanning, setIsScanning] = useState(false);
 
     const [activeIssueLineStart, setActiveIssueLineStart] = useState<number | undefined>(undefined);
     const [activeIssueLineEnd, setActiveIssueLineEnd] = useState<number | undefined>(undefined);
@@ -248,7 +250,6 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             targetFile = targetFile + ".class";
         }
 
-        // Expand folders for file
         const parts = targetFile.split('/');
         const foldersToExpand = new Set<string>();
         let currentPath = "";
@@ -262,6 +263,17 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         setActiveIssueLineStart(lineStart);
         setActiveIssueLineEnd(lineEnd);
         setShowIssuesDropdown(false);
+    };
+
+    const handleRescan = async () => {
+        setIsScanning(true);
+        try {
+            await api.post(`/admin/projects/${modId}/versions/${versionId}/scan`);
+        } catch (e) {
+            console.error("Rescan failed", e);
+        } finally {
+            setIsScanning(false);
+        }
     };
 
     useEffect(() => {
@@ -347,9 +359,19 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         </div>
                     )}
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
-                    <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleRescan}
+                        disabled={isScanning}
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+                        title="Rescan File"
+                    >
+                        <RefreshCw className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 flex overflow-hidden">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink,
-    AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye
+    AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw
 } from 'lucide-react';
 import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
 import { SourceInspector } from './SourceInspector';
@@ -62,7 +62,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
     const [showRejectPanel, setShowRejectPanel] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
     const [showScanDetails, setShowScanDetails] = useState(false);
-    const [actioningVersion, setActioningVersion] = useState<string | null>(null);
+    const [rescanning, setRescanning] = useState(false);
 
     const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
@@ -154,11 +154,25 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
         }
     };
 
+    const handleRescan = async () => {
+        if (!pendingVersion) return;
+        setRescanning(true);
+        try {
+            await api.post(`/admin/projects/${mod.id}/versions/${pendingVersion.id}/scan`);
+            setStatus({ type: 'success', title: 'Scan Initiated', msg: 'The malware scanner has been queued for this version.' });
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Scan Failed', msg: e.response?.data || 'Could not start rescan.' });
+        } finally {
+            setRescanning(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
             {inspectorData && (
                 <SourceInspector
                     modId={mod.id}
+                    versionId={pendingVersion.id}
                     version={inspectorData.version}
                     structure={inspectorData.structure}
                     issues={inspectorData.issues}
@@ -399,13 +413,9 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                         {currentStep === 2 && (
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
 
-                                {/* Warden Analysis Dropdown */}
                                 {hasScanIssues && (
                                     <div className="rounded-2xl border border-red-200 dark:border-red-900/50 overflow-hidden">
-                                        <button
-                                            onClick={() => setShowScanDetails(!showScanDetails)}
-                                            className="w-full flex items-center justify-between p-5 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors text-left"
-                                        >
+                                        <div className="flex items-center justify-between p-5 bg-red-50 dark:bg-red-900/10">
                                             <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
                                                 <ShieldAlert className="w-6 h-6" />
                                                 <div>
@@ -413,8 +423,23 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                                     <p className="text-xs opacity-80 font-medium">Status: {scanResult.status} • Risk Score: {scanResult.riskScore}</p>
                                                 </div>
                                             </div>
-                                            {showScanDetails ? <ChevronUp className="w-5 h-5 text-red-500"/> : <ChevronDown className="w-5 h-5 text-red-500"/>}
-                                        </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={handleRescan}
+                                                    disabled={rescanning}
+                                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
+                                                    title="Rescan"
+                                                >
+                                                    <RefreshCw className={`w-5 h-5 ${rescanning ? 'animate-spin' : ''}`} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowScanDetails(!showScanDetails)}
+                                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
+                                                >
+                                                    {showScanDetails ? <ChevronUp className="w-5 h-5"/> : <ChevronDown className="w-5 h-5"/>}
+                                                </button>
+                                            </div>
+                                        </div>
 
                                         {showScanDetails && (
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
@@ -452,14 +477,24 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                 )}
 
                                 {!hasScanIssues && (
-                                    <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-4">
-                                        <Check className="w-6 h-6 text-emerald-500" />
-                                        <div>
-                                            <h4 className="font-bold text-emerald-500">Automated Checks Passed</h4>
-                                            <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
-                                                Warden found no known malware signatures or suspicious patterns.
-                                            </p>
+                                    <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <Check className="w-6 h-6 text-emerald-500" />
+                                            <div>
+                                                <h4 className="font-bold text-emerald-500">Automated Checks Passed</h4>
+                                                <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
+                                                    Warden found no known malware signatures or suspicious patterns.
+                                                </p>
+                                            </div>
                                         </div>
+                                        <button
+                                            onClick={handleRescan}
+                                            disabled={rescanning}
+                                            className="p-2 hover:bg-emerald-500/10 rounded-lg transition-colors text-emerald-600 dark:text-emerald-400"
+                                            title="Force Rescan"
+                                        >
+                                            <RefreshCw className={`w-5 h-5 ${rescanning ? 'animate-spin' : ''}`} />
+                                        </button>
                                     </div>
                                 )}
 
