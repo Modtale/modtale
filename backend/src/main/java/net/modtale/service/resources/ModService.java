@@ -1604,7 +1604,7 @@ public class ModService {
 
         if (mod != null) {
             if (!hasEditPermission(mod, user)) {
-                throw new SecurityException("Only the project creator can reply to reviews.");
+                throw new SecurityException("Only project team members can reply to reviews.");
             }
 
             Review review = mod.getReviews().stream()
@@ -1612,7 +1612,6 @@ public class ModService {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Review not found"));
 
-            // Allow editing reply if it exists, or adding new one
             review.setDeveloperReply(sanitizer.sanitizePlainText(reply));
             review.setDeveloperReplyDate(LocalDateTime.now().toString());
 
