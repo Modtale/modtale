@@ -444,6 +444,7 @@ export const ModDetail: React.FC<{
     const [mod, setMod] = useState<Mod | null>(initialMod);
     const [loading, setLoading] = useState(!initialMod);
     const [isNotFound, setIsNotFound] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
 
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [showAllVersionsModal, setShowAllVersionsModal] = useState(false);
@@ -466,6 +467,13 @@ export const ModDetail: React.FC<{
     const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
     const breadcrumbSchema = useMemo(() => mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null, [mod]);
     const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         if (mod && mod.id) {
@@ -552,9 +560,15 @@ export const ModDetail: React.FC<{
         fetchMeta();
     }, [latestDependencies]);
 
-    const handleShare = () => {
-        if (navigator.share) navigator.share({ title: mod?.title, url: currentUrl }).catch(() => {});
-        else setIsShareOpen(true);
+    const handleShare = async () => {
+        if (isMobile && navigator.share) {
+            try {
+                await navigator.share({ title: mod?.title, url: currentUrl });
+            } catch (e) {
+            }
+        } else {
+            setIsShareOpen(true);
+        }
     };
 
     const handleFollowToggle = async () => {
