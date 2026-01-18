@@ -302,6 +302,8 @@ public class ModService {
 
         if (direct.isPresent()) {
             Mod mod = direct.get();
+            if (mod.getDeletedAt() != null) return null; // Hide deleted mods from public view
+
             User currentUser = userService.getCurrentUser();
             boolean isPrivileged = hasEditPermission(mod, currentUser) || isAdmin(currentUser);
 
@@ -1118,6 +1120,24 @@ public class ModService {
     }
 
     @CacheEvict(value = {"sitemapData"}, allEntries = true)
+    public void adminRestoreProject(String id) {
+        User user = userService.getCurrentUser();
+        if (!isAdmin(user)) throw new SecurityException("Access Denied");
+
+        Mod mod = getRawModById(id);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+
+        if (!"DELETED".equals(mod.getStatus()) || mod.getDeletedAt() == null) {
+            throw new IllegalArgumentException("Project is not in a recoverable state.");
+        }
+
+        mod.setStatus("PUBLISHED");
+        mod.setDeletedAt(null);
+        modRepository.save(mod);
+        logger.info("Project " + mod.getId() + " restored by admin " + user.getUsername());
+    }
+
+    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void adminUnlistProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -1159,11 +1179,35 @@ public class ModService {
     }
 
     private void performDeletionStrategy(Mod mod) {
+        mod.setStatus("DELETED");
+        mod.setDeletedAt(LocalDateTime.now());
+        modRepository.save(mod);
+
+        logger.info("Soft deleted project " + mod.getId() + ". Grace period started.");
+    }
+
+    @Scheduled(cron = "0 0 0 * * ?")
+    public void cleanupExpiredDeletedProjects() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
+        List<Mod> expiredMods = modRepository.findByDeletedAtBefore(cutoff);
+
+        for (Mod mod : expiredMods) {
+            try {
+                performHardDelete(mod);
+            } catch (Exception e) {
+                logger.error("Failed to cleanup expired project " + mod.getId(), e);
+            }
+        }
+
+        String today = LocalDate.now().toString();
+        modRepository.deleteByStatusAndExpiresAtBefore("DRAFT", today);
+    }
+
+    private void performHardDelete(Mod mod) {
         List<Mod> dependents = modRepository.findByDependency(mod.getId());
 
         if (!dependents.isEmpty()) {
-            logger.info("Soft deleting project " + mod.getId() + " because it is a dependency.");
-            mod.setStatus("DELETED");
+            logger.info("Converting expired project " + mod.getId() + " to skeleton due to dependencies.");
             mod.setTitle("Deleted Project");
             mod.setDescription("This project has been deleted.");
             mod.setAbout("This project was deleted by the author but is retained for dependency resolution.");
@@ -1185,6 +1229,8 @@ public class ModService {
             mod.setPendingInvites(new ArrayList<>());
             mod.setReviews(new ArrayList<>());
             mod.setTags(new ArrayList<>());
+
+            mod.setDeletedAt(null);
             modRepository.save(mod);
         } else {
             logger.info("Hard deleting project " + mod.getId());
@@ -1234,7 +1280,7 @@ public class ModService {
 
             if (remainingDependents.isEmpty()) {
                 logger.info("Project " + modId + " is no longer a dependency for anyone. Cleaning up orphan.");
-                performDeletionStrategy(mod);
+                performHardDelete(mod);
             }
         }
     }
