@@ -11,8 +11,9 @@ import {
     GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
     UserPlus, Scale, Check, Copy, Link2, Edit2, X, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
-    AlertCircle, Clock, Archive, Globe, EyeOff, Image, MessageSquare
+    AlertCircle, Clock, Archive, Globe, EyeOff, Image, MessageSquare, ExternalLink
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { api, BACKEND_URL } from '../../../utils/api';
 import { LICENSES, GLOBAL_TAGS } from '../../../data/categories';
@@ -186,6 +187,14 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         return 'modtale.net/mod/';
     };
 
+    const getProjectLink = () => {
+        if (!modData?.id) return '#';
+        const slug = metaData.slug || modData.slug || modData.id;
+        if (classification === 'MODPACK') return `/modpack/${slug}`;
+        if (classification === 'SAVE') return `/world/${slug}`;
+        return `/mod/${slug}`;
+    };
+
     const onGalleryDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles[0] && !readOnly) handleGalleryUpload(acceptedFiles[0]);
     }, [readOnly, handleGalleryUpload]);
@@ -345,46 +354,50 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                     </div>
                 }
                 headerActions={
-                    !readOnly && (
-                        <div className="flex flex-col items-end gap-2">
-                            {isDirty && <div className="text-[10px] font-bold text-amber-500 animate-pulse uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded">Unsaved Changes</div>}
-                            <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-end gap-2">
+                        {isDirty && <div className="text-[10px] font-bold text-amber-500 animate-pulse uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded">Unsaved Changes</div>}
+                        <div className="flex items-center gap-3">
+                            <Link to={getProjectLink()} target="_blank" className="h-10 px-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors" title="View Page">
+                                <ExternalLink className="w-5 h-5" />
+                            </Link>
+
+                            {!readOnly && (
                                 <button onClick={() => { handleSave(false); setIsDirty(false); }} disabled={isLoading} className="h-10 px-5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 font-bold flex items-center gap-2 hover:bg-slate-200">{isLoading ? <Spinner className="w-4 h-4"/> : <Save className="w-4 h-4" />} Save</button>
+                            )}
 
-                                {handlePublish && (
-                                    <div className="relative group">
-                                        <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-4 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-50">
-                                            <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-white/5 pb-2">
-                                                <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Requirements</span>
-                                                <span className={`text-xs font-bold ${isPublishable ? 'text-green-500' : 'text-slate-400'}`}>
-                                                    {metCount}/{publishRequirements.length}
-                                                </span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {publishRequirements.map((req, i) => (
-                                                    <div key={i} className="flex items-center gap-2.5">
-                                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${req.met ? 'bg-green-500 text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-400'}`}>
-                                                            {req.met ? <Check className="w-2.5 h-2.5" strokeWidth={3} /> : <X className="w-2.5 h-2.5" strokeWidth={3} />}
-                                                        </div>
-                                                        <span className={`text-xs font-bold ${req.met ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>{req.label}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="absolute top-full right-8 -mt-1.5 border-8 border-transparent border-t-white dark:border-t-slate-900" />
+                            {!readOnly && handlePublish && (
+                                <div className="relative group">
+                                    <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-4 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-50">
+                                        <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-white/5 pb-2">
+                                            <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Requirements</span>
+                                            <span className={`text-xs font-bold ${isPublishable ? 'text-green-500' : 'text-slate-400'}`}>
+                                                {metCount}/{publishRequirements.length}
+                                            </span>
                                         </div>
-
-                                        <button
-                                            onClick={() => setShowPublishConfirm(true)}
-                                            disabled={isLoading || !isPublishable}
-                                            className="h-10 bg-green-500 hover:bg-green-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none text-white px-6 rounded-xl font-black flex items-center gap-2 shadow-lg transition-all"
-                                        >
-                                            <UploadCloud className="w-5 h-5" /> Submit
-                                        </button>
+                                        <div className="space-y-2">
+                                            {publishRequirements.map((req, i) => (
+                                                <div key={i} className="flex items-center gap-2.5">
+                                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${req.met ? 'bg-green-500 text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-400'}`}>
+                                                        {req.met ? <Check className="w-2.5 h-2.5" strokeWidth={3} /> : <X className="w-2.5 h-2.5" strokeWidth={3} />}
+                                                    </div>
+                                                    <span className={`text-xs font-bold ${req.met ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>{req.label}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="absolute top-full right-8 -mt-1.5 border-8 border-transparent border-t-white dark:border-t-slate-900" />
                                     </div>
-                                )}
-                            </div>
+
+                                    <button
+                                        onClick={() => setShowPublishConfirm(true)}
+                                        disabled={isLoading || !isPublishable}
+                                        className="h-10 bg-green-500 hover:bg-green-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none text-white px-6 rounded-xl font-black flex items-center gap-2 shadow-lg transition-all"
+                                    >
+                                        <UploadCloud className="w-5 h-5" /> Submit
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                    )
+                    </div>
                 }
                 tabs={
                     <div className="flex items-center gap-1">
