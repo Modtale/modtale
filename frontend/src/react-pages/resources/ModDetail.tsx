@@ -852,10 +852,22 @@ export const ModDetail: React.FC<{
                                                     {String(children).replace(/\n$/, '')}
                                                 </SyntaxHighlighter>
                                             ) : (
-                                                <code className={`${className} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                                                <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
                                                     {children}
                                                 </code>
                                             )
+                                        },
+                                        p({node, children, ...props}: any) {
+                                            return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
+                                        },
+                                        li({node, children, ...props}: any) {
+                                            return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
+                                        },
+                                        ul({node, children, ...props}: any) {
+                                            return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
+                                        },
+                                        ol({node, children, ...props}: any) {
+                                            return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
                                         }
                                     }}
                                 >
