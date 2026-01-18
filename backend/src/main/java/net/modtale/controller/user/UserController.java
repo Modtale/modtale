@@ -323,25 +323,6 @@ public class UserController {
         }
     }
 
-    @DeleteMapping("/admin/users/{username}")
-    public ResponseEntity<?> adminDeleteUser(@PathVariable String username) {
-        User currentUser = userService.getCurrentUser();
-        if (currentUser == null || currentUser.getRoles() == null || !currentUser.getRoles().contains("ADMIN")) {
-            return ResponseEntity.status(403).build();
-        }
-
-        try {
-            User target = userService.getPublicProfile(username);
-            if (target != null) {
-                userService.deleteUser(target.getId());
-                return ResponseEntity.ok().build();
-            }
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to delete user: " + e.getMessage());
-        }
-    }
-
     @GetMapping("/user/profile/{username}")
     public ResponseEntity<User> getUserProfile(@PathVariable String username) {
         User user = userService.getPublicProfile(username);
