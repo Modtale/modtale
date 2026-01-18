@@ -6,6 +6,8 @@ import net.modtale.model.resources.ProjectMeta;
 import net.modtale.repository.analytics.PlatformMonthlyStatsRepository;
 import net.modtale.repository.analytics.ProjectMonthlyStatsRepository;
 import net.modtale.repository.resources.ModRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -16,16 +18,21 @@ import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class AnalyticsService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AnalyticsService.class);
     private static final int CHART_BUFFER_DAYS = 14;
 
     @Autowired private ProjectMonthlyStatsRepository statsRepository;
@@ -33,6 +40,12 @@ public class AnalyticsService {
     @Autowired private ModRepository modRepository;
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private CacheManager cacheManager;
+
+    private final ConcurrentLinkedQueue<DownloadEvent> downloadBuffer = new ConcurrentLinkedQueue<>();
+
+    private final ConcurrentHashMap<String, AtomicInteger> viewBuffer = new ConcurrentHashMap<>();
+
+    private record DownloadEvent(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {}
 
     private boolean isDebounced(String projectId, String clientIp, String type) {
         if (clientIp == null || clientIp.isEmpty()) return false;
@@ -49,62 +62,133 @@ public class AnalyticsService {
 
     public void logDownload(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {
         if (isDebounced(projectId, clientIp, "download")) return;
-
-        LocalDate now = LocalDate.now();
-        int day = now.getDayOfMonth();
-        int month = now.getMonthValue();
-        int year = now.getYear();
-
-        Query projectQuery = Query.query(Criteria.where("projectId").is(projectId)
-                .and("year").is(year)
-                .and("month").is(month));
-
-        Update projectUpdate = new Update()
-                .setOnInsert("authorId", authorId)
-                .inc("totalDownloads", 1)
-                .inc(isApi ? "apiDownloads" : "frontendDownloads", 1)
-                .inc("days." + day + ".d", 1);
-
-        if (versionId != null) {
-            projectUpdate.inc("versionDownloads." + versionId + "." + day, 1);
-        }
-
-        mongoTemplate.upsert(projectQuery, projectUpdate, ProjectMonthlyStats.class);
-
-        Query platformQuery = Query.query(Criteria.where("year").is(year).and("month").is(month));
-        Update platformUpdate = new Update()
-                .inc("totalDownloads", 1)
-                .inc(isApi ? "apiDownloads" : "frontendDownloads", 1)
-                .inc("days." + day + ".d", 1);
-
-        mongoTemplate.upsert(platformQuery, platformUpdate, PlatformMonthlyStats.class);
+        downloadBuffer.add(new DownloadEvent(projectId, versionId, authorId, isApi, clientIp));
     }
 
     public void logView(String projectId, String authorId, String clientIp) {
         if (isDebounced(projectId, clientIp, "view")) return;
+        viewBuffer.computeIfAbsent(projectId + "|" + authorId, k -> new AtomicInteger(0)).incrementAndGet();
+    }
+
+    @Scheduled(fixedRate = 10000)
+    public void flushAnalyticsBuffer() {
+        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty()) return;
 
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
         int month = now.getMonthValue();
         int year = now.getYear();
 
-        Query projectQuery = Query.query(Criteria.where("projectId").is(projectId)
-                .and("year").is(year)
-                .and("month").is(month));
+        Map<String, ProjectDownloadAggregate> projectAggregates = new HashMap<>();
+        PlatformDownloadAggregate platformAggregate = new PlatformDownloadAggregate();
 
-        Update projectUpdate = new Update()
-                .setOnInsert("authorId", authorId)
-                .inc("totalViews", 1)
-                .inc("days." + day + ".v", 1);
+        DownloadEvent event;
+        while ((event = downloadBuffer.poll()) != null) {
+            DownloadEvent finalEvent = event;
+            ProjectDownloadAggregate pAg = projectAggregates.computeIfAbsent(
+                    event.projectId(),
+                    k -> new ProjectDownloadAggregate(finalEvent.authorId())
+            );
+            pAg.total++;
+            if (event.isApi()) pAg.api++; else pAg.frontend++;
+            if (event.versionId() != null) {
+                pAg.versions.merge(event.versionId(), 1, Integer::sum);
+            }
 
-        mongoTemplate.upsert(projectQuery, projectUpdate, ProjectMonthlyStats.class);
+            platformAggregate.total++;
+            if (event.isApi()) platformAggregate.api++; else platformAggregate.frontend++;
+        }
 
-        Query platformQuery = Query.query(Criteria.where("year").is(year).and("month").is(month));
-        Update platformUpdate = new Update()
-                .inc("totalViews", 1)
-                .inc("days." + day + ".v", 1);
+        for (Map.Entry<String, ProjectDownloadAggregate> entry : projectAggregates.entrySet()) {
+            String pid = entry.getKey();
+            ProjectDownloadAggregate agg = entry.getValue();
 
-        mongoTemplate.upsert(platformQuery, platformUpdate, PlatformMonthlyStats.class);
+            Query q = Query.query(Criteria.where("projectId").is(pid)
+                    .and("year").is(year)
+                    .and("month").is(month));
+
+            Update u = new Update()
+                    .setOnInsert("authorId", agg.authorId)
+                    .inc("totalDownloads", agg.total)
+                    .inc("apiDownloads", agg.api)
+                    .inc("frontendDownloads", agg.frontend)
+                    .inc("days." + day + ".d", agg.total);
+
+            for (Map.Entry<String, Integer> vEntry : agg.versions.entrySet()) {
+                u.inc("versionDownloads." + vEntry.getKey() + "." + day, vEntry.getValue());
+            }
+
+            try {
+                mongoTemplate.upsert(q, u, ProjectMonthlyStats.class);
+            } catch (Exception e) {
+                logger.error("Failed to flush download stats for project " + pid, e);
+            }
+        }
+
+        if (platformAggregate.total > 0) {
+            Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+            Update pu = new Update()
+                    .inc("totalDownloads", platformAggregate.total)
+                    .inc("apiDownloads", platformAggregate.api)
+                    .inc("frontendDownloads", platformAggregate.frontend)
+                    .inc("days." + day + ".d", platformAggregate.total);
+            mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+        }
+
+        if (!viewBuffer.isEmpty()) {
+            Map<String, Integer> currentBatch = new HashMap<>();
+
+            viewBuffer.forEach((key, atomicCount) -> {
+                int count = atomicCount.getAndSet(0);
+                if (count > 0) currentBatch.put(key, count);
+            });
+            viewBuffer.entrySet().removeIf(e -> e.getValue().get() == 0);
+
+            long totalPlatformViews = 0;
+
+            for (Map.Entry<String, Integer> entry : currentBatch.entrySet()) {
+                String[] parts = entry.getKey().split("\\|");
+                String pid = parts[0];
+                String aid = parts.length > 1 ? parts[1] : null;
+                int count = entry.getValue();
+
+                Query q = Query.query(Criteria.where("projectId").is(pid)
+                        .and("year").is(year)
+                        .and("month").is(month));
+
+                Update u = new Update()
+                        .setOnInsert("authorId", aid)
+                        .inc("totalViews", count)
+                        .inc("days." + day + ".v", count);
+
+                mongoTemplate.upsert(q, u, ProjectMonthlyStats.class);
+                totalPlatformViews += count;
+            }
+
+            if (totalPlatformViews > 0) {
+                Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+                Update pu = new Update()
+                        .inc("totalViews", totalPlatformViews)
+                        .inc("days." + day + ".v", totalPlatformViews);
+                mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+            }
+        }
+    }
+
+    private static class ProjectDownloadAggregate {
+        String authorId;
+        int total = 0;
+        int api = 0;
+        int frontend = 0;
+        Map<String, Integer> versions = new HashMap<>();
+
+        ProjectDownloadAggregate(String authorId) { this.authorId = authorId; }
+    }
+
+    private static class PlatformDownloadAggregate {
+        int total = 0;
+        int api = 0;
+        int frontend = 0;
     }
 
     public void deleteProjectAnalytics(String projectId) {
