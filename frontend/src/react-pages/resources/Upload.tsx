@@ -24,6 +24,7 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     const [error, setError] = useState<string | null>(null);
     const [draftId, setDraftId] = useState<string | null>(null);
     const [statusModal, setStatusModal] = useState<{type: 'success' | 'error' | 'warning', title: string, msg: string} | null>(null);
+    const [versionToDelete, setVersionToDelete] = useState<string | null>(null);
 
     const [classification, setClassification] = useState<Classification | null>(null);
     const [title, setTitle] = useState('');
@@ -200,18 +201,23 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         }
     };
 
-    const handleDeleteVersion = async (versionId: string) => {
-        if(!draftId) return;
-        if(!confirm("Are you sure? This cannot be undone.")) return;
+    const handleDeleteVersion = (versionId: string) => {
+        setVersionToDelete(versionId);
+    };
+
+    const confirmDeleteVersion = async () => {
+        if(!draftId || !versionToDelete) return;
         setIsLoading(true);
         try {
-            await api.delete(`/projects/${draftId}/versions/${versionId}`);
+            await api.delete(`/projects/${draftId}/versions/${versionToDelete}`);
             const res = await api.get(`/projects/${draftId}`);
             setModData(res.data);
+            setVersionToDelete(null);
         } catch(e: any) {
             setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete version."});
         } finally {
             setIsLoading(false);
+            setVersionToDelete(null);
         }
     };
 
@@ -421,6 +427,17 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     return (
         <>
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
+            {versionToDelete && (
+                <StatusModal
+                    type="warning"
+                    title="Delete Version?"
+                    message="Are you sure? This cannot be undone."
+                    actionLabel="Delete"
+                    onAction={confirmDeleteVersion}
+                    secondaryLabel="Cancel"
+                    onClose={() => setVersionToDelete(null)}
+                />
+            )}
             <ProjectBuilder
                 modData={modData}
                 setModData={setModData}
