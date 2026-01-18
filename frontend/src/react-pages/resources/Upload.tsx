@@ -89,7 +89,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             setError("Please fill in all fields."); return;
         }
 
-        // Safety check to ensure owner is set before submitting
         const effectiveOwner = owner || currentUser?.username;
         if (!effectiveOwner) {
             setError("Unable to determine project owner. Please refresh and try again.");
