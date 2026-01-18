@@ -236,13 +236,15 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
+        pipeline.add(Aggregation.project().andExclude("about", "reviews", "galleryImages"));
+
         Aggregation mainAgg = Aggregation.newAggregation(Mod.class, pipeline);
         List<Mod> results = mongoTemplate.aggregate(mainAgg, Mod.class, Mod.class).getMappedResults();
 
         long total;
         if ("hidden_gems".equals(viewCategory)) {
             List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
-            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation);
+            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation);
             countPipeline.add(Aggregation.count().as("total"));
 
             Aggregation countAgg = Aggregation.newAggregation(Mod.class, countPipeline);
@@ -268,6 +270,8 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                     Criteria.where("description").regex(regex, "i")
             ));
         }
+
+        query.fields().exclude("about", "reviews", "galleryImages");
 
         query.with(pageable);
         List<Mod> list = mongoTemplate.find(query, Mod.class);

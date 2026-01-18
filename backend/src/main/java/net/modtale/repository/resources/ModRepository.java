@@ -10,11 +10,13 @@ import java.util.Optional;
 
 public interface ModRepository extends MongoRepository<Mod, String>, ModRepositoryCustom {
 
+    @Query(value = "{ 'author': {$regex: '^?0$', $options: 'i'} }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
     Page<Mod> findByAuthorIgnoreCase(String author, Pageable pageable);
 
-    @Query(value = "{ 'author': ?0, 'status': { $in: ['PUBLISHED', 'ARCHIVED'] } }")
+    @Query(value = "{ 'author': ?0, 'status': { $in: ['PUBLISHED', 'ARCHIVED'] } }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
     Page<Mod> findByAuthor(String author, Pageable pageable);
 
+    @Query(value = "{ 'author': ?0, 'status': ?1 }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
     Page<Mod> findByAuthorAndStatus(String author, String status, Pageable pageable);
 
     List<Mod> findByAuthor(String author);
@@ -27,7 +29,7 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
 
     boolean existsByTitleIgnoreCase(String title);
 
-    @Query("{ 'contributors': ?0 }")
+    @Query(value = "{ 'contributors': ?0 }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
     Page<Mod> findByContributors(String username, Pageable pageable);
 
     @Query("{ 'versions.dependencies.modId': ?0 }")

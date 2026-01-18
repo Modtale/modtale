@@ -213,10 +213,6 @@ public class ModService {
                 Objects.requireNonNull(cacheManager.getCache("projectSearch")).clear();
                 results = self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
             }
-
-            if (results != null && results.hasContent()) {
-                results.getContent().forEach(mod -> mod.setReviews(null));
-            }
         }
 
         return results;
@@ -662,9 +658,11 @@ public class ModService {
 
     public List<Mod> getVerificationQueue() {
         Query pendingProjectsQuery = new Query(Criteria.where("status").is("PENDING"));
+        pendingProjectsQuery.fields().exclude("about", "reviews", "galleryImages");
         List<Mod> pendingProjects = mongoTemplate.find(pendingProjectsQuery, Mod.class);
 
         Query pendingVersionsQuery = new Query(Criteria.where("status").is("PUBLISHED").and("versions.reviewStatus").is("PENDING"));
+        pendingVersionsQuery.fields().exclude("about", "reviews", "galleryImages");
         List<Mod> pendingVersions = mongoTemplate.find(pendingVersionsQuery, Mod.class);
 
         Set<Mod> combined = new HashSet<>(pendingProjects);
@@ -1179,7 +1177,7 @@ public class ModService {
             modRepository.save(mod);
         } else {
             logger.info("Hard deleting project " + mod.getId());
-            analyticsService.deleteProjectAnalytics(mod.getId()); // Cleanup analytics
+            analyticsService.deleteProjectAnalytics(mod.getId());
 
             Set<String> dependencyIds = new HashSet<>();
             if (mod.getVersions() != null) {
@@ -1517,7 +1515,6 @@ public class ModService {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Review not found"));
 
-            // Allow editing reply if it exists, or adding new one
             review.setDeveloperReply(sanitizer.sanitizePlainText(reply));
             review.setDeveloperReplyDate(LocalDateTime.now().toString());
 
@@ -1595,7 +1592,6 @@ public class ModService {
     }
 
     public List<User> searchCreators(String query) {
-        // Optimized: Use database regex instead of fetching all users into memory
         List<User> creators = userRepository.findByUsernameContainingIgnoreCase(query, PageRequest.of(0, 10));
         return creators;
     }
