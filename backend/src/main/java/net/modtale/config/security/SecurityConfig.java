@@ -148,7 +148,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/user/analytics",
                                 "/api/v1/projects/*/analytics",

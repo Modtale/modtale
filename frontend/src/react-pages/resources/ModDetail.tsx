@@ -471,6 +471,8 @@ export const ModDetail: React.FC<{
     const breadcrumbSchema = useMemo(() => mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null, [mod]);
     const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
 
+    const ogImageUrl = useMemo(() => mod ? `${API_BASE_URL}/og/project/${mod.id}.png` : '', [mod]);
+
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
         checkMobile();
@@ -643,6 +645,17 @@ export const ModDetail: React.FC<{
                     <meta name="description" content={projectMeta.description} />
                     {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
                     {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
+
+                    <meta property="og:title" content={mod.title} />
+                    <meta property="og:site_name" content="Modtale" />
+                    <meta property="og:image" content={ogImageUrl} />
+                    <meta property="og:type" content="website" />
+                    <meta property="og:url" content={canonicalUrl || currentUrl} />
+                    <meta name="theme-color" content="#3b82f6" />
+
+                    <meta name="twitter:card" content="summary_large_image" />
+                    <meta name="twitter:title" content={mod.title} />
+                    <meta name="twitter:image" content={ogImageUrl} />
                 </Helmet>
             )}
 
