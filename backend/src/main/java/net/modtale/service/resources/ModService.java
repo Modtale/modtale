@@ -1545,6 +1545,11 @@ public class ModService {
                 throw new IllegalStateException("Reviews are disabled for this project.");
             }
 
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user != null && hasEditPermission(mod, user)) {
+                throw new IllegalArgumentException("You cannot review your own project.");
+            }
+
             if (mod.getReviews() != null && mod.getReviews().stream().anyMatch(r -> r.getUser().equalsIgnoreCase(username))) {
                 throw new IllegalArgumentException("You have already reviewed this project. You can edit your existing review.");
             }
