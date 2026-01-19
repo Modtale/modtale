@@ -67,7 +67,7 @@ export const ThemedInput = ({ label, disabled, ...props }: any) => (
     </div>
 );
 
-const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
 interface VersionFieldsProps {
     data: VersionFormData;
@@ -209,7 +209,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                         className={`font-mono font-bold ${versionNum.length > 0 && !isValid && !disabled ? 'border-red-500 focus:ring-red-500' : ''}`}
                     />
                     <p className="text-[10px] text-slate-400 mt-1.5 ml-1">
-                        Must be unique and follow SemVer format (e.g. 1.0.0).
+                        Must be unique and follow SemVer format (e.g. 1.0.0, 1.0.0-beta+exp).
                     </p>
                 </div>
 
