@@ -28,14 +28,57 @@ export const ChannelBadge = ({ channel }: { channel?: string }) => {
 };
 
 export const compareSemVer = (a: string, b: string) => {
-    const pa = a.split('.').map(Number);
-    const pb = b.split('.').map(Number);
-    for (let i = 0; i < 3; i++) {
-        const na = pa[i] || 0;
-        const nb = pb[i] || 0;
-        if (na > nb) return 1;
-        if (nb > na) return -1;
+    const semVerRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+
+    const parse = (v: string) => {
+        const match = v.match(semVerRegex);
+        if (!match) return null;
+        return {
+            major: parseInt(match[1], 10),
+            minor: parseInt(match[2], 10),
+            patch: parseInt(match[3], 10),
+            prerelease: match[4] ? match[4].split('.') : [],
+            build: match[5]
+        };
+    };
+
+    const va = parse(a);
+    const vb = parse(b);
+
+    if (!va || !vb) return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+
+    if (va.major !== vb.major) return va.major > vb.major ? 1 : -1;
+    if (va.minor !== vb.minor) return va.minor > vb.minor ? 1 : -1;
+    if (va.patch !== vb.patch) return va.patch > vb.patch ? 1 : -1;
+
+    if (va.prerelease.length === 0 && vb.prerelease.length > 0) return 1;
+    if (va.prerelease.length > 0 && vb.prerelease.length === 0) return -1;
+    if (va.prerelease.length === 0 && vb.prerelease.length === 0) return 0; // Both have no pre-release (equality, ignoring build)
+
+    let i = 0;
+    while (i < va.prerelease.length && i < vb.prerelease.length) {
+        const idA = va.prerelease[i];
+        const idB = vb.prerelease[i];
+        const isNumA = /^\d+$/.test(idA);
+        const isNumB = /^\d+$/.test(idB);
+
+        if (isNumA && isNumB) {
+            const numA = parseInt(idA, 10);
+            const numB = parseInt(idB, 10);
+            if (numA !== numB) return numA > numB ? 1 : -1;
+        } else if (!isNumA && !isNumB) {
+            if (idA !== idB) return idA.localeCompare(idB);
+        } else {
+            return isNumA ? -1 : 1;
+        }
+        i++;
     }
+
+    if (va.prerelease.length !== vb.prerelease.length) {
+        return va.prerelease.length > vb.prerelease.length ? 1 : -1;
+    }
+
+    // 3. Ignore Build Metadata for precedence/sorting
     return 0;
 };
 
