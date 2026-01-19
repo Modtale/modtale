@@ -5,8 +5,6 @@
 
   <p align="center">
     <strong>The Hytale Community Repository</strong>
-    <br />
-    The premier platform to discover, download, and share Hytale server plugins, modpacks, worlds, and art + data assets.
   </p>
 
   <p align="center">
