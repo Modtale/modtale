@@ -64,7 +64,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
     const [showScanDetails, setShowScanDetails] = useState(false);
     const [rescanning, setRescanning] = useState(false);
 
-    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number } | null>(null);
+    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
 
     const mod = reviewingProject.mod;
@@ -97,11 +97,18 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
         fetchMeta();
     }, [reviewingProject]);
 
-    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, line?: number) => {
+    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number) => {
         setLoadingInspector(true);
         try {
             const res = await api.get(`/admin/projects/${mod.id}/versions/${version}/structure`);
-            setInspectorData({ version, structure: res.data, issues, initialFile: file, initialLine: line });
+            setInspectorData({
+                version,
+                structure: res.data,
+                issues,
+                initialFile: file,
+                initialLine: lineStart,
+                initialLineEnd: lineEnd
+            });
         } catch (e) {
             setStatus({ type: 'error', title: 'Error', msg: 'Failed to inspect JAR structure.' });
         } finally {
@@ -180,6 +187,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                     issues={inspectorData.issues}
                     initialFile={inspectorData.initialFile}
                     initialLine={inspectorData.initialLine}
+                    initialLineEnd={inspectorData.initialLineEnd}
                     onClose={() => setInspectorData(null)}
                 />
             )}
@@ -466,7 +474,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
                                                         </div>
                                                         <button
-                                                            onClick={() => openInspector(pendingVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart)}
+                                                            onClick={() => openInspector(pendingVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart, issue.lineEnd)}
                                                             className="shrink-0 flex items-center gap-1.5 text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-2 rounded-lg transition-colors"
                                                         >
                                                             <Eye className="w-3.5 h-3.5" /> Inspect
