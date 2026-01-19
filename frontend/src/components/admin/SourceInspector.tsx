@@ -171,7 +171,7 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [safeContent, ext]);
 
     useEffect(() => {
-        if (startLine && preRef.current) {
+        if (startLine && preRef.current && startLine > 1) {
             setTimeout(() => {
                 if (preRef.current) {
                     const lineHeight = 20; // Approx
@@ -208,8 +208,12 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set());
     const [isScanning, setIsScanning] = useState(false);
 
-    const [activeIssueLineStart, setActiveIssueLineStart] = useState<number | undefined>(undefined);
-    const [activeIssueLineEnd, setActiveIssueLineEnd] = useState<number | undefined>(undefined);
+    const [activeHighlight, setActiveHighlight] = useState<{
+        file: string;
+        start: number;
+        end: number;
+        snippet?: string;
+    } | null>(null);
 
     const fileTree = useMemo(() => buildFileTree(structure), [structure]);
 
@@ -256,7 +260,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
     };
 
-    const handleJumpToIssue = (file: string, lineStart: number, lineEnd: number) => {
+    const handleJumpToIssue = (file: string, lineStart: number, lineEnd: number, snippet?: string) => {
         let targetFile = file;
         if (!structure.includes(targetFile) && structure.includes(targetFile + ".class")) {
             targetFile = targetFile + ".class";
@@ -271,9 +275,14 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
         setExpandedFolders(prev => new Set([...prev, ...foldersToExpand]));
 
+        setActiveHighlight({
+            file: targetFile,
+            start: lineStart,
+            end: lineEnd,
+            snippet: snippet
+        });
+
         loadInspectorFile(targetFile);
-        setActiveIssueLineStart(lineStart);
-        setActiveIssueLineEnd(lineEnd);
         setShowIssuesDropdown(false);
     };
 
@@ -288,13 +297,35 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
     };
 
+    // Initialize with props
     useEffect(() => {
         if (initialFile) {
             const issue = issues.find(i => i.filePath === initialFile && i.lineStart === initialLine);
             const targetLineEnd = initialLineEnd || issue?.lineEnd || initialLine || 0;
-            handleJumpToIssue(initialFile, initialLine || 0, targetLineEnd);
+            const snippet = issue?.snippet;
+            handleJumpToIssue(initialFile, initialLine || 0, targetLineEnd, snippet);
         }
-    }, [initialFile, initialLine, initialLineEnd]);
+    }, [initialFile]);
+
+    const dynamicHighlight = useMemo(() => {
+        if (!activeHighlight || activeHighlight.file !== inspectorFile) return undefined;
+
+        if (activeHighlight.start > 0) {
+            return { start: activeHighlight.start, end: activeHighlight.end };
+        }
+
+        if (activeHighlight.start <= 0 && activeHighlight.snippet && inspectorContent && typeof inspectorContent === 'string') {
+            const snippet = activeHighlight.snippet.trim();
+            const lines = inspectorContent.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes(snippet) || (snippet.length > 20 && lines[i].includes(snippet.substring(0, 20)))) {
+                    return { start: i + 1, end: i + 1 };
+                }
+            }
+        }
+
+        return undefined;
+    }, [activeHighlight, inspectorFile, inspectorContent]);
 
     const filteredFiles = useMemo(() => {
         if (!fileSearch) return [];
@@ -307,7 +338,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             className={`w-full text-left p-3 hover:bg-white/5 rounded-lg group border border-transparent hover:border-white/5 transition-all mb-1 ${isResolved ? 'opacity-50' : ''}`}
         >
             <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 cursor-pointer" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd)}>
+                <div className="flex-1 cursor-pointer" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd, issue.snippet)}>
                     <div className="flex items-center gap-2 mb-1">
                         <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase
                                                                 ${issue.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
@@ -316,7 +347,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         <span className={`text-xs font-bold truncate flex-1 ${isResolved ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{issue.type}</span>
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
-                        {issue.filePath.split('/').pop()} :{issue.lineStart} - {issue.lineEnd}
+                        {issue.filePath.split('/').pop()} {issue.lineStart > 0 ? `:${issue.lineStart} - ${issue.lineEnd}` : ''}
                     </div>
                     <p className="text-[10px] text-slate-400 line-clamp-2 mb-2">{issue.description}</p>
 
@@ -459,8 +490,8 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         <CodeViewer
                             content={inspectorContent}
                             filename={inspectorFile}
-                            startLine={inspectorFile.includes(initialFile || '') ? activeIssueLineStart : undefined}
-                            endLine={inspectorFile.includes(initialFile || '') ? activeIssueLineEnd : undefined}
+                            startLine={dynamicHighlight?.start}
+                            endLine={dynamicHighlight?.end}
                         />
                     ) : (
                         <div className="flex h-full items-center justify-center text-slate-600 flex-col gap-4">

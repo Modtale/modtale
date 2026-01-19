@@ -36,7 +36,6 @@ public class ScanResult {
         private String filePath;
         private int lineStart;
         private int lineEnd;
-        private String snippet;
         private boolean resolved;
 
         public ScanIssue() {}
@@ -58,9 +57,6 @@ public class ScanResult {
 
         public int getLineEnd() { return lineEnd; }
         public void setLineEnd(int lineEnd) { this.lineEnd = lineEnd; }
-
-        public String getSnippet() { return snippet; }
-        public void setSnippet(String snippet) { this.snippet = snippet; }
 
         public boolean isResolved() { return resolved; }
         public void setResolved(boolean resolved) { this.resolved = resolved; }
