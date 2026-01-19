@@ -469,7 +469,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                                             </div>
                                                             <div className="flex items-center gap-2 text-slate-500 font-mono text-xs truncate mb-1">
                                                                 <span className="truncate">{issue.filePath}</span>
-                                                                {issue.lineStart > -1 && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-600 dark:text-slate-300">:{issue.lineStart}</span>}
+                                                                {issue.lineStart > 0 && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-600 dark:text-slate-300">:{issue.lineStart}</span>}
                                                             </div>
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
                                                         </div>

@@ -40,7 +40,7 @@ dependencies {
 
     implementation 'com.github.weisj:jsvg:1.6.0'
 
-    implementation 'org.vineflower:vineflower:1.10.1'
+    implementation 'org.vineflower:vineflower:1.11.2'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
