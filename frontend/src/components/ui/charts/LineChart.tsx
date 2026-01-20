@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 
 interface DataPoint {
     date: string;
@@ -21,8 +21,7 @@ interface LineChartProps {
 
 export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisFormatter }) => {
     const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-
-    const [chartId] = useState(() => 'chart-' + Math.random().toString(36).substring(2, 9));
+    const chartId = useId();
 
     const activeDatasets = datasets.filter(d => !d.hidden);
     const hasData = activeDatasets.length > 0;

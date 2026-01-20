@@ -658,7 +658,7 @@ export const ModDetail: React.FC<{
 
             {galleryIndex !== null && mod.galleryImages && (
                 <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setGalleryIndex(null)}>
-                    <div className="relative w-full max-w-6xl max-h-[85vh] bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-white/10" onClick={e => e.stopPropagation()}>
+                    <div className="relative w-full max-w-6xl max-h-[85dvh] bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-white/10" onClick={e => e.stopPropagation()}>
 
                         <div className="p-4 flex justify-between items-center bg-black/20 border-b border-white/10 z-10 shrink-0">
                             <span className="text-sm font-bold text-white/70">Image {galleryIndex + 1} of {mod.galleryImages.length}</span>
@@ -852,7 +852,7 @@ export const ModDetail: React.FC<{
                                                     {String(children).replace(/\n$/, '')}
                                                 </SyntaxHighlighter>
                                             ) : (
-                                                <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                                                <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm break-all`} {...props}>
                                                     {children}
                                                 </code>
                                             )
