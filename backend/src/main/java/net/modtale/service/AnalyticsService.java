@@ -42,7 +42,6 @@ public class AnalyticsService {
     @Autowired private CacheManager cacheManager;
 
     private final ConcurrentLinkedQueue<DownloadEvent> downloadBuffer = new ConcurrentLinkedQueue<>();
-
     private final ConcurrentHashMap<String, AtomicInteger> viewBuffer = new ConcurrentHashMap<>();
 
     private record DownloadEvent(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {}
@@ -115,7 +114,8 @@ public class AnalyticsService {
                     .inc("days." + day + ".d", agg.total);
 
             for (Map.Entry<String, Integer> vEntry : agg.versions.entrySet()) {
-                u.inc("versionDownloads." + vEntry.getKey() + "." + day, vEntry.getValue());
+                String safeVersion = vEntry.getKey().replace(".", "_");
+                u.inc("versionDownloads." + safeVersion + "." + day, vEntry.getValue());
             }
 
             try {
@@ -126,13 +126,17 @@ public class AnalyticsService {
         }
 
         if (platformAggregate.total > 0) {
-            Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
-            Update pu = new Update()
-                    .inc("totalDownloads", platformAggregate.total)
-                    .inc("apiDownloads", platformAggregate.api)
-                    .inc("frontendDownloads", platformAggregate.frontend)
-                    .inc("days." + day + ".d", platformAggregate.total);
-            mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+            try {
+                Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+                Update pu = new Update()
+                        .inc("totalDownloads", platformAggregate.total)
+                        .inc("apiDownloads", platformAggregate.api)
+                        .inc("frontendDownloads", platformAggregate.frontend)
+                        .inc("days." + day + ".d", platformAggregate.total);
+                mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+            } catch (Exception e) {
+                logger.error("Failed to flush platform download stats", e);
+            }
         }
 
         if (!viewBuffer.isEmpty()) {
@@ -161,16 +165,24 @@ public class AnalyticsService {
                         .inc("totalViews", count)
                         .inc("days." + day + ".v", count);
 
-                mongoTemplate.upsert(q, u, ProjectMonthlyStats.class);
-                totalPlatformViews += count;
+                try {
+                    mongoTemplate.upsert(q, u, ProjectMonthlyStats.class);
+                    totalPlatformViews += count;
+                } catch (Exception e) {
+                    logger.error("Failed to flush view stats for project " + pid, e);
+                }
             }
 
             if (totalPlatformViews > 0) {
-                Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
-                Update pu = new Update()
-                        .inc("totalViews", totalPlatformViews)
-                        .inc("days." + day + ".v", totalPlatformViews);
-                mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+                try {
+                    Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+                    Update pu = new Update()
+                            .inc("totalViews", totalPlatformViews)
+                            .inc("days." + day + ".v", totalPlatformViews);
+                    mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+                } catch (Exception e) {
+                    logger.error("Failed to flush platform view stats", e);
+                }
             }
         }
     }
@@ -417,7 +429,7 @@ public class AnalyticsService {
             YearMonth ym = YearMonth.of(stat.getYear(), stat.getMonth());
             if (stat.getVersionDownloads() != null) {
                 for (Map.Entry<String, Map<String, Integer>> vEntry : stat.getVersionDownloads().entrySet()) {
-                    String versionId = vEntry.getKey();
+                    String versionId = vEntry.getKey().replace("_", ".");
                     Map<LocalDate, Integer> dateMap = versionData.computeIfAbsent(versionId, k -> new HashMap<>());
 
                     for (Map.Entry<String, Integer> dayEntry : vEntry.getValue().entrySet()) {
