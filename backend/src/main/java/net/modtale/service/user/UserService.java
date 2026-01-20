@@ -3,8 +3,10 @@ package net.modtale.service.user;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.BannedEmail;
 import net.modtale.model.user.User;
 import net.modtale.model.user.Notification;
+import net.modtale.repository.user.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.NotificationRepository;
@@ -14,10 +16,12 @@ import net.modtale.service.security.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,6 +52,7 @@ public class UserService {
     @Autowired private UserRepository userRepository;
     @Autowired private ApiKeyRepository apiKeyRepository;
     @Autowired private NotificationRepository notificationRepository;
+    @Autowired private BannedEmailRepository bannedEmailRepository;
     @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
     @Autowired private AnalyticsService analyticsService;
     @Autowired private MongoTemplate mongoTemplate;
@@ -65,6 +70,10 @@ public class UserService {
 
         if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
             throw new IllegalArgumentException("Invalid email address format.");
+        }
+
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("This email address is prohibited from registration.");
         }
 
         if (password == null || password.length() < 6) {
@@ -105,6 +114,14 @@ public class UserService {
         User user = userRepository.findByUsernameIgnoreCase(login)
                 .or(() -> userRepository.findByEmail(login))
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+
+        if (user.isDeleted()) {
+            throw new IllegalArgumentException("Account deleted.");
+        }
+
+        if (bannedEmailRepository.existsByEmailIgnoreCase(user.getEmail())) {
+            throw new SecurityException("This account has been suspended.");
+        }
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new IllegalArgumentException("Invalid credentials");
@@ -153,7 +170,9 @@ public class UserService {
             String expectedSignature = hmacSha256(userId + ":" + expiry, PRE_AUTH_SIGNING_KEY);
             if (!expectedSignature.equals(providedSignature)) return null;
 
-            return userRepository.findById(userId).orElse(null);
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.isDeleted()) return null;
+            return user;
         } catch (Exception e) {
             return null;
         }
@@ -178,6 +197,10 @@ public class UserService {
         }
         if (password == null || password.length() < 6) {
             throw new IllegalArgumentException("Password must be at least 6 characters.");
+        }
+
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("This email address is not allowed.");
         }
 
         if (!email.equalsIgnoreCase(user.getEmail())) {
@@ -224,6 +247,10 @@ public class UserService {
             throw new IllegalArgumentException("Verification link has expired. Please request a new one.");
         }
 
+        if (bannedEmailRepository.existsByEmailIgnoreCase(user.getEmail())) {
+            throw new SecurityException("This email address is suspended.");
+        }
+
         user.setEmailVerified(true);
         user.setVerificationToken(null);
         user.setVerificationTokenExpiry(null);
@@ -243,6 +270,8 @@ public class UserService {
     }
 
     public void initiatePasswordReset(String email) {
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) return;
+
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
             try { Thread.sleep(200); } catch (InterruptedException ignored) {}
@@ -250,7 +279,7 @@ public class UserService {
         }
 
         User user = userOpt.get();
-        if (user.getPassword() == null && user.getConnectedAccounts().isEmpty()) {
+        if (user.isDeleted() || (user.getPassword() == null && user.getConnectedAccounts().isEmpty())) {
             return;
         }
 
@@ -285,36 +314,96 @@ public class UserService {
 
     public List<User> searchUsers(String query) {
         if (query == null || query.length() < 2) return new ArrayList<>();
-        Query dbQuery = new Query(Criteria.where("username").regex(query, "i")).limit(10);
+        Query dbQuery = new Query(Criteria.where("username").regex(query, "i").and("deletedAt").is(null)).limit(10);
         dbQuery.fields().include("username", "avatarUrl", "accountType");
         return mongoTemplate.find(dbQuery, User.class);
     }
 
     public User getPublicProfile(String username) {
-        return userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        if (user != null && user.isDeleted()) return null;
+        return user;
     }
 
     public void deleteUser(String userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setDeletedAt(LocalDateTime.now());
 
         apiKeyRepository.deleteByUserId(userId);
+        user.setGithubAccessToken(null);
+        user.setGitlabAccessToken(null);
+        user.setGitlabRefreshToken(null);
 
-        mongoTemplate.remove(new Query(Criteria.where("userId").is(userId)), Notification.class);
+        userRepository.save(user);
+        logger.info("Soft deleted user account: " + user.getUsername() + " (" + userId + ")");
+    }
+
+    public void recoverUser(String userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!user.isDeleted()) return;
+        user.setDeletedAt(null);
+        userRepository.save(user);
+        logger.info("Recovered user account: " + user.getUsername() + " (" + userId + ")");
+    }
+
+    private void performHardDelete(User user) {
+        mongoTemplate.remove(new Query(Criteria.where("userId").is(user.getId())), Notification.class);
 
         mongoTemplate.updateMulti(
-                new Query(Criteria.where("followerIds").is(userId)),
-                new Update().pull("followerIds", userId),
+                new Query(Criteria.where("followerIds").is(user.getId())),
+                new Update().pull("followerIds", user.getId()),
                 User.class
         );
         mongoTemplate.updateMulti(
-                new Query(Criteria.where("followingIds").is(userId)),
-                new Update().pull("followingIds", userId),
+                new Query(Criteria.where("followingIds").is(user.getId())),
+                new Update().pull("followingIds", user.getId()),
                 User.class
         );
 
-        userRepository.deleteById(userId);
+        userRepository.deleteById(user.getId());
+        logger.info("Permanently deleted user account: " + user.getUsername() + " (" + user.getId() + ")");
+    }
 
-        logger.info("Deleted user account: " + user.getUsername() + " (" + userId + ")");
+    @Scheduled(cron = "0 0 0 * * ?")
+    public void cleanupDeletedUsers() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
+        List<User> expiredUsers = userRepository.findByDeletedAtBefore(cutoff);
+
+        for (User user : expiredUsers) {
+            try {
+                performHardDelete(user);
+            } catch (Exception e) {
+                logger.error("Failed to hard delete user " + user.getId(), e);
+            }
+        }
+    }
+
+    public void banEmail(String email, String reason, String bannedBy) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new IllegalArgumentException("Invalid email format.");
+        }
+        if (bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("Email is already banned.");
+        }
+
+        bannedEmailRepository.save(new BannedEmail(email, reason, bannedBy));
+
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            if (!user.isDeleted()) {
+                deleteUser(user.getId());
+                logger.info("Automatically deleted user " + user.getUsername() + " due to email ban on " + email);
+            }
+        }
+    }
+
+    public void unbanEmail(String email) {
+        bannedEmailRepository.findByEmailIgnoreCase(email).ifPresent(bannedEmailRepository::delete);
+    }
+
+    public List<BannedEmail> getBannedEmails() {
+        return bannedEmailRepository.findAll(Sort.by(Sort.Direction.DESC, "bannedAt"));
     }
 
     public User createOrganization(String name, User owner) {
@@ -534,17 +623,20 @@ public class UserService {
         User org = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
         if (org.getOrganizationMembers() == null || org.getOrganizationMembers().isEmpty()) return new ArrayList<>();
 
+        if (org.isDeleted()) return new ArrayList<>();
+
         List<String> memberIds = org.getOrganizationMembers().stream()
                 .map(User.OrganizationMember::getUserId)
                 .collect(Collectors.toList());
 
-        Query query = new Query(Criteria.where("_id").in(memberIds));
+        Query query = new Query(Criteria.where("_id").in(memberIds).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id", "bio");
         return mongoTemplate.find(query, User.class);
     }
 
     public List<User> getUserOrganizations(String userId) {
-        return userRepository.findOrganizationsByMemberId(userId);
+        List<User> orgs = userRepository.findOrganizationsByMemberId(userId);
+        return orgs.stream().filter(o -> !o.isDeleted()).collect(Collectors.toList());
     }
 
     public DefaultOAuth2User linkAccountToOrg(String orgId, String provider, OAuth2User oauthUser, String accessToken) {
@@ -612,13 +704,19 @@ public class UserService {
 
     public DefaultOAuth2User processUserLogin(String provider, OAuth2User oauthUser, String accessToken) {
         String providerId = extractProviderId(provider, oauthUser);
-        String username = extractUsername(provider, oauthUser);
+
+        String oauthUsername = extractUsername(provider, oauthUser);
+        String oauthAvatar = extractAvatarUrl(provider, oauthUser, providerId);
+
         String email = oauthUser.getAttribute("email");
-        String avatarUrl = extractAvatarUrl(provider, oauthUser, providerId);
-        String profileUrl = extractProfileUrl(provider, oauthUser, username, providerId);
+        String profileUrl = extractProfileUrl(provider, oauthUser, oauthUsername, providerId);
 
         boolean isVisible = !"google".equals(provider);
         User user = null;
+
+        if (email != null && bannedEmailRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalArgumentException("Account suspended.");
+        }
 
         Optional<User> linkedUser = userRepository.findByConnectedAccountsProviderId(providerId);
         if (linkedUser.isPresent()) {
@@ -635,50 +733,63 @@ public class UserService {
             }
         }
 
+        boolean isNewUser = false;
+
         if (user != null) {
-            if (user.getAvatarUrl() == null || user.getAvatarUrl().isEmpty()) {
-                if (("github".equals(provider) || "gitlab".equals(provider) || "bluesky".equals(provider) || "google".equals(provider)) && avatarUrl != null) {
-                    user.setAvatarUrl(avatarUrl);
+            if (user.isDeleted()) throw new IllegalArgumentException("Account deleted.");
+
+            if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
+            if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
+
+            updateConnectedAccount(user, provider, providerId, oauthUsername, profileUrl, isVisible);
+            userRepository.save(user);
+        }
+        else {
+            isNewUser = true;
+
+            user = new User();
+            user.setEmail(email);
+            user.setCreatedAt(LocalDate.now().toString());
+            user.setEmailVerified(true);
+
+            if ("google".equalsIgnoreCase(provider)) {
+                String randomHandle = "user_" + UUID.randomUUID().toString().substring(0, 5);
+                while (userRepository.existsByUsernameIgnoreCase(randomHandle)) {
+                    randomHandle = "user_" + UUID.randomUUID().toString().substring(0, 5);
                 }
+                user.setUsername(randomHandle);
+                user.setAvatarUrl("https://ui-avatars.com/api/?name=" + randomHandle + "&background=random&length=1");
+            } else {
+                String finalUsername = oauthUsername;
+                if (userRepository.existsByUsernameIgnoreCase(finalUsername)) {
+                    int suffix = 1;
+                    while (userRepository.existsByUsernameIgnoreCase(finalUsername + "_" + suffix)) {
+                        suffix++;
+                    }
+                    finalUsername = finalUsername + "_" + suffix;
+                }
+                user.setUsername(finalUsername);
+                user.setAvatarUrl(oauthAvatar != null ? oauthAvatar : "https://ui-avatars.com/api/?name=" + finalUsername + "&background=random");
             }
 
             if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
             if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
 
-            updateConnectedAccount(user, provider, providerId, username, profileUrl, isVisible);
+            updateConnectedAccount(user, provider, providerId, oauthUsername, profileUrl, isVisible);
             userRepository.save(user);
-
-            Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
-            attributes.put("login", user.getUsername());
-            attributes.remove("is_linking");
-            return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
         }
-
-        String finalUsername = username;
-        if (userRepository.existsByUsernameIgnoreCase(finalUsername)) {
-            int suffix = 1;
-            while (userRepository.existsByUsernameIgnoreCase(finalUsername + "_" + suffix)) {
-                suffix++;
-            }
-            finalUsername = finalUsername + "_" + suffix;
-        }
-
-        user = new User();
-        user.setUsername(finalUsername);
-        user.setEmail(email);
-        user.setAvatarUrl(avatarUrl);
-        user.setCreatedAt(LocalDate.now().toString());
-        user.setEmailVerified(true);
-
-        if ("github".equals(provider)) user.setGithubAccessToken(accessToken);
-        if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
-
-        updateConnectedAccount(user, provider, providerId, username, profileUrl, isVisible);
-        userRepository.save(user);
 
         Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
         attributes.put("login", user.getUsername());
+        attributes.put("id", user.getId());
         attributes.remove("is_linking");
+
+        if (isNewUser && "google".equalsIgnoreCase(provider)) {
+            attributes.put("is_new_account", true);
+            if (oauthUsername != null) attributes.put("suggested_username", oauthUsername);
+            if (oauthAvatar != null) attributes.put("suggested_avatar", oauthAvatar);
+        }
+
         return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
     }
 
@@ -829,7 +940,8 @@ public class UserService {
                 username = ((OAuth2User) principal).getAttribute("login");
             }
             if (username != null) {
-                return userRepository.findByUsername(username).orElse(null);
+                User user = userRepository.findByUsername(username).orElse(null);
+                if (user != null && !user.isDeleted()) return user;
             }
         } catch (Exception e) { logger.error("Error retrieving current user", e); }
         return null;
@@ -888,6 +1000,8 @@ public class UserService {
         User target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new IllegalArgumentException("Target not found"));
         if (target.getId().equals(currentUserId)) throw new IllegalArgumentException("Cannot follow yourself.");
 
+        if (target.isDeleted()) throw new IllegalArgumentException("Target user not found.");
+
         User currentUser = userRepository.findById(currentUserId).orElseThrow();
 
         if (currentUser.getFollowingIds() == null) currentUser.setFollowingIds(new ArrayList<>());
@@ -929,9 +1043,12 @@ public class UserService {
     public List<User> getFollowing(String username) {
         Optional<User> userOpt = userRepository.findByUsername(username);
         if (userOpt.isEmpty()) return new ArrayList<>();
+
+        if (userOpt.get().isDeleted()) return new ArrayList<>();
+
         List<String> ids = userOpt.get().getFollowingIds();
         if (ids == null || ids.isEmpty()) return new ArrayList<>();
-        Query query = new Query(Criteria.where("_id").in(ids));
+        Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id");
         return mongoTemplate.find(query, User.class);
     }
@@ -939,9 +1056,12 @@ public class UserService {
     public List<User> getFollowers(String username) {
         Optional<User> userOpt = userRepository.findByUsername(username);
         if (userOpt.isEmpty()) return new ArrayList<>();
+
+        if (userOpt.get().isDeleted()) return new ArrayList<>();
+
         List<String> ids = userOpt.get().getFollowerIds();
         if (ids == null || ids.isEmpty()) return new ArrayList<>();
-        Query query = new Query(Criteria.where("_id").in(ids));
+        Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id");
         return mongoTemplate.find(query, User.class);
     }

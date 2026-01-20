@@ -95,13 +95,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className={`${containerClasses} mx-auto h-full`}>
                 <div className="flex items-center justify-between h-full">
 
-                    <div className="flex items-center cursor-pointer group flex-shrink-0" onClick={() => onNavigate('home')}>
+                    <Link to="/" className="flex items-center cursor-pointer group flex-shrink-0">
                         <img
                             src={logoSrc}
                             alt="Modtale"
                             className="h-8 md:h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-105 mt-1"
                         />
-                    </div>
+                    </Link>
 
                     <div className="hidden md:flex items-center justify-end flex-1 gap-2">
                         {user && (

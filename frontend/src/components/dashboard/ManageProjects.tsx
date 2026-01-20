@@ -24,35 +24,46 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
 
     useEffect(() => {
         const init = async () => {
+            setLoading(true);
             try {
                 const orgsRes = await api.get('/user/orgs');
-                const orgsData = orgsRes.data;
+                const orgsData = orgsRes.data || [];
                 setMyOrgs(orgsData);
 
-                const personalRes = await api.get(`/creators/${user.username}/projects?size=100`);
-                setProjects(personalRes.data.content || []);
+                const personalPromise = api.get(`/creators/${user.username}/projects?size=100`);
+                const contribPromise = api.get('/projects/user/contributed').catch(() => ({ data: { content: [] } }));
 
-                try {
-                    const contribRes = await api.get('/projects/user/contributed');
-                    setContributedProjects(contribRes.data.content || []);
-                } catch (e) {}
+                const orgPromises = orgsData.map((org: User) =>
+                    api.get(`/creators/${org.username}/projects?size=100`)
+                        .then(res => ({ username: org.username, projects: res.data.content || [] }))
+                        .catch(() => ({ username: org.username, projects: [] }))
+                );
+
+                const [personalRes, contribRes, ...orgResults] = await Promise.all([
+                    personalPromise,
+                    contribPromise,
+                    ...orgPromises
+                ]);
+
+                setProjects(personalRes.data.content || []);
+                setContributedProjects(contribRes.data.content || []);
 
                 const orgData: Record<string, Mod[]> = {};
-                for (const org of orgsData) {
-                    try {
-                        const res = await api.get(`/creators/${org.username}/projects?size=100`);
-                        if (res.data.content && res.data.content.length > 0) {
-                            orgData[org.username] = res.data.content;
-                        }
-                    } catch (e) {}
-                }
+                orgResults.forEach((result: any) => {
+                    if (result.projects.length > 0) {
+                        orgData[result.username] = result.projects;
+                    }
+                });
                 setOrgProjects(orgData);
 
-            } catch (e) { console.error(e); }
-            finally { setLoading(false); }
+            } catch (e) {
+                console.error("Failed to load projects", e);
+            } finally {
+                setLoading(false);
+            }
         };
         init();
-    }, [user]);
+    }, [user.username, user.id]); // Optimized dependency array
 
     const handleDelete = async () => {
         if (!deleteModal) return;

@@ -10,7 +10,7 @@ import { api } from '../utils/api';
 import { captureError } from '../utils/errorTracking';
 import { PROJECT_TYPES, BROWSE_VIEWS } from '../data/categories';
 import type { Classification } from '../data/categories';
-import { createSlug } from '../utils/slug';
+import { getProjectUrl } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getCategorySEO } from '../data/seo-constants';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
@@ -48,6 +48,7 @@ export const Home: React.FC<HomeProps> = ({
                                           }) => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [selectedClassification, setSelectedClassification] = useState<Classification | 'All'>(initialClassification || 'All');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedVersion, setSelectedVersion] = useState<string>('Any');
@@ -67,6 +68,7 @@ export const Home: React.FC<HomeProps> = ({
     const [isTopFilterOpen, setIsTopFilterOpen] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(12);
 
+    const abortControllerRef = useRef<AbortController | null>(null);
     const cardsSectionRef = useRef<HTMLDivElement>(null);
 
     const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
@@ -75,6 +77,13 @@ export const Home: React.FC<HomeProps> = ({
         const crumbs = getBreadcrumbsForClassification(selectedClassification);
         return generateBreadcrumbSchema(crumbs);
     }, [selectedClassification]);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
 
     useEffect(() => {
         if (initialClassification) {
@@ -114,9 +123,16 @@ export const Home: React.FC<HomeProps> = ({
 
     useEffect(() => {
         setPage(0);
-    }, [selectedClassification, selectedTags, searchTerm, selectedVersion, minRating, minDownloads, filterDate, activeViewId, sortBy]);
+    }, [selectedClassification, selectedTags, debouncedSearch, selectedVersion, minRating, minDownloads, filterDate, activeViewId, sortBy]);
 
     const fetchData = useCallback(async (targetPage: number) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setLoading(true);
         try {
             let categoryParam: string | undefined = undefined;
@@ -131,30 +147,37 @@ export const Home: React.FC<HomeProps> = ({
                     size: itemsPerPage,
                     classification: selectedClassification !== 'All' ? selectedClassification : undefined,
                     tags: selectedTags.join(','),
-                    search: searchTerm,
+                    search: debouncedSearch,
                     sort: sortBy,
                     gameVersion: selectedVersion !== 'Any' ? selectedVersion : undefined,
                     minRating: minRating > 0 ? minRating : undefined,
                     minDownloads: minDownloads > 0 ? minDownloads : undefined,
                     dateRange: filterDate || 'all',
                     category: categoryParam,
-                }
+                },
+                signal: controller.signal
             });
 
             setItems(res.data?.content || []);
             setTotalPages(res.data?.totalPages || 0);
             setTotalItems(res.data?.totalElements || 0);
 
-        } catch (err) {
-            captureError(err);
-            setItems([]);
-            setTotalPages(0);
+        } catch (err: any) {
+            if (err.name !== 'Canceled') {
+                captureError(err);
+                setItems([]);
+                setTotalPages(0);
+            }
         } finally {
-            setLoading(false);
+            if (!controller.signal.aborted) {
+                setLoading(false);
+            }
         }
-    }, [selectedClassification, selectedTags, searchTerm, sortBy, selectedVersion, minRating, minDownloads, filterDate, activeViewId, itemsPerPage]);
+    }, [selectedClassification, selectedTags, debouncedSearch, sortBy, selectedVersion, minRating, minDownloads, filterDate, activeViewId, itemsPerPage]);
 
-    useEffect(() => { const timer = setTimeout(() => fetchData(page), 300); return () => clearTimeout(timer); }, [fetchData, page]);
+    useEffect(() => {
+        fetchData(page);
+    }, [fetchData, page]);
 
     const handleClassificationChange = (cls: Classification | 'All') => {
         if (cls !== selectedClassification) {
@@ -213,10 +236,7 @@ export const Home: React.FC<HomeProps> = ({
     };
 
     const getProjectPath = (item: Mod | Modpack | World) => {
-        const slug = createSlug(item.title, item.id);
-        if (item.classification === 'MODPACK') return `/modpack/${slug}`;
-        if (item.classification === 'SAVE') return `/world/${slug}`;
-        return `/mod/${slug}`;
+        return getProjectUrl(item);
     };
 
     const getPageTitle = () => {

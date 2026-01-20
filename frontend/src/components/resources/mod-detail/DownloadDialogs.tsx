@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ProjectVersion } from '../../../types';
 import { Download, X, ChevronDown, ChevronUp, Link as LinkIcon, List, AlertCircle, FileText, ChevronRight } from 'lucide-react';
-import { formatTimeAgo, ChannelBadge } from '../../../utils/modHelpers';
+import { formatTimeAgo, ChannelBadge, compareSemVer } from '../../../utils/modHelpers';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
@@ -275,7 +275,13 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
     const currentVersions = versionsByGame[selectedGameVer] || [];
 
     const visibleVersions = currentVersions.filter((v: any) => showExperimental || (!v.channel || v.channel === 'RELEASE'));
-    const sortedVersions = [...visibleVersions].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+
+    const sortedVersions = [...visibleVersions].sort((a: any, b: any) => {
+        const dateDiff = new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return compareSemVer(b.versionNumber, a.versionNumber);
+    });
+
     const latestVer = sortedVersions[0];
 
     const getVersionBadgeColor = (channel: string) => {

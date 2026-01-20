@@ -54,7 +54,6 @@ export interface ScanIssue {
     filePath: string;
     lineStart: number;
     lineEnd: number;
-    snippet?: string;
     resolved?: boolean;
 }
 

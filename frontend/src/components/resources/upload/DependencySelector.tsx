@@ -3,6 +3,7 @@ import { Search, Loader2, X, Plus, AlertTriangle, FileText, CheckSquare, Square,
 import { api, BACKEND_URL } from '../../../utils/api';
 import type {Mod, ProjectVersion, ModDependency} from '../../../types';
 import { ScrollStyles } from './FormShared';
+import { compareSemVer } from '../../../utils/modHelpers';
 
 interface DependencyWizardProps {
     previousDeps: ModDependency[];
@@ -31,7 +32,8 @@ const DependencyRow: React.FC<{
             try {
                 const res = await api.get(`/projects/${dep.modId}`);
                 const mod = res.data as Mod;
-                setVersions(mod.versions || []);
+                const sorted = (mod.versions || []).sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
+                setVersions(sorted);
             } catch (e) {
                 console.error(`Failed to fetch versions for ${dep.modId}`);
             } finally {
@@ -357,7 +359,10 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     const getIconUrl = (path?: string) => { if (!path) return '/assets/favicon.svg'; return path.startsWith('http') ? path : `${BACKEND_URL}${path}`; };
 
-    const availableVersions = selectedModForVersion?.versions || [];
+    const availableVersions = useMemo(() => {
+        if (!selectedModForVersion?.versions) return [];
+        return [...selectedModForVersion.versions].sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
+    }, [selectedModForVersion]);
 
     const isRelease = (v: any) => !v.channel || v.channel === 'RELEASE';
 

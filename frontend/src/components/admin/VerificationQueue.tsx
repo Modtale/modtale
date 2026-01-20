@@ -29,14 +29,12 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         );
     }
 
-    // Filter to find the actual pending item (Project or Version)
+    const sortedProjects = [...pendingProjects].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+
     const renderQueueItem = (mod: Mod) => {
         const isProjectPending = mod.status === 'PENDING';
 
-        // Find versions that are pending
         const pendingVersions = mod.versions.filter(v => v.reviewStatus === 'PENDING');
-        // If project is pending, we usually look at the latest version anyway.
-        // If project is published, we specifically look at the pending updates.
 
         const targetVersion = pendingVersions[0] || mod.versions[0];
         const scan = targetVersion?.scanResult;
@@ -102,7 +100,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     return (
         <div className="grid gap-4">
-            {pendingProjects.map(renderQueueItem)}
+            {sortedProjects.map(renderQueueItem)}
         </div>
     );
 };
