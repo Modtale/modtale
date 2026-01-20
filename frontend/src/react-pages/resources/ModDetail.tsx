@@ -782,7 +782,13 @@ export const ModDetail: React.FC<{
             <ProjectLayout
                 bannerUrl={mod.bannerUrl}
                 iconUrl={mod.imageUrl}
-                onBack={() => navigate(-1)}
+                onBack={() => {
+                    if (window.history.state && window.history.state.idx > 0) {
+                        navigate(-1);
+                    } else {
+                        navigate('/');
+                    }
+                }}
                 headerActions={
                     <>
                         <button disabled={!currentUser} onClick={() => onToggleFavorite(mod.id)} className={`p-3 rounded-xl border transition-all ${isLiked(mod.id) ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`} title="Favorite">
