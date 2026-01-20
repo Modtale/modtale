@@ -32,8 +32,13 @@ export const NotificationMenu: React.FC = () => {
                 setIsOpen(false);
             }
         };
+        const handleScroll = () => setIsOpen(false);
         document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => {
+            document.removeEventListener('mousedown', handleClick);
+            window.removeEventListener('scroll', handleScroll);
+        };
     }, []);
 
     const handleAction = async (n: Notification, accept: boolean) => {
@@ -75,7 +80,7 @@ export const NotificationMenu: React.FC = () => {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="fixed left-4 right-4 top-16 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-96 max-h-[80vh] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                     <div className="p-3 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-black/20">
                         <div className="flex items-center gap-2">
                             <h3 className="font-bold text-sm text-slate-900 dark:text-white">Notifications</h3>

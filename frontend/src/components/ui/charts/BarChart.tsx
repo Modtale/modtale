@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 
 interface BarData {
     id: string;
@@ -16,8 +16,7 @@ interface BarChartProps {
 
 export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle }) => {
     const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-
-    const [chartId] = useState(() => 'bar-chart-' + Math.random().toString(36).substring(2, 9));
+    const chartId = useId();
 
     const activeData = data.filter(d => !d.hidden);
     const hasData = activeData.length > 0;

@@ -38,9 +38,9 @@ export const Gallery: React.FC<GalleryProps> = ({ currentUser }) => {
         if (viewingImage) {
             document.body.style.overflow = 'hidden';
         } else {
-            document.body.style.overflow = 'unset';
+            document.body.style.overflow = '';
         }
-        return () => { document.body.style.overflow = 'unset'; };
+        return () => { document.body.style.overflow = ''; };
     }, [viewingImage]);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,8 +74,8 @@ export const Gallery: React.FC<GalleryProps> = ({ currentUser }) => {
             {viewingImage && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setViewingImage(null)}>
                     <button onClick={() => setViewingImage(null)} className="absolute top-6 right-6 p-2 bg-black/50 rounded-full text-white hover:bg-white hover:text-black transition-colors z-[110]"><X className="w-8 h-8" /></button>
-                    <div className="relative max-w-[90vw] max-h-[90vh] rounded-lg overflow-hidden shadow-2xl border border-white/10" onClick={(e) => e.stopPropagation()}>
-                        <img src={resolveUrl(viewingImage)} alt="Full view" className="w-full h-full object-contain max-h-[85vh]" />
+                    <div className="relative max-w-[90vw] max-h-[90dvh] rounded-lg overflow-hidden shadow-2xl border border-white/10" onClick={(e) => e.stopPropagation()}>
+                        <img src={resolveUrl(viewingImage)} alt="Full view" className="w-full h-full object-contain max-h-[85dvh]" />
                     </div>
                 </div>
             )}

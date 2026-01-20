@@ -49,7 +49,7 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 p-6 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 p-6 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90dvh]">
                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Transfer Ownership</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                     Select a target to transfer <strong>{project.title}</strong> to. They must accept the request.

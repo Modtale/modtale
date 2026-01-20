@@ -48,20 +48,15 @@ const ScrollToTop = () => {
 
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [loadingAuth, setLoadingAuth] = useState(true);
+    const [loadingAuth, setLoadingAuth] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const [mods, setMods] = useState<Mod[]>([]);
     const [modpacks, setModpacks] = useState<Modpack[]>([]);
     const [worlds, setWorlds] = useState<World[]>([]);
     const [downloadedSessionIds, setDownloadedSessionIds] = useState<Set<string>>(new Set());
     const [globalError, setGlobalError] = useState<string | null>(null);
 
-    const [isDarkMode, setIsDarkMode] = useState(() => {
-        if (import.meta.env.SSR) return true;
-        if (typeof window === 'undefined') return true;
-        const stored = localStorage.getItem('modtale-theme');
-        if (stored === 'light') return false;
-        return true;
-    });
+    const [isDarkMode, setIsDarkMode] = useState(true);
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -77,13 +72,16 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     }, [location, navigate]);
 
     useEffect(() => {
-        if (typeof document !== 'undefined') {
-            const root = document.documentElement;
-            if (isDarkMode) {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
+        const stored = localStorage.getItem('modtale-theme');
+        if (stored === 'light') setIsDarkMode(false);
+    }, []);
+
+    useEffect(() => {
+        const root = document.documentElement;
+        if (isDarkMode) {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
         }
     }, [isDarkMode]);
 
@@ -116,12 +114,13 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     };
 
     useEffect(() => {
+        setMounted(true);
         const init = async () => {
             setLoadingAuth(true);
             try {
-                if (!import.meta.env.SSR) await fetchUser();
+                await fetchUser();
             } catch (e) { setUser(null); } finally { setLoadingAuth(false); }
-            if (!import.meta.env.SSR) refreshData();
+            refreshData();
         };
         init();
     }, [refreshData]);
@@ -149,7 +148,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
     const handleDownload = (id: string, isModpack = false) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
 
-    if (loadingAuth && !import.meta.env.SSR) return (
+    if (mounted && loadingAuth) return (
         <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark flex items-center justify-center">
             <Spinner fullScreen={false} label="Authenticating..." />
         </div>
@@ -256,7 +255,7 @@ export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData
                             <AppContent initialClassification={initialClassification} />
                         </StaticRouter>
                     ) : (
-                        <BrowserRouter>
+                        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                             <AppContent initialClassification={initialClassification} />
                         </BrowserRouter>
                     )}
