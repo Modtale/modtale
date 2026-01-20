@@ -444,6 +444,7 @@ export const ModDetail: React.FC<{
     const [mod, setMod] = useState<Mod | null>(initialMod);
     const [loading, setLoading] = useState(!initialMod);
     const [isNotFound, setIsNotFound] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
 
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [showAllVersionsModal, setShowAllVersionsModal] = useState(false);
@@ -463,12 +464,25 @@ export const ModDetail: React.FC<{
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
     const canEdit = currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username));
 
+    const analyticsFired = useRef(false);
+    const fetchedDepMeta = useRef<Set<string>>(new Set());
+
     const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
     const breadcrumbSchema = useMemo(() => mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null, [mod]);
     const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
 
+    const ogImageUrl = useMemo(() => mod ? `${API_BASE_URL}/og/project/${mod.id}.png` : '', [mod]);
+
     useEffect(() => {
-        if (mod && mod.id) {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    useEffect(() => {
+        if (mod && mod.id && !analyticsFired.current) {
+            analyticsFired.current = true;
             api.post(`/analytics/view/${mod.id}`).catch(() => {});
         }
     }, [mod?.id]);
@@ -538,23 +552,38 @@ export const ModDetail: React.FC<{
     useEffect(() => {
         if (!latestDependencies.length) return;
         const fetchMeta = async () => {
-            const missing = latestDependencies.filter(d => !depMeta[d.modId]);
+            const missing = latestDependencies.filter(d =>
+                !depMeta[d.modId] && !fetchedDepMeta.current.has(d.modId)
+            );
+
             if (!missing.length) return;
+
+            missing.forEach(d => fetchedDepMeta.current.add(d.modId));
+
             const newMeta = { ...depMeta };
             await Promise.all(missing.map(async (d) => {
                 try {
                     const res = await api.get(`/projects/${d.modId}/meta`);
                     newMeta[d.modId] = { icon: res.data.icon, title: res.data.title };
-                } catch (e) { newMeta[d.modId] = { icon: '', title: d.modTitle || d.modId }; }
+                } catch (e) {
+                    newMeta[d.modId] = { icon: '', title: d.modTitle || d.modId };
+                }
             }));
-            setDepMeta(newMeta);
+
+            setDepMeta(prev => ({...prev, ...newMeta}));
         };
         fetchMeta();
     }, [latestDependencies]);
 
-    const handleShare = () => {
-        if (navigator.share) navigator.share({ title: mod?.title, url: currentUrl }).catch(() => {});
-        else setIsShareOpen(true);
+    const handleShare = async () => {
+        if (isMobile && navigator.share) {
+            try {
+                await navigator.share({ title: mod?.title, url: currentUrl });
+            } catch (e) {
+            }
+        } else {
+            setIsShareOpen(true);
+        }
     };
 
     const handleFollowToggle = async () => {
@@ -583,6 +612,57 @@ export const ModDetail: React.FC<{
         setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
         setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
     };
+
+    const memoizedDescription = useMemo(() => {
+        if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
+
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                    ...defaultSchema,
+                    attributes: {
+                        ...defaultSchema.attributes,
+                        code: ['className']
+                    }
+                }]]}
+                components={{
+                    code({node, inline, className, children, ...props}: any) {
+                        const match = /language-(\w+)/.exec(className || '')
+                        return !inline && match ? (
+                            <SyntaxHighlighter
+                                {...props}
+                                style={vscDarkPlus}
+                                language={match[1]}
+                                PreTag="div"
+                                className="rounded-lg text-sm"
+                            >
+                                {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                        ) : (
+                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                                {children}
+                            </code>
+                        )
+                    },
+                    p({node, children, ...props}: any) {
+                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
+                    },
+                    li({node, children, ...props}: any) {
+                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
+                    },
+                    ul({node, children, ...props}: any) {
+                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
+                    },
+                    ol({node, children, ...props}: any) {
+                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
+                    }
+                }}
+            >
+                {mod.about}
+            </ReactMarkdown>
+        );
+    }, [mod?.about]);
 
     if (isNotFound) return <NotFound />;
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
@@ -616,6 +696,17 @@ export const ModDetail: React.FC<{
                     <meta name="description" content={projectMeta.description} />
                     {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
                     {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
+
+                    <meta property="og:title" content={mod.title} />
+                    <meta property="og:site_name" content="Modtale" />
+                    <meta property="og:image" content={ogImageUrl} />
+                    <meta property="og:type" content="website" />
+                    <meta property="og:url" content={canonicalUrl || currentUrl} />
+                    <meta name="theme-color" content="#3b82f6" />
+
+                    <meta name="twitter:card" content="summary_large_image" />
+                    <meta name="twitter:title" content={mod.title} />
+                    <meta name="twitter:image" content={ogImageUrl} />
                 </Helmet>
             )}
 
@@ -691,7 +782,13 @@ export const ModDetail: React.FC<{
             <ProjectLayout
                 bannerUrl={mod.bannerUrl}
                 iconUrl={mod.imageUrl}
-                onBack={() => navigate(-1)}
+                onBack={() => {
+                    if (window.history.state && window.history.state.idx > 0) {
+                        navigate(-1);
+                    } else {
+                        navigate('/');
+                    }
+                }}
                 headerActions={
                     <>
                         <button disabled={!currentUser} onClick={() => onToggleFavorite(mod.id)} className={`p-3 rounded-xl border transition-all ${isLiked(mod.id) ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`} title="Favorite">
@@ -876,6 +973,7 @@ export const ModDetail: React.FC<{
                             ) : (
                                 <p className="text-slate-500 italic">No description.</p>
                             )}
+                            {memoizedDescription}
                         </div>
                         <ReviewSection
                             modId={mod.id}

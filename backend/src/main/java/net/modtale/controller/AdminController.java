@@ -2,12 +2,15 @@ package net.modtale.controller;
 
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
+import net.modtale.model.user.BannedEmail;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ModVersion;
+import net.modtale.model.analytics.AdminLog;
 import net.modtale.service.user.UserService;
 import net.modtale.service.resources.ModService;
 import net.modtale.service.resources.StorageService;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.repository.analytics.AdminLogRepository;
 import org.jetbrains.java.decompiler.main.Fernflower;
 import org.jetbrains.java.decompiler.main.extern.IBytecodeProvider;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
@@ -32,14 +35,11 @@ import java.util.jar.JarInputStream;
 @RequestMapping("/api/v1/admin")
 public class AdminController {
 
-    @Autowired
-    private UserService userService;
-    @Autowired
-    private ModService modService;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private StorageService storageService;
+    @Autowired private UserService userService;
+    @Autowired private ModService modService;
+    @Autowired private UserRepository userRepository;
+    @Autowired private StorageService storageService;
+    @Autowired private AdminLogRepository adminLogRepository;
 
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
@@ -56,6 +56,65 @@ public class AdminController {
             return userService.getCurrentUser();
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private void logAction(String admin, String action, String targetId, String targetType, String details) {
+        adminLogRepository.save(new AdminLog(admin, action, targetId, targetType, details));
+    }
+
+    @GetMapping("/users/bans")
+    public ResponseEntity<List<BannedEmail>> getBannedEmails() {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(userService.getBannedEmails());
+    }
+
+    @PostMapping("/users/bans")
+    public ResponseEntity<?> banEmail(@RequestBody Map<String, String> body) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        String email = body.get("email");
+        String reason = body.get("reason");
+        try {
+            userService.banEmail(email, reason, currentUser.getUsername());
+            logAction(currentUser.getUsername(), "BAN_EMAIL", email, "EMAIL", "Reason: " + reason);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/users/bans")
+    public ResponseEntity<?> unbanEmail(@RequestParam String email) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        userService.unbanEmail(email);
+        logAction(currentUser.getUsername(), "UNBAN_EMAIL", email, "EMAIL", null);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/users/{username}")
+    public ResponseEntity<?> deleteUser(@PathVariable String username) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        User target = userRepository.findByUsername(username).orElse(null);
+        if (target == null) return ResponseEntity.notFound().build();
+
+        try {
+            userService.deleteUser(target.getId());
+            logAction(currentUser.getUsername(), "DELETE_USER", target.getId(), "USER", "Username: " + username);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
@@ -76,6 +135,7 @@ public class AdminController {
             }
 
             userService.setUserTier(username, tierEnum);
+            logAction(currentUser.getUsername(), "UPDATE_TIER", username, "USER", "New Tier: " + tierEnum);
             return ResponseEntity.ok(Map.of(
                     "status", "success",
                     "message", "User " + username + " updated to tier " + tierEnum
@@ -100,6 +160,7 @@ public class AdminController {
             target.getRoles().add(role);
         }
         userRepository.save(target);
+        logAction(currentUser.getUsername(), "ADD_ROLE", target.getId(), "USER", "Role: " + role);
         return ResponseEntity.ok().build();
     }
 
@@ -117,6 +178,7 @@ public class AdminController {
             target.getRoles().remove(role);
             userRepository.save(target);
         }
+        logAction(currentUser.getUsername(), "REMOVE_ROLE", target.getId(), "USER", "Role: " + role);
         return ResponseEntity.ok().build();
     }
 
@@ -159,6 +221,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.publishMod(id, currentUser.getUsername());
+            logAction(currentUser.getUsername(), "PUBLISH_PROJECT", id, "PROJECT", null);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -171,6 +234,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.approveVersion(id, versionId);
+            logAction(currentUser.getUsername(), "APPROVE_VERSION", id, "VERSION", "VerID: " + versionId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -183,6 +247,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.rejectVersion(id, versionId, body.get("reason"));
+            logAction(currentUser.getUsername(), "REJECT_VERSION", id, "VERSION", "VerID: " + versionId + ", Reason: " + body.get("reason"));
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -197,6 +262,7 @@ public class AdminController {
         }
         try {
             modService.rejectMod(id, body.get("reason"));
+            logAction(currentUser.getUsername(), "REJECT_PROJECT", id, "PROJECT", "Reason: " + body.get("reason"));
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -209,9 +275,23 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminDeleteProject(id);
+            logAction(currentUser.getUsername(), "DELETE_PROJECT", id, "PROJECT", null);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/projects/{id}/restore")
+    public ResponseEntity<?> restoreProject(@PathVariable String id) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.adminRestoreProject(id);
+            logAction(currentUser.getUsername(), "RESTORE_PROJECT", id, "PROJECT", null);
+            return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -223,6 +303,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminUnlistProject(id);
+            logAction(currentUser.getUsername(), "UNLIST_PROJECT", id, "PROJECT", null);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -237,6 +318,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminDeleteVersion(id, versionId);
+            logAction(currentUser.getUsername(), "DELETE_VERSION", id, "VERSION", "VerID: " + versionId);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -358,6 +440,19 @@ public class AdminController {
         }
     }
 
+    @PostMapping("/projects/{id}/versions/{versionId}/scan")
+    public ResponseEntity<?> rescanVersion(@PathVariable String id, @PathVariable String versionId) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.triggerRescan(id, versionId);
+            logAction(currentUser.getUsername(), "RESCAN_VERSION", id, "VERSION", "VerID: " + versionId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     private boolean isTextFile(String path) {
         String lower = path.toLowerCase();
         return lower.endsWith(".json") || lower.endsWith(".yml") || lower.endsWith(".yaml") ||
@@ -370,7 +465,6 @@ public class AdminController {
         try {
             tempDir = Files.createTempDirectory("decompile");
             String fileName = new File(originalPath).getName();
-            // Basic sanitization
             fileName = fileName.replaceAll("[^a-zA-Z0-9.-]", "_");
 
             Path classFile = tempDir.resolve(fileName);

@@ -38,7 +38,9 @@ dependencies {
     implementation 'com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20240325.1'
     implementation 'net.coobird:thumbnailator:0.4.20'
 
-    implementation 'org.vineflower:vineflower:1.10.1'
+    implementation 'com.github.weisj:jsvg:1.6.0'
+
+    implementation 'org.vineflower:vineflower:1.11.2'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'

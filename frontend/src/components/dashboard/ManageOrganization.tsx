@@ -56,6 +56,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     const [transferModal, setTransferModal] = useState<Mod | null>(null);
     const [status, setStatus] = useState<{type: 'success'|'error', title: string, msg: string} | null>(null);
 
+    const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
+    const [memberToUpdateRole, setMemberToUpdateRole] = useState<{userId: string, currentRole: string} | null>(null);
+
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [cropType, setCropType] = useState<'avatar' | 'banner'>('avatar');
@@ -158,25 +161,33 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         } catch (err: any) { setManageError(err.response?.data || "Failed to add member."); }
     };
 
-    const handleRemoveMember = async (userId: string) => {
+    const handleRemoveMember = (userId: string) => {
         if (!selectedOrg) return;
-        if (!confirm("Remove this member?")) return;
+        setMemberToRemove(userId);
+    };
+
+    const confirmRemoveMember = async () => {
+        if (!selectedOrg || !memberToRemove) return;
         try {
-            await api.delete(`/orgs/${selectedOrg.id}/members/${userId}`);
+            await api.delete(`/orgs/${selectedOrg.id}/members/${memberToRemove}`);
             await fetchMembers(selectedOrg.username);
-            if (userId === user.id) {
+            if (memberToRemove === user.id) {
                 setSelectedOrg(null);
                 fetchOrgs();
             }
         } catch (err: any) { setManageError(err.response?.data || "Failed to remove member."); }
+        finally { setMemberToRemove(null); }
     };
 
-    const handleRoleUpdate = async (userId: string, currentRole: string) => {
+    const handleRoleUpdate = (userId: string, currentRole: string) => {
         if (!selectedOrg) return;
-        const newRole = currentRole === 'ADMIN' ? 'MEMBER' : 'ADMIN';
-        const action = currentRole === 'ADMIN' ? 'Demote to Member' : 'Promote to Admin';
+        setMemberToUpdateRole({ userId, currentRole });
+    };
 
-        if (!confirm(`Are you sure you want to ${action.toLowerCase()} this user?`)) return;
+    const confirmRoleUpdate = async () => {
+        if (!selectedOrg || !memberToUpdateRole) return;
+        const { userId, currentRole } = memberToUpdateRole;
+        const newRole = currentRole === 'ADMIN' ? 'MEMBER' : 'ADMIN';
 
         try {
             await api.put(`/orgs/${selectedOrg.id}/members/${userId}`, { role: newRole });
@@ -189,6 +200,8 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
             await fetchMembers(selectedOrg.username);
         } catch (err: any) {
             setManageError(err.response?.data || "Failed to update role.");
+        } finally {
+            setMemberToUpdateRole(null);
         }
     };
 
@@ -410,6 +423,30 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         onAction={handleDeleteProject}
                         onClose={() => setDeleteProjectModal(null)}
                         secondaryLabel="Cancel"
+                    />
+                )}
+
+                {memberToRemove && (
+                    <StatusModal
+                        type="warning"
+                        title="Remove Member?"
+                        message="Are you sure you want to remove this member from the organization?"
+                        actionLabel="Remove"
+                        onAction={confirmRemoveMember}
+                        secondaryLabel="Cancel"
+                        onClose={() => setMemberToRemove(null)}
+                    />
+                )}
+
+                {memberToUpdateRole && (
+                    <StatusModal
+                        type="warning"
+                        title={memberToUpdateRole.currentRole === 'ADMIN' ? "Demote Member?" : "Promote Member?"}
+                        message={`Are you sure you want to ${memberToUpdateRole.currentRole === 'ADMIN' ? 'demote this user to Member' : 'promote this user to Admin'}?`}
+                        actionLabel={memberToUpdateRole.currentRole === 'ADMIN' ? "Demote" : "Promote"}
+                        onAction={confirmRoleUpdate}
+                        secondaryLabel="Cancel"
+                        onClose={() => setMemberToUpdateRole(null)}
                     />
                 )}
 

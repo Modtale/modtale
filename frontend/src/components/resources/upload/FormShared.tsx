@@ -67,7 +67,7 @@ export const ThemedInput = ({ label, disabled, ...props }: any) => (
     </div>
 );
 
-const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
 interface VersionFieldsProps {
     data: VersionFormData;
@@ -88,7 +88,14 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                                                             }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const gameVersions = ['1.0-SNAPSHOT'];
+
+    const gameVersions = ['2026.01.17-4b0f30090', '2026.01.13-dcad8778f'].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+
+    useEffect(() => {
+        if (!disabled && (!data.gameVersions || data.gameVersions.length === 0) && gameVersions.length > 0) {
+            onChange({ ...data, gameVersions: [gameVersions[0]] });
+        }
+    }, []);
 
     const versionNum = data.versionNumber.trim();
     const isFormatValid = STRICT_VERSION_REGEX.test(versionNum);
@@ -123,10 +130,13 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
         disabled: disabled
     });
 
-    const setGameVersion = (ver: string) => {
+    const toggleGameVersion = (ver: string) => {
         if(disabled) return;
-        onChange({ ...data, gameVersions: [ver] });
-        setDropdownOpen(false);
+        const current = data.gameVersions || [];
+        const next = current.includes(ver)
+            ? current.filter(v => v !== ver)
+            : [...current, ver];
+        onChange({ ...data, gameVersions: next });
     };
 
     useEffect(() => {
@@ -209,12 +219,12 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                         className={`font-mono font-bold ${versionNum.length > 0 && !isValid && !disabled ? 'border-red-500 focus:ring-red-500' : ''}`}
                     />
                     <p className="text-[10px] text-slate-400 mt-1.5 ml-1">
-                        Must be unique and follow SemVer format (e.g. 1.0.0).
+                        Must be unique and follow SemVer format (e.g. 1.0.0, 1.0.0-beta+exp).
                     </p>
                 </div>
 
                 <div ref={dropdownRef}>
-                    <Label required>Game Version</Label>
+                    <Label required>Game Versions</Label>
                     <div className="relative">
                         <button
                             type="button"
@@ -223,7 +233,9 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                             className={`w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none transition-all text-left flex justify-between items-center ${disabled ? 'cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent'}`}
                         >
                             <span className={data.gameVersions?.length > 0 ? "text-slate-900 dark:text-white font-medium" : "text-slate-400"}>
-                                {data.gameVersions?.[0] || "Select Version..."}
+                                {data.gameVersions && data.gameVersions.length > 0
+                                    ? `${data.gameVersions.length} selected`
+                                    : "Select Versions..."}
                             </span>
                             <ChevronDown className="w-4 h-4 text-slate-400" />
                         </button>
@@ -233,7 +245,10 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                                     <button
                                         key={v}
                                         type="button"
-                                        onClick={() => setGameVersion(v)}
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Keep dropdown open for multi-select
+                                            toggleGameVersion(v);
+                                        }}
                                         className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-white/5 text-sm text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between"
                                     >
                                         <span>{v}</span>
@@ -243,6 +258,15 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                             </div>
                         )}
                     </div>
+                    {data.gameVersions?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {data.gameVersions.map(v => (
+                                <span key={v} className="text-[10px] font-bold px-2 py-1 bg-slate-100 dark:bg-white/10 rounded text-slate-600 dark:text-slate-300">
+                                    {v}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 

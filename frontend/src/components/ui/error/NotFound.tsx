@@ -8,7 +8,6 @@ const NotFound: React.FC = () => {
         <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 text-center">
             <Helmet>
                 <title>404 - Page Not Found | Modtale</title>
-                <meta name="robots" content="noindex, nofollow" />
                 <meta name="prerender-status-code" content="404" />
             </Helmet>
 

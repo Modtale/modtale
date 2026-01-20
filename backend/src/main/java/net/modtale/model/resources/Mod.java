@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 @Document(collection = "projects")
 @CompoundIndexes({
@@ -69,6 +70,8 @@ public class Mod {
     @Indexed
     private String status = "PUBLISHED";
     private String expiresAt;
+
+    private LocalDateTime deletedAt;
 
     private String approvedBy;
 
@@ -156,6 +159,9 @@ public class Mod {
     public void setStatus(String status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
     public void setExpiresAt(String expiresAt) { this.expiresAt = expiresAt; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 
     public String getApprovedBy() { return approvedBy; }
     public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
