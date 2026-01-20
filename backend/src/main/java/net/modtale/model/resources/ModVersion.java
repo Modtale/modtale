@@ -15,7 +15,6 @@ public class ModVersion {
 
     private ScanResult scanResult;
 
-    // New fields for granular approval
     private ReviewStatus reviewStatus = ReviewStatus.PENDING;
     private String rejectionReason;
 

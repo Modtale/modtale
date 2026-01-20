@@ -60,7 +60,7 @@ public class ModService {
     );
 
     private static final Set<String> ALLOWED_GAME_VERSIONS = Set.of(
-            "1.0-SNAPSHOT"
+            "2026.01.13-dcad8778f", "2026.01.17-4b0f30090"
     );
 
     private static final Set<String> ALLOWED_CLASSIFICATIONS = Set.of(
