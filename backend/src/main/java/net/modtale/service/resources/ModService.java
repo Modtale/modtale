@@ -13,10 +13,10 @@ import net.modtale.service.user.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.Executor;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -82,6 +83,8 @@ public class ModService {
     @Autowired private NotificationService notificationService;
     @Autowired private CacheManager cacheManager;
     @Autowired private WardenClientService wardenService;
+    @Qualifier("taskExecutor")
+    @Autowired private Executor taskExecutor;
 
     @Lazy
     @Autowired
@@ -201,21 +204,7 @@ public class ModService {
             String gameVersion, String contentType, Double minRating, Integer minDownloads, String viewCategory,
             String dateRange, String author
     ) {
-        Page<Mod> results = self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
-
-        if (results != null && results.hasContent()) {
-            List<String> idsToCheck = results.getContent().stream().map(Mod::getId).collect(Collectors.toList());
-            Query query = new Query(Criteria.where("id").in(idsToCheck));
-            long count = mongoTemplate.count(query, Mod.class);
-
-            if (count != idsToCheck.size()) {
-                logger.warn("Cache verification failed for getMods (Stale Data Detected). Invalidating 'projectSearch' and retrying.");
-                Objects.requireNonNull(cacheManager.getCache("projectSearch")).clear();
-                results = self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
-            }
-        }
-
-        return results;
+        return self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
     }
 
     @Cacheable(
@@ -289,6 +278,7 @@ public class ModService {
         return direct.orElse(null);
     }
 
+    @Cacheable(value = "projectDetails", key = "#identifier")
     public Mod getModById(String identifier) {
         Optional<Mod> direct = Optional.empty();
 
@@ -457,7 +447,6 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void archiveMod(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
@@ -472,7 +461,6 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void unlistMod(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
@@ -487,7 +475,6 @@ public class ModService {
         modRepository.save(mod);
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void publishMod(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
@@ -593,7 +580,7 @@ public class ModService {
     }
 
     private void triggerWebhook(Mod mod) {
-        new Thread(() -> {
+        taskExecutor.execute(() -> {
             try {
                 RestTemplate restTemplate = new RestTemplate();
                 HttpHeaders headers = new HttpHeaders();
@@ -613,7 +600,7 @@ public class ModService {
             } catch (Exception e) {
                 logger.error("Failed to trigger webhook", e);
             }
-        }).start();
+        });
     }
 
     public void triggerRescan(String modId, String versionId) {
@@ -783,7 +770,6 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void addMod(Mod mod) {
         validateTags(mod.getTags());
         validateClassification(mod.getClassification());
@@ -855,10 +841,6 @@ public class ModService {
 
         existing.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(existing);
-
-        if (slugChanged) {
-            Objects.requireNonNull(cacheManager.getCache("sitemapData")).clear();
-        }
     }
 
     public void updateProjectIcon(String id, MultipartFile file) throws IOException {
@@ -1137,7 +1119,6 @@ public class ModService {
         }
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void deleteMod(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
@@ -1150,7 +1131,6 @@ public class ModService {
         performDeletionStrategy(mod);
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void adminDeleteProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -1159,7 +1139,6 @@ public class ModService {
         performDeletionStrategy(mod);
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void adminRestoreProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -1177,7 +1156,6 @@ public class ModService {
         logger.info("Project " + mod.getId() + " restored by admin " + user.getUsername());
     }
 
-    @CacheEvict(value = {"sitemapData"}, allEntries = true)
     public void adminUnlistProject(String id) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
@@ -1405,7 +1383,7 @@ public class ModService {
     }
 
     private void notifyUpdates(Mod mod, String versionNumber) {
-        new Thread(() -> {
+        taskExecutor.execute(() -> {
             try {
                 List<User> fans = userRepository.findByLikedModIdsContaining(mod.getId());
                 String msg = "Version " + versionNumber + " is now available.";
@@ -1418,11 +1396,11 @@ public class ModService {
                     notificationService.sendNotification(usersToNotify, "Update: " + mod.getTitle(), msg, getProjectLink(mod), mod.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send notifications", e); }
-        }).start();
+        });
     }
 
     private void notifyNewProject(Mod mod) {
-        new Thread(() -> {
+        taskExecutor.execute(() -> {
             try {
                 User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
                 if (author == null) return;
@@ -1438,11 +1416,11 @@ public class ModService {
                     notificationService.sendNotification(usersToNotify, title, msg, getProjectLink(mod), mod.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send new project notifications", e); }
-        }).start();
+        });
     }
 
     private void notifyDependents(Mod updatedMod, String version) {
-        new Thread(() -> {
+        taskExecutor.execute(() -> {
             List<Mod> dependents = modRepository.findByDependency(updatedMod.getId());
             for (Mod dependent : dependents) {
                 User author = userRepository.findByUsername(dependent.getAuthor()).orElse(null);
@@ -1452,7 +1430,7 @@ public class ModService {
                     notificationService.sendNotification(List.of(author.getId()), title, msg, getProjectLink(updatedMod), updatedMod.getImageUrl());
                 }
             }
-        }).start();
+        });
     }
 
     public void checkTrendingNotifications() {

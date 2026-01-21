@@ -7,6 +7,7 @@ import net.modtale.model.user.User;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -22,6 +24,8 @@ public class ApiKeyService {
 
     @Autowired private ApiKeyRepository apiKeyRepository;
     @Autowired private UserRepository userRepository;
+    @Qualifier("taskExecutor")
+    @Autowired private Executor taskExecutor;
 
     private final PasswordEncoder encoder = new BCryptPasswordEncoder();
     private final SecureRandom secureRandom = new SecureRandom();
@@ -72,10 +76,10 @@ public class ApiKeyService {
     }
 
     private void updateLastUsed(ApiKey key) {
-        new Thread(() -> {
+        taskExecutor.execute(() -> {
             key.setLastUsed(LocalDateTime.now());
             apiKeyRepository.save(key);
-        }).start();
+        });
     }
 
     public User getUserFromKey(ApiKey key) {
