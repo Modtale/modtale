@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -109,6 +110,15 @@ public class ModService {
         }
         if ("ARCHIVED".equals(mod.getStatus())) {
             throw new IllegalStateException("Archived projects are read-only. Please unarchive the project to make changes.");
+        }
+    }
+
+    private void evictProjectDetails(Mod mod) {
+        if (mod == null) return;
+        Cache cache = cacheManager.getCache("projectDetails");
+        if (cache != null) {
+            if (mod.getId() != null) cache.evict(mod.getId());
+            if (mod.getSlug() != null) cache.evict(mod.getSlug());
         }
     }
 
@@ -431,6 +441,7 @@ public class ModService {
         }
 
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void revertModToDraft(String id, String username) {
@@ -445,6 +456,7 @@ public class ModService {
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void archiveMod(String id, String username) {
@@ -459,6 +471,7 @@ public class ModService {
         mod.setStatus("ARCHIVED");
         mod.setExpiresAt(null);
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void unlistMod(String id, String username) {
@@ -473,6 +486,7 @@ public class ModService {
         mod.setStatus("UNLISTED");
         mod.setExpiresAt(null);
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void publishMod(String id, String username) {
@@ -521,6 +535,7 @@ public class ModService {
         }
 
         Mod saved = modRepository.save(mod);
+        evictProjectDetails(mod);
 
         if (isNewRelease) {
             notifyNewProject(saved);
@@ -548,6 +563,7 @@ public class ModService {
         mod.setUpdatedAt(LocalDateTime.now().toString());
 
         modRepository.save(mod);
+        evictProjectDetails(mod);
         notifyUpdates(mod, ver.getVersionNumber());
         notifyDependents(mod, ver.getVersionNumber());
     }
@@ -566,6 +582,7 @@ public class ModService {
         ver.setReviewStatus(ModVersion.ReviewStatus.REJECTED);
         ver.setRejectionReason(reason);
         modRepository.save(mod);
+        evictProjectDetails(mod);
 
         User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
         if(author != null) {
@@ -619,6 +636,7 @@ public class ModService {
         version.setScanResult(pending);
 
         modRepository.save(mod);
+        evictProjectDetails(mod);
 
         String originalFilename = version.getFileUrl().substring(version.getFileUrl().lastIndexOf('/') + 1);
         if (originalFilename.length() > 37 && originalFilename.charAt(36) == '-') {
@@ -640,6 +658,7 @@ public class ModService {
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
         modRepository.save(mod);
+        evictProjectDetails(mod);
 
         User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
         if(author != null) {
@@ -715,6 +734,7 @@ public class ModService {
 
         mod.setPendingTransferTo(targetUsername);
         modRepository.save(mod);
+        evictProjectDetails(mod);
 
         Map<String, String> metadata = new HashMap<>();
         metadata.put("modId", mod.getId());
@@ -755,6 +775,7 @@ public class ModService {
             mod.setPendingTransferTo(null);
             mod.getContributors().remove(mod.getAuthor());
             modRepository.save(mod);
+            evictProjectDetails(mod);
 
             User oldOwner = userRepository.findByUsername(oldAuthor).orElse(null);
             if(oldOwner != null) {
@@ -763,6 +784,8 @@ public class ModService {
         } else {
             mod.setPendingTransferTo(null);
             modRepository.save(mod);
+            evictProjectDetails(mod);
+
             User oldOwner = userRepository.findByUsername(mod.getAuthor()).orElse(null);
             if(oldOwner != null) {
                 notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Declined", "Transfer request for " + mod.getTitle() + " was declined.", "/dashboard/projects", mod.getImageUrl());
@@ -775,6 +798,7 @@ public class ModService {
         validateClassification(mod.getClassification());
         mod.setStatus("PUBLISHED");
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void updateMod(String id, Mod updatedMod) {
@@ -841,6 +865,11 @@ public class ModService {
 
         existing.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(existing);
+        evictProjectDetails(existing);
+
+        if (slugChanged) {
+            Objects.requireNonNull(cacheManager.getCache("sitemapData")).clear();
+        }
     }
 
     public void updateProjectIcon(String id, MultipartFile file) throws IOException {
@@ -856,6 +885,7 @@ public class ModService {
         mod.setImageUrl(storageService.getPublicUrl(path));
         mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void updateProjectBanner(String id, MultipartFile file) throws IOException {
@@ -872,6 +902,7 @@ public class ModService {
         mod.setBannerUrl(storageService.getPublicUrl(path));
         mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     private void validateDependency(Mod parentMod, Mod depMod) {
@@ -923,6 +954,7 @@ public class ModService {
         }
         mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void addVersionToMod(String modId, String versionNumber, List<String> gameVersions,
@@ -1016,6 +1048,7 @@ public class ModService {
 
         mod.getVersions().add(0, ver);
         modRepository.save(mod);
+        evictProjectDetails(mod);
 
         if (file != null && !isModpack) {
             self.performBackgroundScan(mod.getId(), ver.getId(), filePath, file.getOriginalFilename());
@@ -1065,6 +1098,7 @@ public class ModService {
 
             Query query = new Query(Criteria.where("_id").is(modId).and("versions._id").is(versionId));
             mongoTemplate.updateFirst(query, update, Mod.class);
+            evictProjectDetails(mod);
 
             if (autoApproved && "PUBLISHED".equals(mod.getStatus())) {
                 ModVersion ver = mod.getVersions().stream()
@@ -1087,6 +1121,9 @@ public class ModService {
             Update update = new Update()
                     .set("versions.$.scanResult", failed);
             mongoTemplate.updateFirst(query, update, Mod.class);
+
+            Mod mod = modRepository.findById(modId).orElse(null);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1114,6 +1151,7 @@ public class ModService {
 
         if (removed) {
             modRepository.save(mod);
+            evictProjectDetails(mod);
         } else {
             throw new IllegalArgumentException("Version not found.");
         }
@@ -1150,9 +1188,10 @@ public class ModService {
             throw new IllegalArgumentException("Project is not in a recoverable state.");
         }
 
-        mod.setStatus("PUBLISHED"); // Restore to published state
+        mod.setStatus("PUBLISHED");
         mod.setDeletedAt(null);
         modRepository.save(mod);
+        evictProjectDetails(mod);
         logger.info("Project " + mod.getId() + " restored by admin " + user.getUsername());
     }
 
@@ -1164,6 +1203,7 @@ public class ModService {
         mod.setStatus("UNLISTED");
         mod.setExpiresAt(null);
         modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void adminDeleteVersion(String modId, String versionId) {
@@ -1182,6 +1222,7 @@ public class ModService {
 
         if (removed) {
             modRepository.save(mod);
+            evictProjectDetails(mod);
         } else {
             throw new IllegalArgumentException("Version not found.");
         }
@@ -1200,6 +1241,7 @@ public class ModService {
         mod.setStatus("DELETED");
         mod.setDeletedAt(LocalDateTime.now());
         modRepository.save(mod);
+        evictProjectDetails(mod);
 
         logger.info("Soft deleted project " + mod.getId() + ". Grace period started.");
     }
@@ -1250,6 +1292,7 @@ public class ModService {
 
             mod.setDeletedAt(null);
             modRepository.save(mod);
+            evictProjectDetails(mod);
         } else {
             logger.info("Hard deleting project " + mod.getId());
             analyticsService.deleteProjectAnalytics(mod.getId());
@@ -1284,6 +1327,7 @@ public class ModService {
 
             mongoTemplate.updateMulti(new Query(Criteria.where("likedModIds").is(mod.getId())), new Update().pull("likedModIds", mod.getId()), User.class);
             modRepository.delete(mod);
+            evictProjectDetails(mod);
 
             for (String depId : dependencyIds) {
                 cleanupOrphanedDependency(depId);
@@ -1473,6 +1517,7 @@ public class ModService {
         User invitee = userRepository.findByUsername(usernameToInvite).orElseThrow(() -> new IllegalArgumentException("User not found"));
         mod.getPendingInvites().add(usernameToInvite);
         modRepository.save(mod);
+        evictProjectDetails(mod);
         Map<String, String> metadata = new HashMap<>();
         metadata.put("modId", mod.getId());
         metadata.put("action", "CONTRIBUTOR_INVITE");
@@ -1486,6 +1531,7 @@ public class ModService {
             ensureEditable(mod);
             mod.getContributors().remove(usernameToRemove);
             modRepository.save(mod);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1495,6 +1541,7 @@ public class ModService {
         if (mod != null && mod.getPendingInvites().remove(currentUser.getUsername())) {
             mod.getContributors().add(currentUser.getUsername());
             modRepository.save(mod);
+            evictProjectDetails(mod);
             User owner = userRepository.findByUsername(mod.getAuthor()).orElse(null);
             if (owner != null) {
                 notificationService.sendNotification(
@@ -1513,6 +1560,7 @@ public class ModService {
         Mod mod = getRawModById(modId);
         if (mod != null && mod.getPendingInvites().remove(currentUser.getUsername())) {
             modRepository.save(mod);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1546,6 +1594,7 @@ public class ModService {
             double avg = mod.getReviews().stream().mapToInt(Review::getRating).average().orElse(0.0);
             mod.setRating(Math.round(avg * 10.0) / 10.0);
             modRepository.save(mod);
+            evictProjectDetails(mod);
             User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
             if (author != null && author.getNotificationPreferences().getNewReviews() != User.NotificationLevel.OFF) {
                 notificationService.sendNotification(
@@ -1578,6 +1627,7 @@ public class ModService {
             double avg = mod.getReviews().stream().mapToInt(Review::getRating).average().orElse(0.0);
             mod.setRating(Math.round(avg * 10.0) / 10.0);
             modRepository.save(mod);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1599,6 +1649,7 @@ public class ModService {
             review.setDeveloperReplyDate(LocalDateTime.now().toString());
 
             modRepository.save(mod);
+            evictProjectDetails(mod);
 
             User reviewer = userRepository.findByUsername(review.getUser()).orElse(null);
             if (reviewer != null) {
@@ -1628,6 +1679,7 @@ public class ModService {
             }
             userRepository.save(user);
             modRepository.save(mod);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1637,6 +1689,7 @@ public class ModService {
             ensureEditable(mod);
             mod.getGalleryImages().add(imageUrl);
             modRepository.save(mod);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1648,6 +1701,7 @@ public class ModService {
             mod.getGalleryImages().remove(imageUrl);
             storageService.deleteFile(imageUrl);
             modRepository.save(mod);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1672,7 +1726,6 @@ public class ModService {
     }
 
     public List<User> searchCreators(String query) {
-        // Optimized: Use database regex instead of fetching all users into memory
         List<User> creators = userRepository.findByUsernameContainingIgnoreCase(query, PageRequest.of(0, 10));
         return creators;
     }
@@ -1700,6 +1753,7 @@ public class ModService {
             Mod mod = modOpt.get();
             mod.setDownloadCount(mod.getDownloadCount() + 1);
             modRepository.save(mod);
+            evictProjectDetails(mod);
             analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false, "internal");
         }
     }
