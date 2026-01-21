@@ -245,8 +245,16 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
-        // OPTIMIZATION: Exclude heavy fields for list views
-        pipeline.add(Aggregation.project().andExclude("about", "reviews", "galleryImages"));
+        pipeline.add(Aggregation.project().andExclude(
+                "about",
+                "reviews",
+                "galleryImages",
+                "contributors",
+                "pendingInvites",
+                "versions.scanResult",
+                "versions.rejectionReason",
+                "versions.changelog"
+        ));
 
         Aggregation mainAgg = Aggregation.newAggregation(Mod.class, pipeline);
         List<Mod> results = mongoTemplate.aggregate(mainAgg, Mod.class, Mod.class).getMappedResults();
@@ -254,7 +262,6 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         long total;
         if ("hidden_gems".equals(viewCategory)) {
             List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
-            // Remove sort/skip/limit and the projection we just added to ensure accurate counting
             countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation);
             countPipeline.add(Aggregation.count().as("total"));
 
@@ -282,7 +289,16 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             ));
         }
 
-        query.fields().exclude("about", "reviews", "galleryImages");
+        query.fields().exclude(
+                "about",
+                "reviews",
+                "galleryImages",
+                "contributors",
+                "pendingInvites",
+                "versions.scanResult",
+                "versions.rejectionReason",
+                "versions.changelog"
+        );
 
         query.with(pageable);
         List<Mod> list = mongoTemplate.find(query, Mod.class);
