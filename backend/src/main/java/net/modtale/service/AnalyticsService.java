@@ -1,5 +1,7 @@
 package net.modtale.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import net.modtale.model.analytics.*;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ProjectMeta;
@@ -9,9 +11,6 @@ import net.modtale.repository.resources.ModRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
@@ -27,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -39,23 +39,25 @@ public class AnalyticsService {
     @Autowired private PlatformMonthlyStatsRepository platformStatsRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private MongoTemplate mongoTemplate;
-    @Autowired private CacheManager cacheManager;
 
     private final ConcurrentLinkedQueue<DownloadEvent> downloadBuffer = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<String, AtomicInteger> viewBuffer = new ConcurrentHashMap<>();
+
+    private final Cache<String, Boolean> debounceCache = Caffeine.newBuilder()
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .maximumSize(50000)
+            .build();
 
     private record DownloadEvent(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {}
 
     private boolean isDebounced(String projectId, String clientIp, String type) {
         if (clientIp == null || clientIp.isEmpty()) return false;
-        Cache cache = cacheManager.getCache("analyticsDebounce");
-        if (cache != null) {
-            String key = type + ":" + projectId + ":" + clientIp;
-            if (cache.get(key) != null) {
-                return true;
-            }
-            cache.put(key, Boolean.TRUE);
+
+        String key = type + ":" + projectId + ":" + clientIp;
+        if (debounceCache.getIfPresent(key) != null) {
+            return true;
         }
+        debounceCache.put(key, Boolean.TRUE);
         return false;
     }
 
