@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, Home, Moon, Sun, LayoutDashboard, User as UserIcon, LogOut, ChevronDown, Shield, Users, LogIn } from 'lucide-react';
+import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, ChevronDown, Shield, Users, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationMenu } from './user/NotificationMenu';
 import { FollowingModal } from './user/FollowingModal';
 import { SignInModal } from './user/SignInModal';
+import { AnimatedThemeToggler } from './ui/AnimatedThemeToggler';
 import type {User} from "@/types.ts";
 
 interface NavbarProps {
@@ -125,9 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             </>
                         )}
 
-                        <button onClick={toggleDarkMode} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors">
-                            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                        </button>
+                        <AnimatedThemeToggler onToggle={toggleDarkMode} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors" />
 
                         {user ? (
                             <div className="relative ml-1" ref={profileRef}>
@@ -190,9 +189,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <div className="flex items-center justify-between p-3">
                         <span className="font-bold text-slate-700 dark:text-slate-200">Theme</span>
-                        <button onClick={toggleDarkMode} className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg text-slate-600 dark:text-slate-300">
-                            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                        </button>
+                        <AnimatedThemeToggler onToggle={toggleDarkMode} className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg text-slate-600 dark:text-slate-300" />
                     </div>
 
                     {user ? (

@@ -69,8 +69,8 @@ const FilterDropdown = ({ label, value, options, onChange }: { label: string, va
     return (
         <div className="relative">
             <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">{label}</label>
-            <button onClick={() => setIsOpen(!isOpen)} className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 flex justify-between items-center hover:border-modtale-accent transition-colors">{value}<ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button>
-            {isOpen && <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto py-1 custom-scrollbar">{options.map(opt => <button key={opt} onClick={() => { onChange(opt); setIsOpen(false); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${value === opt ? 'bg-modtale-accent/10 text-modtale-accent' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt}{value === opt && <Check className="w-3 h-3" />}</button>)}</div>}
+            <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 flex justify-between items-center hover:border-modtale-accent transition-colors">{value}<ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button>
+            {isOpen && <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg shadow-xl z-[250] max-h-48 overflow-y-auto py-1 custom-scrollbar">{options.map(opt => <button key={opt} onClick={(e) => { e.stopPropagation(); onChange(opt); setIsOpen(false); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${value === opt ? 'bg-modtale-accent/10 text-modtale-accent' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt}{value === opt && <Check className="w-3 h-3" />}</button>)}</div>}
         </div>
     );
 };
@@ -125,7 +125,10 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                 if(isFilterOpen) onToggleFilterMenu();
             }
         };
-        document.addEventListener('mousedown', handleClick); return () => document.removeEventListener('mousedown', handleClick);
+        document.addEventListener('mousedown', handleClick);
+        return () => {
+            document.removeEventListener('mousedown', handleClick);
+        };
     }, [isFilterOpen, onToggleFilterMenu]);
 
     useEffect(() => {
@@ -179,7 +182,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                             {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px]">{selectedTags.length}</span>}
                         </button>
                         {isTagsOpen && (
-                            <div className="absolute top-12 left-0 md:left-auto md:right-0 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[70] p-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute left-0 top-12 w-[calc(100vw-2rem)] md:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
                                 <div className="flex justify-between items-center mb-3">
                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</h3>
                                     {selectedTags.length > 0 && <button onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
@@ -203,7 +206,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                         </button>
 
                         {isFilterOpen && (
-                            <div className="absolute top-12 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-0 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[70] animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute left-1/2 -translate-x-1/2 md:left-auto md:right-0 md:translate-x-0 top-12 w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] animate-in fade-in slide-in-from-top-2">
                                 <div className="p-4 border-b border-slate-100 dark:border-white/5">
                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</h3>
                                 </div>

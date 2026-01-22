@@ -174,7 +174,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
              onPointerUp={handlePointerUp}
              onPointerLeave={handlePointerUp}
         >
-            <div className="bg-white dark:bg-modtale-card w-full max-w-lg rounded-xl overflow-hidden shadow-2xl flex flex-col h-[80vh] md:h-[600px]">
+            <div className="bg-white dark:bg-modtale-card w-full max-w-lg rounded-xl overflow-hidden shadow-2xl flex flex-col h-[80dvh] md:h-[600px]">
 
                 <div className="p-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white dark:bg-modtale-card z-10">
                     <h3 className="font-black text-lg text-slate-900 dark:text-white">Crop Image</h3>
