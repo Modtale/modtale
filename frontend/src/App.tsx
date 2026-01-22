@@ -51,7 +51,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const [loadingAuth, setLoadingAuth] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [mods, setMods] = useState<Mod[]>([]);
-    const [modpacks, setModpacks] = useState<Modpack[]>([]);
+    // Removed separate modpacks state
     const [worlds, setWorlds] = useState<World[]>([]);
     const [downloadedSessionIds, setDownloadedSessionIds] = useState<Set<string>>(new Set());
     const [globalError, setGlobalError] = useState<string | null>(null);
@@ -99,9 +99,9 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
             const res = await api.get('/projects?size=1000');
             const allProjects = res.data?.content || [];
 
-            setMods(allProjects.filter((p: any) => p.classification !== 'SAVE' && p.classification !== 'MODPACK'));
+            // Group all non-SAVE projects (plugins, modpacks, art, data) into 'mods'
+            setMods(allProjects.filter((p: any) => p.classification !== 'SAVE'));
             setWorlds(allProjects.filter((p: any) => p.classification === 'SAVE'));
-            setModpacks(allProjects.filter((p: any) => p.classification === 'MODPACK'));
         } catch (e) { console.error("Background fetch failed", e); }
     }, []);
 
@@ -138,24 +138,23 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const handleNavigate = (page: string) => { navigate(page === 'home' ? '/' : `/${page}`); };
     const handleAuthorClick = (author: string) => { navigate(`/creator/${author}`); };
     const handleModClick = (mod: Mod) => { navigate(`/mod/${createSlug(mod.title, mod.id)}`); }
-    const handleModpackClick = (modpack: Modpack) => { navigate(`/modpack/${createSlug(modpack.title, modpack.id)}`); }
+    // handleModpackClick removed, use handleModClick or direct navigation
     const handleWorldClick = (world: World) => { navigate(`/world/${createSlug(world.title, world.id)}`); }
 
     const handleToggleFavorite = async (id: string) => {
         if (!user) return;
-        const isLiked = user.likedModIds?.includes(id) || user.likedModpackIds?.includes(id);
+        const isLiked = user.likedModIds?.includes(id);
 
         const newModLikes = isLiked ? (user.likedModIds || []).filter(lid => lid !== id) : [...(user.likedModIds || []), id];
         setUser({ ...user, likedModIds: newModLikes });
 
         setMods(prev => prev.map(m => m.id === id ? { ...m, favoriteCount: isLiked ? Math.max(0, m.favoriteCount - 1) : m.favoriteCount + 1 } : m));
         setWorlds(prev => prev.map(w => w.id === id ? { ...w, favoriteCount: isLiked ? Math.max(0, w.favoriteCount - 1) : w.favoriteCount + 1 } : w));
-        setModpacks(prev => prev.map(m => m.id === id ? { ...m, favoriteCount: isLiked ? Math.max(0, m.favoriteCount - 1) : m.favoriteCount + 1 } : m));
 
         try { await api.post(`/projects/${id}/favorite`); } catch (e) { refreshData(); }
     };
 
-    const handleDownload = (id: string, isModpack = false) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
+    const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
 
     if (mounted && loadingAuth) return (
         <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark flex items-center justify-center">
@@ -164,11 +163,17 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     );
 
     const renderHome = (classification?: Classification) => (
-        <Home onModClick={handleModClick} onModpackClick={handleModpackClick} onWorldClick={handleWorldClick}
-              onAuthorClick={handleAuthorClick} likedModIds={user?.likedModIds || []}
-              likedModpackIds={user?.likedModpackIds || []} onToggleFavoriteMod={handleToggleFavorite}
-              onToggleFavoriteModpack={handleToggleFavorite} isLoggedIn={!!user}
-              initialClassification={classification} />
+        <Home
+            onModClick={handleModClick}
+            onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)} // Unified handler
+            onWorldClick={handleWorldClick}
+            onAuthorClick={handleAuthorClick}
+            likedModIds={user?.likedModIds || []}
+            onToggleFavoriteMod={handleToggleFavorite}
+            onToggleFavoriteModpack={handleToggleFavorite}
+            isLoggedIn={!!user}
+            initialClassification={classification}
+        />
     );
 
     return (
@@ -213,15 +218,26 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                         <Route path="/dashboard/*" element={<Dashboard user={user} onRefreshUser={fetchUser} />} />
                         <Route path="/analytics/project/:id" element={<Analytics />} />
 
-                        <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, false)} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
                         <Route path="/mod/:id/edit" element={<EditMod currentUser={user} />} />
 
-                        <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModpackIds?.includes(id) || user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, true)} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
                         <Route path="/modpack/:id/edit" element={<EditMod currentUser={user} />} />
 
-                        <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={(id) => handleDownload(id, false)} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
 
-                        <Route path="/creator/:username" element={<CreatorProfile onModClick={handleModClick} onModpackClick={handleModpackClick} onBack={() => handleNavigate('home')} likedModIds={user?.likedModIds || []} likedModpackIds={user?.likedModpackIds || []} onToggleFavorite={handleToggleFavorite} onToggleFavoriteModpack={handleToggleFavorite} currentUser={user} onRefreshUser={fetchUser} />} />
+                        <Route path="/creator/:username" element={
+                            <CreatorProfile
+                                onModClick={handleModClick}
+                                onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
+                                onBack={() => handleNavigate('home')}
+                                likedModIds={user?.likedModIds || []}
+                                onToggleFavorite={handleToggleFavorite}
+                                onToggleFavoriteModpack={handleToggleFavorite}
+                                currentUser={user}
+                                onRefreshUser={fetchUser}
+                            />
+                        } />
 
                         <Route path="/verify" element={
                             <VerifyEmail

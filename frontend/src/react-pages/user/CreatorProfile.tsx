@@ -15,7 +15,6 @@ interface CreatorProfileProps {
     onModpackClick: (modpack: Modpack) => void;
     onBack: () => void;
     likedModIds: string[];
-    likedModpackIds: string[];
     onToggleFavorite: (id: string) => void;
     onToggleFavoriteModpack: (id: string) => void;
     currentUser: User | null;
@@ -23,7 +22,7 @@ interface CreatorProfileProps {
 }
 
 export const CreatorProfile: React.FC<CreatorProfileProps> = ({
-                                                                  onModClick, onModpackClick, onBack, likedModIds, likedModpackIds, onToggleFavorite, onToggleFavoriteModpack, currentUser, onRefreshUser
+                                                                  onModClick, onModpackClick, onBack, likedModIds, onToggleFavorite, onToggleFavoriteModpack, currentUser, onRefreshUser
                                                               }) => {
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
@@ -261,7 +260,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                     <ModCard
                                         mod={project as Mod}
                                         path={getProjectPath(project)}
-                                        isFavorite={likedModIds.includes(project.id) || likedModpackIds.includes(project.id)}
+                                        isFavorite={likedModIds.includes(project.id)}
                                         onToggleFavorite={() => { if (project.classification === 'MODPACK') onToggleFavoriteModpack(project.id); else onToggleFavorite(project.id); }}
                                         isLoggedIn={!!currentUser}
                                     />

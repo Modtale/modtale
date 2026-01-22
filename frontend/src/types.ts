@@ -22,7 +22,6 @@ export interface User {
     emailVerified?: boolean;
     createdAt?: string;
     likedModIds: string[];
-    likedModpackIds: string[];
     followingIds?: string[];
     followerIds?: string[];
     connectedAccounts?: ConnectedAccount[];

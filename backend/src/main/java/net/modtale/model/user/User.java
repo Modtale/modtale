@@ -230,8 +230,6 @@ public class User implements Serializable {
 
     public List<String> getLikedModIds() { return likedModIds; }
     public void setLikedModIds(List<String> likedModIds) { this.likedModIds = likedModIds; }
-    public List<String> getLikedModpackIds() { return likedModpackIds; }
-    public void setLikedModpackIds(List<String> likedModpackIds) { this.likedModpackIds = likedModpackIds; }
 
     public List<String> getFollowingIds() { return followingIds; }
     public void setFollowingIds(List<String> followingIds) { this.followingIds = followingIds; }

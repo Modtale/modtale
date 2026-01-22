@@ -21,7 +21,6 @@ interface HomeProps {
     onWorldClick: (world: World) => void;
     onAuthorClick: (author: string) => void;
     likedModIds: string[];
-    likedModpackIds: string[];
     onToggleFavoriteMod: (modId: string) => void;
     onToggleFavoriteModpack: (modpackId: string) => void;
     isLoggedIn: boolean;
@@ -43,7 +42,7 @@ const getRouteForClassification = (cls: Classification | 'All') => {
 
 export const Home: React.FC<HomeProps> = ({
                                               onModClick, onModpackClick, onWorldClick, onAuthorClick,
-                                              likedModIds, likedModpackIds, onToggleFavoriteMod, onToggleFavoriteModpack, isLoggedIn,
+                                              likedModIds, onToggleFavoriteMod, onToggleFavoriteModpack, isLoggedIn,
                                               initialClassification
                                           }) => {
     const navigate = useNavigate();
@@ -232,7 +231,7 @@ export const Home: React.FC<HomeProps> = ({
     const handleToggleLocal = (id: string, isModpack: boolean) => {
         if (!isLoggedIn) return;
         onToggleFavoriteMod(id);
-        setItems(prev => prev.map(i => i.id === id ? { ...i, favoriteCount: (likedModIds.includes(id) || likedModpackIds.includes(id)) ? Math.max(0, i.favoriteCount - 1) : i.favoriteCount + 1 } : i));
+        setItems(prev => prev.map(i => i.id === id ? { ...i, favoriteCount: (likedModIds.includes(id) ? Math.max(0, i.favoriteCount - 1) : i.favoriteCount + 1)} : i));
     };
 
     const getProjectPath = (item: Mod | Modpack | World) => {
@@ -348,7 +347,7 @@ export const Home: React.FC<HomeProps> = ({
                                         <ModCard
                                             mod={item}
                                             path={getProjectPath(item)}
-                                            isFavorite={likedModIds.includes(item.id) || likedModpackIds.includes(item.id)}
+                                            isFavorite={likedModIds.includes(item.id)}
                                             onToggleFavorite={(id) => handleToggleLocal(id, item.classification === 'MODPACK')}
                                             isLoggedIn={isLoggedIn}
                                             onClick={() => { if(item.classification === 'MODPACK') onModpackClick(item as Modpack); else if (item.classification === 'SAVE') onWorldClick(item as World); else onModClick(item as Mod); }}
