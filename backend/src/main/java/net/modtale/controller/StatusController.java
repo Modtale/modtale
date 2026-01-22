@@ -1,7 +1,7 @@
 package net.modtale.controller;
 
-import net.modtale.model.analytics.StatusHistory;
-import net.modtale.repository.analytics.StatusHistoryRepository;
+import net.modtale.model.StatusHistory;
+import net.modtale.repository.StatusHistoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

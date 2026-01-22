@@ -1,5 +1,7 @@
 package net.modtale.config.security;
 
+import net.modtale.config.security.auth.CustomOAuth2UserService;
+import net.modtale.config.security.auth.CustomOidcUserService;
 import net.modtale.service.security.CustomUserDetailsService;
 import net.modtale.service.user.UserService;
 import net.modtale.model.user.User;

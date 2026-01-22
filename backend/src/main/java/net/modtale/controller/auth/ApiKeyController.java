@@ -1,4 +1,4 @@
-package net.modtale.controller.user;
+package net.modtale.controller.auth;
 
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;

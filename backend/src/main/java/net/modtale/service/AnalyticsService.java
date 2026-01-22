@@ -3,6 +3,8 @@ package net.modtale.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import net.modtale.model.analytics.*;
+import net.modtale.model.analytics.PlatformAnalyticsSummary;
+import net.modtale.model.analytics.PlatformMonthlyStats;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ProjectMeta;
 import net.modtale.repository.analytics.PlatformMonthlyStatsRepository;

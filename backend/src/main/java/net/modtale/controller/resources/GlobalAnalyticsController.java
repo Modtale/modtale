@@ -1,4 +1,4 @@
-package net.modtale.controller;
+package net.modtale.controller.resources;
 
 import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.user.User;

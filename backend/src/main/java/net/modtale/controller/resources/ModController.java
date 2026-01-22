@@ -1,4 +1,4 @@
-package net.modtale.controller;
+package net.modtale.controller.resources;
 
 import net.modtale.model.user.User;
 import net.modtale.model.resources.*;
@@ -27,7 +27,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Arrays;
 import java.util.List;

@@ -1,4 +1,4 @@
-package net.modtale.controller.user;
+package net.modtale.controller.resources;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.modtale.model.user.User;
