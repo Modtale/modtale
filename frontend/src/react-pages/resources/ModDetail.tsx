@@ -938,54 +938,6 @@ export const ModDetail: React.FC<{
                 mainContent={
                     <>
                         <div className="prose dark:prose-invert prose-lg max-w-none">
-                            {mod.about ? (
-                                <ReactMarkdown
-                                    remarkPlugins={[remarkGfm]}
-                                    rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                                        ...defaultSchema,
-                                        attributes: {
-                                            ...defaultSchema.attributes,
-                                            code: ['className']
-                                        }
-                                    }]]}
-                                    components={{
-                                        code({node, inline, className, children, ...props}: any) {
-                                            const match = /language-(\w+)/.exec(className || '')
-                                            return !inline && match ? (
-                                                <SyntaxHighlighter
-                                                    {...props}
-                                                    style={vscDarkPlus}
-                                                    language={match[1]}
-                                                    PreTag="div"
-                                                    className="rounded-lg text-sm"
-                                                >
-                                                    {String(children).replace(/\n$/, '')}
-                                                </SyntaxHighlighter>
-                                            ) : (
-                                                <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm break-all`} {...props}>
-                                                    {children}
-                                                </code>
-                                            )
-                                        },
-                                        p({node, children, ...props}: any) {
-                                            return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
-                                        },
-                                        li({node, children, ...props}: any) {
-                                            return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
-                                        },
-                                        ul({node, children, ...props}: any) {
-                                            return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
-                                        },
-                                        ol({node, children, ...props}: any) {
-                                            return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
-                                        }
-                                    }}
-                                >
-                                    {mod.about}
-                                </ReactMarkdown>
-                            ) : (
-                                <p className="text-slate-500 italic">No description.</p>
-                            )}
                             {memoizedDescription}
                         </div>
                         <ReviewSection
