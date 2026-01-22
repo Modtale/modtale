@@ -113,8 +113,12 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
             if (res.data && (res.data as any).is_new_account) {
                 setShowOnboarding(true);
             }
-        } catch (e) {
-            console.error("Failed to refresh user", e);
+        } catch (e: any) {
+            if (e.response && e.response.status === 401) {
+                setUser(null);
+            } else {
+                console.error("Failed to refresh user", e);
+            }
         }
     };
 
