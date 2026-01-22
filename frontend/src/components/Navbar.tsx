@@ -48,22 +48,29 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const NavLink = ({ id, icon: Icon, label }: any) => {
         let isActive = false;
+        let toPath = '/';
 
         if (id === 'home') {
+            toPath = '/';
             const homeCategories = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
             const detailPrefixes = ['mod/', 'world/', 'modpack/'];
 
             isActive = homeCategories.includes(currentPage) ||
                 detailPrefixes.some(prefix => currentPage.startsWith(prefix));
         } else if (id === 'dashboard') {
+            toPath = '/dashboard';
             isActive = currentPage.startsWith('dashboard');
+        } else if (id === 'upload') {
+            toPath = '/upload';
+            isActive = currentPage === 'upload';
         } else {
+            toPath = `/${id}`;
             isActive = currentPage === id;
         }
 
         return (
-            <button
-                onClick={() => onNavigate(id)}
+            <Link
+                to={toPath}
                 className={`flex items-center px-3 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 border ${
                     isActive
                         ? 'text-modtale-accent border-modtale-accent bg-modtale-accentDim shadow-[0_0_15px_rgba(59,130,246,0.2)]'
@@ -72,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
                 <Icon className="w-4 h-4 mr-2" />
                 {label}
-            </button>
+            </Link>
         );
     };
 
@@ -169,10 +176,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {isMobileMenuOpen && (
                 <div ref={mobileMenuRef} className="md:hidden absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
-                    <button onClick={() => onNavigate('home')} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Home className="w-4 h-4 mr-3" /> Home</button>
-                    <button onClick={() => onNavigate('upload')} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Upload className="w-4 h-4 mr-3" /> Create Project</button>
+                    <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Home className="w-4 h-4 mr-3" /> Home</Link>
+                    <Link to="/upload" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Upload className="w-4 h-4 mr-3" /> Create Project</Link>
                     {user && (
-                        <button onClick={() => onNavigate('dashboard')} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</button>
+                        <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
+                    )}
+
+                    {(user?.roles?.includes('ADMIN') || user?.username === 'Villagers654') && (
+                        <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
                     )}
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
