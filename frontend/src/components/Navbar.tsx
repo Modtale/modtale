@@ -150,7 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                         <button onClick={() => { setIsProfileOpen(false); onAuthorClick(user.username); }} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors"><UserIcon className="w-4 h-4" /> Your Profile</button>
                                         <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors"><Users className="w-4 h-4" /> Following</button>
                                         <Link to="/dashboard" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors"><LayoutDashboard className="w-4 h-4" /> Creator Dashboard</Link>
-                                        {(user.roles?.includes('ADMIN') || user.username === 'Villagers654') && (
+                                        {(user.roles?.includes('ADMIN')) && (
                                             <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors"><Shield className="w-4 h-4" /> Admin Panel</Link>
                                         )}
                                         <div className="border-t border-slate-100 dark:border-white/5 my-1"></div>
@@ -182,7 +182,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
                     )}
 
-                    {(user?.roles?.includes('ADMIN') || user?.username === 'Villagers654') && (
+                    {(user?.roles?.includes('ADMIN')) && (
                         <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
                     )}
 

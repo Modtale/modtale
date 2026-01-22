@@ -25,8 +25,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
 
     const [reports, setReports] = useState<any[]>([]);
 
-    const isAdmin = currentUser?.roles?.includes('ADMIN') || currentUser?.username === 'Villagers654';
-    const isSuperAdmin = currentUser?.username === 'Villagers654';
+    const isAdmin = currentUser?.roles?.includes('ADMIN');
+    const isSuperAdmin = currentUser?.username;
 
     useEffect(() => {
         if (isAdmin) {
