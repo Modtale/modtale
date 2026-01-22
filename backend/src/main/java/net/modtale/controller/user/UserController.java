@@ -12,10 +12,14 @@ import net.modtale.service.security.FileValidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -25,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -339,7 +344,7 @@ public class UserController {
     }
 
     @PutMapping("/user/profile")
-    public ResponseEntity<?> updateProfile(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> updateProfile(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
@@ -352,6 +357,20 @@ public class UserController {
 
         try {
             User updated = userService.updateUserProfile(user.getId(), bio, username);
+
+            if (username != null && !username.equals(user.getUsername())) {
+                Authentication newAuth = new UsernamePasswordAuthenticationToken(
+                        updated,
+                        null,
+                        updated.getRoles().stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).collect(Collectors.toList())
+                );
+                SecurityContextHolder.getContext().setAuthentication(newAuth);
+                HttpSession session = request.getSession(false);
+                if (session != null) {
+                    session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, SecurityContextHolder.getContext());
+                }
+            }
+
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
