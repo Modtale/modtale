@@ -126,13 +126,17 @@ public class AuthController {
         if (user == null) return ResponseEntity.status(401).build();
 
         String code = body.get("code");
+        if (code == null || code.length() != 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid code format"));
+        }
+
         String secret = user.getMfaSecret();
 
         if (twoFactorService.isOtpValid(secret, code)) {
             userService.enableMfa(user.getId());
             return ResponseEntity.ok(Map.of("message", "MFA enabled successfully"));
         } else {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid code"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid verification code. 2FA not enabled."));
         }
     }
 
