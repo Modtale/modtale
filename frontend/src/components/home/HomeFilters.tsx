@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Star, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GLOBAL_TAGS } from '../../data/categories';
+import { api } from '../../utils/api';
+import { compareSemVer } from '../../utils/modHelpers';
 
 const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null, onSelect: (date: Date) => void }) => {
     const [viewDate, setViewDate] = useState(selectedDate || new Date());
@@ -114,6 +116,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
     const [customDl, setCustomDl] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
     const [selectedDateObj, setSelectedDateObj] = useState<Date | null>(null);
+    const [gameVersionOptions, setGameVersionOptions] = useState<string[]>(['Any']);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
@@ -124,6 +127,14 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
         };
         document.addEventListener('mousedown', handleClick); return () => document.removeEventListener('mousedown', handleClick);
     }, [isFilterOpen, onToggleFilterMenu]);
+
+    useEffect(() => {
+        api.get('/meta/game-versions').then(res => {
+            const versions = Array.isArray(res.data) ? res.data : [];
+            const sorted = versions.sort((a: string, b: string) => compareSemVer(b, a));
+            setGameVersionOptions(['Any', ...sorted]);
+        }).catch(err => console.error("Failed to load game versions for filters", err));
+    }, []);
 
     const handleSortOpen = () => { if (isFilterOpen) onToggleFilterMenu(); if (isTagsOpen) setIsTagsOpen(false); };
     const handleDateSelect = (date: Date) => { const isoDate = date.toISOString().split('T')[0]; setFilterDate(isoDate); setSelectedDateObj(date); setShowCalendar(false); setPage(0); };
@@ -197,7 +208,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</h3>
                                 </div>
                                 <div className="p-4 space-y-5">
-                                    <FilterDropdown label="Game Version" value={selectedVersion} options={['Any', '2026.01.13-dcad8778f', '2026.01.17-4b0f30090']} onChange={(val) => {setSelectedVersion(val); setPage(0);}} />
+                                    <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val); setPage(0);}} />
 
                                     <div>
                                         <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Minimum Rating</label>

@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone, type Accept } from 'react-dropzone';
-import { UploadCloud, Check, ChevronDown, AlertCircle, CheckCircle2, Beaker, Zap } from 'lucide-react';
+import { UploadCloud, Check, ChevronDown, AlertCircle, CheckCircle2, Beaker, Zap, Loader2 } from 'lucide-react';
 import { DependencySelector } from './DependencySelector';
 import { compareSemVer } from '../../../utils/modHelpers';
+import { api } from '../../../utils/api';
 
 export interface MetadataFormData {
     title: string;
@@ -87,17 +88,32 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                                                                 disabled
                                                             }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [availableGameVersions, setAvailableGameVersions] = useState<string[]>([]);
+    const [loadingVersions, setLoadingVersions] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const gameVersions = useMemo(() =>
-            ['2026.01.17-4b0f30090', '2026.01.13-dcad8778f'].sort((a, b) => compareSemVer(b, a)),
-        []);
+    useEffect(() => {
+        const fetchVersions = async () => {
+            setLoadingVersions(true);
+            try {
+                const res = await api.get('/meta/game-versions');
+                const versions = Array.isArray(res.data) ? res.data : [];
+                const sorted = versions.sort((a: string, b: string) => compareSemVer(b, a));
+                setAvailableGameVersions(sorted);
+            } catch (error) {
+                console.error("Failed to fetch game versions", error);
+            } finally {
+                setLoadingVersions(false);
+            }
+        };
+        fetchVersions();
+    }, []);
 
     useEffect(() => {
-        if (!disabled && (!data.gameVersions || data.gameVersions.length === 0) && gameVersions.length > 0) {
-            onChange({ ...data, gameVersions: [gameVersions[0]] });
+        if (!disabled && (!data.gameVersions || data.gameVersions.length === 0) && availableGameVersions.length > 0) {
+            onChange({ ...data, gameVersions: [availableGameVersions[0]] });
         }
-    }, [disabled, data.gameVersions, onChange, gameVersions]);
+    }, [disabled, data.gameVersions, onChange, availableGameVersions]);
 
     const versionNum = data.versionNumber.trim();
     const isFormatValid = STRICT_VERSION_REGEX.test(versionNum);
@@ -235,20 +251,20 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                             className={`w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none transition-all text-left flex justify-between items-center ${disabled ? 'cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent'}`}
                         >
                             <span className={data.gameVersions?.length > 0 ? "text-slate-900 dark:text-white font-medium" : "text-slate-400"}>
-                                {data.gameVersions && data.gameVersions.length > 0
+                                {loadingVersions ? "Loading..." : data.gameVersions && data.gameVersions.length > 0
                                     ? `${data.gameVersions.length} selected`
                                     : "Select Versions..."}
                             </span>
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                            {loadingVersions ? <Loader2 className="w-4 h-4 text-slate-400 animate-spin" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                         </button>
-                        {dropdownOpen && !disabled && (
+                        {dropdownOpen && !disabled && !loadingVersions && (
                             <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                                {gameVersions.map(v => (
+                                {availableGameVersions.map(v => (
                                     <button
                                         key={v}
                                         type="button"
                                         onClick={(e) => {
-                                            e.stopPropagation(); // Keep dropdown open for multi-select
+                                            e.stopPropagation();
                                             toggleGameVersion(v);
                                         }}
                                         className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-white/5 text-sm text-slate-700 dark:text-slate-200 transition-colors flex items-center justify-between"
