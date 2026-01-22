@@ -455,7 +455,14 @@ export const ModDetail: React.FC<{
 
     const [isFollowing, setIsFollowing] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
-    const [showExperimental, setShowExperimental] = useState(false);
+
+    const [showExperimental, setShowExperimental] = useState(() => {
+        if (initialMod?.versions?.length) {
+            return !initialMod.versions.some((v: any) => !v.channel || v.channel === 'RELEASE');
+        }
+        return false;
+    });
+
     const [showMobileLinks, setShowMobileLinks] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
 
@@ -499,6 +506,12 @@ export const ModDetail: React.FC<{
             api.get(`/projects/${realId}`).then(res => {
                 setMod(res.data);
                 if (currentUser?.followingIds?.includes(res.data.author)) setIsFollowing(true);
+
+                const vers = res.data.versions || [];
+                if (vers.length > 0 && !vers.some((v: any) => !v.channel || v.channel === 'RELEASE')) {
+                    setShowExperimental(true);
+                }
+
             }).catch(() => setIsNotFound(true)).finally(() => setLoading(false));
         }
     }, [realId, currentUser]);
