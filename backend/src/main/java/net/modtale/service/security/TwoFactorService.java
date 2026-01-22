@@ -48,7 +48,9 @@ public class TwoFactorService {
     public boolean isOtpValid(String secret, String code) {
         TimeProvider timeProvider = new SystemTimeProvider();
         CodeGenerator codeGenerator = new DefaultCodeGenerator();
-        CodeVerifier verifier = new DefaultCodeVerifier(codeGenerator, timeProvider);
+        DefaultCodeVerifier verifier = new DefaultCodeVerifier(codeGenerator, timeProvider);
+        verifier.setAllowedTimePeriodDiscrepancy(2);
+
         return verifier.isValidCode(secret, code);
     }
 }
