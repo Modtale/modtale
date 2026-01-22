@@ -1,4 +1,4 @@
-package net.modtale.config.security;
+package net.modtale.config.security.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.modtale.model.user.User;

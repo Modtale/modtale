@@ -1,4 +1,4 @@
-package net.modtale.config.security;
+package net.modtale.config.security.auth;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
