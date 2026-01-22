@@ -45,7 +45,6 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     const [resendingEmail, setResendingEmail] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
 
-    // Password / Credentials State
     const [credEmail, setCredEmail] = useState(user.email || '');
     const [credPassword, setCredPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -218,7 +217,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
             setMfaCode('');
             onUpdate();
         } catch (e: any) {
-            setError(e.response?.data?.error || "Invalid code.");
+            setError(e.response?.data?.error || "Invalid verification code.");
         } finally {
             setMfaLoading(false);
         }
