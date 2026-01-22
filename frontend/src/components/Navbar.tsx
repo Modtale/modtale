@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, ChevronDown, Shield, Users, LogIn } from 'lucide-react';
+import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationMenu } from './user/NotificationMenu';
 import { FollowingModal } from './user/FollowingModal';
 import { SignInModal } from './user/SignInModal';
 import { AnimatedThemeToggler } from './ui/AnimatedThemeToggler';
-import type {User} from "@/types.ts";
+import type { User } from "@/types.ts";
 
 interface NavbarProps {
     user: User | null;
@@ -72,13 +72,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         return (
             <Link
                 to={toPath}
-                className={`flex items-center px-3 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 border ${
+                className={`flex items-center px-3 py-1.5 rounded-md text-sm transition-all duration-200 ${
                     isActive
-                        ? 'text-modtale-accent border-modtale-accent bg-modtale-accentDim shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                        : 'text-slate-600 dark:text-slate-400 border-transparent hover:text-modtale-accent hover:bg-slate-100 dark:hover:bg-white/5'
+                        ? 'text-slate-900 dark:text-white font-extrabold bg-slate-100/50 dark:bg-white/5'
+                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-medium hover:bg-slate-50 dark:hover:bg-white/5'
                 }`}
             >
-                <Icon className="w-4 h-4 mr-2" />
+                <Icon className={`w-4 h-4 mr-2 transition-transform duration-200 ${isActive ? 'scale-110 text-modtale-accent' : 'scale-100 opacity-70'}`} />
                 {label}
             </Link>
         );
@@ -110,58 +110,84 @@ export const Navbar: React.FC<NavbarProps> = ({
                         />
                     </Link>
 
-                    <div className="hidden md:flex items-center justify-end flex-1 gap-2">
-                        {user && (
-                            <div className="flex items-center gap-1 mr-2">
-                                <NavLink id="home" icon={Home} label="Mods" />
-                                <NavLink id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-                                <NavLink id="upload" icon={Upload} label="Create" />
-                            </div>
-                        )}
+                    <div className="hidden md:flex items-center justify-end flex-1">
+                        <div className="flex items-center gap-2">
+                            {user && (
+                                <div className="flex items-center gap-1 mr-3">
+                                    <NavLink id="home" icon={Home} label="Mods" />
+                                    <NavLink id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+                                    <NavLink id="upload" icon={Upload} label="Create" />
+                                </div>
+                            )}
 
-                        {user && (
-                            <>
-                                <NotificationMenu />
-                                <div className="h-6 w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
-                            </>
-                        )}
+                            <div className="h-5 w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
 
-                        <AnimatedThemeToggler onToggle={toggleDarkMode} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors" />
+                            <div className="flex items-center gap-2">
+                                {user && <NotificationMenu />}
 
-                        {user ? (
-                            <div className="relative ml-1" ref={profileRef}>
-                                <button
-                                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className={`flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-full border transition-all ${
-                                        isProfileOpen ? 'border-modtale-accent bg-modtale-accent/10' : 'border-transparent hover:border-slate-200 dark:hover:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
-                                    }`}
-                                >
-                                    <img src={user.avatarUrl} alt={user.username} className="h-9 w-9 rounded-full border border-slate-200 dark:border-white/10" />
-                                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
-                                </button>
+                                <AnimatedThemeToggler
+                                    onToggle={toggleDarkMode}
+                                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors"
+                                />
 
-                                {isProfileOpen && (
-                                    <div className="absolute right-0 mt-3 w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                                        <div className="px-4 py-3 border-b border-slate-100 dark:border-white/5 mb-1">
-                                            <p className="text-xs text-slate-500 uppercase font-bold">Signed in as</p>
-                                            <p className="text-sm font-black text-slate-900 dark:text-white truncate">{user.username}</p>
-                                        </div>
-                                        <button onClick={() => { setIsProfileOpen(false); onAuthorClick(user.username); }} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors"><UserIcon className="w-4 h-4" /> Your Profile</button>
-                                        <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors"><Users className="w-4 h-4" /> Following</button>
-                                        <Link to="/dashboard" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors"><LayoutDashboard className="w-4 h-4" /> Creator Dashboard</Link>
-                                        {(user.roles?.includes('ADMIN')) && (
-                                            <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors"><Shield className="w-4 h-4" /> Admin Panel</Link>
+                                {user ? (
+                                    <div className="relative" ref={profileRef}>
+                                        <button
+                                            onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                            className={`group relative flex items-center justify-center rounded-full transition-all duration-200 ${
+                                                isProfileOpen
+                                                    ? 'ring-2 ring-modtale-accent ring-offset-2 dark:ring-offset-[#141d30]'
+                                                    : 'hover:ring-2 hover:ring-slate-200 dark:hover:ring-white/10 ring-offset-2 dark:ring-offset-[#141d30]'
+                                            }`}
+                                        >
+                                            <img
+                                                src={user.avatarUrl}
+                                                alt={user.username}
+                                                className="h-9 w-9 rounded-full transition-transform group-active:scale-95"
+                                            />
+                                        </button>
+
+                                        {isProfileOpen && (
+                                            <div className="absolute right-0 mt-4 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 origin-top-right">
+                                                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 mb-2 bg-slate-50/50 dark:bg-white/5 mx-2 rounded-xl">
+                                                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Signed in as</p>
+                                                    <p className="text-base font-black text-slate-900 dark:text-white truncate">{user.username}</p>
+                                                </div>
+
+                                                <div className="px-2 space-y-0.5">
+                                                    <button onClick={() => { setIsProfileOpen(false); onAuthorClick(user.username); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                        <UserIcon className="w-4 h-4 text-slate-400" /> Your Profile
+                                                    </button>
+                                                    <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                        <Users className="w-4 h-4 text-slate-400" /> Following
+                                                    </button>
+                                                    <Link to="/dashboard" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                        <LayoutDashboard className="w-4 h-4 text-slate-400" /> Creator Dashboard
+                                                    </Link>
+                                                    {(user.roles?.includes('ADMIN')) && (
+                                                        <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
+                                                            <Shield className="w-4 h-4" /> Admin Panel
+                                                        </Link>
+                                                    )}
+                                                </div>
+
+                                                <div className="border-t border-slate-100 dark:border-white/5 my-2 mx-4"></div>
+
+                                                <div className="px-2">
+                                                    <button onClick={() => { setIsProfileOpen(false); onLogout(); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-3 transition-colors">
+                                                        <LogOut className="w-4 h-4" /> Sign Out
+                                                    </button>
+                                                </div>
+                                            </div>
                                         )}
-                                        <div className="border-t border-slate-100 dark:border-white/5 my-1"></div>
-                                        <button onClick={() => { setIsProfileOpen(false); onLogout(); }} className="w-full text-left px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-3 transition-colors"><LogOut className="w-4 h-4" /> Sign Out</button>
                                     </div>
+                                ) : (
+                                    <button onClick={() => setIsSignInOpen(true)} className="flex items-center bg-slate-900 dark:bg-modtale-accent text-white dark:text-white hover:opacity-90 font-black py-2 px-5 rounded-lg transition-all text-sm shadow-sm dark:shadow-none ml-2 hover:scale-105 active:scale-95">
+                                        <LogIn className="w-4 h-4 mr-2" /> Sign in
+                                    </button>
                                 )}
                             </div>
-                        ) : (
-                            <button onClick={() => setIsSignInOpen(true)} className="flex items-center bg-slate-900 dark:bg-modtale-accent text-white dark:text-white hover:opacity-90 font-black py-1.5 px-4 rounded-lg transition-all text-sm shadow-lg dark:shadow-none ml-2">
-                                <LogIn className="w-4 h-4 mr-2" /> Sign in
-                            </button>
-                        )}
+                        </div>
                     </div>
 
                     <div className="-mr-2 flex md:hidden items-center gap-2">
