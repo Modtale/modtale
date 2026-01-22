@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDropzone, type Accept } from 'react-dropzone';
 import { UploadCloud, Check, ChevronDown, AlertCircle, CheckCircle2, Beaker, Zap } from 'lucide-react';
 import { DependencySelector } from './DependencySelector';
@@ -89,7 +89,9 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const gameVersions = ['2026.01.17-4b0f30090', '2026.01.13-dcad8778f'].sort((a, b) => compareSemVer(b, a));
+    const gameVersions = useMemo(() =>
+            ['2026.01.17-4b0f30090', '2026.01.13-dcad8778f'].sort((a, b) => compareSemVer(b, a)),
+        []);
 
     useEffect(() => {
         if (!disabled && (!data.gameVersions || data.gameVersions.length === 0) && gameVersions.length > 0) {

@@ -197,7 +197,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 if (!prev) return null;
                 return {
                     ...prev,
-                    contributors: prev.contributors.filter(u => u !== username),
+                    contributors: (prev.contributors || []).filter(u => u !== username),
                     pendingInvites: (prev.pendingInvites || []).filter(u => u !== username)
                 };
             });
