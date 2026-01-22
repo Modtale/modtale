@@ -279,7 +279,7 @@ export const Home: React.FC<HomeProps> = ({
                         <div className={`mb-6 transition-all duration-300 ${showMiniSearch ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
                             <div className="relative group"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" /><input type="text" className="block w-full pl-9 pr-3 py-2 rounded-lg bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 text-sm shadow-sm" placeholder="Quick search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
                         </div>
-                        <div className="p-4 bg-white/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-white/5">
+                        <div className="p-4 bg-white/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-white/5 animate-in fade-in slide-in-from-left-4 duration-700">
                             <h3 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest px-2">Browse</h3>
                             <div className="space-y-1">
                                 {BROWSE_VIEWS.map(v => (
@@ -328,24 +328,36 @@ export const Home: React.FC<HomeProps> = ({
 
                         {loading ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-5 mt-4">
-                                {[...Array(itemsPerPage)].map((_, i) => <div key={i} className="h-[154px] bg-white dark:bg-modtale-card rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />)}
+                                {[...Array(itemsPerPage)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="h-[154px] bg-white dark:bg-modtale-card rounded-xl animate-pulse border border-slate-200 dark:border-white/5 relative overflow-hidden"
+                                    >
+                                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                                    </div>
+                                ))}
                             </div>
                         ) : items.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-5 mt-4">
-                                {items.map((item) => (
-                                    <ModCard
+                                {items.map((item, index) => (
+                                    <div
                                         key={item.id}
-                                        mod={item}
-                                        path={getProjectPath(item)}
-                                        isFavorite={likedModIds.includes(item.id) || likedModpackIds.includes(item.id)}
-                                        onToggleFavorite={(id) => handleToggleLocal(id, item.classification === 'MODPACK')}
-                                        isLoggedIn={isLoggedIn}
-                                        onClick={() => { if(item.classification === 'MODPACK') onModpackClick(item as Modpack); else if (item.classification === 'SAVE') onWorldClick(item as World); else onModClick(item as Mod); }}
-                                    />
+                                        className="animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards"
+                                        style={{ animationDelay: `${index * 50}ms` }}
+                                    >
+                                        <ModCard
+                                            mod={item}
+                                            path={getProjectPath(item)}
+                                            isFavorite={likedModIds.includes(item.id) || likedModpackIds.includes(item.id)}
+                                            onToggleFavorite={(id) => handleToggleLocal(id, item.classification === 'MODPACK')}
+                                            isLoggedIn={isLoggedIn}
+                                            onClick={() => { if(item.classification === 'MODPACK') onModpackClick(item as Modpack); else if (item.classification === 'SAVE') onWorldClick(item as World); else onModClick(item as Mod); }}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="mt-8">
+                            <div className="mt-8 animate-in fade-in zoom-in-95 duration-500">
                                 <EmptyState
                                     icon={PackageSearch}
                                     title="No matches found"
@@ -355,7 +367,7 @@ export const Home: React.FC<HomeProps> = ({
                         )}
 
                         {totalPages > 1 && (
-                            <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-4 pb-12 animate-in fade-in">
+                            <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                 <div className="flex items-center gap-2">
                                     <button onClick={() => handlePageChange(page - 1)} disabled={page === 0} className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                                     <div className="hidden sm:flex gap-2">{getPageNumbers().map((p, idx) => (typeof p === 'number' ? ( <button key={p} onClick={() => handlePageChange(p - 1)} className={`w-10 h-10 rounded-lg text-sm font-bold border transition-colors ${page === p - 1 ? 'bg-modtale-accent text-white border-modtale-accent' : 'text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}>{p}</button> ) : ( <span key={`dots-${idx}`} className="w-10 h-10 flex items-center justify-center text-slate-400">...</span> )))}</div>
