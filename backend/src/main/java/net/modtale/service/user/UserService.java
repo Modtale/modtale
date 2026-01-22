@@ -16,6 +16,7 @@ import net.modtale.service.security.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -61,7 +62,11 @@ public class UserService {
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailService emailService;
 
-    private final String PRE_AUTH_SIGNING_KEY = UUID.randomUUID().toString();
+    @Value("${app.security.pre-auth-secret:default-secret-change-in-prod}")
+    private String preAuthSigningKey;
+
+    @Value("${app.security.pre-auth-expiry-seconds:600}")
+    private long preAuthExpirySeconds;
 
     public User registerUser(String username, String email, String password) {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
@@ -149,9 +154,9 @@ public class UserService {
     }
 
     public String generatePreAuthToken(String userId) {
-        long expiry = System.currentTimeMillis() + (5 * 60 * 1000);
+        long expiry = System.currentTimeMillis() + (preAuthExpirySeconds * 1000);
         String payload = userId + ":" + expiry;
-        String signature = hmacSha256(payload, PRE_AUTH_SIGNING_KEY);
+        String signature = hmacSha256(payload, preAuthSigningKey);
         return Base64.getEncoder().encodeToString((payload + ":" + signature).getBytes(StandardCharsets.UTF_8));
     }
 
@@ -167,7 +172,7 @@ public class UserService {
 
             if (System.currentTimeMillis() > expiry) return null;
 
-            String expectedSignature = hmacSha256(userId + ":" + expiry, PRE_AUTH_SIGNING_KEY);
+            String expectedSignature = hmacSha256(userId + ":" + expiry, preAuthSigningKey);
             if (!expectedSignature.equals(providedSignature)) return null;
 
             User user = userRepository.findById(userId).orElse(null);
