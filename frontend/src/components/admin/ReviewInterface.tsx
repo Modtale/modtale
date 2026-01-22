@@ -192,7 +192,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                 />
             )}
 
-            <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-7xl h-[85vh] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex overflow-hidden ring-1 ring-white/10 relative">
+            <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-7xl h-[85dvh] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex overflow-hidden ring-1 ring-white/10 relative">
 
                 {showRejectPanel && (
                     <div className="absolute inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">

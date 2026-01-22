@@ -177,7 +177,7 @@ const DependencyRow: React.FC<{
 const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps, targetGameVersion, onConfirm, onClose }) => {
     useEffect(() => {
         document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = 'unset'; };
+        return () => { document.body.style.overflow = ''; };
     }, []);
 
     const [selections, setSelections] = useState<Record<string, string | null>>({});
@@ -203,7 +203,7 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85dvh]">
                 <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-modtale-dark">
                     <div>
                         <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -291,9 +291,9 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
         if (selectedModForVersion) {
             document.body.style.overflow = 'hidden';
         } else {
-            document.body.style.overflow = 'unset';
+            document.body.style.overflow = '';
         }
-        return () => { document.body.style.overflow = 'unset'; };
+        return () => { document.body.style.overflow = ''; };
     }, [selectedModForVersion]);
 
     useEffect(() => {
@@ -392,7 +392,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
             {selectedModForVersion && !disabled && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85dvh]">
                         <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-black/20">
                             <h3 className="font-bold text-slate-900 dark:text-white">Select Version</h3>
                             <button onClick={() => setSelectedModForVersion(null)}><X className="w-5 h-5 text-slate-400 hover:text-slate-900 dark:hover:text-white" /></button>

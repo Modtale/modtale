@@ -32,7 +32,7 @@ export const FollowingModal: React.FC<FollowingModalProps> = ({ username, onClos
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={onClose}></div>
 
-            <div className="relative bg-white dark:bg-modtale-card w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="relative bg-white dark:bg-modtale-card w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[80dvh]">
 
                 <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
                     <h3 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">

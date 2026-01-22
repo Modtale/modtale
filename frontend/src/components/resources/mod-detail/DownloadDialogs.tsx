@@ -7,11 +7,23 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { api, BACKEND_URL } from '../../../utils/api';
 
+let scrollLockCount = 0;
+
 const useScrollLock = (lock: boolean) => {
     useEffect(() => {
-        if (lock) document.body.style.overflow = 'hidden';
-        else document.body.style.overflow = 'unset';
-        return () => { document.body.style.overflow = 'unset'; };
+        if (lock) {
+            scrollLockCount++;
+            document.body.style.overflow = 'hidden';
+        }
+        return () => {
+            if (lock) {
+                scrollLockCount--;
+                if (scrollLockCount <= 0) {
+                    scrollLockCount = 0;
+                    document.body.style.overflow = '';
+                }
+            }
+        };
     }, [lock]);
 };
 
@@ -93,7 +105,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-            <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden relative flex flex-col max-h-[85vh]">
+            <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden relative flex flex-col max-h-[85dvh]">
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
                     <h3 className="text-xl font-black text-white flex items-center gap-2">
                         <LinkIcon className="w-5 h-5 text-modtale-accent" /> Dependencies
@@ -282,7 +294,7 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" onClick={onClose}>
-            <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden relative flex flex-col max-h-[90dvh]" onClick={e => e.stopPropagation()}>
 
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
                     <div>
@@ -382,7 +394,7 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={onClose}>
-            <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+            <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh]" onClick={e => e.stopPropagation()}>
 
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
                     <div>
