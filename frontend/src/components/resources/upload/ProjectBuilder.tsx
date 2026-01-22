@@ -171,6 +171,42 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const handleInvite = async () => {
+        if (!modData?.id || !inviteUsername) return;
+        setIsInviting(true);
+        try {
+            await api.post(`/projects/${modData.id}/invite`, null, { params: { username: inviteUsername } });
+            setModData(prev => prev ? ({
+                ...prev,
+                pendingInvites: [...(prev.pendingInvites || []), inviteUsername]
+            }) : null);
+            setInviteUsername('');
+            onShowStatus('success', 'Invited', `Invited ${inviteUsername}`);
+        } catch (e: any) {
+            onShowStatus('error', 'Error', e.response?.data || 'Failed to invite user');
+        } finally {
+            setIsInviting(false);
+        }
+    };
+
+    const handleRemoveContributor = async (username: string) => {
+        if (!modData?.id) return;
+        try {
+            await api.delete(`/projects/${modData.id}/contributors/${username}`);
+            setModData(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    contributors: prev.contributors.filter(u => u !== username),
+                    pendingInvites: (prev.pendingInvites || []).filter(u => u !== username)
+                };
+            });
+            onShowStatus('success', 'Removed', `Removed ${username}`);
+        } catch (e: any) {
+            onShowStatus('error', 'Error', 'Failed to remove contributor');
+        }
+    };
+
     const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         markDirty();
         const val = e.target.value;
@@ -227,7 +263,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         childProjectIds: modData?.childProjectIds || [],
         versions: modData?.versions || [],
         reviews: [],
-        galleryImages: []
+        galleryImages: [],
+        pendingInvites: modData?.pendingInvites || []
     };
 
     const MarkdownComponents = {
@@ -262,6 +299,11 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
         }
     };
+
+    const allContributors = [
+        ...(modData?.contributors?.map(c => ({ username: c, status: 'active' })) || []),
+        ...(modData?.pendingInvites?.map(c => ({ username: c, status: 'pending' })) || [])
+    ];
 
     return (
         <>
@@ -582,9 +624,21 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         <h3 className="text-sm font-bold mb-2">Contributors</h3>
                                         <div className="flex gap-2 mb-4">
                                             <input disabled={readOnly} value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="Username" className="flex-1 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm" />
-                                            <button disabled={readOnly || isInviting || !inviteUsername} className="bg-modtale-accent text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><UserPlus className="w-3 h-3" /> Invite</button>
+                                            <button onClick={handleInvite} disabled={readOnly || isInviting || !inviteUsername} className="bg-modtale-accent text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><UserPlus className="w-3 h-3" /> Invite</button>
                                         </div>
-                                        {modData?.contributors?.map(u => <div key={u} className="flex justify-between items-center p-2 bg-slate-100 dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/5"><span className="text-sm font-bold">{u}</span></div>)}
+                                        {allContributors.map(u => (
+                                            <div key={u.username} className="flex justify-between items-center p-2 bg-slate-100 dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/5 mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-bold">{u.username}</span>
+                                                    {u.status === 'pending' && <span className="text-[10px] font-bold bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded">PENDING</span>}
+                                                </div>
+                                                {!readOnly && (
+                                                    <button onClick={() => handleRemoveContributor(u.username)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                                 {!readOnly && <button onClick={handleDelete} className="w-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white p-4 rounded-xl font-bold flex justify-center gap-2 transition-all"><Trash2 className="w-4 h-4"/> Delete Project</button>}

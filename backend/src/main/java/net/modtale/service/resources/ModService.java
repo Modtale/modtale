@@ -1530,6 +1530,9 @@ public class ModService {
         if (mod != null && isOwner(mod, currentUser)) {
             ensureEditable(mod);
             mod.getContributors().remove(usernameToRemove);
+            if (mod.getPendingInvites() != null) {
+                mod.getPendingInvites().remove(usernameToRemove);
+            }
             modRepository.save(mod);
             evictProjectDetails(mod);
         }
