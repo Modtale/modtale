@@ -1,29 +1,26 @@
 package net.modtale.controller.auth;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletResponse;
 import net.modtale.model.user.User;
-import net.modtale.service.user.UserService;
+import net.modtale.service.security.JwtService;
 import net.modtale.service.security.TwoFactorService;
+import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    @Autowired private UserService userService;
-    @Autowired private TwoFactorService twoFactorService;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private TwoFactorService twoFactorService;
+    @Autowired
+    private JwtService jwtService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -141,7 +138,7 @@ public class AuthController {
     }
 
     @PostMapping("/signin")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> body, HttpServletResponse response) {
         String username = body.get("username");
         String password = body.get("password");
 
@@ -152,8 +149,15 @@ public class AuthController {
                 String preAuthToken = userService.generatePreAuthToken(user.getId());
                 return ResponseEntity.accepted().body(Map.of("mfa_required", true, "pre_auth_token", preAuthToken));
             } else {
-                createSession(user, request);
-                return ResponseEntity.ok(Map.of("status", "success"));
+                String refreshToken = jwtService.generateRefreshToken(user);
+                String accessToken = jwtService.generateAccessToken(user);
+                jwtService.setTokenCookie(response, refreshToken);
+
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "access_token", accessToken,
+                        "expires_in", jwtService.getAccessTokenExpiration() / 1000
+                ));
             }
         } catch (Exception e) {
             return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
@@ -161,7 +165,7 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/validate-login")
-    public ResponseEntity<?> validateLoginMfa(@RequestBody Map<String, String> body, HttpServletRequest request) {
+    public ResponseEntity<?> validateLoginMfa(@RequestBody Map<String, String> body, HttpServletResponse response) {
         String preAuthToken = body.get("pre_auth_token");
         String code = body.get("code");
 
@@ -172,8 +176,15 @@ public class AuthController {
 
         if (user.isMfaEnabled()) {
             if (twoFactorService.isOtpValid(user.getMfaSecret(), code)) {
-                createSession(user, request);
-                return ResponseEntity.ok(Map.of("status", "success"));
+                String refreshToken = jwtService.generateRefreshToken(user);
+                String accessToken = jwtService.generateAccessToken(user);
+                jwtService.setTokenCookie(response, refreshToken);
+
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "access_token", accessToken,
+                        "expires_in", jwtService.getAccessTokenExpiration() / 1000
+                ));
             } else {
                 return ResponseEntity.status(401).body(Map.of("error", "Invalid 2FA code"));
             }
@@ -182,17 +193,42 @@ public class AuthController {
         return ResponseEntity.badRequest().build();
     }
 
-    private void createSession(User user, HttpServletRequest request) {
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                user,
-                null,
-                user.getRoles().stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).collect(Collectors.toList())
-        );
-        context.setAuthentication(authentication);
-        SecurityContextHolder.setContext(context);
-        HttpSession session = request.getSession(true);
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(@RequestBody(required = false) Map<String, String> body,
+                                          @CookieValue(name = "modtale_token", required = false) String cookieToken,
+                                          HttpServletResponse response) {
+        String refreshToken = null;
+        if (body != null && body.containsKey("refresh_token")) {
+            refreshToken = body.get("refresh_token");
+        } else if (cookieToken != null) {
+            refreshToken = cookieToken;
+        }
+
+        if (refreshToken == null || !jwtService.validateToken(refreshToken)) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid or expired token"));
+        }
+
+        if (!jwtService.isRefreshToken(refreshToken)) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid token type"));
+        }
+
+        String userId = jwtService.getUserIdFromToken(refreshToken);
+        if (userId == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid token"));
+        }
+
+        User user = userService.getUserById(userId);
+        if (user == null || user.getDeletedAt() != null) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not found"));
+        }
+
+        String newAccessToken = jwtService.generateAccessToken(user);
+
+        return ResponseEntity.ok(Map.of(
+                "access_token", newAccessToken,
+                "expires_in", jwtService.getAccessTokenExpiration() / 1000,
+                "user", user
+        ));
     }
 
     public static class RegisterRequest {

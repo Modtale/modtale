@@ -1,10 +1,13 @@
 package net.modtale.config.security;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import net.modtale.config.security.auth.CustomOAuth2UserService;
 import net.modtale.config.security.auth.CustomOidcUserService;
-import net.modtale.service.security.CustomUserDetailsService;
-import net.modtale.service.user.UserService;
 import net.modtale.model.user.User;
+import net.modtale.service.security.CustomUserDetailsService;
+import net.modtale.service.security.JwtService;
+import net.modtale.service.user.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,37 +19,33 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
+import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -56,14 +55,26 @@ public class SecurityConfig {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    @Autowired private ApiKeyAuthFilter apiKeyAuthFilter;
-    @Autowired private RateLimitFilter rateLimitFilter;
-    @Autowired private CustomOAuth2UserService customOAuth2UserService;
-    @Autowired private CustomOidcUserService customOidcUserService;
-    @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
-    @Autowired private CustomUserDetailsService userDetailsService;
-    @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private UserService userService;
+    @Autowired
+    private ApiKeyAuthFilter apiKeyAuthFilter;
+    @Autowired
+    private RateLimitFilter rateLimitFilter;
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+    @Autowired
+    private CustomOAuth2UserService customOAuth2UserService;
+    @Autowired
+    private CustomOidcUserService customOidcUserService;
+    @Autowired
+    private OAuth2AuthorizedClientRepository authorizedClientRepository;
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private JwtService jwtService;
 
     @PostConstruct
     public void logConfig() {
@@ -113,20 +124,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(tokenRepository)
                         .csrfTokenRequestHandler(requestHandler)
-                        .ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**")
+                        .ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**", "/logout")
                         .ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null)
                 )
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
+                .addFilterAfter(jwtAuthenticationFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
-                .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-                        .sessionFixation().migrateSession()
-                )
-                .formLogin(form -> form
-                        .loginProcessingUrl("/api/v1/auth/login-legacy")
-                        .permitAll()
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
@@ -144,6 +150,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/verify",
                                 "/api/v1/auth/signin",
+                                "/api/v1/auth/refresh",
                                 "/api/v1/auth/mfa/validate-login",
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password"
@@ -191,10 +198,9 @@ public class SecurityConfig {
                 )
                 .logout(logout -> logout
                         .logoutUrl("/logout")
-                        .invalidateHttpSession(true)
                         .clearAuthentication(true)
-                        .deleteCookies("JSESSIONID", "XSRF-TOKEN", "SESSION")
-                        .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler())
+                        .deleteCookies("XSRF-TOKEN", jwtService.getCookieName())
+                        .logoutSuccessHandler(jwtLogoutSuccessHandler())
                 )
                 .exceptionHandling(exception -> exception
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
@@ -247,8 +253,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityContextRepository securityContextRepository() {
-        return new HttpSessionSecurityContextRepository();
+    public LogoutSuccessHandler jwtLogoutSuccessHandler() {
+        return (request, response, authentication) -> {
+            jwtService.clearTokenCookie(response);
+            response.setStatus(HttpStatus.OK.value());
+        };
     }
 
     @Bean
@@ -260,8 +269,7 @@ public class SecurityConfig {
                 login = oauthUser.getAttribute("username");
             }
 
-            if (authentication instanceof OAuth2AuthenticationToken) {
-                OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
+            if (authentication instanceof OAuth2AuthenticationToken oauthToken) {
                 String registrationId = oauthToken.getAuthorizedClientRegistrationId();
                 if ("gitlab".equals(registrationId)) {
                     OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient(
@@ -285,22 +293,14 @@ public class SecurityConfig {
 
             if (user != null && user.isMfaEnabled() && !isLinking) {
                 String preAuthToken = userService.generatePreAuthToken(user.getId());
-
                 SecurityContextHolder.clearContext();
-
-                SecurityContextRepository repository = securityContextRepository();
-                repository.saveContext(SecurityContextHolder.createEmptyContext(), request, response);
-
-                HttpSession session = request.getSession(false);
-                if (session != null) {
-                    session.invalidate();
-                }
-
                 response.sendRedirect(frontendUrl + "/mfa?token=" + preAuthToken);
-            } else {
-                SecurityContextRepository repository = securityContextRepository();
-                repository.saveContext(SecurityContextHolder.getContext(), request, response);
+            } else if (user != null) {
+                String refreshToken = jwtService.generateRefreshToken(user);
+                jwtService.setTokenCookie(response, refreshToken);
                 response.sendRedirect(frontendUrl + "/dashboard/profile");
+            } else {
+                response.sendRedirect(frontendUrl + "/?oauth_error=User+not+found");
             }
         };
     }
@@ -308,7 +308,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationFailureHandler oauthFailureHandler() {
         return (request, response, exception) -> {
-            String errorParam = java.net.URLEncoder.encode(exception.getMessage(), "UTF-8");
+            String errorParam = java.net.URLEncoder.encode(exception.getMessage(), StandardCharsets.UTF_8);
             response.sendRedirect(frontendUrl + "/?oauth_error=" + errorParam);
         };
     }
