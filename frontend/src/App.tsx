@@ -268,7 +268,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                         <Route path="/terms" element={<TermsOfService />} />
                         <Route path="/privacy" element={<PrivacyPolicy />} />
                         <Route path="/api-docs" element={<ApiDocs />} />
-                        <Route path="/status" element={<Status />} />
                         <Route path="/settings/developer" element={<Navigate to="/dashboard/developer" replace />} />
                         <Route path="/analytics" element={<Navigate to="/dashboard/analytics" replace />} />
                         <Route path="/admin" element={user ? <AdminPanel currentUser={user} /> : <Navigate to="/" />} />
