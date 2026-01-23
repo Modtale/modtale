@@ -33,11 +33,9 @@ jobs:
             echo "FRONTEND_SERVICE=modtale-frontend" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
-            echo "FIXED_BACKEND_URL=https://api.modtale.net" >> $GITHUB_ENV
+            echo "FIXED_BACKEND_URL=https://api.modtale.net/api/v1" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
             echo "TAG=latest" >> $GITHUB_ENV
-            
-            # PROD BUCKET CONFIG
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
             
@@ -49,13 +47,10 @@ jobs:
             echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
-            
-            # DEV BUCKET CONFIG
             echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://dev-cdn.modtale.net" >> $GITHUB_ENV
             
           else
-            # Feature Branch
             SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
@@ -63,8 +58,6 @@ jobs:
             echo "DB_NAME=modtale-$SLUG" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
-            
-            # DEV BUCKET CONFIG (Shared for all previews)
             echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://dev-cdn.modtale.net" >> $GITHUB_ENV
           fi
@@ -82,36 +75,42 @@ jobs:
           cd backend
           gcloud builds submit --tag gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} .
           
-          gcloud run deploy ${{ env.BACKEND_SERVICE }} \
+          CMD="gcloud run deploy ${{ env.BACKEND_SERVICE }} \
             --image gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} \
             --region $REGION \
             --allow-unauthenticated \
             --update-env-vars MONGODB_DATABASE_NAME=${{ env.DB_NAME }} \
             --update-env-vars APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }} \
             --update-env-vars APP_SEEDING_SOURCE_DB=modtale \
-            --update-env-vars APP_WARDEN_URL="${{ secrets.WARDEN_URL }}" \
-            --update-env-vars MONGODB_URI="${{ secrets.MONGODB_URI }}" \
-            --update-env-vars FRONTEND_URL="placeholder" \
-            --update-env-vars R2_ACCESS_KEY="${{ secrets.R2_ACCESS_KEY }}" \
-            --update-env-vars R2_SECRET_KEY="${{ secrets.R2_SECRET_KEY }}" \
-            --update-env-vars R2_ENDPOINT="${{ secrets.R2_ENDPOINT }}" \
-            --update-env-vars R2_BUCKET_NAME="${{ env.R2_BUCKET_NAME }}" \
-            --update-env-vars R2_PUBLIC_DOMAIN="${{ env.R2_PUBLIC_DOMAIN }}" \
-            --update-env-vars SMTP_HOST="${{ secrets.SMTP_HOST }}" \
-            --update-env-vars SMTP_USERNAME="${{ secrets.SMTP_USERNAME }}" \
-            --update-env-vars SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
-            --update-env-vars GITHUB_CLIENT_ID="${{ secrets.GITHUB_CLIENT_ID }}" \
-            --update-env-vars GITHUB_CLIENT_SECRET="${{ secrets.GITHUB_CLIENT_SECRET }}" \
-            --update-env-vars GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
-            --update-env-vars GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-            --format="value(status.url)" > backend_url.txt
+            --update-env-vars APP_WARDEN_URL=${{ secrets.WARDEN_URL }} \
+            --update-env-vars FRONTEND_URL=placeholder \
+            --update-env-vars R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }} \
+            --update-env-vars R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
+
+          if [ "${{ env.ENV_TYPE }}" != "prod" ]; then
+            CMD="$CMD --update-env-vars MONGODB_URI=${{ secrets.MONGODB_URI }}"
+            CMD="$CMD --update-env-vars R2_ACCESS_KEY=${{ secrets.R2_ACCESS_KEY }}"
+            CMD="$CMD --update-env-vars R2_SECRET_KEY=${{ secrets.R2_SECRET_KEY }}"
+            CMD="$CMD --update-env-vars R2_ENDPOINT=${{ secrets.R2_ENDPOINT }}"
+            CMD="$CMD --update-env-vars SMTP_HOST=${{ secrets.SMTP_HOST }}"
+            CMD="$CMD --update-env-vars SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}"
+            CMD="$CMD --update-env-vars SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}"
+            CMD="$CMD --update-env-vars GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}"
+            CMD="$CMD --update-env-vars GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}"
+            CMD="$CMD --update-env-vars GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}"
+            CMD="$CMD --update-env-vars GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
+          fi
+
+          CMD="$CMD --format=value(status.url)"
+          
+          eval $CMD > backend_url.txt
 
       - name: Determine API URL
         run: |
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             echo "API_URL=${{ env.FIXED_BACKEND_URL }}" >> $GITHUB_ENV
           else
-            echo "API_URL=$(cat backend/backend_url.txt)" >> $GITHUB_ENV
+            echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
           fi
 
       - name: Build and Deploy Frontend
