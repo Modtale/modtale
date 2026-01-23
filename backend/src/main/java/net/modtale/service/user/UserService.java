@@ -68,6 +68,9 @@ public class UserService {
     @Value("${app.security.pre-auth-expiry-seconds:600}")
     private long preAuthExpirySeconds;
 
+    @Value("${app.limits.max-orgs-per-user:5}")
+    private int maxOrgsPerUser;
+
     public User registerUser(String username, String email, String password) {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
             throw new IllegalArgumentException("Invalid username. Must be at least 3 characters and alphanumeric.");
@@ -420,6 +423,16 @@ public class UserService {
 
         if (!cleanName.matches("^[a-zA-Z0-9_.-]+$")) {
             throw new IllegalArgumentException("Organization name contains invalid characters.");
+        }
+
+        List<User> myOrgs = getUserOrganizations(owner.getId());
+        long adminOrgCount = myOrgs.stream()
+                .filter(o -> o.getOrganizationMembers().stream()
+                        .anyMatch(m -> m.getUserId().equals(owner.getId()) && "ADMIN".equals(m.getRole())))
+                .count();
+
+        if (adminOrgCount >= maxOrgsPerUser) {
+            throw new IllegalStateException("You have reached the limit of " + maxOrgsPerUser + " organizations.");
         }
 
         User org = new User();

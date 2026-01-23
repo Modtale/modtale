@@ -1,5 +1,8 @@
 package net.modtale.service.resources;
 
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Refill;
 import net.modtale.model.resources.*;
 import net.modtale.model.user.User;
 import net.modtale.repository.resources.ModRepository;
@@ -38,9 +41,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -99,6 +104,27 @@ public class ModService {
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
+
+    @Value("${app.limits.max-projects-per-user:50}")
+    private int maxProjectsPerUser;
+
+    @Value("${app.limits.max-versions-per-day:5}")
+    private int maxVersionsPerDay;
+
+    @Value("${app.limits.max-versions-per-month:30}")
+    private int maxVersionsPerMonth;
+
+    @Value("${app.limits.max-gallery-images-per-project:20}")
+    private int maxGalleryImagesPerProject;
+
+    @Value("${app.limits.modpack-gen-per-hour:10}")
+    private int modpackGenLimitPerHour;
+
+    @Value("${app.limits.rescans-per-day:5}")
+    private int rescanLimitPerDay;
+
+    private final Map<String, Bucket> modpackGenBuckets = new ConcurrentHashMap<>();
+    private final Map<String, Bucket> rescanBuckets = new ConcurrentHashMap<>();
 
     private boolean isAdmin(User user) {
         return user != null && user.getRoles() != null && user.getRoles().contains("ADMIN");
@@ -386,6 +412,12 @@ public class ModService {
             finalAuthor = org.getUsername();
         }
 
+        Query projectCountQuery = new Query(Criteria.where("author").is(finalAuthor).and("status").ne("DELETED"));
+        long projectCount = mongoTemplate.count(projectCountQuery, Mod.class);
+        if (projectCount >= maxProjectsPerUser) {
+            throw new IllegalStateException("Project limit reached. Maximum allowed projects per user/org: " + maxProjectsPerUser);
+        }
+
         if (customSlug != null && !customSlug.isEmpty()) {
             validateSlug(customSlug);
             if (modRepository.existsBySlug(customSlug)) {
@@ -621,6 +653,19 @@ public class ModService {
     }
 
     public void triggerRescan(String modId, String versionId) {
+        User user = userService.getCurrentUser();
+
+        if (user != null && !isAdmin(user)) {
+            Bucket bucket = rescanBuckets.computeIfAbsent(user.getId(),
+                    k -> Bucket.builder()
+                            .addLimit(Bandwidth.classic(rescanLimitPerDay, Refill.greedy(rescanLimitPerDay, Duration.ofDays(1))))
+                            .build());
+
+            if (!bucket.tryConsume(1)) {
+                throw new IllegalStateException("Daily rescan limit reached. Please wait 24 hours.");
+            }
+        }
+
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
 
@@ -972,6 +1017,33 @@ public class ModService {
 
         if ("DRAFT".equals(mod.getStatus()) && !mod.getVersions().isEmpty()) {
             throw new IllegalArgumentException("Drafts are limited to one version. Please delete the existing version or publish the project.");
+        }
+
+        LocalDate now = LocalDate.now();
+        long versionsToday = mod.getVersions().stream()
+                .filter(v -> {
+                    try {
+                        return LocalDate.parse(v.getReleaseDate()).equals(now);
+                    } catch (Exception e) { return false; }
+                })
+                .count();
+
+        if (versionsToday >= maxVersionsPerDay) {
+            throw new IllegalStateException("Daily version limit reached (" + maxVersionsPerDay + "). Please try again tomorrow.");
+        }
+
+        LocalDate monthAgo = now.minusDays(30);
+        long versionsMonth = mod.getVersions().stream()
+                .filter(v -> {
+                    try {
+                        LocalDate d = LocalDate.parse(v.getReleaseDate());
+                        return d.isAfter(monthAgo) || d.equals(monthAgo);
+                    } catch (Exception e) { return false; }
+                })
+                .count();
+
+        if (versionsMonth >= maxVersionsPerMonth) {
+            throw new IllegalStateException("Monthly version limit reached (" + maxVersionsPerMonth + ").");
         }
 
         validateVersionNumber(versionNumber);
@@ -1348,6 +1420,19 @@ public class ModService {
     }
 
     public byte[] generateModpackZip(Mod pack, ModVersion version) throws IOException {
+        User user = userService.getCurrentUser();
+
+        if (user != null) {
+            Bucket bucket = modpackGenBuckets.computeIfAbsent(user.getId(),
+                    k -> Bucket.builder()
+                            .addLimit(Bandwidth.classic(modpackGenLimitPerHour, Refill.greedy(modpackGenLimitPerHour, Duration.ofHours(1))))
+                            .build());
+
+            if (!bucket.tryConsume(1)) {
+                throw new IllegalStateException("Modpack generation limit reached. Please wait a while before trying again.");
+            }
+        }
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             ZipEntry readme = new ZipEntry("modpack.json");
@@ -1690,6 +1775,9 @@ public class ModService {
         Mod mod = getRawModById(id);
         if (mod != null) {
             ensureEditable(mod);
+            if (mod.getGalleryImages().size() >= maxGalleryImagesPerProject) {
+                throw new IllegalStateException("Maximum gallery images reached (" + maxGalleryImagesPerProject + ").");
+            }
             mod.getGalleryImages().add(imageUrl);
             modRepository.save(mod);
             evictProjectDetails(mod);

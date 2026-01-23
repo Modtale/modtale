@@ -8,6 +8,7 @@ import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,9 @@ public class ApiKeyService {
     @Qualifier("taskExecutor")
     @Autowired private Executor taskExecutor;
 
+    @Value("${app.limits.max-api-keys-per-user:10}")
+    private int maxApiKeys;
+
     private final PasswordEncoder encoder = new BCryptPasswordEncoder();
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -38,6 +42,11 @@ public class ApiKeyService {
     public String createApiKey(String userId, String name) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        List<ApiKey> existingKeys = apiKeyRepository.findByUserId(userId);
+        if (existingKeys.size() >= maxApiKeys) {
+            throw new IllegalStateException("You have reached the maximum limit of " + maxApiKeys + " API keys.");
+        }
 
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);

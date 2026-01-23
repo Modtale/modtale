@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -35,12 +36,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "java", "python", "curl", "wget", "apache-httpclient", "libwww-perl"
     );
 
+    private static final Set<String> WRITE_METHODS = Set.of("POST", "PUT", "DELETE", "PATCH");
+
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws ServletException, IOException {
         if (!req.getRequestURI().startsWith("/api/v1")) {
             chain.doFilter(req, res);
             return;
         }
+
+        boolean isWrite = WRITE_METHODS.contains(req.getMethod().toUpperCase());
 
         String apiKeyHeader = req.getHeader("X-MODTALE-KEY");
         String userAgent = req.getHeader("User-Agent");
@@ -57,15 +62,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
             if (apiKey != null) {
                 limitKey = "USER:" + apiKey.getUserId();
                 if (apiKey.getTier() == ApiKey.Tier.ENTERPRISE) {
-                    capacity = 2000;
+                    capacity = isWrite ? 200 : 2000;
                     tierName = "Enterprise";
                 } else {
-                    capacity = 300;
+                    capacity = isWrite ? 50 : 300;
                     tierName = "User-API";
                 }
             } else {
                 limitKey = "IP:" + getClientIp(req);
-                capacity = 10;
+                capacity = isWrite ? 2 : 10;
                 tierName = "Invalid-Key";
             }
         } else {
@@ -80,11 +85,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
             if (isSessionUser) {
                 User user = (User) auth.getPrincipal();
                 limitKey = "USER:" + user.getId();
-                capacity = 1000;
+                capacity = isWrite ? 100 : 1000;
                 tierName = "Frontend-User";
             } else if (isFrontend) {
                 limitKey = "IP:" + getClientIp(req);
-                capacity = 2000;
+                capacity = isWrite ? 30 : 2000;
                 tierName = "Frontend-Public";
             } else {
                 if (userAgent == null || userAgent.isBlank() || isBlockedAgent(userAgent)) {
@@ -95,10 +100,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 }
 
                 limitKey = "IP:" + getClientIp(req);
-                capacity = 60;
+                capacity = isWrite ? 5 : 60;
                 tierName = "Public";
             }
         }
+
+        limitKey = limitKey + (isWrite ? ":WRITE" : ":READ");
 
         final long finalCapacity = capacity;
         Bucket bucket = bucketCache.computeIfAbsent(limitKey, k -> createNewBucket(finalCapacity));
@@ -112,7 +119,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } else {
             res.setStatus(429);
             res.setContentType("application/json");
-            res.getWriter().write("{\"error\": \"Too Many Requests\", \"message\": \"Rate limit exceeded for tier: " + tierName + "\"}");
+            res.getWriter().write("{\"error\": \"Too Many Requests\", \"message\": \"Rate limit exceeded for tier: " + tierName + " (" + (isWrite ? "Write" : "Read") + ")\"}");
         }
     }
 
