@@ -75,35 +75,37 @@ jobs:
           cd backend
           gcloud builds submit --tag gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} .
           
-          CMD="gcloud run deploy ${{ env.BACKEND_SERVICE }} \
-            --image gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} \
-            --region $REGION \
-            --allow-unauthenticated \
-            --update-env-vars MONGODB_DATABASE_NAME=${{ env.DB_NAME }} \
-            --update-env-vars APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }} \
-            --update-env-vars APP_SEEDING_SOURCE_DB=modtale \
-            --update-env-vars APP_WARDEN_URL=${{ secrets.WARDEN_URL }} \
-            --update-env-vars FRONTEND_URL=placeholder \
-            --update-env-vars R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }} \
-            --update-env-vars R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
+          # Initialize arguments array with standard flags
+          ARGS=(
+            "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
+            "--region" "$REGION"
+            "--allow-unauthenticated"
+            "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
+            "--update-env-vars" "APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
+            "--update-env-vars" "APP_SEEDING_SOURCE_DB=modtale"
+            "--update-env-vars" "APP_WARDEN_URL=${{ secrets.WARDEN_URL }}"
+            "--update-env-vars" "FRONTEND_URL=placeholder"
+            "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
+            "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
+          )
 
+          # Conditionally append secrets if NOT production
           if [ "${{ env.ENV_TYPE }}" != "prod" ]; then
-            CMD="$CMD --update-env-vars MONGODB_URI=${{ secrets.MONGODB_URI }}"
-            CMD="$CMD --update-env-vars R2_ACCESS_KEY=${{ secrets.R2_ACCESS_KEY }}"
-            CMD="$CMD --update-env-vars R2_SECRET_KEY=${{ secrets.R2_SECRET_KEY }}"
-            CMD="$CMD --update-env-vars R2_ENDPOINT=${{ secrets.R2_ENDPOINT }}"
-            CMD="$CMD --update-env-vars SMTP_HOST=${{ secrets.SMTP_HOST }}"
-            CMD="$CMD --update-env-vars SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}"
-            CMD="$CMD --update-env-vars SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}"
-            CMD="$CMD --update-env-vars GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}"
-            CMD="$CMD --update-env-vars GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}"
-            CMD="$CMD --update-env-vars GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}"
-            CMD="$CMD --update-env-vars GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
+            ARGS+=("--update-env-vars" "MONGODB_URI=${{ secrets.MONGODB_URI }}")
+            ARGS+=("--update-env-vars" "R2_ACCESS_KEY=${{ secrets.R2_ACCESS_KEY }}")
+            ARGS+=("--update-env-vars" "R2_SECRET_KEY=${{ secrets.R2_SECRET_KEY }}")
+            ARGS+=("--update-env-vars" "R2_ENDPOINT=${{ secrets.R2_ENDPOINT }}")
+            ARGS+=("--update-env-vars" "SMTP_HOST=${{ secrets.SMTP_HOST }}")
+            ARGS+=("--update-env-vars" "SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}")
+            ARGS+=("--update-env-vars" "SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}")
+            ARGS+=("--update-env-vars" "GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}")
+            ARGS+=("--update-env-vars" "GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}")
+            ARGS+=("--update-env-vars" "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}")
+            ARGS+=("--update-env-vars" "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}")
           fi
 
-          CMD="$CMD --format=value(status.url)"
-          
-          eval $CMD > backend_url.txt
+          # Execute gcloud with the array
+          gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
 
       - name: Determine API URL
         run: |
