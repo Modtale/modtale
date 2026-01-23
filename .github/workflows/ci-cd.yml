@@ -43,12 +43,12 @@ jobs:
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-dev" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-dev" >> $GITHUB_ENV
-            echo "DB_NAME=modtale-dev" >> $GITHUB_ENV
-            echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
+            echo "DB_NAME=modtale" >> $GITHUB_ENV
+            echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
-            echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
-            echo "R2_PUBLIC_DOMAIN=https://dev-cdn.modtale.net" >> $GITHUB_ENV
+            echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
             
           else
             SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
