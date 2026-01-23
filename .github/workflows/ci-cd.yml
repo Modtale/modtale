@@ -158,3 +158,13 @@ jobs:
             --service ${{ env.FRONTEND_SERVICE }} \
             --domain dev.modtale.net \
             --region $REGION || echo "Mapping likely exists."
+
+      - name: Ensure Prod Domain Mapping
+        if: env.ENV_TYPE == 'prod'
+        continue-on-error: true
+        run: |
+          gcloud beta run domain-mappings create \
+            --service modtale-frontend \
+            --domain modtale.net \
+            --region $REGION \
+            --force-override || echo "Prod mapping confirmed."
