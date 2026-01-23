@@ -75,7 +75,6 @@ jobs:
           cd backend
           gcloud builds submit --tag gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} .
           
-          # Initialize arguments array with standard flags
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
@@ -89,22 +88,20 @@ jobs:
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
 
-          # Conditionally append secrets if NOT production
           if [ "${{ env.ENV_TYPE }}" != "prod" ]; then
-            ARGS+=("--update-env-vars" "MONGODB_URI=${{ secrets.MONGODB_URI }}")
-            ARGS+=("--update-env-vars" "R2_ACCESS_KEY=${{ secrets.R2_ACCESS_KEY }}")
-            ARGS+=("--update-env-vars" "R2_SECRET_KEY=${{ secrets.R2_SECRET_KEY }}")
-            ARGS+=("--update-env-vars" "R2_ENDPOINT=${{ secrets.R2_ENDPOINT }}")
-            ARGS+=("--update-env-vars" "SMTP_HOST=${{ secrets.SMTP_HOST }}")
-            ARGS+=("--update-env-vars" "SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}")
-            ARGS+=("--update-env-vars" "SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}")
-            ARGS+=("--update-env-vars" "GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}")
-            ARGS+=("--update-env-vars" "GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}")
-            ARGS+=("--update-env-vars" "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}")
-            ARGS+=("--update-env-vars" "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}")
+            ARGS+=("--update-secrets" "MONGODB_URI=MONGODB_URI:latest")
+            ARGS+=("--update-secrets" "R2_ACCESS_KEY=R2_ACCESS_KEY:latest")
+            ARGS+=("--update-secrets" "R2_SECRET_KEY=R2_SECRET_KEY:latest")
+            ARGS+=("--update-secrets" "R2_ENDPOINT=R2_ENDPOINT:latest")
+            ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
+            ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
+            ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
+            ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest")
           fi
 
-          # Execute gcloud with the array
           gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
 
       - name: Determine API URL
