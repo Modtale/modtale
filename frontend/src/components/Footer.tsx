@@ -95,9 +95,6 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                             <Link to="/api-docs" className={linkClass}>
                                 <Code className="w-4 h-4 mr-2 opacity-70" /> API Docs
                             </Link>
-                            <Link to="/status" className={linkClass}>
-                                <Activity className="w-4 h-4 mr-2 opacity-70" /> System Status
-                            </Link>
                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
                             <Link to="/terms" className={linkClass}>
                                 <FileText className="w-4 h-4 mr-2 opacity-70" /> Terms of Service
