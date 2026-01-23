@@ -57,8 +57,7 @@ git checkout -b feat/my-cool-feature
 
 By contributing to Modtale, you agree that:
 
-1. **License:** Your code will be licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
-2. **Ownership:** You grant Modtale (the project maintainers) ownership and the necessary licensing rights over the code contributed to the repository. This allows us to defend the project legally and ensure it remains open and sustainable.
+* **License:** Your code will be licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
 
 ---
 
