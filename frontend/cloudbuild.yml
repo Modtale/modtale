@@ -5,11 +5,11 @@ steps:
       - '--build-arg'
       - 'PUBLIC_API_URL=${_PUBLIC_API_URL}'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/modtale-frontend'
+      - 'gcr.io/$PROJECT_ID/modtale-frontend:${_TAG}'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/modtale-frontend']
+    args: ['push', 'gcr.io/$PROJECT_ID/modtale-frontend:${_TAG}']
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -18,10 +18,11 @@ steps:
       - 'deploy'
       - 'modtale-frontend'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/modtale-frontend'
+      - 'gcr.io/$PROJECT_ID/modtale-frontend:${_TAG}'
       - '--region'
       - 'us-central1'
       - '--allow-unauthenticated'
 
 substitutions:
   _PUBLIC_API_URL: https://api.modtale.net/api/v1
+  _TAG: latest
