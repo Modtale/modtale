@@ -1,0 +1,155 @@
+name: Modtale CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - '*' 
+      
+env:
+  PROJECT_ID: gen-lang-client-0244308719
+  REGION: us-central1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Environment
+        id: config
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Detected branch: $BRANCH_NAME"
+          
+          if [ "$BRANCH_NAME" = "main" ]; then
+            echo "ENV_TYPE=prod" >> $GITHUB_ENV
+            echo "BACKEND_SERVICE=modtale-backend" >> $GITHUB_ENV
+            echo "FRONTEND_SERVICE=modtale-frontend" >> $GITHUB_ENV
+            echo "DB_NAME=modtale" >> $GITHUB_ENV
+            echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
+            # Production uses the fixed custom domain for API
+            echo "FIXED_BACKEND_URL=https://api.modtale.net" >> $GITHUB_ENV
+            echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
+            echo "TAG=latest" >> $GITHUB_ENV
+            
+          elif [ "$BRANCH_NAME" = "develop" ]; then
+            echo "ENV_TYPE=dev" >> $GITHUB_ENV
+            echo "BACKEND_SERVICE=modtale-backend-dev" >> $GITHUB_ENV
+            echo "FRONTEND_SERVICE=modtale-frontend-dev" >> $GITHUB_ENV
+            echo "DB_NAME=modtale-dev" >> $GITHUB_ENV
+            echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
+            # Dev uses the Cloud Run URL for API (simplifies certs), maps Frontend to custom domain
+            echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
+            echo "TAG=dev" >> $GITHUB_ENV
+            
+          else
+            # Feature Branch Logic
+            SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
+            echo "ENV_TYPE=preview" >> $GITHUB_ENV
+            echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
+            echo "FRONTEND_SERVICE=modtale-frontend-$SLUG" >> $GITHUB_ENV
+            echo "DB_NAME=modtale-$SLUG" >> $GITHUB_ENV
+            echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
+            echo "TAG=$SLUG" >> $GITHUB_ENV
+          fi
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      # --- 2. DEPLOY BACKEND ---
+      - name: Build and Deploy Backend
+        run: |
+          cd backend
+          gcloud builds submit --tag gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} .
+          
+          # We deploy to Cloud Run. 
+          # Note: We capture the URL output to use for the frontend build.
+          gcloud run deploy ${{ env.BACKEND_SERVICE }} \
+            --image gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} \
+            --region $REGION \
+            --allow-unauthenticated \
+            --update-env-vars MONGODB_DATABASE_NAME=${{ env.DB_NAME }} \
+            --update-env-vars APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }} \
+            --update-env-vars APP_SEEDING_SOURCE_DB=modtale \
+            --update-env-vars APP_WARDEN_URL="${{ secrets.WARDEN_URL }}" \
+            --update-env-vars MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+            --update-env-vars FRONTEND_URL="placeholder" \
+            --update-env-vars R2_ACCESS_KEY="${{ secrets.R2_ACCESS_KEY }}" \
+            --update-env-vars R2_SECRET_KEY="${{ secrets.R2_SECRET_KEY }}" \
+            --update-env-vars R2_ENDPOINT="${{ secrets.R2_ENDPOINT }}" \
+            --update-env-vars SMTP_HOST="${{ secrets.SMTP_HOST }}" \
+            --update-env-vars SMTP_USERNAME="${{ secrets.SMTP_USERNAME }}" \
+            --update-env-vars SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
+            --update-env-vars GITHUB_CLIENT_ID="${{ secrets.GITHUB_CLIENT_ID }}" \
+            --update-env-vars GITHUB_CLIENT_SECRET="${{ secrets.GITHUB_CLIENT_SECRET }}" \
+            --update-env-vars GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --update-env-vars GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+            --format="value(status.url)" > backend_url.txt
+
+      - name: Determine API URL
+        run: |
+          # If main, use the fixed production API URL. Otherwise, use the Cloud Run URL.
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            echo "API_URL=${{ env.FIXED_BACKEND_URL }}" >> $GITHUB_ENV
+          else
+            echo "API_URL=$(cat backend/backend_url.txt)" >> $GITHUB_ENV
+          fi
+
+      - name: Build and Deploy Frontend
+        run: |
+          cd frontend
+          gcloud builds submit \
+            --config=cloudbuild.yml \
+            --substitutions=_PUBLIC_API_URL=${{ env.API_URL }},_TAG=${{ env.TAG }} .
+          
+          gcloud run deploy ${{ env.FRONTEND_SERVICE }} \
+            --image gcr.io/$PROJECT_ID/modtale-frontend:${{ env.TAG }} \
+            --region $REGION \
+            --allow-unauthenticated \
+            --set-env-vars PUBLIC_API_URL=${{ env.API_URL }} \
+            --format="value(status.url)" > frontend_url.txt
+
+      - name: Determine Frontend URL
+        run: |
+          # If prod or dev, we use the custom domains. For previews, we use the Cloud Run URL.
+          if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
+            echo "FINAL_FRONTEND_URL=$(cat frontend/frontend_url.txt)" >> $GITHUB_ENV
+          else
+            echo "FINAL_FRONTEND_URL=${{ env.FRONTEND_DOMAIN }}" >> $GITHUB_ENV
+          fi
+
+      - name: Update Backend CORS
+        run: |
+          gcloud run services update ${{ env.BACKEND_SERVICE }} \
+            --region $REGION \
+            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }}
+
+      - name: Map Dev Domain
+        if: env.ENV_TYPE == 'dev'
+        continue-on-error: true
+        run: |
+          echo "Ensuring dev.modtale.net is mapped..."
+          gcloud beta run domain-mappings create \
+            --service ${{ env.FRONTEND_SERVICE }} \
+            --domain dev.modtale.net \
+            --region $REGION || echo "Mapping likely exists."
+
+      - name: Deployment Summary
+        run: |
+          echo "### 🚀 Deployment Complete (${{ env.ENV_TYPE }})" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Frontend** | [${{ env.FINAL_FRONTEND_URL }}](${{ env.FINAL_FRONTEND_URL }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Backend API** | ${{ env.API_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Database** | \`${{ env.DB_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
