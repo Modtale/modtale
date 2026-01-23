@@ -96,10 +96,20 @@ jobs:
             ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
             ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
+            ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
+            ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
+            ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
             ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "GITLAB_CLIENT_ID=GITLAB_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "GITLAB_CLIENT_SECRET=GITLAB_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "DISCORD_CLIENT_ID=DISCORD_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "TWITTER_CLIENT_ID=TWITTER_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
           fi
 
           gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
