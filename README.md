@@ -7,13 +7,13 @@
 <strong>The Hytale Community Repository</strong>
 </p>
 
-<p align="center">
-<a href="[https://www.gnu.org/licenses/agpl-3.0](https://www.gnu.org/licenses/agpl-3.0)"><img src="[https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square&logo=gnu](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square&logo=gnu)" alt="License: AGPL v3"></a>
-<a href="[https://astro.build](https://astro.build)"><img src="[https://img.shields.io/badge/Astro-4.3-orange?style=flat-square&logo=astro](https://www.google.com/search?q=https://img.shields.io/badge/Astro-4.3-orange%3Fstyle%3Dflat-square%26logo%3Dastro)" alt="Astro"></a>
-<a href="[https://react.dev](https://react.dev)"><img src="[https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react](https://www.google.com/search?q=https://img.shields.io/badge/React-19-blue%3Fstyle%3Dflat-square%26logo%3Dreact)" alt="React"></a>
-<a href="[https://spring.io/projects/spring-boot](https://spring.io/projects/spring-boot)"><img src="[https://img.shields.io/badge/Spring_Boot-3.3-green?style=flat-square&logo=springboot](https://img.shields.io/badge/Spring_Boot-3.3-green?style=flat-square&logo=springboot)" alt="Spring Boot"></a>
-<a href="[https://www.java.com](https://www.java.com)"><img src="[https://img.shields.io/badge/Java-21-red?style=flat-square&logo=openjdk](https://img.shields.io/badge/Java-21-red?style=flat-square&logo=openjdk)" alt="Java 21"></a>
-<a href="[https://www.mongodb.com](https://www.mongodb.com)"><img src="[https://img.shields.io/badge/Database-MongoDB-forestgreen?style=flat-square&logo=mongodb](https://img.shields.io/badge/Database-MongoDB-forestgreen?style=flat-square&logo=mongodb)" alt="MongoDB"></a>
+  <p align="center">
+    <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square&logo=gnu" alt="License: AGPL v3"></a>
+    <a href="https://astro.build"><img src="https://img.shields.io/badge/Astro-4.0-orange?style=flat-square&logo=astro" alt="Astro"></a>
+    <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19.0-blue?style=flat-square&logo=react" alt="React"></a>
+    <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-3.3-green?style=flat-square&logo=springboot" alt="Spring Boot"></a>
+    <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-21-red?style=flat-square&logo=openjdk" alt="Java 21"></a>
+    <a href="https://www.mongodb.com"><img src="https://img.shields.io/badge/Database-MongoDB-forestgreen?style=flat-square&logo=mongodb" alt="MongoDB"></a>
 </p>
 </div>
 
