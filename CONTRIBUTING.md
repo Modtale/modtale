@@ -53,14 +53,7 @@ git checkout -b feat/my-cool-feature
 * **Components:** Prefer functional components with hooks.
 * **State:** Use React Context for global state only when necessary.
 
-## 5. Reporting Issues
-
-If you find a bug or have a feature request, please open an issue.
-
-* **Bugs:** Include steps to reproduce, expected behavior, and actual behavior. Screenshots are helpful!
-* **Features:** Describe the problem you are solving and your proposed solution.
-
-## 6. Licensing & Legal
+## 4. Licensing & Legal
 
 By contributing to Modtale, you agree that:
 
