@@ -19,6 +19,9 @@ public class WardenClientService {
     private static final Logger logger = LoggerFactory.getLogger(WardenClientService.class);
     private final WebClient webClient;
 
+    @Value("${app.warden.enabled:true}")
+    private boolean wardenEnabled;
+
     public WardenClientService(@Value("${app.warden.url}") String wardenUrl) {
         this.webClient = WebClient.builder()
                 .baseUrl(wardenUrl)
@@ -26,6 +29,16 @@ public class WardenClientService {
     }
 
     public ScanResult scanFile(byte[] fileBytes, String filename) {
+        if (!wardenEnabled) {
+            logger.warn("Warden scanner is DISABLED. Returning MOCK 'CLEAN' result for file: {}", filename);
+            ScanResult mockResult = new ScanResult();
+            mockResult.setStatus("CLEAN");
+            mockResult.setRiskScore(0);
+            mockResult.setIssues(new ArrayList<>());
+            mockResult.setScanTimestamp(System.currentTimeMillis());
+            return mockResult;
+        }
+
         try {
             MultipartBodyBuilder builder = new MultipartBodyBuilder();
             builder.part("file", new ByteArrayResource(fileBytes) {
