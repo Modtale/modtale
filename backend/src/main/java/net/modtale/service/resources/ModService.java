@@ -38,9 +38,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.FileCopyUtils;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -993,6 +997,11 @@ public class ModService {
             throw new IllegalArgumentException("Modpacks must have at least two valid dependencies.");
         }
 
+        if (version.getFileUrl() != null && version.getFileUrl().endsWith(".zip")) {
+            try { storageService.deleteFile(version.getFileUrl()); } catch (Exception ignore) {}
+            version.setFileUrl(null);
+        }
+
         version.setDependencies(newDeps);
         if (isModpack && mod.getVersions().get(0).getId().equals(versionId)) {
             mod.setModIds(simpleModIds);
@@ -1433,6 +1442,15 @@ public class ModService {
             }
         }
 
+        if (version.getFileUrl() != null) {
+            try {
+                return storageService.download(version.getFileUrl());
+            } catch (Exception e) {
+                logger.warn("Cached modpack zip missing, regenerating: {}", version.getFileUrl());
+                version.setFileUrl(null);
+            }
+        }
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             ZipEntry readme = new ZipEntry("modpack.json");
@@ -1479,7 +1497,21 @@ public class ModService {
                 }
             }
         }
-        return baos.toByteArray();
+
+        byte[] zipBytes = baos.toByteArray();
+
+        try {
+            String fileName = (pack.getSlug() != null ? pack.getSlug() : pack.getId()) + "-" + version.getVersionNumber() + ".zip";
+            MultipartFile multipart = new InMemoryMultipartFile(fileName, zipBytes);
+            String uploadPath = storageService.upload(multipart, "modpacks");
+
+            version.setFileUrl(uploadPath);
+            modRepository.save(pack);
+        } catch (Exception e) {
+            logger.error("Failed to cache generated modpack", e);
+        }
+
+        return zipBytes;
     }
 
     public ModVersion findVersion(Mod pack, String versionNumber) {
@@ -1865,5 +1897,24 @@ public class ModService {
         } else {
             return "/mod/" + slug;
         }
+    }
+
+    private static class InMemoryMultipartFile implements MultipartFile {
+        private final String name;
+        private final byte[] content;
+
+        public InMemoryMultipartFile(String name, byte[] content) {
+            this.name = name;
+            this.content = content;
+        }
+
+        @Override public String getName() { return name; }
+        @Override public String getOriginalFilename() { return name; }
+        @Override public String getContentType() { return "application/zip"; }
+        @Override public boolean isEmpty() { return content.length == 0; }
+        @Override public long getSize() { return content.length; }
+        @Override public byte[] getBytes() throws IOException { return content; }
+        @Override public InputStream getInputStream() throws IOException { return new ByteArrayInputStream(content); }
+        @Override public void transferTo(File dest) throws IOException, IllegalStateException { FileCopyUtils.copy(content, dest); }
     }
 }
