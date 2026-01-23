@@ -4,19 +4,18 @@ import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.BannedEmail;
-import net.modtale.model.user.User;
 import net.modtale.model.user.Notification;
-import net.modtale.repository.user.BannedEmailRepository;
-import net.modtale.repository.user.UserRepository;
+import net.modtale.model.user.User;
 import net.modtale.repository.user.ApiKeyRepository;
+import net.modtale.repository.user.BannedEmailRepository;
 import net.modtale.repository.user.NotificationRepository;
+import net.modtale.repository.user.UserRepository;
 import net.modtale.service.AnalyticsService;
-import net.modtale.service.security.SanitizationService;
 import net.modtale.service.security.EmailService;
+import net.modtale.service.security.SanitizationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -49,24 +48,30 @@ public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
     private static final String EMAIL_REGEX = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
     private static final Pattern EMAIL_PATTERN = Pattern.compile(EMAIL_REGEX);
+    private final String PRE_AUTH_SIGNING_KEY = UUID.randomUUID().toString();
 
-    @Autowired private UserRepository userRepository;
-    @Autowired private ApiKeyRepository apiKeyRepository;
-    @Autowired private NotificationRepository notificationRepository;
-    @Autowired private BannedEmailRepository bannedEmailRepository;
-    @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
-    @Autowired private AnalyticsService analyticsService;
-    @Autowired private MongoTemplate mongoTemplate;
-    @Autowired private SanitizationService sanitizer;
-    @Autowired private NotificationService notificationService;
-    @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private EmailService emailService;
-
-    @Value("${app.security.pre-auth-secret:default-secret-change-in-prod}")
-    private String preAuthSigningKey;
-
-    @Value("${app.security.pre-auth-expiry-seconds:600}")
-    private long preAuthExpirySeconds;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private ApiKeyRepository apiKeyRepository;
+    @Autowired
+    private NotificationRepository notificationRepository;
+    @Autowired
+    private BannedEmailRepository bannedEmailRepository;
+    @Autowired
+    private OAuth2AuthorizedClientRepository authorizedClientRepository;
+    @Autowired
+    private AnalyticsService analyticsService;
+    @Autowired
+    private MongoTemplate mongoTemplate;
+    @Autowired
+    private SanitizationService sanitizer;
+    @Autowired
+    private NotificationService notificationService;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private EmailService emailService;
 
     public User registerUser(String username, String email, String password) {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
@@ -154,9 +159,9 @@ public class UserService {
     }
 
     public String generatePreAuthToken(String userId) {
-        long expiry = System.currentTimeMillis() + (preAuthExpirySeconds * 1000);
+        long expiry = System.currentTimeMillis() + (5 * 60 * 1000);
         String payload = userId + ":" + expiry;
-        String signature = hmacSha256(payload, preAuthSigningKey);
+        String signature = hmacSha256(payload, PRE_AUTH_SIGNING_KEY);
         return Base64.getEncoder().encodeToString((payload + ":" + signature).getBytes(StandardCharsets.UTF_8));
     }
 
@@ -172,7 +177,7 @@ public class UserService {
 
             if (System.currentTimeMillis() > expiry) return null;
 
-            String expectedSignature = hmacSha256(userId + ":" + expiry, preAuthSigningKey);
+            String expectedSignature = hmacSha256(userId + ":" + expiry, PRE_AUTH_SIGNING_KEY);
             if (!expectedSignature.equals(providedSignature)) return null;
 
             User user = userRepository.findById(userId).orElse(null);
@@ -328,6 +333,10 @@ public class UserService {
         User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (user != null && user.isDeleted()) return null;
         return user;
+    }
+
+    public User getUserById(String userId) {
+        return userRepository.findById(userId).orElse(null);
     }
 
     public void deleteUser(String userId) {
