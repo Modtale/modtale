@@ -37,6 +37,8 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepo
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.session.web.http.DefaultCookieSerializer;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -78,30 +80,77 @@ public class SecurityConfig {
         return authProvider;
     }
 
+    private boolean isPreviewEnvironment() {
+        if (frontendUrl == null || frontendUrl.isBlank()) return false;
+        try {
+            String host = URI.create(frontendUrl).getHost();
+            return host != null && host.endsWith(".run.app");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Bean
+    public CookieSerializer cookieSerializer() {
+        DefaultCookieSerializer serializer = new DefaultCookieSerializer();
+        serializer.setUseSecureCookie(true);
+        serializer.setCookiePath("/");
+
+        boolean isPreview = isPreviewEnvironment();
+
+        if (isPreview) {
+            serializer.setSameSite("None");
+            logger.info("CookieSerializer: Detected Preview Environment. Using SameSite=None.");
+        } else {
+            serializer.setSameSite("Lax");
+            logger.info("CookieSerializer: Detected Prod/Dev Environment. Using SameSite=Lax.");
+
+            if (frontendUrl != null && !frontendUrl.isBlank()) {
+                try {
+                    String host = URI.create(frontendUrl).getHost();
+                    if (host != null && !host.equalsIgnoreCase("localhost")) {
+                        String[] parts = host.split("\\.");
+                        if (parts.length >= 2) {
+                            String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                            serializer.setDomainName(rootDomain);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to parse frontend URL for cookie domain: {}", e.getMessage());
+                }
+            }
+        }
+        return serializer;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
         tokenRepository.setCookieHttpOnly(false);
         tokenRepository.setSecure(true);
         tokenRepository.setCookiePath("/");
+
         tokenRepository.setCookieCustomizer(cookie -> {
-            cookie.sameSite("None");
-            if (frontendUrl != null && !frontendUrl.isBlank()) {
-                try {
-                    String host = URI.create(frontendUrl).getHost();
-                    if (host != null && !host.equalsIgnoreCase("localhost")) {
-                        if (!host.endsWith(".run.app")) {
+            boolean isPreview = isPreviewEnvironment();
+
+            if (isPreview) {
+                cookie.sameSite("None");
+            } else {
+                cookie.sameSite("Lax");
+
+                if (frontendUrl != null && !frontendUrl.isBlank()) {
+                    try {
+                        String host = URI.create(frontendUrl).getHost();
+                        if (host != null && !host.equalsIgnoreCase("localhost")) {
                             String[] parts = host.split("\\.");
                             if (parts.length >= 2) {
                                 String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
                                 cookie.domain(rootDomain);
-                            } else {
-                                cookie.domain(host);
                             }
                         }
+                    } catch (Exception e) {
+                        logger.warn("Failed to set CSRF cookie domain: {}", e.getMessage());
                     }
-                } catch (Exception e) {
-                    logger.warn("Failed to set CSRF cookie domain: {}", e.getMessage());
                 }
             }
         });
