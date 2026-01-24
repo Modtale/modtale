@@ -134,6 +134,7 @@ public class SecurityConfig {
             boolean isPreview = isPreviewEnvironment();
             if (isPreview) {
                 cookie.sameSite("None");
+                cookie.domain(null);
             } else {
                 cookie.sameSite("Lax");
                 if (frontendUrl != null && !frontendUrl.isBlank()) {
