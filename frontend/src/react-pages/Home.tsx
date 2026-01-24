@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, {useState, useRef, useEffect, useCallback, useMemo, type JSX} from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import type { Mod, Modpack, World } from '../types';
@@ -14,6 +14,7 @@ import { getProjectUrl } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getCategorySEO } from '../data/seo-constants';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
+import { AdUnit } from '../components/ads/AdUnit';
 
 interface HomeProps {
     onModClick: (mod: Mod) => void;
@@ -252,6 +253,36 @@ export const Home: React.FC<HomeProps> = ({
     const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minRating > 0 ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (filterDate ? 1 : 0);
     const seoContent = getCategorySEO(selectedClassification);
 
+    const renderItemsWithAds = () => {
+        const elements: JSX.Element[] = [];
+        items.forEach((item, index) => {
+            elements.push(
+                <div
+                    key={item.id}
+                    className="animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                >
+                    <ModCard
+                        mod={item}
+                        path={getProjectPath(item)}
+                        isFavorite={likedModIds.includes(item.id)}
+                        onToggleFavorite={(id) => handleToggleLocal(id, item.classification === 'MODPACK')}
+                        isLoggedIn={isLoggedIn}
+                        onClick={() => { if(item.classification === 'MODPACK') onModpackClick(item as Modpack); else if (item.classification === 'SAVE') onWorldClick(item as World); else onModClick(item as Mod); }}
+                    />
+                </div>
+            );
+            if (index === 5) {
+                elements.push(
+                    <div key="ad-unit-1" className="animate-in fade-in zoom-in-95 duration-500 delay-300">
+                        <AdUnit variant="card" />
+                    </div>
+                );
+            }
+        });
+        return elements;
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-300">
             <Helmet>
@@ -338,22 +369,7 @@ export const Home: React.FC<HomeProps> = ({
                             </div>
                         ) : items.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-5 mt-4">
-                                {items.map((item, index) => (
-                                    <div
-                                        key={item.id}
-                                        className="animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards"
-                                        style={{ animationDelay: `${index * 50}ms` }}
-                                    >
-                                        <ModCard
-                                            mod={item}
-                                            path={getProjectPath(item)}
-                                            isFavorite={likedModIds.includes(item.id)}
-                                            onToggleFavorite={(id) => handleToggleLocal(id, item.classification === 'MODPACK')}
-                                            isLoggedIn={isLoggedIn}
-                                            onClick={() => { if(item.classification === 'MODPACK') onModpackClick(item as Modpack); else if (item.classification === 'SAVE') onWorldClick(item as World); else onModClick(item as Mod); }}
-                                        />
-                                    </div>
-                                ))}
+                                {renderItemsWithAds()}
                             </div>
                         ) : (
                             <div className="mt-8 animate-in fade-in zoom-in-95 duration-500">

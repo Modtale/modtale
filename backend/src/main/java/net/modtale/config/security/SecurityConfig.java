@@ -150,6 +150,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
+                        .requestMatchers("/api/v1/ads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(

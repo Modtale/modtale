@@ -1,3 +1,10 @@
+export interface AffiliateAd {
+    id: string;
+    title: string;
+    imageUrl: string;
+    linkUrl: string;
+}
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;
