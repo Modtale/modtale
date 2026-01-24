@@ -90,12 +90,14 @@ public class SecurityConfig {
                 try {
                     String host = URI.create(frontendUrl).getHost();
                     if (host != null && !host.equalsIgnoreCase("localhost")) {
-                        String[] parts = host.split("\\.");
-                        if (parts.length >= 2) {
-                            String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
-                            cookie.domain(rootDomain);
-                        } else {
-                            cookie.domain(host);
+                        if (!host.endsWith(".run.app")) {
+                            String[] parts = host.split("\\.");
+                            if (parts.length >= 2) {
+                                String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                                cookie.domain(rootDomain);
+                            } else {
+                                cookie.domain(host);
+                            }
                         }
                     }
                 } catch (Exception e) {
