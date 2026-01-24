@@ -3,6 +3,9 @@ export interface AffiliateAd {
     title: string;
     imageUrl: string;
     linkUrl: string;
+    active: boolean;
+    views?: number;
+    clicks?: number;
 }
 
 export interface ConnectedAccount {

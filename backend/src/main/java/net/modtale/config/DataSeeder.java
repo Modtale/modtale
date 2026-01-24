@@ -3,6 +3,7 @@ package net.modtale.config;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import org.bson.Document;
@@ -35,6 +36,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private static final int PROJECT_LIMIT = 50;
     private static final int REPORT_LIMIT = 20;
+    private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
     public DataSeeder(MongoTemplate mongoTemplate, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.mongoTemplate = mongoTemplate;
@@ -60,18 +62,21 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        logger.info("Initializing Preview Environment with relational subset from '{}'...", sourceDbName);
+        logger.info("Initializing Preview Environment...");
+
+        createSuperAdmin();
+        createNormalUser();
 
         try {
+            logger.info("Attempting to clone relational subset from '{}'...", sourceDbName);
+
             MongoDatabase sourceDb = mongoTemplate.getMongoDatabaseFactory().getMongoDatabase(sourceDbName);
             MongoDatabase targetDb = mongoTemplate.getDb();
-
-            createDevAdmin();
 
             List<Document> projects = fetchSubset(sourceDb, "projects", PROJECT_LIMIT);
 
             if (projects.isEmpty()) {
-                logger.info("No projects found in source. Seeding finished early.");
+                logger.info("No projects found in source. Seeding finished with just users.");
                 return;
             }
 
@@ -99,19 +104,36 @@ public class DataSeeder implements CommandLineRunner {
             logger.info("Seeding completed successfully.");
 
         } catch (Exception e) {
-            logger.error("Failed to seed preview database", e);
+            logger.error("Failed to seed preview database (Users were created, but cloning failed)", e);
         }
     }
 
-    private void createDevAdmin() {
+    private void createSuperAdmin() {
+        if (userRepository.existsById(SUPER_ADMIN_ID)) return;
+
         User user = new User();
-        user.setUsername("dev_admin");
+        user.setId(SUPER_ADMIN_ID); // Explicitly set the secure ID
+        user.setUsername("super_admin");
         user.setEmail("admin@modtale.net");
         user.setPassword(passwordEncoder.encode("password"));
         user.setRoles(List.of("USER", "ADMIN"));
-        user.setBio("I am the generated admin for this preview environment.");
+        user.setBio("I am the Super Admin for this preview environment.");
+        user.setTier(ApiKey.Tier.ENTERPRISE);
         userRepository.save(user);
-        logger.info("Created Default Admin: dev_admin / password");
+        logger.info("Created Super Admin: super_admin / password (ID: {})", SUPER_ADMIN_ID);
+    }
+
+    private void createNormalUser() {
+        if (userRepository.findByUsername("user").isPresent()) return;
+        User user = new User();
+        user.setUsername("user");
+        user.setEmail("user@modtale.net");
+        user.setPassword(passwordEncoder.encode("password"));
+        user.setRoles(List.of("USER"));
+        user.setBio("I am a standard user.");
+        user.setTier(ApiKey.Tier.USER);
+        userRepository.save(user);
+        logger.info("Created Normal User: user / password");
     }
 
     private List<Document> fetchSubset(MongoDatabase db, String collectionName, int limit) {
@@ -139,8 +161,11 @@ public class DataSeeder implements CommandLineRunner {
 
         String defaultPasswordHash = passwordEncoder.encode("password");
         for (Document user : usersToClone) {
+            String id = user.getObjectId("_id").toString();
+            if (id.equals(SUPER_ADMIN_ID)) continue;
+
             user.put("password", defaultPasswordHash);
-            user.put("email", "scrubbed_" + user.getObjectId("_id").toString() + "@modtale.local");
+            user.put("email", "scrubbed_" + id + "@modtale.local");
             user.put("githubAccessToken", null);
             user.put("gitlabAccessToken", null);
         }
