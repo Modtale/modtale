@@ -132,12 +132,10 @@ public class SecurityConfig {
 
         tokenRepository.setCookieCustomizer(cookie -> {
             boolean isPreview = isPreviewEnvironment();
-
             if (isPreview) {
                 cookie.sameSite("None");
             } else {
                 cookie.sameSite("Lax");
-
                 if (frontendUrl != null && !frontendUrl.isBlank()) {
                     try {
                         String host = URI.create(frontendUrl).getHost();
@@ -263,9 +261,17 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration restrictedConfig = new CorsConfiguration();
         List<String> restrictedOrigins = new ArrayList<>();
-        if (frontendUrl != null && !frontendUrl.isBlank()) {
-            restrictedOrigins.add(frontendUrl);
+
+        boolean isPreview = isPreviewEnvironment();
+
+        if (isPreview) {
+            restrictedOrigins.add("https://*.run.app");
+        } else {
+            if (frontendUrl != null && !frontendUrl.isBlank()) {
+                restrictedOrigins.add(frontendUrl);
+            }
         }
+
         restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
         restrictedConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         restrictedConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN"));
@@ -288,6 +294,9 @@ public class SecurityConfig {
         publicOrigins.add("*");
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             publicOrigins.add(frontendUrl);
+        }
+        if (isPreview) {
+            publicOrigins.add("https://*.run.app");
         }
         publicConfig.setAllowedOriginPatterns(publicOrigins);
         publicConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
