@@ -59,7 +59,7 @@ jobs:
             echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
-            echo "R2_PUBLIC_DOMAIN=https://dev-cdn.modtale.net" >> $GITHUB_ENV
+            echo "R2_PUBLIC_DOMAIN=https://pub-dc8241faa0a343c080802bf00bc72bc5.r2.dev" >> $GITHUB_ENV
           fi
 
       - id: 'auth'
