@@ -323,6 +323,10 @@ export const Home: React.FC<HomeProps> = ({
                                 ))}
                             </div>
                         </div>
+
+                        <div className="mt-6">
+                            <AdUnit variant="sidebar" />
+                        </div>
                     </div>
 
                     <div className="flex-1 min-h-[500px]" ref={cardsSectionRef}>

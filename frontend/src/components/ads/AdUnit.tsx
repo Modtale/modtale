@@ -50,7 +50,7 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
 
     if (useExternal) {
         return (
-            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest ${className}`}>
+            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest min-h-[150px] rounded-xl ${className}`}>
                 <div id={`ad-slot-${Math.random().toString(36).substr(2, 9)}`} className="w-full h-full flex items-center justify-center">
                     <span>Advertisement</span>
                 </div>
@@ -86,13 +86,13 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
             target="_blank"
             rel="nofollow noreferrer"
             onClick={handleClick}
-            className={`block rounded-xl overflow-hidden group relative border border-slate-200 dark:border-white/5 ${className}`}
+            className={`block rounded-xl overflow-hidden group relative border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-900/50 hover:shadow-md transition-all ${className}`}
         >
-            <div className="aspect-video relative">
-                <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
+            <div className="relative w-full">
+                <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-cover block" />
                 <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/80 uppercase">Ad</div>
             </div>
-            <div className="p-3 bg-white dark:bg-slate-900/50">
+            <div className="p-3 border-t border-slate-100 dark:border-white/5">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-modtale-accent truncate">{ad.title}</h4>
                 <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">Visit Site <ExternalLink className="w-3 h-3" /></p>
             </div>
