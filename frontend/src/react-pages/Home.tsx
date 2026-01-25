@@ -407,6 +407,8 @@ export const Home: React.FC<HomeProps> = ({
                     </div>
                 </div>
             </main>
+
+            <AdUnit variant="sticky-banner" />
         </div>
     );
 };
