@@ -18,7 +18,6 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
         let mounted = true;
         const fetchAd = async () => {
             try {
-                // Map variant to placement parameter
                 const placement = variant === 'sticky-banner' ? 'banner' : variant;
                 const res = await api.get<AffiliateAd>(`/ads/serve?placement=${placement}`);
 
