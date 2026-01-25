@@ -84,7 +84,7 @@ jobs:
             "--update-env-vars" "APP_SEEDING_SOURCE_DB=modtale"
             "--update-env-vars" "APP_WARDEN_URL=${{ secrets.WARDEN_URL }}"
             "--update-env-vars" "FRONTEND_URL=placeholder"
-            "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
+            "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}" 
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
 
