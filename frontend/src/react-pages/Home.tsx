@@ -259,7 +259,7 @@ export const Home: React.FC<HomeProps> = ({
             elements.push(
                 <div
                     key={item.id}
-                    className="animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards"
+                    className="animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards h-full"
                     style={{ animationDelay: `${index * 50}ms` }}
                 >
                     <ModCard
@@ -274,7 +274,7 @@ export const Home: React.FC<HomeProps> = ({
             );
             if (index === 5) {
                 elements.push(
-                    <div key="ad-unit-1" className="animate-in fade-in zoom-in-95 duration-500 delay-300">
+                    <div key="ad-unit-1" className="animate-in fade-in zoom-in-95 duration-500 delay-300 h-full">
                         <AdUnit variant="card" />
                     </div>
                 );

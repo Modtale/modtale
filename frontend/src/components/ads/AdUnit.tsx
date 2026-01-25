@@ -57,7 +57,7 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
 
     if (useExternal) {
         return (
-            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest rounded-xl ${variant === 'sidebar' ? 'min-h-[200px]' : 'h-full'} ${className}`}>
+            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest rounded-xl ${variant === 'card' ? 'h-full min-h-[154px]' : ''} ${variant === 'sidebar' ? 'min-h-[200px]' : ''} ${className}`}>
                 <span>Advertisement</span>
             </div>
         );
@@ -76,7 +76,7 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
 
     if (variant === 'card') {
         return (
-            <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`group relative block h-[154px] bg-slate-900 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden hover:shadow-lg transition-all ${className}`}>
+            <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`group relative block h-full min-h-[154px] bg-slate-900 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden hover:shadow-lg transition-all ${className}`}>
                 <img src={ad.imageUrl} alt={ad.title} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-4 flex flex-col justify-end">
                     <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1 flex items-center gap-1">Sponsored <ExternalLink className="w-3 h-3" /></span>

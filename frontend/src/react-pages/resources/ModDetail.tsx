@@ -141,7 +141,7 @@ const ProjectSidebar: React.FC<{
                 </div>
             </div>
 
-            <AdUnit variant="sidebar" className="my-2 shadow-sm" />
+            <AdUnit variant="card" className="my-2 shadow-sm" />
 
             {gameVersions.length > 0 && (
                 <SidebarSection title="Supported Versions" icon={Gamepad2}>
