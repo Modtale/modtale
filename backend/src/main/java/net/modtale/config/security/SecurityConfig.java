@@ -130,8 +130,10 @@ public class SecurityConfig {
         tokenRepository.setSecure(true);
         tokenRepository.setCookiePath("/");
 
+        // Configure Cookie settings (SameSite) based on environment
         tokenRepository.setCookieCustomizer(cookie -> {
             boolean isPreview = isPreviewEnvironment();
+
             if (isPreview) {
                 cookie.sameSite("None");
                 cookie.domain(null);
@@ -160,12 +162,19 @@ public class SecurityConfig {
         http
                 .authenticationProvider(authenticationProvider())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(tokenRepository)
-                        .csrfTokenRequestHandler(requestHandler)
-                        .ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**")
-                        .ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null)
-                )
+                .csrf(csrf -> {
+                    csrf
+                            .csrfTokenRepository(tokenRepository)
+                            .csrfTokenRequestHandler(requestHandler);
+
+                    csrf.ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**");
+                    csrf.ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null);
+
+                    if (isPreviewEnvironment()) {
+                        logger.warn("SECURITY WARNING: Disabling CSRF protection for Staging/Preview environment to allow cross-site requests.");
+                        csrf.ignoringRequestMatchers("/**");
+                    }
+                })
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
