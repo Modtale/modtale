@@ -60,21 +60,34 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
     if (variant === 'sticky-banner') {
         if (!ad || !ad.imageUrl) return null;
         return (
-            <div className={`fixed bottom-4 left-4 right-4 z-50 flex justify-center pointer-events-none animate-in slide-in-from-bottom-10 duration-700 ${className}`}>
-                <div className="relative pointer-events-auto bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 p-1 max-w-4xl w-full">
+            <div className={`fixed bottom-6 left-0 right-0 z-50 flex justify-center pointer-events-none animate-in slide-in-from-bottom-10 duration-700 px-4 ${className}`}>
+                <div className="relative pointer-events-auto shadow-2xl rounded-xl group transition-transform hover:-translate-y-1">
                     <button
                         onClick={() => setIsDismissed(true)}
-                        className="absolute -top-3 -right-3 p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-red-500 rounded-full shadow-md border border-slate-200 dark:border-white/10 transition-colors z-20"
+                        className="absolute -top-2 -right-2 p-1 bg-white dark:bg-slate-800 text-slate-400 hover:text-white hover:bg-red-500 rounded-full shadow-md border border-slate-200 dark:border-white/10 transition-all z-20 opacity-0 group-hover:opacity-100"
+                        title="Dismiss"
                     >
-                        <X className="w-4 h-4" />
+                        <X className="w-3 h-3" />
                     </button>
-                    <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className="block relative rounded-lg overflow-hidden group">
-                        <img src={ad.imageUrl} alt={ad.title} className="w-full h-20 md:h-24 object-cover" />
-                        <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/90 uppercase tracking-wider">Ad</div>
-                        <div className="absolute inset-0 flex items-end p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-white font-bold text-sm flex items-center gap-2">
-                                Visit {ad.title} <ExternalLink className="w-3 h-3" />
+
+                    <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className="block relative rounded-xl overflow-hidden">
+                        {/* Auto width, constrained height to prevent blocking view */}
+                        <img
+                            src={ad.imageUrl}
+                            alt={ad.title}
+                            className="h-auto max-h-[100px] w-auto max-w-full object-contain bg-slate-900"
+                        />
+
+                        {/* Minimal Hover Overlay */}
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                            <span className="text-white font-bold text-sm flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20">
+                                Visit Site <ExternalLink className="w-3 h-3" />
                             </span>
+                        </div>
+
+                        {/* Tiny Badge */}
+                        <div className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/40 rounded text-[8px] font-bold text-white/50 uppercase">
+                            Ad
                         </div>
                     </a>
                 </div>
@@ -95,8 +108,9 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
     if (variant === 'banner') {
         return (
             <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`block w-full rounded-xl overflow-hidden group relative ${className}`}>
-                <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-cover max-h-[150px]" />
-                <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/90 uppercase tracking-wider shadow-sm">Ad</div>
+                {/* Removed max-h to allow image to dictate height fully */}
+                <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-contain bg-slate-950/20" />
+                <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/80 uppercase">Ad</div>
             </a>
         );
     }
@@ -123,8 +137,8 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
     return (
         <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`block rounded-xl overflow-hidden group relative border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-900/50 hover:shadow-md transition-all ${className}`}>
             <div className="relative w-full">
-                <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-cover block" />
-                <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/90 uppercase tracking-wider">Ad</div>
+                <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-contain block" />
+                <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/80 uppercase">Ad</div>
             </div>
             <div className="p-3 border-t border-slate-100 dark:border-white/5 flex justify-between items-center">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-modtale-accent truncate max-w-[80%]">{ad.title}</h4>
