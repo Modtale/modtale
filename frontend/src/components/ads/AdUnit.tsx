@@ -18,6 +18,7 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
         let mounted = true;
         const fetchAd = async () => {
             try {
+                // Map variant to placement parameter
                 const placement = variant === 'sticky-banner' ? 'banner' : variant;
                 const res = await api.get<AffiliateAd>(`/ads/serve?placement=${placement}`);
 
@@ -60,7 +61,7 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
     if (variant === 'sticky-banner') {
         if (!ad || !ad.imageUrl) return null;
         return (
-            <div className={`fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none animate-in slide-in-from-bottom-full duration-700 ${className}`}>
+            <div className={`fixed bottom-0 left-0 right-0 z-[100] flex justify-center pointer-events-none animate-in slide-in-from-bottom-full duration-700 ${className}`}>
                 <div className="relative pointer-events-auto group">
                     <button
                         onClick={() => setIsDismissed(true)}
@@ -77,8 +78,8 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
                             className="h-auto max-h-[120px] w-auto max-w-full object-contain bg-slate-900"
                         />
 
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                            <span className="text-white font-bold text-sm flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20 hover:bg-white/20 transition-colors">
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 flex items-center justify-center">
+                            <span className="text-white font-bold text-sm flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-md">
                                 Visit Site <ExternalLink className="w-3 h-3" />
                             </span>
                         </div>
@@ -120,8 +121,8 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
                     Ad
                 </div>
 
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                    <span className="text-white font-bold text-sm flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20 hover:bg-white/20 transition-colors">
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 flex items-center justify-center">
+                    <span className="text-white font-bold text-sm flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-md">
                         Visit Site <ExternalLink className="w-3 h-3" />
                     </span>
                 </div>
@@ -135,8 +136,8 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
                 <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-contain block" />
                 <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/80 uppercase">Ad</div>
 
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                    <span className="text-white font-bold text-xs flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full border border-white/20 hover:bg-white/20 transition-colors">
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 flex items-center justify-center">
+                    <span className="text-white font-bold text-xs flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-md">
                         Visit <ExternalLink className="w-3 h-3" />
                     </span>
                 </div>
