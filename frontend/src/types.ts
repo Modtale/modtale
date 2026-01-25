@@ -1,11 +1,20 @@
+export interface AdCreative {
+    id: string;
+    imageUrl: string;
+    width: number;
+    height: number;
+    type: 'BANNER' | 'SIDEBAR' | 'CARD';
+}
+
 export interface AffiliateAd {
     id: string;
     title: string;
-    imageUrl: string;
     linkUrl: string;
     active: boolean;
+    creatives: AdCreative[];
     views?: number;
     clicks?: number;
+    imageUrl?: string;
 }
 
 export interface ConnectedAccount {

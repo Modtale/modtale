@@ -1,5 +1,6 @@
 package net.modtale.service.ad;
 
+import net.modtale.model.ad.AdCreative;
 import net.modtale.model.ad.AffiliateAd;
 import net.modtale.repository.ad.AffiliateAdRepository;
 import net.modtale.service.resources.StorageService;
@@ -9,9 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 @Service
 public class AdService {
@@ -26,25 +31,65 @@ public class AdService {
 
     private final Random random = new Random();
 
-    public AffiliateAd getRandomAd() {
+    public AffiliateAd getRandomAd(String placement) {
         if (random.nextDouble() > 0.5) {
             return null;
         }
 
-        List<AffiliateAd> ads = adRepository.findAllActive();
-        if (ads.isEmpty()) {
-            return null;
-        }
-        AffiliateAd ad = ads.get(random.nextInt(ads.size()));
-        ad.setViews(ad.getViews() + 1);
-        adRepository.save(ad);
+        AdCreative.CreativeType targetType = parsePlacement(placement);
 
-        // Ensure we return the full public URL
-        if (ad.getImageUrl() != null && !ad.getImageUrl().startsWith("http")) {
-            ad.setImageUrl(storageService.getPublicUrl(ad.getImageUrl()));
+        List<AffiliateAd> allActive = adRepository.findAllActive();
+
+        List<AffiliateAd> candidates = allActive.stream()
+                .filter(ad -> ad.getCreatives().stream().anyMatch(c -> c.getType() == targetType))
+                .collect(Collectors.toList());
+
+        if (candidates.isEmpty()) {
+            if (targetType == AdCreative.CreativeType.SIDEBAR) {
+                candidates = allActive.stream()
+                        .filter(ad -> ad.getCreatives().stream().anyMatch(c -> c.getType() == AdCreative.CreativeType.CARD))
+                        .collect(Collectors.toList());
+            }
+
+            if (candidates.isEmpty()) return null;
         }
 
-        return ad;
+        AffiliateAd selectedAd = candidates.get(random.nextInt(candidates.size()));
+
+        AdCreative bestCreative = selectedAd.getCreatives().stream()
+                .filter(c -> c.getType() == targetType)
+                .findFirst()
+                .orElse(selectedAd.getCreatives().stream()
+                        .filter(c -> c.getType() == AdCreative.CreativeType.CARD)
+                        .findFirst()
+                        .orElse(selectedAd.getCreatives().get(0)));
+
+        AffiliateAd response = new AffiliateAd();
+        response.setId(selectedAd.getId());
+        response.setTitle(selectedAd.getTitle());
+        response.setLinkUrl(selectedAd.getLinkUrl());
+
+        String publicUrl = bestCreative.getImageUrl();
+        if (publicUrl != null && !publicUrl.startsWith("http")) {
+            publicUrl = storageService.getPublicUrl(publicUrl);
+        }
+        bestCreative.setImageUrl(publicUrl);
+
+        response.setCreatives(List.of(bestCreative));
+
+        selectedAd.setViews(selectedAd.getViews() + 1);
+        adRepository.save(selectedAd);
+
+        return response;
+    }
+
+    private AdCreative.CreativeType parsePlacement(String placement) {
+        if (placement == null) return AdCreative.CreativeType.CARD;
+        switch (placement.toLowerCase()) {
+            case "banner": return AdCreative.CreativeType.BANNER;
+            case "sidebar": return AdCreative.CreativeType.SIDEBAR;
+            default: return AdCreative.CreativeType.CARD;
+        }
     }
 
     public void trackClick(String id) {
@@ -54,46 +99,49 @@ public class AdService {
         });
     }
 
-    public AffiliateAd createAd(AffiliateAd ad, MultipartFile image) throws IOException {
-        if (image != null && !image.isEmpty()) {
-            String path = storageService.upload(image, "ads");
-            ad.setImageUrl(path);
-        }
+    public AffiliateAd createAd(AffiliateAd ad, List<MultipartFile> images) throws IOException {
+        processImages(ad, images);
         return adRepository.save(ad);
     }
 
     public List<AffiliateAd> getAllAds() {
         List<AffiliateAd> ads = adRepository.findAll();
-        // Resolve URLs for admin display
         ads.forEach(ad -> {
-            if (ad.getImageUrl() != null && !ad.getImageUrl().startsWith("http")) {
-                ad.setImageUrl(storageService.getPublicUrl(ad.getImageUrl()));
+            if (ad.getCreatives() != null) {
+                ad.getCreatives().forEach(c -> {
+                    if (c.getImageUrl() != null && !c.getImageUrl().startsWith("http")) {
+                        c.setImageUrl(storageService.getPublicUrl(c.getImageUrl()));
+                    }
+                });
             }
         });
         return ads;
     }
 
-    public AffiliateAd updateAd(String id, AffiliateAd updated, MultipartFile image) throws IOException {
+    public AffiliateAd updateAd(String id, AffiliateAd updated, List<MultipartFile> newImages, List<String> deleteCreativeIds) throws IOException {
         return adRepository.findById(id).map(ad -> {
             ad.setTitle(updated.getTitle());
             ad.setLinkUrl(updated.getLinkUrl());
             ad.setActive(updated.isActive());
 
-            if (image != null && !image.isEmpty()) {
-                // Delete old image if it exists and isn't external
-                if (ad.getImageUrl() != null && !ad.getImageUrl().startsWith("http")) {
-                    storageService.deleteFile(ad.getImageUrl());
+            if (deleteCreativeIds != null && !deleteCreativeIds.isEmpty() && ad.getCreatives() != null) {
+                List<AdCreative> toKeep = new ArrayList<>();
+                for (AdCreative c : ad.getCreatives()) {
+                    if (deleteCreativeIds.contains(c.getId())) {
+                        if (c.getImageUrl() != null && !c.getImageUrl().startsWith("http")) {
+                            storageService.deleteFile(c.getImageUrl());
+                        }
+                    } else {
+                        toKeep.add(c);
+                    }
                 }
-                try {
-                    String path = storageService.upload(image, "ads");
-                    ad.setImageUrl(path);
-                } catch (IOException e) {
-                    logger.error("Failed to upload ad image", e);
-                }
-            } else if (updated.getImageUrl() != null) {
-                if (!updated.getImageUrl().equals(storageService.getPublicUrl(ad.getImageUrl()))) {
-                    ad.setImageUrl(updated.getImageUrl());
-                }
+                ad.setCreatives(toKeep);
+            }
+
+            try {
+                processImages(ad, newImages);
+            } catch (IOException e) {
+                logger.error("Failed to process new images", e);
             }
 
             return adRepository.save(ad);
@@ -102,10 +150,35 @@ public class AdService {
 
     public void deleteAd(String id) {
         adRepository.findById(id).ifPresent(ad -> {
-            if (ad.getImageUrl() != null && !ad.getImageUrl().startsWith("http")) {
-                storageService.deleteFile(ad.getImageUrl());
+            if (ad.getCreatives() != null) {
+                for (AdCreative c : ad.getCreatives()) {
+                    if (c.getImageUrl() != null && !c.getImageUrl().startsWith("http")) {
+                        storageService.deleteFile(c.getImageUrl());
+                    }
+                }
             }
             adRepository.deleteById(id);
         });
+    }
+
+    private void processImages(AffiliateAd ad, List<MultipartFile> images) throws IOException {
+        if (images == null || images.isEmpty()) return;
+
+        if (ad.getCreatives() == null) {
+            ad.setCreatives(new ArrayList<>());
+        }
+
+        for (MultipartFile file : images) {
+            if (file.isEmpty()) continue;
+
+            BufferedImage bImg = ImageIO.read(file.getInputStream());
+            int width = bImg != null ? bImg.getWidth() : 0;
+            int height = bImg != null ? bImg.getHeight() : 0;
+
+            String path = storageService.upload(file, "ads");
+
+            AdCreative creative = new AdCreative(path, width, height);
+            ad.getCreatives().add(creative);
+        }
     }
 }

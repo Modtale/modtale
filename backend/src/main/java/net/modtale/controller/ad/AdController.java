@@ -26,10 +26,6 @@ public class AdController {
 
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
-    private boolean isSuperAdmin(User user) {
-        return user != null && SUPER_ADMIN_ID.equals(user.getId());
-    }
-
     private boolean isAdmin(User user) {
         if (user == null) return false;
         if (SUPER_ADMIN_ID.equals(user.getId())) return true;
@@ -45,8 +41,8 @@ public class AdController {
     }
 
     @GetMapping("/ads/serve")
-    public ResponseEntity<AffiliateAd> getAd() {
-        AffiliateAd ad = adService.getRandomAd();
+    public ResponseEntity<AffiliateAd> getAd(@RequestParam(required = false, defaultValue = "card") String placement) {
+        AffiliateAd ad = adService.getRandomAd(placement);
         if (ad == null) {
             return ResponseEntity.noContent().build();
         }
@@ -70,24 +66,25 @@ public class AdController {
     @PostMapping(value = "/admin/ads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AffiliateAd> createAd(
             @RequestPart("ad") AffiliateAd ad,
-            @RequestPart(value = "image", required = false) MultipartFile image
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
     ) throws IOException {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        return ResponseEntity.ok(adService.createAd(ad, image));
+        return ResponseEntity.ok(adService.createAd(ad, images));
     }
 
     @PutMapping(value = "/admin/ads/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AffiliateAd> updateAd(
             @PathVariable String id,
             @RequestPart("ad") AffiliateAd ad,
-            @RequestPart(value = "image", required = false) MultipartFile image
+            @RequestPart(value = "images", required = false) List<MultipartFile> images,
+            @RequestParam(value = "deleteIds", required = false) List<String> deleteIds
     ) throws IOException {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        return ResponseEntity.ok(adService.updateAd(id, ad, image));
+        return ResponseEntity.ok(adService.updateAd(id, ad, images, deleteIds));
     }
 
     @DeleteMapping("/admin/ads/{id}")

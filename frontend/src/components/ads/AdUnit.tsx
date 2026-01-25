@@ -1,30 +1,38 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../../utils/api';
 import type { AffiliateAd } from '../../types';
 import { ExternalLink } from 'lucide-react';
 
 interface AdUnitProps {
     className?: string;
-    variant: 'card' | 'sidebar';
+    variant: 'card' | 'sidebar' | 'banner';
 }
 
 export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
     const [ad, setAd] = useState<AffiliateAd | null>(null);
     const [loading, setLoading] = useState(true);
     const [useExternal, setUseExternal] = useState(false);
-    const adRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         let mounted = true;
-
         const fetchAd = async () => {
             try {
-                const res = await api.get<AffiliateAd>('/ads/serve');
+                const placement = variant;
+                const res = await api.get<AffiliateAd>(`/ads/serve?placement=${placement}`);
+
                 if (mounted) {
                     if (res.status === 204) {
                         setUseExternal(true);
                     } else {
-                        setAd(res.data);
+                        const chosenCreative = res.data.creatives?.[0];
+                        if (chosenCreative) {
+                            setAd({
+                                ...res.data,
+                                imageUrl: chosenCreative.imageUrl
+                            });
+                        } else {
+                            setUseExternal(true);
+                        }
                     }
                     setLoading(false);
                 }
@@ -35,10 +43,9 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
                 }
             }
         };
-
         fetchAd();
         return () => { mounted = false; };
-    }, []);
+    }, [variant]);
 
     const handleClick = () => {
         if (ad) {
@@ -50,30 +57,29 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
 
     if (useExternal) {
         return (
-            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest min-h-[150px] rounded-xl ${className}`}>
-                <div id={`ad-slot-${Math.random().toString(36).substr(2, 9)}`} className="w-full h-full flex items-center justify-center">
-                    <span>Advertisement</span>
-                </div>
+            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest rounded-xl ${variant === 'sidebar' ? 'min-h-[200px]' : 'h-full'} ${className}`}>
+                <span>Advertisement</span>
             </div>
         );
     }
 
-    if (!ad) return null;
+    if (!ad || !ad.imageUrl) return null;
+
+    if (variant === 'banner') {
+        return (
+            <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`block w-full rounded-xl overflow-hidden group relative ${className}`}>
+                <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-cover max-h-[150px]" />
+                <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/80 uppercase">Ad</div>
+            </a>
+        );
+    }
 
     if (variant === 'card') {
         return (
-            <a
-                href={ad.linkUrl}
-                target="_blank"
-                rel="nofollow noreferrer"
-                onClick={handleClick}
-                className={`group relative block h-[154px] bg-slate-900 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden hover:shadow-lg transition-all ${className}`}
-            >
+            <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`group relative block h-[154px] bg-slate-900 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden hover:shadow-lg transition-all ${className}`}>
                 <img src={ad.imageUrl} alt={ad.title} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-4 flex flex-col justify-end">
-                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1 flex items-center gap-1">
-                        Sponsored <ExternalLink className="w-3 h-3" />
-                    </span>
+                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1 flex items-center gap-1">Sponsored <ExternalLink className="w-3 h-3" /></span>
                     <h3 className="text-white font-bold truncate group-hover:underline">{ad.title}</h3>
                 </div>
             </a>
@@ -81,13 +87,7 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
     }
 
     return (
-        <a
-            href={ad.linkUrl}
-            target="_blank"
-            rel="nofollow noreferrer"
-            onClick={handleClick}
-            className={`block rounded-xl overflow-hidden group relative border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-900/50 hover:shadow-md transition-all ${className}`}
-        >
+        <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`block rounded-xl overflow-hidden group relative border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-900/50 hover:shadow-md transition-all ${className}`}>
             <div className="relative w-full">
                 <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-cover block" />
                 <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur rounded text-[10px] font-bold text-white/80 uppercase">Ad</div>

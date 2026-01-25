@@ -385,6 +385,10 @@ export const Home: React.FC<HomeProps> = ({
                             </div>
                         )}
 
+                        <div className="mt-12 mb-8">
+                            <AdUnit variant="banner" className="max-w-4xl mx-auto" />
+                        </div>
+
                         {totalPages > 1 && (
                             <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                 <div className="flex items-center gap-2">
