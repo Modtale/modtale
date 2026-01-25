@@ -50,6 +50,9 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
+        ensureSuperAdmin();
+        ensureNormalUser();
+
         String currentDbName = mongoTemplate.getDb().getName();
 
         if (currentDbName.equalsIgnoreCase(sourceDbName)) {
@@ -57,15 +60,12 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        if (userRepository.count() > 0) {
-            logger.info("Database '{}' already contains data. Skipping seed.", currentDbName);
+        if (mongoTemplate.getCollection("projects").countDocuments() > 0) {
+            logger.info("Database '{}' already contains projects. Skipping content clone.", currentDbName);
             return;
         }
 
         logger.info("Initializing Preview Environment...");
-
-        createSuperAdmin();
-        createNormalUser();
 
         try {
             logger.info("Attempting to clone relational subset from '{}'...", sourceDbName);
@@ -73,10 +73,16 @@ public class DataSeeder implements CommandLineRunner {
             MongoDatabase sourceDb = mongoTemplate.getMongoDatabaseFactory().getMongoDatabase(sourceDbName);
             MongoDatabase targetDb = mongoTemplate.getDb();
 
+            long sourceProjectCount = sourceDb.getCollection("projects").countDocuments();
+            if (sourceProjectCount == 0) {
+                logger.warn("SOURCE DB '{}' IS EMPTY! Cannot clone data. Are you connecting to the correct cluster?", sourceDbName);
+                return;
+            }
+
             List<Document> projects = fetchSubset(sourceDb, "projects", PROJECT_LIMIT);
 
             if (projects.isEmpty()) {
-                logger.info("No projects found in source. Seeding finished with just users.");
+                logger.info("No projects found in source (after count check). Seeding finished.");
                 return;
             }
 
@@ -90,7 +96,7 @@ public class DataSeeder implements CommandLineRunner {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
-            logger.info("Identified {} projects and {} unique authors to clone.", projects.size(), authorIds.size());
+            logger.info("Found {} projects. Cloning referenced authors ({})...", projects.size(), authorIds.size());
 
             cloneSpecificUsers(sourceDb, targetDb, authorIds);
 
@@ -104,15 +110,19 @@ public class DataSeeder implements CommandLineRunner {
             logger.info("Seeding completed successfully.");
 
         } catch (Exception e) {
-            logger.error("Failed to seed preview database (Users were created, but cloning failed)", e);
+            logger.error("Failed to seed preview database", e);
         }
     }
 
-    private void createSuperAdmin() {
-        if (userRepository.existsById(SUPER_ADMIN_ID)) return;
+    private void ensureSuperAdmin() {
+        if (userRepository.existsById(SUPER_ADMIN_ID)) {
+            return;
+        }
+
+        userRepository.findByUsername("super_admin").ifPresent(userRepository::delete);
 
         User user = new User();
-        user.setId(SUPER_ADMIN_ID); // Explicitly set the secure ID
+        user.setId(SUPER_ADMIN_ID);
         user.setUsername("super_admin");
         user.setEmail("admin@modtale.net");
         user.setPassword(passwordEncoder.encode("password"));
@@ -123,8 +133,9 @@ public class DataSeeder implements CommandLineRunner {
         logger.info("Created Super Admin: super_admin / password (ID: {})", SUPER_ADMIN_ID);
     }
 
-    private void createNormalUser() {
+    private void ensureNormalUser() {
         if (userRepository.findByUsername("user").isPresent()) return;
+
         User user = new User();
         user.setUsername("user");
         user.setEmail("user@modtale.net");
@@ -155,24 +166,37 @@ public class DataSeeder implements CommandLineRunner {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        List<Document> usersToClone = new ArrayList<>();
+        if (objectIds.isEmpty()) return;
 
+        List<Document> usersToClone = new ArrayList<>();
         sourceCol.find(Filters.in("_id", objectIds)).into(usersToClone);
 
         String defaultPasswordHash = passwordEncoder.encode("password");
+
+        List<Document> safeToInsert = new ArrayList<>();
+
         for (Document user : usersToClone) {
             String id = user.getObjectId("_id").toString();
-            if (id.equals(SUPER_ADMIN_ID)) continue;
+            String username = user.getString("username");
+
+            if (id.equals(SUPER_ADMIN_ID) || "user".equals(username) || "super_admin".equals(username)) {
+                continue;
+            }
 
             user.put("password", defaultPasswordHash);
             user.put("email", "scrubbed_" + id + "@modtale.local");
             user.put("githubAccessToken", null);
             user.put("gitlabAccessToken", null);
+            safeToInsert.add(user);
         }
 
-        if (!usersToClone.isEmpty()) {
-            targetCol.insertMany(usersToClone);
-            logger.info("Cloned and sanitized {} users.", usersToClone.size());
+        if (!safeToInsert.isEmpty()) {
+            try {
+                targetCol.insertMany(safeToInsert);
+                logger.info("Cloned and sanitized {} users.", safeToInsert.size());
+            } catch (Exception e) {
+                logger.warn("Partial user insertion error (likely duplicates): {}", e.getMessage());
+            }
         }
     }
 
@@ -193,8 +217,12 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         if (!stats.isEmpty()) {
-            target.getCollection("project_monthly_stats").insertMany(stats);
-            logger.info("Cloned {} project statistics records.", stats.size());
+            try {
+                target.getCollection("project_monthly_stats").insertMany(stats);
+                logger.info("Cloned {} project statistics records.", stats.size());
+            } catch (Exception e) {
+                logger.warn("Stats insertion error: {}", e.getMessage());
+            }
         }
     }
 
@@ -202,8 +230,12 @@ public class DataSeeder implements CommandLineRunner {
         try {
             List<Document> docs = fetchSubset(source, collectionName, limit);
             if (!docs.isEmpty()) {
-                target.getCollection(collectionName).insertMany(docs);
-                logger.info("Cloned {} documents from {}.", docs.size(), collectionName);
+                try {
+                    target.getCollection(collectionName).insertMany(docs);
+                    logger.info("Cloned {} documents from {}.", docs.size(), collectionName);
+                } catch (Exception e) {
+                    logger.warn("Insertion error for {}: {}", collectionName, e.getMessage());
+                }
             }
         } catch (Exception e) {
             logger.warn("Could not clone subset of {}", collectionName);
