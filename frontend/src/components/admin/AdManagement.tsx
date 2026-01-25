@@ -117,11 +117,13 @@ export const AdManagement: React.FC<AdManagementProps> = ({ setStatus }) => {
         setFormData({ title: '', linkUrl: '', active: true, imageUrl: '' });
         setSelectedFile(null);
         setPreviewUrl('');
+        if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input value
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setSelectedFile(e.target.files[0]);
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            setSelectedFile(file);
             setFormData(prev => ({...prev, imageUrl: ''}));
         }
     };
