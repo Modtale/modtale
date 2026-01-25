@@ -130,7 +130,6 @@ public class SecurityConfig {
         tokenRepository.setSecure(true);
         tokenRepository.setCookiePath("/");
 
-        // Configure Cookie settings (SameSite) based on environment
         tokenRepository.setCookieCustomizer(cookie -> {
             boolean isPreview = isPreviewEnvironment();
 
