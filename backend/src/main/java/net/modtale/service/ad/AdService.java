@@ -32,10 +32,6 @@ public class AdService {
     private final Random random = new Random();
 
     public AffiliateAd getRandomAd(String placement) {
-        if (random.nextDouble() > 0.5) {
-            return null;
-        }
-
         AdCreative.CreativeType targetType = parsePlacement(placement);
 
         List<AffiliateAd> allActive = adRepository.findAllActive();
@@ -60,7 +56,7 @@ public class AdService {
                 .filter(c -> c.getType() == targetType)
                 .findFirst()
                 .orElse(selectedAd.getCreatives().stream()
-                        .filter(c -> c.getType() == AdCreative.CreativeType.CARD)
+                        .filter(c -> c.getType() == AdCreative.CreativeType.CARD) // Fallback for sidebar
                         .findFirst()
                         .orElse(selectedAd.getCreatives().get(0)));
 
