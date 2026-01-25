@@ -75,14 +75,14 @@ public class DataSeeder implements CommandLineRunner {
 
             long sourceProjectCount = sourceDb.getCollection("projects").countDocuments();
             if (sourceProjectCount == 0) {
-                logger.warn("SOURCE DB '{}' IS EMPTY! Cannot clone data. Are you connecting to the correct cluster?", sourceDbName);
+                logger.warn("SOURCE DB '{}' IS EMPTY! Cannot clone data.", sourceDbName);
                 return;
             }
 
             List<Document> projects = fetchSubset(sourceDb, "projects", PROJECT_LIMIT);
 
             if (projects.isEmpty()) {
-                logger.info("No projects found in source (after count check). Seeding finished.");
+                logger.info("No projects found in source. Seeding finished.");
                 return;
             }
 
@@ -92,7 +92,7 @@ public class DataSeeder implements CommandLineRunner {
                     .collect(Collectors.toSet());
 
             Set<ObjectId> projectIds = projects.stream()
-                    .map(doc -> doc.getObjectId("_id"))
+                    .map(doc -> getSafeObjectId(doc.get("_id")))
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
@@ -100,8 +100,12 @@ public class DataSeeder implements CommandLineRunner {
 
             cloneSpecificUsers(sourceDb, targetDb, authorIds);
 
-            targetDb.getCollection("projects").insertMany(projects);
-            logger.info("Cloned {} projects.", projects.size());
+            try {
+                targetDb.getCollection("projects").insertMany(projects);
+                logger.info("Cloned {} projects.", projects.size());
+            } catch (Exception e) {
+                logger.warn("Project insertion warning (duplicates might exist): {}", e.getMessage());
+            }
 
             cloneProjectStats(sourceDb, targetDb, projectIds);
 
@@ -114,10 +118,21 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    private void ensureSuperAdmin() {
-        if (userRepository.existsById(SUPER_ADMIN_ID)) {
-            return;
+    private ObjectId getSafeObjectId(Object id) {
+        if (id == null) return null;
+        if (id instanceof ObjectId) return (ObjectId) id;
+        if (id instanceof String) {
+            try {
+                return new ObjectId((String) id);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
         }
+        return null;
+    }
+
+    private void ensureSuperAdmin() {
+        if (userRepository.existsById(SUPER_ADMIN_ID)) return;
 
         userRepository.findByUsername("super_admin").ifPresent(userRepository::delete);
 
@@ -160,9 +175,7 @@ public class DataSeeder implements CommandLineRunner {
         MongoCollection<Document> targetCol = target.getCollection("users");
 
         List<ObjectId> objectIds = userIds.stream()
-                .map(id -> {
-                    try { return new ObjectId(id); } catch (IllegalArgumentException e) { return null; }
-                })
+                .map(this::getSafeObjectId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
@@ -171,12 +184,16 @@ public class DataSeeder implements CommandLineRunner {
         List<Document> usersToClone = new ArrayList<>();
         sourceCol.find(Filters.in("_id", objectIds)).into(usersToClone);
 
-        String defaultPasswordHash = passwordEncoder.encode("password");
+        if (usersToClone.isEmpty()) {
+            List<String> stringIds = userIds.stream().collect(Collectors.toList());
+            sourceCol.find(Filters.in("_id", stringIds)).into(usersToClone);
+        }
 
+        String defaultPasswordHash = passwordEncoder.encode("password");
         List<Document> safeToInsert = new ArrayList<>();
 
         for (Document user : usersToClone) {
-            String id = user.getObjectId("_id").toString();
+            String id = user.get("_id").toString();
             String username = user.getString("username");
 
             if (id.equals(SUPER_ADMIN_ID) || "user".equals(username) || "super_admin".equals(username)) {
@@ -195,7 +212,7 @@ public class DataSeeder implements CommandLineRunner {
                 targetCol.insertMany(safeToInsert);
                 logger.info("Cloned and sanitized {} users.", safeToInsert.size());
             } catch (Exception e) {
-                logger.warn("Partial user insertion error (likely duplicates): {}", e.getMessage());
+                logger.warn("Partial user insertion error: {}", e.getMessage());
             }
         }
     }
