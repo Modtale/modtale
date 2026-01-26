@@ -35,6 +35,7 @@ import type { Classification } from './data/categories';
 import { SSRProvider } from './context/SSRContext';
 import { ExternalLinkProvider } from './context/ExternalLinkContext';
 import { NotificationProvider } from './context/NotificationsContext.tsx';
+import { ToastProvider } from './components/ui/Toast';
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
@@ -285,15 +286,17 @@ export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData
         <SSRProvider data={ssrData}>
             <HelmetProvider>
                 <ExternalLinkProvider>
-                    {import.meta.env.SSR ? (
-                        <StaticRouter location={initialPath || "/"}>
-                            <AppContent initialClassification={initialClassification} />
-                        </StaticRouter>
-                    ) : (
-                        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                            <AppContent initialClassification={initialClassification} />
-                        </BrowserRouter>
-                    )}
+                    <ToastProvider>
+                        {import.meta.env.SSR ? (
+                            <StaticRouter location={initialPath || "/"}>
+                                <AppContent initialClassification={initialClassification} />
+                            </StaticRouter>
+                        ) : (
+                            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                                <AppContent initialClassification={initialClassification} />
+                            </BrowserRouter>
+                        )}
+                    </ToastProvider>
                 </ExternalLinkProvider>
             </HelmetProvider>
         </SSRProvider>
