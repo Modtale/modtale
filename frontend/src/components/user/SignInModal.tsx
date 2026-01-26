@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Github, Mail, ArrowRight, Loader2, ArrowLeft, Smartphone } from 'lucide-react';
 import { BACKEND_URL, api } from '../../utils/api';
+import { useToast } from '../ui/Toast';
 
 const GitLabIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -30,6 +31,7 @@ interface SignInModalProps {
 }
 
 export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
+    const { showToast } = useToast();
     const [mounted, setMounted] = useState(false);
     const [mode, setMode] = useState<'signin' | 'register' | 'forgot-password' | 'mfa'>('signin');
     const [email, setEmail] = useState('');
@@ -39,8 +41,6 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
     const [preAuthToken, setPreAuthToken] = useState<string | null>(null);
 
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -57,21 +57,19 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        setError(null);
-        setSuccessMessage(null);
 
         try {
             if (mode === 'register') {
                 await api.post('/auth/register', { username, email, password });
                 setMode('signin');
-                setSuccessMessage("Account created! Please sign in.");
+                showToast("Account created! Please sign in.", 'success');
                 setLoading(false);
                 return;
             }
 
             if (mode === 'forgot-password') {
                 await api.post('/auth/forgot-password', { email });
-                setSuccessMessage("If an account exists, a reset link has been sent.");
+                showToast("If an account exists, a reset link has been sent.", 'success');
                 setLoading(false);
                 return;
             }
@@ -101,11 +99,11 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
         } catch (err: any) {
             console.error(err);
             if (err.response?.status === 401) {
-                setError(mode === 'mfa' ? "Invalid code." : "Invalid credentials.");
+                showToast(mode === 'mfa' ? "Invalid code." : "Invalid credentials.", 'error');
             } else if (err.response?.data?.error) {
-                setError(err.response.data.error);
+                showToast(err.response.data.error, 'error');
             } else {
-                setError("An error occurred. Please try again.");
+                showToast("An error occurred. Please try again.", 'error');
             }
         } finally {
             setLoading(false);
@@ -114,157 +112,144 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                    <X className="w-5 h-5" />
-                </button>
+            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl max-w-sm w-full shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="p-6">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
 
-                <div className="text-center mb-6">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
-                        {mode === 'signin' ? 'Welcome Back' : (mode === 'register' ? 'Create Account' : (mode === 'mfa' ? 'Security Check' : 'Reset Password'))}
-                    </h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">
-                        {mode === 'signin' ? 'Sign in to manage your projects.' : (mode === 'register' ? 'Join the community today.' : (mode === 'mfa' ? 'Enter the code from your authenticator app.' : 'Enter your email to receive a reset link.'))}
-                    </p>
-                </div>
+                    <div className="text-center mb-6">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+                            {mode === 'signin' ? 'Welcome Back' : (mode === 'register' ? 'Create Account' : (mode === 'mfa' ? 'Security Check' : 'Reset Password'))}
+                        </h2>
+                        <p className="text-slate-600 dark:text-slate-400 text-sm">
+                            {mode === 'signin' ? 'Tell the tale of your mods.' : (mode === 'register' ? 'Join the community today.' : (mode === 'mfa' ? 'Enter the code from your authenticator app.' : 'Enter your email to receive a reset link.'))}
+                        </p>
+                    </div>
 
-                {mode !== 'forgot-password' && mode !== 'mfa' && (
-                    <>
-                        <div className="space-y-3 mb-6">
-                            <button
-                                onClick={() => handleOAuthLogin('github')}
-                                className="w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10"
-                            >
-                                <Github className="w-5 h-5" />
-                                <span className="text-sm">GitHub</span>
-                            </button>
-
-                            <div className="grid grid-cols-3 gap-3">
+                    {mode !== 'forgot-password' && mode !== 'mfa' && (
+                        <>
+                            <div className="space-y-3 mb-6">
                                 <button
-                                    onClick={() => handleOAuthLogin('gitlab')}
-                                    className="w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
-                                    title="Sign in with GitLab"
+                                    onClick={() => handleOAuthLogin('github')}
+                                    className="w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10"
                                 >
-                                    <GitLabIcon className="w-5 h-5" />
+                                    <Github className="w-5 h-5" />
+                                    <span className="text-sm">GitHub</span>
                                 </button>
-                                <button
-                                    onClick={() => handleOAuthLogin('discord')}
-                                    className="w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
-                                    title="Sign in with Discord"
-                                >
-                                    <DiscordIcon className="w-5 h-5" />
-                                </button>
-                                <button
-                                    onClick={() => handleOAuthLogin('google')}
-                                    className="w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
-                                    title="Sign in with Google"
-                                >
-                                    <GoogleIcon className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
 
-                        <div className="relative mb-6">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-slate-200 dark:border-white/10"></div>
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white dark:bg-modtale-card px-2 text-slate-500">Or continue with email</span>
-                            </div>
-                        </div>
-                    </>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {error && (
-                        <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
-                            {error}
-                        </div>
-                    )}
-                    {successMessage && (
-                        <div className="p-3 text-sm text-green-500 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
-                            {successMessage}
-                        </div>
-                    )}
-
-                    {mode === 'register' && (
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Username</label>
-                            <input
-                                type="text"
-                                required
-                                value={username}
-                                onChange={e => setUsername(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
-                                placeholder="Display name"
-                            />
-                        </div>
-                    )}
-
-                    {(mode === 'signin' || mode === 'register' || mode === 'forgot-password') && (
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
-                                {mode === 'signin' ? 'Email or Username' : 'Email'}
-                            </label>
-                            <input
-                                type={mode === 'signin' ? "text" : "email"}
-                                required
-                                value={mode === 'signin' ? (username || email) : email}
-                                onChange={e => mode === 'signin' ? setUsername(e.target.value) : setEmail(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
-                                placeholder={mode === 'signin' ? "user@example.com" : "user@example.com"}
-                            />
-                        </div>
-                    )}
-
-                    {(mode === 'signin' || mode === 'register') && (
-                        <div className="space-y-1">
-                            <div className="flex justify-between items-center">
-                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Password</label>
-                                {mode === 'signin' && (
+                                <div className="grid grid-cols-3 gap-3">
                                     <button
-                                        type="button"
-                                        onClick={() => { setMode('forgot-password'); setError(null); setSuccessMessage(null); }}
-                                        className="text-xs text-modtale-accent hover:text-modtale-accentHover font-medium"
+                                        onClick={() => handleOAuthLogin('gitlab')}
+                                        className="w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
+                                        title="Sign in with GitLab"
                                     >
-                                        Forgot?
+                                        <GitLabIcon className="w-5 h-5" />
                                     </button>
-                                )}
+                                    <button
+                                        onClick={() => handleOAuthLogin('discord')}
+                                        className="w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
+                                        title="Sign in with Discord"
+                                    >
+                                        <DiscordIcon className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleOAuthLogin('google')}
+                                        className="w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
+                                        title="Sign in with Google"
+                                    >
+                                        <GoogleIcon className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
-                            <input
-                                type="password"
-                                required
-                                minLength={6}
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
-                                placeholder="••••••••"
-                            />
-                        </div>
+
+                            <div className="relative mb-6 flex items-center gap-3">
+                                <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+                                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">or use email</span>
+                                <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+                            </div>
+                        </>
                     )}
 
-                    {mode === 'mfa' && (
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Authentication Code</label>
-                            <div className="relative">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {mode === 'register' && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-white uppercase">Username</label>
                                 <input
                                     type="text"
                                     required
-                                    value={mfaCode}
-                                    onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                    className="w-full px-3 py-2.5 pl-10 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm font-mono tracking-widest text-center"
-                                    placeholder="000 000"
-                                    autoFocus
+                                    value={username}
+                                    onChange={e => setUsername(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white"
+                                    placeholder="Display name"
                                 />
-                                <Smartphone className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
                             </div>
-                        </div>
-                    )}
+                        )}
+
+                        {(mode === 'signin' || mode === 'register' || mode === 'forgot-password') && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-white uppercase">
+                                    {mode === 'signin' ? 'Email or Username' : 'Email'}
+                                </label>
+                                <input
+                                    type={mode === 'signin' ? "text" : "email"}
+                                    required
+                                    value={mode === 'signin' ? (username || email) : email}
+                                    onChange={e => mode === 'signin' ? setUsername(e.target.value) : setEmail(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white"
+                                    placeholder={mode === 'signin' ? "user@example.com" : "user@example.com"}
+                                />
+                            </div>
+                        )}
+
+                        {(mode === 'signin' || mode === 'register') && (
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-bold text-white uppercase">Password</label>
+                                    {mode === 'signin' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setMode('forgot-password')}
+                                            className="text-xs text-modtale-accent hover:text-modtale-accentHover font-medium"
+                                        >
+                                            Forgot?
+                                        </button>
+                                    )}
+                                </div>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={6}
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                        )}
+
+                        {mode === 'mfa' && (
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-white uppercase">Authentication Code</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        required
+                                        value={mfaCode}
+                                        onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                        className="w-full px-3 py-2.5 pl-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm font-mono tracking-widest text-center text-slate-900 dark:text-white"
+                                        placeholder="000 000"
+                                        autoFocus
+                                    />
+                                    <Smartphone className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+                                </div>
+                            </div>
+                        )}
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-modtale-accent/90 transition-colors active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20"
+                        className="w-full bg-white text-slate-900 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors active:scale-95 duration-200 shadow-lg"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                             <>
@@ -283,8 +268,6 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                             } else {
                                 setMode(mode === 'signin' ? 'register' : 'signin');
                             }
-                            setError(null);
-                            setSuccessMessage(null);
                             setMfaCode('');
                         }}
                         className="text-sm text-slate-500 hover:text-modtale-accent dark:text-slate-400 dark:hover:text-white transition-colors flex items-center justify-center gap-2 mx-auto"
@@ -299,6 +282,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                     </button>
                 </div>
             </div>
+        </div>
         </div>,
         document.body
     );
