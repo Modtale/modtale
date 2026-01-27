@@ -245,16 +245,22 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
-        pipeline.add(Aggregation.project().andExclude(
-                "about",
-                "reviews",
-                "galleryImages",
-                "contributors",
-                "pendingInvites",
-                "versions.scanResult",
-                "versions.rejectionReason",
-                "versions.changelog"
-        ));
+        pipeline.add(Aggregation.project()
+                .andExclude(
+                        "about",
+                        "reviews",
+                        "galleryImages",
+                        "contributors",
+                        "pendingInvites",
+                        "modIds",
+                        "childProjectIds",
+                        "versions.scanResult",
+                        "versions.rejectionReason",
+                        "versions.changelog",
+                        "versions.dependencies",
+                        "versions.fileUrl"
+                )
+        );
 
         Aggregation mainAgg = Aggregation.newAggregation(Mod.class, pipeline);
         List<Mod> results = mongoTemplate.aggregate(mainAgg, Mod.class, Mod.class).getMappedResults();
@@ -295,9 +301,13 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                 "galleryImages",
                 "contributors",
                 "pendingInvites",
+                "modIds",
+                "childProjectIds",
                 "versions.scanResult",
                 "versions.rejectionReason",
-                "versions.changelog"
+                "versions.changelog",
+                "versions.dependencies",
+                "versions.fileUrl"
         );
 
         query.with(pageable);
