@@ -78,6 +78,10 @@ public class User implements Serializable {
     private String gitlabRefreshToken;
     private LocalDateTime gitlabTokenExpiresAt;
 
+    private String stripeConnectId;
+    private int platformFeePercent = 10;
+    private List<DonationReminder> donationReminders = new ArrayList<>();
+
     public User() {
         this.tier = ApiKey.Tier.USER;
         this.createdAt = LocalDate.now().toString();
@@ -168,6 +172,26 @@ public class User implements Serializable {
         public void setProfileUrl(String profileUrl) { this.profileUrl = profileUrl; }
         public boolean isVisible() { return visible; }
         public void setVisible(boolean visible) { this.visible = visible; }
+    }
+
+    public static class DonationReminder implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private String modId;
+        private LocalDateTime remindAt;
+        private boolean sent = false;
+
+        public DonationReminder() {}
+        public DonationReminder(String modId, LocalDateTime remindAt) {
+            this.modId = modId;
+            this.remindAt = remindAt;
+        }
+
+        public String getModId() { return modId; }
+        public void setModId(String modId) { this.modId = modId; }
+        public LocalDateTime getRemindAt() { return remindAt; }
+        public void setRemindAt(LocalDateTime remindAt) { this.remindAt = remindAt; }
+        public boolean isSent() { return sent; }
+        public void setSent(boolean sent) { this.sent = sent; }
     }
 
     public String getId() { return id; }
@@ -266,4 +290,13 @@ public class User implements Serializable {
 
     public LocalDateTime getGitlabTokenExpiresAt() { return gitlabTokenExpiresAt; }
     public void setGitlabTokenExpiresAt(LocalDateTime gitlabTokenExpiresAt) { this.gitlabTokenExpiresAt = gitlabTokenExpiresAt; }
+
+    public String getStripeConnectId() { return stripeConnectId; }
+    public void setStripeConnectId(String stripeConnectId) { this.stripeConnectId = stripeConnectId; }
+
+    public int getPlatformFeePercent() { return platformFeePercent; }
+    public void setPlatformFeePercent(int platformFeePercent) { this.platformFeePercent = platformFeePercent; }
+
+    public List<DonationReminder> getDonationReminders() { return donationReminders; }
+    public void setDonationReminders(List<DonationReminder> donationReminders) { this.donationReminders = donationReminders; }
 }

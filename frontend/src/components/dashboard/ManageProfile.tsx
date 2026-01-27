@@ -1,7 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, BACKEND_URL } from '../../utils/api';
-import { Save, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Mail, ShieldCheck, ShieldAlert, Key, Smartphone, Lock } from 'lucide-react';
+import {
+    Save,
+    Github,
+    Twitter,
+    Check,
+    Eye,
+    EyeOff,
+    Trash2,
+    Plus,
+    Link,
+    AlertTriangle,
+    Edit3,
+    XCircle,
+    Mail,
+    ShieldCheck,
+    ShieldAlert,
+    Key,
+    Smartphone,
+    Lock,
+    CreditCard,
+    DollarSign,
+    ChevronRight
+} from 'lucide-react';
 import type { User as UserType } from '../../types';
 import { Spinner } from '../ui/Spinner';
 import { ErrorBanner } from '../ui/error/ErrorBanner.tsx';
@@ -22,6 +44,10 @@ const BlueskyIcon = ({ className }: { className?: string }) => (
 
 const GoogleIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+);
+
+const StripeIcon = ({ className }: { className?: string }) => (
+    <svg className={className} viewBox="0 0 40 58" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M39.02 50.84C36.8 53.64 33.4 56.44 26.68 56.44C15.68 56.44 9.16 48.72 9.16 38.36C9.16 26.8 19.32 23.32 28.52 23.32C28.84 23.32 29.16 23.32 29.48 23.36V18.72C29.48 11.2 24.12 9.56 19.32 9.56C15.36 9.56 12.16 11.08 9.96 13.08L5.56 4.36C10.04 0.64 16.48 -0.84 21.08 0.16C31.52 2.44 38.84 10.2 38.84 20.88V50.84H39.02ZM29.48 31.04C29.28 31.04 28.92 31.04 28.6 31.04C22.64 31.04 18.6 33.64 18.6 38.8C18.6 42.6 21.72 45.48 25.56 45.48C28.2 45.48 29.48 43.6 29.48 41.96V31.04Z" /></svg>
 );
 
 interface ManageProfileProps {
@@ -57,6 +83,10 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     const [mfaQr, setMfaQr] = useState('');
     const [mfaCode, setMfaCode] = useState('');
     const [mfaLoading, setMfaLoading] = useState(false);
+
+    const [platformFee, setPlatformFee] = useState(user.platformFeePercent || 10);
+    const [savingFee, setSavingFee] = useState(false);
+    const [feeSaved, setFeeSaved] = useState(false);
 
     const accounts = user.connectedAccounts || [];
 
@@ -223,6 +253,20 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
         }
     };
 
+    const handleSaveFee = async () => {
+        setSavingFee(true);
+        try {
+            await api.put('/user/monetization/fee', { percent: platformFee });
+            setFeeSaved(true);
+            setTimeout(() => setFeeSaved(false), 2000);
+            onUpdate();
+        } catch (e) {
+            setError("Failed to update platform fee.");
+        } finally {
+            setSavingFee(false);
+        }
+    };
+
     const AccountRow = ({ provider, icon: Icon, label }: { provider: string, icon: any, label: string }) => {
         const account = accounts.find(a => a.provider === provider);
         const isLinked = !!account;
@@ -310,6 +354,87 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                 actionInput={actionContent}
                 bioInput={bioInput}
             />
+
+            <div className={containerClasses}>
+                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-white/5 pb-4">
+                        <DollarSign className="w-4 h-4 text-modtale-accent" />
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Monetization</h3>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="flex flex-col md:flex-row gap-6 md:items-start">
+                            <div className="flex-1">
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2">
+                                    <StripeIcon className="w-10 h-6 text-[#635BFF]" />
+                                    <span>Payout Account</span>
+                                </h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                                    Link your Stripe account to receive donations from users who download your mods.
+                                    We use Stripe Connect to handle secure payouts directly to your bank.
+                                </p>
+                            </div>
+                            <div className="flex-shrink-0">
+                                {user.stripeConnectId ? (
+                                    <div className="px-4 py-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-xl flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600 dark:text-green-300">
+                                            <Check className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-green-700 dark:text-green-300">Connected</p>
+                                            <p className="text-[10px] text-green-600/70 font-mono">{user.stripeConnectId}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => window.location.href = `${BACKEND_URL}/api/stripe/connect`}
+                                        className="bg-[#635BFF] hover:bg-[#5851E0] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-[#635BFF]/20 transition-all flex items-center gap-2"
+                                    >
+                                        Connect with Stripe <ChevronRight className="w-4 h-4 opacity-70" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {user.stripeConnectId && (
+                            <div className="pt-6 border-t border-slate-100 dark:border-white/5">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div>
+                                        <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Platform Support</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Choose what percentage of donations goes to support Modtale hosting costs.
+                                        </p>
+                                    </div>
+                                    <span className="text-2xl font-black text-modtale-accent">{platformFee}%</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="30"
+                                        step="1"
+                                        value={platformFee}
+                                        onChange={(e) => setPlatformFee(parseInt(e.target.value))}
+                                        className="flex-1 h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-modtale-accent"
+                                    />
+                                    <button
+                                        onClick={handleSaveFee}
+                                        disabled={savingFee || platformFee === user.platformFeePercent}
+                                        className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {savingFee ? 'Saving...' : (feeSaved ? 'Saved' : 'Update')}
+                                    </button>
+                                </div>
+                                <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-2 px-1">
+                                    <span>0%</span>
+                                    <span>Default (10%)</span>
+                                    <span>30%</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
 
             <div className={containerClasses}>
                 <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">

@@ -8,6 +8,7 @@ import net.modtale.model.user.User;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.AnalyticsService;
+import net.modtale.service.security.EmailService;
 import net.modtale.service.security.SanitizationService;
 import net.modtale.service.security.FileValidationService;
 import net.modtale.service.security.WardenClientService;
@@ -91,6 +92,7 @@ public class ModService {
     @Autowired private FileValidationService validationService;
     @Autowired private AnalyticsService analyticsService;
     @Autowired private NotificationService notificationService;
+    @Autowired private EmailService emailService;
     @Autowired private CacheManager cacheManager;
     @Autowired private WardenClientService wardenService;
     @Qualifier("taskExecutor")
@@ -448,6 +450,7 @@ public class ModService {
         mod.setVersions(new ArrayList<>());
         mod.setAllowModpacks(true);
         mod.setAllowReviews(true);
+        mod.setDonationsEnabled(false);
 
         return modRepository.save(mod);
     }
@@ -908,6 +911,7 @@ public class ModService {
         existing.setTypes(updatedMod.getTypes());
         existing.setAllowModpacks(updatedMod.isAllowModpacks());
         existing.setAllowReviews(updatedMod.isAllowReviews());
+        existing.setDonationsEnabled(updatedMod.isDonationsEnabled());
 
         if (updatedMod.getLinks() != null) existing.setLinks(updatedMod.getLinks());
         if (updatedMod.getImageUrl() != null) existing.setImageUrl(updatedMod.getImageUrl());
@@ -1540,7 +1544,58 @@ public class ModService {
                     notificationService.sendNotification(List.of(author.getId()), title, msg, link, mod.getImageUrl());
                 }
             }
+
+            if (mod.isDonationsEnabled()) {
+                taskExecutor.execute(() -> trackDownloadForReminder(modId, mod));
+            }
         }
+    }
+
+    private void trackDownloadForReminder(String modId, Mod mod) {
+        User currentUser = userService.getCurrentUser();
+        if (currentUser != null) {
+            boolean alreadyHasReminder = currentUser.getDonationReminders().stream()
+                    .anyMatch(r -> r.getModId().equals(modId));
+
+            if (!alreadyHasReminder) {
+                User.DonationReminder reminder = new User.DonationReminder(modId, LocalDateTime.now().plusDays(7));
+                Update update = new Update().push("donationReminders", reminder);
+                mongoTemplate.updateFirst(Query.query(Criteria.where("id").is(currentUser.getId())), update, User.class);
+            }
+        }
+    }
+
+    @Scheduled(cron = "0 0 10 * * ?") // Every day at 10 AM
+    public void processDonationReminders() {
+        LocalDateTime now = LocalDateTime.now();
+        Query query = Query.query(Criteria.where("donationReminders").elemMatch(
+                Criteria.where("remindAt").lte(now).and("sent").is(false)
+        ));
+
+        // Limit processing to prevent timeouts, using a stream to handle potentially large sets efficiently
+        mongoTemplate.stream(query, User.class).forEach(user -> {
+            boolean updated = false;
+            for (User.DonationReminder reminder : user.getDonationReminders()) {
+                if (!reminder.isSent() && reminder.getRemindAt().isBefore(now)) {
+                    Mod mod = getRawModById(reminder.getModId());
+                    if (mod != null && mod.isDonationsEnabled()) {
+                        // Use notificationService instead of emailService
+                        notificationService.sendNotification(
+                                List.of(user.getId()),
+                                "Enjoying " + mod.getTitle() + "?",
+                                "Consider supporting " + mod.getAuthor() + " with a donation!",
+                                getProjectLink(mod) + "?donate=true",
+                                mod.getImageUrl()
+                        );
+                    }
+                    reminder.setSent(true);
+                    updated = true;
+                }
+            }
+            if (updated) {
+                userRepository.save(user);
+            }
+        });
     }
 
     private void notifyUpdates(Mod mod, String versionNumber) {
@@ -1878,6 +1933,10 @@ public class ModService {
             modRepository.save(mod);
             evictProjectDetails(mod);
             analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false, "internal");
+
+            if (mod.isDonationsEnabled()) {
+                taskExecutor.execute(() -> trackDownloadForReminder(mod.getId(), mod));
+            }
         }
     }
 
