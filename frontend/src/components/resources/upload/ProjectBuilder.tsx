@@ -720,7 +720,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                         {!isModpack && (
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
-                                <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2 max-h-80 overflow-y-auto">
+                                <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2 max-h-80 overflow-y-auto custom-scrollbar">
                                     {LICENSES.map(lic => (
                                         <button key={lic.id} disabled={readOnly} onClick={() => { markDirty(); setIsCustomLicense(false); setMetaData({ ...metaData, license: lic.id }); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${!isCustomLicense && metaData.license === lic.id ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}>
                                             <span>{lic.name}</span>{!isCustomLicense && metaData.license === lic.id && <Check className="w-3 h-3" />}
