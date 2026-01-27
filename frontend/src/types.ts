@@ -126,6 +126,8 @@ export interface Mod {
     allowReviews?: boolean;
     status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
+    canEdit?: boolean;
+    isOwner?: boolean;
 }
 
 export type Modpack = Mod;

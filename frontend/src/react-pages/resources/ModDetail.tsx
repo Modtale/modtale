@@ -12,7 +12,7 @@ import {
     MessageSquare, Send, Star, StarHalf, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, MessageCircle
+    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, MessageCircle, Crown
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -405,11 +405,23 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: o
                                 </div>
                             </form>
                         ) : review.developerReply && (
-                            <div className="mt-4 ml-14 bg-modtale-accent/5 p-4 rounded-xl border border-modtale-accent/10">
-                                <div className="flex items-center gap-2 mb-1 text-xs font-bold text-modtale-accent">
-                                    <MessageCircle className="w-3 h-3" /> Developer Response
+                            <div className="mt-6 ml-14 relative">
+                                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-modtale-accent to-transparent rounded-full opacity-50"></div>
+                                <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/5">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="px-2 py-0.5 rounded-md bg-modtale-accent text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                                <Crown className="w-3 h-3" /> Developer Response
+                                            </div>
+                                            {review.developerReplyDate && (
+                                                <span className="text-xs text-slate-400 font-medium">
+                                                    {new Date(review.developerReplyDate).toLocaleDateString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{review.developerReply}</p>
                                 </div>
-                                <p className="text-sm text-slate-600 dark:text-slate-300">{review.developerReply}</p>
                             </div>
                         )}
                     </div>
@@ -469,7 +481,8 @@ export const ModDetail: React.FC<{
     const reviewsRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
-    const canEdit = currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username));
+
+    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
 
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
@@ -813,7 +826,7 @@ export const ModDetail: React.FC<{
                         <button onClick={() => setShowReportModal(true)} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
                             <Flag className="w-5 h-5" />
                         </button>
-                        {canEdit && (
+                        {Boolean(canEdit) && (
                             <button onClick={() => navigate(`${getProjectUrl(mod)}/edit`)} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" title="Edit Project">
                                 <Edit className="w-5 h-5" />
                             </button>
