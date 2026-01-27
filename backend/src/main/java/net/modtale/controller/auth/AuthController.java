@@ -175,7 +175,7 @@ public class AuthController {
                 createSession(user, request);
                 return ResponseEntity.ok(Map.of("status", "success"));
             } else {
-                return ResponseEntity.status(401).body(Map.of("error", "Invalid 2FA code"));
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid 2FA code"));
             }
         }
 
