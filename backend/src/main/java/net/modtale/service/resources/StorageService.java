@@ -47,6 +47,10 @@ public class StorageService {
     }
 
     public String upload(MultipartFile file, String pathPrefix) throws IOException {
+        if (bucketName == null || bucketName.isEmpty()) {
+            throw new IOException("Storage configuration error: Bucket name is not set.");
+        }
+
         String originalName = file.getOriginalFilename();
         if (originalName == null) originalName = "unknown";
 
@@ -58,14 +62,20 @@ public class StorageService {
 
         String contentDisposition = "attachment; filename=\"" + originalName.replace("\"", "") + "\"";
 
-        PutObjectRequest putOb = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(storageKey)
-                .contentType(safeContentType)
-                .contentDisposition(contentDisposition)
-                .build();
+        try {
+            PutObjectRequest putOb = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(storageKey)
+                    .contentType(safeContentType)
+                    .contentDisposition(contentDisposition)
+                    .build();
 
-        s3Client.putObject(putOb, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            s3Client.putObject(putOb, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            logger.info("Successfully uploaded {} to bucket {}", storageKey, bucketName);
+        } catch (S3Exception e) {
+            logger.error("Failed to upload to S3/R2. Bucket: {}, Key: {}. Error: {}", bucketName, storageKey, e.getMessage());
+            throw new IOException("Cloud storage error: " + e.getMessage(), e);
+        }
 
         return storageKey;
     }
@@ -123,9 +133,9 @@ public class StorageService {
                     .key(fileName)
                     .build();
             s3Client.deleteObject(deleteReq);
-            logger.info("R2: Deleted file " + fileName);
+            logger.info("R2: Deleted file " + fileName + " from bucket " + bucketName);
         } catch (Exception e) {
-            logger.error("R2 ERROR: Failed to delete " + fileName, e);
+            logger.error("R2 ERROR: Failed to delete " + fileName + " from bucket " + bucketName, e);
         }
     }
 
@@ -138,7 +148,7 @@ public class StorageService {
             ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getReq);
             return response.readAllBytes();
         } catch (NoSuchKeyException e) {
-            throw new IOException("File not found: " + fileName);
+            throw new IOException("File not found in bucket " + bucketName + ": " + fileName);
         }
     }
 
@@ -150,7 +160,7 @@ public class StorageService {
                     .build();
             return s3Client.getObject(getReq);
         } catch (NoSuchKeyException e) {
-            throw new IOException("File not found: " + fileName);
+            throw new IOException("File not found in bucket " + bucketName + ": " + fileName);
         }
     }
 

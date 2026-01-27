@@ -37,6 +37,8 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepo
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.session.web.http.DefaultCookieSerializer;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -78,14 +80,31 @@ public class SecurityConfig {
         return authProvider;
     }
 
+    private boolean isPreviewEnvironment() {
+        if (frontendUrl == null || frontendUrl.isBlank()) return false;
+        try {
+            String host = URI.create(frontendUrl).getHost();
+            return host != null && host.endsWith(".run.app");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
-        tokenRepository.setCookieHttpOnly(false);
-        tokenRepository.setSecure(true);
-        tokenRepository.setCookiePath("/");
-        tokenRepository.setCookieCustomizer(cookie -> {
-            cookie.sameSite("None");
+    public CookieSerializer cookieSerializer() {
+        DefaultCookieSerializer serializer = new DefaultCookieSerializer();
+        serializer.setUseSecureCookie(true);
+        serializer.setCookiePath("/");
+
+        boolean isPreview = isPreviewEnvironment();
+
+        if (isPreview) {
+            serializer.setSameSite("None");
+            logger.info("CookieSerializer: Detected Preview Environment. Using SameSite=None.");
+        } else {
+            serializer.setSameSite("Lax");
+            logger.info("CookieSerializer: Detected Prod/Dev Environment. Using SameSite=Lax.");
+
             if (frontendUrl != null && !frontendUrl.isBlank()) {
                 try {
                     String host = URI.create(frontendUrl).getHost();
@@ -93,13 +112,45 @@ public class SecurityConfig {
                         String[] parts = host.split("\\.");
                         if (parts.length >= 2) {
                             String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
-                            cookie.domain(rootDomain);
-                        } else {
-                            cookie.domain(host);
+                            serializer.setDomainName(rootDomain);
                         }
                     }
                 } catch (Exception e) {
-                    logger.warn("Failed to set CSRF cookie domain: {}", e.getMessage());
+                    logger.warn("Failed to parse frontend URL for cookie domain: {}", e.getMessage());
+                }
+            }
+        }
+        return serializer;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
+        tokenRepository.setCookieHttpOnly(false);
+        tokenRepository.setSecure(true);
+        tokenRepository.setCookiePath("/");
+
+        tokenRepository.setCookieCustomizer(cookie -> {
+            boolean isPreview = isPreviewEnvironment();
+
+            if (isPreview) {
+                cookie.sameSite("None");
+                cookie.domain(null);
+            } else {
+                cookie.sameSite("Lax");
+                if (frontendUrl != null && !frontendUrl.isBlank()) {
+                    try {
+                        String host = URI.create(frontendUrl).getHost();
+                        if (host != null && !host.equalsIgnoreCase("localhost")) {
+                            String[] parts = host.split("\\.");
+                            if (parts.length >= 2) {
+                                String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                                cookie.domain(rootDomain);
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to set CSRF cookie domain: {}", e.getMessage());
+                    }
                 }
             }
         });
@@ -110,12 +161,19 @@ public class SecurityConfig {
         http
                 .authenticationProvider(authenticationProvider())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(tokenRepository)
-                        .csrfTokenRequestHandler(requestHandler)
-                        .ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**")
-                        .ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null)
-                )
+                .csrf(csrf -> {
+                    csrf
+                            .csrfTokenRepository(tokenRepository)
+                            .csrfTokenRequestHandler(requestHandler);
+
+                    csrf.ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**");
+                    csrf.ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null);
+
+                    if (isPreviewEnvironment()) {
+                        logger.warn("SECURITY WARNING: Disabling CSRF protection for Staging/Preview environment to allow cross-site requests.");
+                        csrf.ignoringRequestMatchers("/**");
+                    }
+                })
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
@@ -210,9 +268,17 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration restrictedConfig = new CorsConfiguration();
         List<String> restrictedOrigins = new ArrayList<>();
-        if (frontendUrl != null && !frontendUrl.isBlank()) {
-            restrictedOrigins.add(frontendUrl);
+
+        boolean isPreview = isPreviewEnvironment();
+
+        if (isPreview) {
+            restrictedOrigins.add("https://*.run.app");
+        } else {
+            if (frontendUrl != null && !frontendUrl.isBlank()) {
+                restrictedOrigins.add(frontendUrl);
+            }
         }
+
         restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
         restrictedConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         restrictedConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN"));
@@ -235,6 +301,9 @@ public class SecurityConfig {
         publicOrigins.add("*");
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             publicOrigins.add(frontendUrl);
+        }
+        if (isPreview) {
+            publicOrigins.add("https://*.run.app");
         }
         publicConfig.setAllowedOriginPatterns(publicOrigins);
         publicConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
