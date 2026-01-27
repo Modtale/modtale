@@ -11,13 +11,28 @@ import java.util.Optional;
 
 public interface ModRepository extends MongoRepository<Mod, String>, ModRepositoryCustom {
 
-    @Query(value = "{ 'author': {$regex: '^?0$', $options: 'i'}, 'deletedAt': null }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
+    String CARD_FIELDS = "{ " +
+            "'about': 0, " +
+            "'reviews': 0, " +
+            "'galleryImages': 0, " +
+            "'contributors': 0, " +
+            "'pendingInvites': 0, " +
+            "'modIds': 0, " +
+            "'childProjectIds': 0, " +
+            "'versions.scanResult': 0, " +
+            "'versions.changelog': 0, " +
+            "'versions.dependencies': 0, " +
+            "'versions.rejectionReason': 0, " +
+            "'versions.fileUrl': 0 " +
+            "}";
+
+    @Query(value = "{ 'author': {$regex: '^?0$', $options: 'i'}, 'deletedAt': null }", fields = CARD_FIELDS)
     Page<Mod> findByAuthorIgnoreCase(String author, Pageable pageable);
 
-    @Query(value = "{ 'author': ?0, 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
+    @Query(value = "{ 'author': ?0, 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = CARD_FIELDS)
     Page<Mod> findByAuthor(String author, Pageable pageable);
 
-    @Query(value = "{ 'author': ?0, 'status': ?1, 'deletedAt': null }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
+    @Query(value = "{ 'author': ?0, 'status': ?1, 'deletedAt': null }", fields = CARD_FIELDS)
     Page<Mod> findByAuthorAndStatus(String author, String status, Pageable pageable);
 
     @Query(value = "{ 'author': ?0, 'deletedAt': null }")
@@ -35,7 +50,7 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
 
     boolean existsByTitleIgnoreCase(String title);
 
-    @Query(value = "{ 'contributors': ?0, 'deletedAt': null }", fields = "{ 'about': 0, 'reviews': 0, 'galleryImages': 0 }")
+    @Query(value = "{ 'contributors': ?0, 'deletedAt': null }", fields = CARD_FIELDS)
     Page<Mod> findByContributors(String username, Pageable pageable);
 
     @Query("{ 'versions.dependencies.modId': ?0 }")
@@ -47,7 +62,7 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
     @Query(value = "{ 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = "{ 'tags' : 1 }")
     List<Mod> findAllWithTags();
 
-    @Query(value = "{ 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }")
+    @Query(value = "{ 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = CARD_FIELDS)
     List<Mod> findAllPublished();
 
     @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null }", fields = "{ 'id': 1, 'title': 1, 'slug': 1, 'updatedAt': 1, 'classification': 1, 'author': 1 }")
