@@ -170,11 +170,16 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                     ).then("$daysArray.v.d").otherwise(0)).as("prevWeekDownloads")
             );
 
-            pipeline.add(Aggregation.replaceRoot("doc"));
             pipeline.add(Aggregation.addFields()
                     .addField("trendScore")
                     .withValue(ArithmeticOperators.Subtract.valueOf("currentWeekDownloads").subtract("prevWeekDownloads"))
                     .build());
+
+            pipeline.add(Aggregation.addFields()
+                    .addField("doc.trendScore").withValue("$trendScore")
+                    .build());
+
+            pipeline.add(Aggregation.replaceRoot("doc"));
 
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "trendScore"));
 
@@ -258,7 +263,11 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                         "versions.rejectionReason",
                         "versions.changelog",
                         "versions.dependencies",
-                        "versions.fileUrl"
+                        "versions.fileUrl",
+                        "monthly_stats",
+                        "daysArray",
+                        "logDate",
+                        "trendScore"
                 )
         );
 
