@@ -48,7 +48,9 @@ public class AdminController {
     }
 
     private boolean isAdmin(User user) {
-        return (user != null && user.getRoles() != null && user.getRoles().contains("ADMIN")) || isSuperAdmin(user);
+        if (user == null) return false;
+        if (SUPER_ADMIN_ID.equals(user.getId())) return true;
+        return user.getRoles() != null && user.getRoles().contains("ADMIN");
     }
 
     private User getSafeUser() {

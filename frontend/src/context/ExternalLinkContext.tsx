@@ -55,6 +55,10 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             if (!anchor.href.startsWith('http')) return;
 
+            if (anchor.getAttribute('rel')?.includes('nofollow')) {
+                return;
+            }
+
             try {
                 const url = new URL(anchor.href);
                 const currentHost = window.location.hostname;
