@@ -94,7 +94,7 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
 
     if (useExternal) {
         return (
-            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest rounded-xl ${variant === 'card' ? 'h-full min-h-[154px]' : ''} ${variant === 'sidebar' ? 'min-h-[200px]' : ''} ${className}`}>
+            <div className={`bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs text-slate-400 uppercase tracking-widest rounded-xl ${variant === 'card' ? 'min-h-[154px]' : ''} ${variant === 'sidebar' ? 'min-h-[200px]' : ''} ${className}`}>
                 <span>Advertisement</span>
             </div>
         );
@@ -113,8 +113,8 @@ export const AdUnit: React.FC<AdUnitProps> = ({ className, variant }) => {
 
     if (variant === 'card') {
         return (
-            <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`group relative block h-full min-h-[154px] bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden transition-all hover:ring-2 hover:ring-modtale-accent hover:ring-offset-2 hover:ring-offset-slate-50 dark:hover:ring-offset-slate-900 ${className}`}>
-                <img src={ad.imageUrl} alt={ad.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            <a href={ad.linkUrl} target="_blank" rel="nofollow noreferrer" onClick={handleClick} className={`group relative block w-full bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden transition-all hover:ring-2 hover:ring-modtale-accent hover:ring-offset-2 hover:ring-offset-slate-50 dark:hover:ring-offset-slate-900 ${className}`}>
+                <img src={ad.imageUrl} alt={ad.title} className="w-full h-auto object-contain block transition-transform duration-700 group-hover:scale-105" />
 
                 <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/40 backdrop-blur-md rounded text-[10px] font-bold text-white/90 uppercase tracking-wider border border-white/10">
                     Ad
