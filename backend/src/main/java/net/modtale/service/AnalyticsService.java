@@ -10,12 +10,14 @@ import net.modtale.model.resources.ProjectMeta;
 import net.modtale.repository.analytics.PlatformMonthlyStatsRepository;
 import net.modtale.repository.analytics.ProjectMonthlyStatsRepository;
 import net.modtale.repository.resources.ModRepository;
+import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,6 +52,159 @@ public class AnalyticsService {
             .expireAfterWrite(10, TimeUnit.MINUTES)
             .maximumSize(50000)
             .build();
+
+
+    @Scheduled(cron = "0 30 0 * * ?")
+    public void updateTrendingScores() {
+        logger.info("Starting daily trending score calculation...");
+        LocalDate now = LocalDate.now();
+        Date date7DaysAgo = Date.from(now.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date date14DaysAgo = Date.from(now.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        int currYear = now.getYear();
+        int currMonth = now.getMonthValue();
+        LocalDate prevMonthDate = now.minusMonths(1);
+        int prevYear = prevMonthDate.getYear();
+        int prevMonth = prevMonthDate.getMonthValue();
+
+        List<AggregationOperation> pipeline = new ArrayList<>();
+
+        pipeline.add(Aggregation.match(
+                new Criteria().orOperator(
+                        Criteria.where("year").is(currYear).and("month").is(currMonth),
+                        Criteria.where("year").is(prevYear).and("month").is(prevMonth)
+                )
+        ));
+
+        pipeline.add(Aggregation.addFields()
+                .addField("daysArray")
+                .withValue(ObjectOperators.ObjectToArray.valueOfToArray("days"))
+                .build());
+        pipeline.add(Aggregation.unwind("daysArray", true));
+
+        pipeline.add(Aggregation.addFields()
+                .addField("logDate")
+                .withValue(
+                        DateOperators.DateFromParts.dateFromParts()
+                                .year("year")
+                                .month("month")
+                                .day(ConvertOperators.ToInt.toInt("$daysArray.k"))
+                )
+                .build());
+
+        pipeline.add(Aggregation.group("projectId")
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
+                                Criteria.where("logDate").gte(date7DaysAgo)
+                        )
+                ).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
+                                Criteria.where("logDate").gte(date14DaysAgo),
+                                Criteria.where("logDate").lt(date7DaysAgo)
+                        )
+                ).then("$daysArray.v.d").otherwise(0)).as("prevWeek")
+        );
+
+        pipeline.add(Aggregation.project()
+                .and(ArithmeticOperators.Subtract.valueOf("currentWeek").subtract("prevWeek"))
+                .as("score")
+        );
+
+        Aggregation agg = Aggregation.newAggregation(ProjectMonthlyStats.class, pipeline);
+        AggregationResults<Document> results = mongoTemplate.aggregate(agg, ProjectMonthlyStats.class, Document.class);
+
+        BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
+        int count = 0;
+
+        mongoTemplate.updateMulti(new Query(), new Update().set("trendScore", 0), Mod.class);
+
+        for (Document doc : results) {
+            String projectId = doc.getString("_id");
+            int score = doc.getInteger("score", 0);
+
+            if (score != 0) {
+                bulkOps.updateOne(
+                        new Query(Criteria.where("_id").is(projectId)),
+                        new Update().set("trendScore", score)
+                );
+                count++;
+            }
+
+            if (count >= 1000) {
+                bulkOps.execute();
+                bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
+                count = 0;
+            }
+        }
+
+        if (count > 0) {
+            bulkOps.execute();
+        }
+
+        logger.info("Trending scores updated.");
+    }
+
+    public static List<AggregationOperation> getRelevanceAggregationStages() {
+        List<AggregationOperation> stages = new ArrayList<>();
+        LocalDate now = LocalDate.now();
+        int currYear = now.getYear();
+        int currMonth = now.getMonthValue();
+        LocalDate prev = now.minusMonths(1);
+        int prevYear = prev.getYear();
+        int prevMonth = prev.getMonthValue();
+
+        LookupOperation lookup = LookupOperation.newLookup()
+                .from("project_monthly_stats")
+                .localField("_id")
+                .foreignField("projectId")
+                .pipeline(
+                        Aggregation.match(
+                                new Criteria().orOperator(
+                                        Criteria.where("year").is(currYear).and("month").is(currMonth),
+                                        Criteria.where("year").is(prevYear).and("month").is(prevMonth)
+                                )
+                        ),
+                        Aggregation.project("totalDownloads")
+                )
+                .as("monthly_stats");
+        stages.add(lookup);
+
+        stages.add(Aggregation.addFields()
+                .addField("recentDownloads")
+                .withValue(ConditionalOperators.ifNull(AccumulatorOperators.Sum.sumOf("monthly_stats.totalDownloads")).then(0))
+                .build());
+
+        stages.add(Aggregation.addFields().addField("relevanceScore")
+                .withValue(
+                        ArithmeticOperators.Multiply.valueOf("recentDownloads")
+                                .multiplyBy(
+                                        ConditionalOperators.when(Criteria.where("rating").gte(4.5)).then(1.0)
+                                                .otherwise(ConditionalOperators.when(Criteria.where("rating").gt(0))
+                                                        .then(ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5))
+                                                        .otherwise(0.5))
+                                )
+                ).build());
+
+        stages.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
+        return stages;
+    }
+
+    public static List<AggregationOperation> getPopularAggregationStages() {
+        List<AggregationOperation> stages = new ArrayList<>();
+        stages.add(Aggregation.addFields().addField("popularScore")
+                .withValue(
+                        ArithmeticOperators.Multiply.valueOf("downloadCount")
+                                .multiplyBy(
+                                        ConditionalOperators.when(Criteria.where("rating").gte(4.5)).then(1.0)
+                                                .otherwise(ConditionalOperators.when(Criteria.where("rating").gt(0))
+                                                        .then(ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5))
+                                                        .otherwise(0.5))
+                                )
+                ).build());
+        stages.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
+        return stages;
+    }
 
     private record DownloadEvent(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {}
 
