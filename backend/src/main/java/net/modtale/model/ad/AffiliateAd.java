@@ -13,6 +13,8 @@ public class AffiliateAd {
     private String linkUrl;
     private boolean active;
 
+    private String trackingParam;
+
     private List<AdCreative> creatives = new ArrayList<>();
 
     private int views;
@@ -34,6 +36,10 @@ public class AffiliateAd {
     public void setLinkUrl(String linkUrl) { this.linkUrl = linkUrl; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public String getTrackingParam() { return trackingParam; }
+    public void setTrackingParam(String trackingParam) { this.trackingParam = trackingParam; }
+
     public List<AdCreative> getCreatives() { return creatives; }
     public void setCreatives(List<AdCreative> creatives) { this.creatives = creatives; }
     public int getViews() { return views; }

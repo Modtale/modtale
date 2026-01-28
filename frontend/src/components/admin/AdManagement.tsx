@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../utils/api';
-import { Plus, Trash2, Edit2, ExternalLink, BarChart2, X, Upload, Image as ImageIcon, Layout, Columns, RectangleHorizontal } from 'lucide-react';
-import type { AffiliateAd, AdCreative } from '../../types';
+import { Plus, Trash2, Edit2, ExternalLink, BarChart2, X, Upload, RectangleHorizontal, Columns, Layout } from 'lucide-react';
+import type { AffiliateAd } from '../../types';
 
 interface AdManagementProps {
     setStatus: (status: any) => void;
@@ -21,6 +21,7 @@ export const AdManagement: React.FC<AdManagementProps> = ({ setStatus }) => {
     const [formData, setFormData] = useState({
         title: '',
         linkUrl: '',
+        trackingParam: '', // New field
         active: true
     });
 
@@ -53,6 +54,7 @@ export const AdManagement: React.FC<AdManagementProps> = ({ setStatus }) => {
         data.append('ad', new Blob([JSON.stringify({
             title: formData.title,
             linkUrl: formData.linkUrl,
+            trackingParam: formData.trackingParam,
             active: formData.active
         })], { type: 'application/json' }));
 
@@ -100,6 +102,7 @@ export const AdManagement: React.FC<AdManagementProps> = ({ setStatus }) => {
         setFormData({
             title: ad.title,
             linkUrl: ad.linkUrl,
+            trackingParam: ad.trackingParam || '',
             active: ad.active
         });
         setSelectedFiles([]);
@@ -115,7 +118,7 @@ export const AdManagement: React.FC<AdManagementProps> = ({ setStatus }) => {
 
     const resetForm = () => {
         setEditingAd(null);
-        setFormData({ title: '', linkUrl: '', active: true });
+        setFormData({ title: '', linkUrl: '', trackingParam: '', active: true });
         setSelectedFiles([]);
         setPreviewUrls([]);
         setDeletedCreativeIds([]);
@@ -185,6 +188,7 @@ export const AdManagement: React.FC<AdManagementProps> = ({ setStatus }) => {
                                 <div className="flex gap-3 text-xs font-bold text-slate-500">
                                     <span className="flex items-center gap-1"><BarChart2 className="w-3 h-3"/> {ad.views || 0}</span>
                                     <span className="flex items-center gap-1"><ExternalLink className="w-3 h-3"/> {ad.clicks || 0}</span>
+                                    {ad.trackingParam && <span className="flex items-center gap-1 text-modtale-accent">?{ad.trackingParam}=...</span>}
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={() => openEdit(ad)} className="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 rounded-lg"><Edit2 className="w-4 h-4" /></button>
@@ -215,6 +219,18 @@ export const AdManagement: React.FC<AdManagementProps> = ({ setStatus }) => {
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Target URL</label>
                                         <input type="url" required value={formData.linkUrl} onChange={e => setFormData({ ...formData, linkUrl: e.target.value })} className="w-full px-4 py-2 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white" />
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tracking Parameter (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={formData.trackingParam}
+                                        onChange={e => setFormData({ ...formData, trackingParam: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white font-mono text-sm"
+                                        placeholder="e.g. r, ref, utm_source"
+                                    />
+                                    <p className="text-[10px] text-slate-500 mt-1">If set, Modtale will append <code className="bg-slate-100 dark:bg-white/10 px-1 rounded">?{formData.trackingParam || 'param'}=PageSource</code> to the URL.</p>
                                 </div>
 
                                 {editingAd && editingAd.creatives && editingAd.creatives.length > 0 && (

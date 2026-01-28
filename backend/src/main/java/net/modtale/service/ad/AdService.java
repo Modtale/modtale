@@ -56,7 +56,7 @@ public class AdService {
                 .filter(c -> c.getType() == targetType)
                 .findFirst()
                 .orElse(selectedAd.getCreatives().stream()
-                        .filter(c -> c.getType() == AdCreative.CreativeType.CARD) // Fallback for sidebar
+                        .filter(c -> c.getType() == AdCreative.CreativeType.CARD)
                         .findFirst()
                         .orElse(selectedAd.getCreatives().get(0)));
 
@@ -64,6 +64,7 @@ public class AdService {
         response.setId(selectedAd.getId());
         response.setTitle(selectedAd.getTitle());
         response.setLinkUrl(selectedAd.getLinkUrl());
+        response.setTrackingParam(selectedAd.getTrackingParam());
 
         String publicUrl = bestCreative.getImageUrl();
         if (publicUrl != null && !publicUrl.startsWith("http")) {
@@ -119,6 +120,7 @@ public class AdService {
             ad.setTitle(updated.getTitle());
             ad.setLinkUrl(updated.getLinkUrl());
             ad.setActive(updated.isActive());
+            ad.setTrackingParam(updated.getTrackingParam());
 
             if (deleteCreativeIds != null && !deleteCreativeIds.isEmpty() && ad.getCreatives() != null) {
                 List<AdCreative> toKeep = new ArrayList<>();

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, {useState, useRef, useEffect, useCallback, useMemo} from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import type { Mod, Modpack, World } from '../types';
@@ -295,7 +295,7 @@ export const Home: React.FC<HomeProps> = ({
                         </div>
 
                         <div className="mt-6">
-                            <AdUnit variant="sidebar" />
+                            <AdUnit variant="sidebar" trackingSource="HomePage" />
                         </div>
                     </div>
 
@@ -371,7 +371,7 @@ export const Home: React.FC<HomeProps> = ({
                         )}
 
                         <div className="mt-12 mb-8">
-                            <AdUnit variant="banner" className="max-w-4xl mx-auto" />
+                            <AdUnit variant="banner" className="max-w-4xl mx-auto" trackingSource="HomePage" />
                         </div>
 
                         {totalPages > 1 && (

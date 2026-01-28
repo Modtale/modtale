@@ -12,6 +12,7 @@ export interface AffiliateAd {
     linkUrl: string;
     active: boolean;
     creatives: AdCreative[];
+    trackingParam?: string;
     views?: number;
     clicks?: number;
     imageUrl?: string;
