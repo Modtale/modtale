@@ -2,7 +2,7 @@ package net.modtale.repository.resources;
 
 import net.modtale.model.resources.Mod;
 import net.modtale.repository.user.UserRepository;
-import org.bson.Document;
+import net.modtale.service.AnalyticsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,9 +18,7 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -80,7 +78,6 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         List<AggregationOperation> pipeline = new ArrayList<>();
         pipeline.add(Aggregation.match(baseCriteria));
 
-
         if ("hidden_gems".equals(viewCategory)) {
             long totalDocs = mongoTemplate.count(new Query(baseCriteria), Mod.class);
             int p5Index = Math.max(0, (int) (totalDocs * 0.05));
@@ -105,138 +102,11 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         }
 
         if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
-            LocalDate now = LocalDate.now();
-            int currYear = now.getYear();
-            int currMonth = now.getMonthValue();
-
-            LocalDate prevMonthDate = now.minusMonths(1);
-            int prevYear = prevMonthDate.getYear();
-            int prevMonth = prevMonthDate.getMonthValue();
-
-            LookupOperation lookup = LookupOperation.newLookup()
-                    .from("project_monthly_stats")
-                    .localField("_id")
-                    .foreignField("projectId")
-                    .pipeline(
-                            Aggregation.match(
-                                    new Criteria().orOperator(
-                                            Criteria.where("year").is(currYear).and("month").is(currMonth),
-                                            Criteria.where("year").is(prevYear).and("month").is(prevMonth)
-                                    )
-                            )
-                    )
-                    .as("monthly_stats");
-            pipeline.add(lookup);
-
-            pipeline.add(Aggregation.unwind("monthly_stats", true));
-
-            pipeline.add(Aggregation.addFields()
-                    .addField("daysArray").withValue(ObjectOperators.ObjectToArray.valueOfToArray("monthly_stats.days"))
-                    .build());
-
-            pipeline.add(Aggregation.unwind("daysArray", true));
-
-            pipeline.add(Aggregation.addFields()
-                    .addField("logDate")
-                    .withValue(
-                            ConditionalOperators.when(Criteria.where("daysArray").ne(null))
-                                    .then(
-                                            DateOperators.DateFromParts.dateFromParts()
-                                                    .year("monthly_stats.year")
-                                                    .month("monthly_stats.month")
-                                                    .day(ConvertOperators.ToInt.toInt("$daysArray.k"))
-                                    )
-                                    .otherwise(null)
-                    )
-                    .build());
-
-            Date date7DaysAgo = Date.from(now.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
-            Date date14DaysAgo = Date.from(now.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
-
-            pipeline.add(Aggregation.group("_id")
-                    .first("$$ROOT").as("doc")
-                    .sum(ConditionalOperators.when(
-                            new Criteria().andOperator(
-                                    Criteria.where("logDate").ne(null),
-                                    Criteria.where("logDate").gte(date7DaysAgo)
-                            )
-                    ).then("$daysArray.v.d").otherwise(0)).as("currentWeekDownloads")
-                    .sum(ConditionalOperators.when(
-                            new Criteria().andOperator(
-                                    Criteria.where("logDate").ne(null),
-                                    Criteria.where("logDate").gte(date14DaysAgo),
-                                    Criteria.where("logDate").lt(date7DaysAgo)
-                            )
-                    ).then("$daysArray.v.d").otherwise(0)).as("prevWeekDownloads")
-            );
-
-            pipeline.add(Aggregation.addFields()
-                    .addField("trendScore")
-                    .withValue(ArithmeticOperators.Subtract.valueOf("currentWeekDownloads").subtract("prevWeekDownloads"))
-                    .build());
-
-            pipeline.add(Aggregation.addFields()
-                    .addField("doc.trendScore").withValue("$trendScore")
-                    .build());
-
-            pipeline.add(Aggregation.replaceRoot("doc"));
-
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "trendScore"));
-
         } else if ("popular".equals(sortBy) || "popular".equals(viewCategory)) {
-            pipeline.add(Aggregation.addFields().addField("popularScore")
-                    .withValue(
-                            ArithmeticOperators.Multiply.valueOf("downloadCount")
-                                    .multiplyBy(
-                                            ConditionalOperators.when(Criteria.where("rating").gte(4.5)).then(1.0)
-                                                    .otherwise(ConditionalOperators.when(Criteria.where("rating").gt(0))
-                                                            .then(ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5))
-                                                            .otherwise(0.5))
-                                    )
-                    ).build());
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
-
+            pipeline.addAll(AnalyticsService.getPopularAggregationStages());
         } else if ("relevance".equals(sortBy)) {
-            LocalDate now = LocalDate.now();
-            int currYear = now.getYear();
-            int currMonth = now.getMonthValue();
-            LocalDate prev = now.minusMonths(1);
-            int prevYear = prev.getYear();
-            int prevMonth = prev.getMonthValue();
-
-            LookupOperation lookup = LookupOperation.newLookup()
-                    .from("project_monthly_stats")
-                    .localField("_id")
-                    .foreignField("projectId")
-                    .pipeline(
-                            Aggregation.match(
-                                    new Criteria().orOperator(
-                                            Criteria.where("year").is(currYear).and("month").is(currMonth),
-                                            Criteria.where("year").is(prevYear).and("month").is(prevMonth)
-                                    )
-                            ),
-                            Aggregation.project("totalDownloads")
-                    )
-                    .as("monthly_stats");
-            pipeline.add(lookup);
-
-            pipeline.add(Aggregation.addFields()
-                    .addField("recentDownloads")
-                    .withValue(ConditionalOperators.ifNull(AccumulatorOperators.Sum.sumOf("monthly_stats.totalDownloads")).then(0))
-                    .build());
-
-            pipeline.add(Aggregation.addFields().addField("relevanceScore")
-                    .withValue(
-                            ArithmeticOperators.Multiply.valueOf("recentDownloads")
-                                    .multiplyBy(
-                                            ConditionalOperators.when(Criteria.where("rating").gte(4.5)).then(1.0)
-                                                    .otherwise(ConditionalOperators.when(Criteria.where("rating").gt(0))
-                                                            .then(ArithmeticOperators.Divide.valueOf("rating").divideBy(4.5))
-                                                            .otherwise(0.5))
-                                    )
-                    ).build());
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
-
+            pipeline.addAll(AnalyticsService.getRelevanceAggregationStages());
         } else if (pageable.getSort().isSorted()) {
             pipeline.add(Aggregation.sort(pageable.getSort()));
         } else {
@@ -267,7 +137,9 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                         "monthly_stats",
                         "daysArray",
                         "logDate",
-                        "trendScore"
+                        "popularScore",
+                        "relevanceScore",
+                        "recentDownloads"
                 )
         );
 
