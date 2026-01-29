@@ -81,20 +81,27 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
         }
     };
 
-    const handleDownload = () => {
-        dependencies.forEach((d, index) => {
+    const handleDownload = async () => {
+        for (let index = 0; index < dependencies.length; index++) {
+            const d = dependencies[index];
             if (selected.has(d.modId)) {
-                const url = `${BACKEND_URL}/api/projects/${d.modId}/versions/${d.versionNumber}/download`;
-                setTimeout(() => {
+                try {
+                    await new Promise(resolve => setTimeout(resolve, index * 250));
+
+                    const response = await api.get(`/projects/${d.modId}/versions/${d.versionNumber}/download-url`);
+                    const { downloadUrl } = response.data;
+
                     const link = document.createElement('a');
-                    link.href = url;
+                    link.href = `${BACKEND_URL}${downloadUrl}`;
                     link.setAttribute('download', '');
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-                }, index * 250);
+                } catch (error) {
+                    console.error(`Failed to download dependency ${d.modId}:`, error);
+                }
             }
-        });
+        }
         onConfirm();
     };
 

@@ -628,15 +628,34 @@ export const ModDetail: React.FC<{
         }
     };
 
-    const executeDownload = (fileUrl: string, ver?: string) => {
-        const targetUrl = mod?.classification === 'MODPACK'
-            ? `${API_BASE_URL}/projects/${mod.id}/versions/${ver}/download`
-            : (ver ? `${API_BASE_URL}/projects/${mod?.id}/versions/${ver}/download` : `${API_BASE_URL}/files/download/${encodeURI(fileUrl)}`);
+    const executeDownload = async (fileUrl: string, ver?: string) => {
+        try {
+            if (!ver) {
+                const targetUrl = `${API_BASE_URL}/files/download/${encodeURI(fileUrl)}`;
+                window.open(targetUrl, '_blank');
+                if(mod && !downloadedSessionIds.has(mod.id)) {
+                    setMod(prev => prev ? { ...prev, downloadCount: prev.downloadCount + 1 } : null);
+                    onDownload(mod.id);
+                }
+                setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
+                setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+                return;
+            }
 
-        window.open(targetUrl, '_blank');
-        if(mod && !downloadedSessionIds.has(mod.id)) { setMod(prev => prev ? { ...prev, downloadCount: prev.downloadCount + 1 } : null); onDownload(mod.id); }
-        setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
-        setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+            const response = await api.get(`/projects/${mod?.id}/versions/${ver}/download-url`);
+            const { downloadUrl } = response.data;
+
+            window.open(`${API_BASE_URL}${downloadUrl}`, '_blank');
+            if(mod && !downloadedSessionIds.has(mod.id)) {
+                setMod(prev => prev ? { ...prev, downloadCount: prev.downloadCount + 1 } : null);
+                onDownload(mod.id);
+            }
+            setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
+            setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+        } catch (error) {
+            console.error('Failed to initiate download:', error);
+            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
+        }
     };
 
     const memoizedDescription = useMemo(() => {

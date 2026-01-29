@@ -1082,7 +1082,7 @@ public class ModService {
         ver.setVersionNumber(versionNumber);
         ver.setGameVersions(gameVersions);
         ver.setFileUrl(filePath);
-        ver.setReleaseDate(LocalDate.now().toString());
+        ver.setReleaseDate(LocalDateTime.now().toString());
         ver.setDownloadCount(0);
         ver.setChangelog(sanitizer.sanitizePlainText(changelog));
         ver.setChannel(channel);

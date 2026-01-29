@@ -4,6 +4,7 @@ import net.modtale.model.user.User;
 import net.modtale.model.resources.*;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.AnalyticsService;
+import net.modtale.service.DownloadTokenService;
 import net.modtale.service.user.UserService;
 import net.modtale.service.resources.ModService;
 import net.modtale.service.resources.StorageService;
@@ -48,6 +49,7 @@ public class ModController {
     @Autowired private AnalyticsService analyticsService;
     @Autowired private FileValidationService validationService;
     @Autowired private UserRepository userRepository;
+    @Autowired private DownloadTokenService downloadTokenService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -100,6 +102,126 @@ public class ModController {
         }
     }
 
+    @GetMapping("/projects/{id}/versions/{version}/download-url")
+    public ResponseEntity<?> getDownloadUrl(@PathVariable String id, @PathVariable String version) {
+        try {
+            Mod mod = modService.getModById(id);
+            if (mod == null) return ResponseEntity.notFound().build();
+
+            if ("DRAFT".equals(mod.getStatus()) || "PENDING".equals(mod.getStatus())) {
+                User user = userService.getCurrentUser();
+                if (!isAdminOrSuper(user)) {
+                    if (user == null || !modService.hasEditPermission(mod, user)) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                    }
+                }
+            }
+
+            ModVersion targetVersion = mod.getVersions().stream()
+                    .filter(v -> v.getVersionNumber().equalsIgnoreCase(version))
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetVersion == null) return ResponseEntity.notFound().build();
+
+            String token = downloadTokenService.generateToken(id, version);
+            String downloadUrl = "/api/v1/download/" + token;
+
+            return ResponseEntity.ok(Map.of(
+                    "downloadUrl", downloadUrl,
+                    "expiresIn", 300
+            ));
+        } catch (Exception e) {
+            logger.error("Error generating download URL", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/download/{token}")
+    public ResponseEntity<Resource> downloadWithToken(@PathVariable String token, HttpServletRequest request) {
+        try {
+            DownloadTokenService.DownloadToken downloadToken = downloadTokenService.validateAndConsume(token);
+
+            if (downloadToken == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(null);
+            }
+
+            String id = downloadToken.getProjectId();
+            String version = downloadToken.getVersion();
+
+            Mod mod = modService.getModById(id);
+            if (mod == null) return ResponseEntity.notFound().build();
+
+            boolean isApi = false;
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+            if (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) {
+                isApi = true;
+            } else {
+                String referer = request.getHeader("Referer");
+                if (referer == null || !referer.startsWith(frontendUrl)) {
+                    isApi = true;
+                }
+            }
+
+            String clientIp = getClientIp(request);
+
+            if ("MODPACK".equals(mod.getClassification())) {
+                ModVersion targetVersion = modService.findVersion(mod, version);
+                if (targetVersion == null) return ResponseEntity.notFound().build();
+
+                modService.incrementDownloadCount(mod.getId());
+                analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
+
+                if (targetVersion.getDependencies() != null) {
+                    for (ModDependency dep : targetVersion.getDependencies()) {
+                        modService.incrementDownloadCount(dep.getModId());
+                        analyticsService.logDownload(dep.getModId(), null, null, isApi, clientIp);
+                    }
+                }
+
+                byte[] zipData = modService.generateModpackZip(mod, targetVersion);
+                ByteArrayResource resource = new ByteArrayResource(zipData);
+                String zipFilename = mod.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-" + targetVersion.getVersionNumber() + ".zip";
+
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFilename + "\"")
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                        .body(resource);
+            }
+
+            ModVersion targetVersion = mod.getVersions().stream()
+                    .filter(v -> v.getVersionNumber().equalsIgnoreCase(version))
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetVersion == null) return ResponseEntity.notFound().build();
+
+            byte[] data = storageService.download(targetVersion.getFileUrl());
+            ByteArrayResource resource = new ByteArrayResource(data);
+
+            modService.incrementDownloadCount(mod.getId());
+            analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
+
+            String originalPath = targetVersion.getFileUrl();
+            String filename = originalPath.contains("/") ? originalPath.substring(originalPath.lastIndexOf('/') + 1) : originalPath;
+            if (filename.length() > 37 && filename.charAt(36) == '-') {
+                filename = filename.substring(37);
+            }
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(resource);
+
+        } catch (Exception e) {
+            logger.error("Error processing download", e);
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @Deprecated
     @GetMapping("/projects/{id}/versions/{version}/download")
     public ResponseEntity<Resource> downloadVersion(@PathVariable String id, @PathVariable String version, HttpServletRequest request) {
         try {
