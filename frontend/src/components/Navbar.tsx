@@ -57,7 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const maxWidthClass = isHomeLayout
         ? "max-w-7xl"
-        : "max-w-[85rem]";
+        : "max-w-[112rem]";
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
@@ -81,6 +81,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="flex-1"></div>
 
                     <div className="hidden lg:flex items-center gap-2">
+
                         <div className="relative" ref={browseDropdownRef}>
                             <button
                                 onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
