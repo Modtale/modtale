@@ -53,17 +53,20 @@ public class AnalyticsService {
             .maximumSize(50000)
             .build();
 
-
     @Scheduled(cron = "0 30 0 * * ?")
     public void updateTrendingScores() {
         logger.info("Starting daily trending score calculation...");
-        LocalDate now = LocalDate.now();
-        Date date7DaysAgo = Date.from(now.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
-        Date date14DaysAgo = Date.from(now.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
-        int currYear = now.getYear();
-        int currMonth = now.getMonthValue();
-        LocalDate prevMonthDate = now.minusMonths(1);
+        LocalDate today = LocalDate.now();
+
+        Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        int currYear = today.getYear();
+        int currMonth = today.getMonthValue();
+        LocalDate prevMonthDate = today.minusMonths(1);
         int prevYear = prevMonthDate.getYear();
         int prevMonth = prevMonthDate.getMonthValue();
 
@@ -95,13 +98,14 @@ public class AnalyticsService {
         pipeline.add(Aggregation.group("projectId")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
-                                Criteria.where("logDate").gte(date7DaysAgo)
+                                Criteria.where("logDate").gte(week1Start),
+                                Criteria.where("logDate").lt(todayStart)
                         )
                 ).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
-                                Criteria.where("logDate").gte(date14DaysAgo),
-                                Criteria.where("logDate").lt(date7DaysAgo)
+                                Criteria.where("logDate").gte(week2Start),
+                                Criteria.where("logDate").lt(week1Start)
                         )
                 ).then("$daysArray.v.d").otherwise(0)).as("prevWeek")
         );
