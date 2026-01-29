@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, FileText, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationMenu } from './user/NotificationMenu';
 import { FollowingModal } from './user/FollowingModal';
@@ -25,9 +25,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     const [isFollowingOpen, setIsFollowingOpen] = useState(false);
     const [isSignInOpen, setIsSignInOpen] = useState(false);
     const [isBrowseDropdownOpen, setIsBrowseDropdownOpen] = useState(false);
-
-    const containerRef = useRef<HTMLDivElement>(null);
-    const prevRectRef = useRef<{ width: number; padL: string; padR: string } | null>(null);
 
     const profileRef = useRef<HTMLDivElement>(null);
     const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -57,68 +54,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const detailPrefixes = ['mod/', 'world/', 'modpack/'];
-
-    const isHomeLayout = homeLikePages.includes(currentPage) ||
-        detailPrefixes.some(prefix => currentPage.startsWith(prefix));
+    const isHomeLayout = homeLikePages.includes(currentPage) || detailPrefixes.some(prefix => currentPage.startsWith(prefix) && currentPage.split('/').length < 2); // Fallback logic, assumes strict exact match needed for home layout styles
 
     const widthClass = isHomeLayout
         ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
         : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
-
-    useLayoutEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-
-        const originalTransition = el.style.transition;
-        el.style.transition = 'none';
-
-        el.style.width = '';
-        el.style.maxWidth = '';
-        el.style.paddingLeft = '';
-        el.style.paddingRight = '';
-
-        const rect = el.getBoundingClientRect();
-        const computedStyle = window.getComputedStyle(el);
-
-        const newWidth = rect.width;
-        const newPadL = computedStyle.paddingLeft;
-        const newPadR = computedStyle.paddingRight;
-
-        if (prevRectRef.current) {
-            const { width: oldWidth, padL: oldPadL, padR: oldPadR } = prevRectRef.current;
-
-            if (Math.abs(oldWidth - newWidth) > 1 || oldPadL !== newPadL) {
-
-                el.style.width = `${oldWidth}px`;
-                el.style.maxWidth = 'none';
-                el.style.paddingLeft = oldPadL;
-                el.style.paddingRight = oldPadR;
-
-                el.offsetHeight;
-
-                el.style.transition = 'all 700ms cubic-bezier(0.2, 0.0, 0.2, 1)';
-                el.style.width = `${newWidth}px`;
-                el.style.paddingLeft = newPadL;
-                el.style.paddingRight = newPadR;
-
-                const handleTransitionEnd = () => {
-                    el.style.transition = '';
-                    el.style.width = '';
-                    el.style.maxWidth = '';
-                    el.style.paddingLeft = '';
-                    el.style.paddingRight = '';
-                    el.removeEventListener('transitionend', handleTransitionEnd);
-                };
-
-                el.addEventListener('transitionend', handleTransitionEnd);
-
-                setTimeout(handleTransitionEnd, 750);
-            }
-        }
-
-        prevRectRef.current = { width: newWidth, padL: newPadL, padR: newPadR };
-
-    }, [isHomeLayout]);
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
@@ -130,8 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <div className="flex justify-center w-full h-full">
                 <div
-                    ref={containerRef}
-                    className={`${widthClass} w-full h-full will-change-[width,padding]`}
+                    className={`${widthClass} w-full h-full transition-[max-width,padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)] transform-gpu will-change-[max-width,padding]`}
                 >
                     <div className="flex items-center justify-between h-full">
 
