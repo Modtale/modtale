@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, FileText, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
+import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationMenu } from './user/NotificationMenu';
 import { FollowingModal } from './user/FollowingModal';
@@ -52,49 +52,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         setIsMobileMenuOpen(false);
     }, [currentPage]);
 
-    const NavLink = ({ id, icon: Icon, label }: any) => {
-        let isActive = false;
-        let toPath = '/';
-
-        if (id === 'home') {
-            toPath = '/';
-            const homeCategories = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
-            const detailPrefixes = ['mod/', 'world/', 'modpack/'];
-
-            isActive = homeCategories.includes(currentPage) ||
-                detailPrefixes.some(prefix => currentPage.startsWith(prefix));
-        } else if (id === 'dashboard') {
-            toPath = '/dashboard';
-            isActive = currentPage.startsWith('dashboard');
-        } else if (id === 'upload') {
-            toPath = '/upload';
-            isActive = currentPage === 'upload';
-        } else {
-            toPath = `/${id}`;
-            isActive = currentPage === id;
-        }
-
-        return (
-            <Link
-                to={toPath}
-                className={`flex items-center px-3 py-1.5 rounded-md text-sm transition-all duration-200 ${
-                    isActive
-                        ? 'text-slate-900 dark:text-white font-extrabold bg-slate-100/50 dark:bg-white/5'
-                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-medium hover:bg-slate-50 dark:hover:bg-white/5'
-                }`}
-            >
-                <Icon className={`w-4 h-4 mr-2 transition-transform duration-200 ${isActive ? 'scale-110 text-modtale-accent' : 'scale-100 opacity-70'}`} />
-                {label}
-            </Link>
-        );
-    };
-
     const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const isHomeLayout = homeLikePages.includes(currentPage);
 
-    const widthClass = isHomeLayout
-        ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
-        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+    const maxWidthClass = isHomeLayout
+        ? "max-w-7xl"
+        : "max-w-[100rem]";
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
@@ -104,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <FollowingModal username={user.username} onClose={() => setIsFollowingOpen(false)} />
             )}
 
-            <div className={`${widthClass} mx-auto h-full transition-[max-width,padding] duration-700 ease-in-out`}>
+            <div className={`${maxWidthClass} w-full mx-auto h-full px-4 sm:px-6 lg:px-8 transition-[max-width] duration-700 ease-in-out`}>
                 <div className="flex items-center justify-between h-full">
 
                     <Link to="/" className="flex items-center cursor-pointer group flex-shrink-0 mr-8">
