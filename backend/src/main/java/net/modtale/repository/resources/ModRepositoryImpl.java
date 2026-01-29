@@ -104,9 +104,9 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "trendScore"));
         } else if ("popular".equals(sortBy) || "popular".equals(viewCategory)) {
-            pipeline.addAll(AnalyticsService.getPopularAggregationStages());
+            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
         } else if ("relevance".equals(sortBy)) {
-            pipeline.addAll(AnalyticsService.getRelevanceAggregationStages());
+            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
         } else if (pageable.getSort().isSorted()) {
             pipeline.add(Aggregation.sort(pageable.getSort()));
         } else {
@@ -133,13 +133,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                         "versions.rejectionReason",
                         "versions.changelog",
                         "versions.dependencies",
-                        "versions.fileUrl",
-                        "monthly_stats",
-                        "daysArray",
-                        "logDate",
-                        "popularScore",
-                        "relevanceScore",
-                        "recentDownloads"
+                        "versions.fileUrl"
                 )
         );
 
