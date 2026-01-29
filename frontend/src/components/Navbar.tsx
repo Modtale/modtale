@@ -55,9 +55,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const isHomeLayout = homeLikePages.includes(currentPage);
 
-    const maxWidthClass = isHomeLayout
-        ? "max-w-7xl"
-        : "max-w-[112rem]";
+    const containerClasses = isHomeLayout
+        ? "max-w-7xl px-4 sm:px-6 lg:px-8"
+        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
@@ -67,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <FollowingModal username={user.username} onClose={() => setIsFollowingOpen(false)} />
             )}
 
-            <div className={`${maxWidthClass} w-full mx-auto h-full px-4 sm:px-6 lg:px-8 transition-[max-width] duration-700 ease-in-out`}>
+            <div className={`${containerClasses} w-full mx-auto h-full transition-[max-width,padding] duration-700 ease-in-out`}>
                 <div className="flex items-center justify-between h-full">
 
                     <Link to="/" className="flex items-center cursor-pointer group flex-shrink-0 mr-8">
