@@ -18,7 +18,9 @@ import java.time.LocalDateTime;
         @CompoundIndex(name = "class_tags_downloads_idx", def = "{'classification': 1, 'tags': 1, 'downloadCount': -1}"),
         @CompoundIndex(name = "class_updated_idx", def = "{'classification': 1, 'updatedAt': -1}"),
         @CompoundIndex(name = "status_expires_idx", def = "{'status': 1, 'expiresAt': 1}"),
-        @CompoundIndex(name = "trend_score_idx", def = "{'trendScore': -1}")
+        @CompoundIndex(name = "trend_score_idx", def = "{'trendScore': -1}"),
+        @CompoundIndex(name = "relevance_score_idx", def = "{'relevanceScore': -1}"),
+        @CompoundIndex(name = "popular_score_idx", def = "{'popularScore': -1}")
 })
 public class Mod {
     @Id
@@ -50,7 +52,10 @@ public class Mod {
     private int downloadCount;
     private int favoriteCount;
     private double rating;
+
     private int trendScore;
+    private double relevanceScore;
+    private double popularScore;
 
     private String category;
     private String repositoryUrl;
@@ -127,8 +132,14 @@ public class Mod {
     public void setFavoriteCount(int favoriteCount) { this.favoriteCount = favoriteCount; }
     public double getRating() { return rating; }
     public void setRating(double rating) { this.rating = rating; }
+
     public int getTrendScore() { return trendScore; }
     public void setTrendScore(int trendScore) { this.trendScore = trendScore; }
+    public double getRelevanceScore() { return relevanceScore; }
+    public void setRelevanceScore(double relevanceScore) { this.relevanceScore = relevanceScore; }
+    public double getPopularScore() { return popularScore; }
+    public void setPopularScore(double popularScore) { this.popularScore = popularScore; }
+
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
 
