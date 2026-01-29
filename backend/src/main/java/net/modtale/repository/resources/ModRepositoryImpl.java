@@ -2,9 +2,11 @@ package net.modtale.repository.resources;
 
 import net.modtale.model.resources.Mod;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.AnalyticsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +34,10 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Lazy
+    @Autowired
+    private AnalyticsService analyticsService;
 
     @Override
     public Page<Mod> searchMods(
@@ -138,6 +144,8 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
         Aggregation mainAgg = Aggregation.newAggregation(Mod.class, pipeline);
         List<Mod> results = mongoTemplate.aggregate(mainAgg, Mod.class, Mod.class).getMappedResults();
+
+        analyticsService.ensureScores(results);
 
         long total;
         if ("hidden_gems".equals(viewCategory)) {

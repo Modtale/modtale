@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
@@ -118,27 +119,7 @@ public class AnalyticsService {
         try (Stream<Mod> projectStream = mongoTemplate.stream(projectQuery, Mod.class)) {
             projectStream.forEach(mod -> {
                 Document stats = statsMap.get(mod.getId());
-
-                int currentWeek = stats != null ? stats.getInteger("currentWeek", 0) : 0;
-                int prevWeek = stats != null ? stats.getInteger("prevWeek", 0) : 0;
-                int recent = stats != null ? stats.getInteger("recent", 0) : 0;
-
-                int trendScore = currentWeek - prevWeek;
-
-                double ratingWeight;
-                if (mod.getRating() >= 4.5) ratingWeight = 1.0;
-                else if (mod.getRating() > 0) ratingWeight = mod.getRating() / 4.5;
-                else ratingWeight = 0.5;
-
-                double relevanceScore = recent * ratingWeight;
-                double popularScore = mod.getDownloadCount() * ratingWeight;
-
-                Update update = new Update()
-                        .set("trendScore", trendScore)
-                        .set("relevanceScore", relevanceScore)
-                        .set("popularScore", popularScore);
-
-                bulkOps.updateOne(new Query(Criteria.where("_id").is(mod.getId())), update);
+                calculateAndQueueUpdate(mod, stats, bulkOps);
 
                 if (counter.incrementAndGet() >= 1000) {
                     bulkOps.execute();
@@ -153,6 +134,123 @@ public class AnalyticsService {
         }
 
         logger.info("Daily scores updated. Processed {} projects in {} batches.", (batchCount.get() * 1000 + counter.get()), batchCount.get() + 1);
+    }
+
+    public void ensureScores(List<Mod> mods) {
+        if (mods == null || mods.isEmpty()) return;
+
+        List<Mod> missingScores = mods.stream()
+                .filter(m -> m.getDownloadCount() > 0 && m.getPopularScore() == 0.0)
+                .collect(Collectors.toList());
+
+        if (missingScores.isEmpty()) return;
+
+        List<String> modIds = missingScores.stream().map(Mod::getId).collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
+
+        Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        int currYear = today.getYear();
+        int currMonth = today.getMonthValue();
+        LocalDate prevMonthDate = today.minusMonths(1);
+        int prevYear = prevMonthDate.getYear();
+        int prevMonth = prevMonthDate.getMonthValue();
+
+        List<AggregationOperation> pipeline = new ArrayList<>();
+        pipeline.add(Aggregation.match(
+                new Criteria().andOperator(
+                        Criteria.where("projectId").in(modIds),
+                        new Criteria().orOperator(
+                                Criteria.where("year").is(currYear).and("month").is(currMonth),
+                                Criteria.where("year").is(prevYear).and("month").is(prevMonth)
+                        )
+                )
+        ));
+        pipeline.add(Aggregation.addFields().addField("daysArray").withValue(ObjectOperators.ObjectToArray.valueOfToArray("days")).build());
+        pipeline.add(Aggregation.unwind("daysArray", true));
+        pipeline.add(Aggregation.addFields().addField("logDate")
+                .withValue(DateOperators.DateFromParts.dateFromParts().year("year").month("month").day(ConvertOperators.ToInt.toInt("$daysArray.k")))
+                .build());
+
+        pipeline.add(Aggregation.group("projectId")
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
+                                Criteria.where("logDate").gte(week1Start),
+                                Criteria.where("logDate").lt(todayStart)
+                        )).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
+                                Criteria.where("logDate").gte(week2Start),
+                                Criteria.where("logDate").lt(week1Start)
+                        )).then("$daysArray.v.d").otherwise(0)).as("prevWeek")
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
+                                Criteria.where("logDate").gte(monthStart),
+                                Criteria.where("logDate").lt(todayStart)
+                        )).then("$daysArray.v.d").otherwise(0)).as("recent")
+        );
+
+        Aggregation agg = Aggregation.newAggregation(ProjectMonthlyStats.class, pipeline);
+        AggregationResults<Document> statsResults = mongoTemplate.aggregate(agg, ProjectMonthlyStats.class, Document.class);
+        Map<String, Document> statsMap = new HashMap<>();
+        for (Document d : statsResults) {
+            statsMap.put(d.getString("_id"), d);
+        }
+
+        BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
+        boolean needsExecution = false;
+
+        for (Mod mod : missingScores) {
+            Document stats = statsMap.get(mod.getId());
+            boolean queued = calculateAndQueueUpdate(mod, stats, bulkOps);
+            if (queued) needsExecution = true;
+        }
+
+        if (needsExecution) {
+            try {
+                bulkOps.execute();
+            } catch (Exception e) {
+                logger.error("Failed to backfill missing scores", e);
+            }
+        }
+    }
+
+    private boolean calculateAndQueueUpdate(Mod mod, Document stats, BulkOperations bulkOps) {
+        int currentWeek = stats != null ? stats.getInteger("currentWeek", 0) : 0;
+        int prevWeek = stats != null ? stats.getInteger("prevWeek", 0) : 0;
+        int recent = stats != null ? stats.getInteger("recent", 0) : 0;
+
+        int trendScore = currentWeek - prevWeek;
+
+        double ratingWeight;
+        if (mod.getRating() >= 4.5) ratingWeight = 1.0;
+        else if (mod.getRating() > 0) ratingWeight = mod.getRating() / 4.5;
+        else ratingWeight = 0.5;
+
+        double relevanceScore = recent * ratingWeight;
+        double popularScore = mod.getDownloadCount() * ratingWeight;
+
+        boolean changed = mod.getTrendScore() != trendScore ||
+                Math.abs(mod.getRelevanceScore() - relevanceScore) > 0.01 ||
+                Math.abs(mod.getPopularScore() - popularScore) > 0.01;
+
+        if (changed) {
+            mod.setTrendScore(trendScore);
+            mod.setRelevanceScore(relevanceScore);
+            mod.setPopularScore(popularScore);
+
+            Update update = new Update()
+                    .set("trendScore", trendScore)
+                    .set("relevanceScore", relevanceScore)
+                    .set("popularScore", popularScore);
+
+            bulkOps.updateOne(new Query(Criteria.where("_id").is(mod.getId())), update);
+            return true;
+        }
+        return false;
     }
 
     private record DownloadEvent(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {}
