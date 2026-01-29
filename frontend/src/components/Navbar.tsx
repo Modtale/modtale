@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, FileText, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers } from 'lucide-react';
+import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, FileText, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationMenu } from './user/NotificationMenu';
 import { FollowingModal } from './user/FollowingModal';
@@ -92,7 +92,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const isHomeLayout = homeLikePages.includes(currentPage);
 
-    const containerClasses = isHomeLayout
+    const widthClass = isHomeLayout
         ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
         : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
@@ -104,10 +104,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <FollowingModal username={user.username} onClose={() => setIsFollowingOpen(false)} />
             )}
 
-            <div className={`${containerClasses} mx-auto h-full`}>
+            <div className={`${widthClass} mx-auto h-full transition-[max-width,padding] duration-700 ease-in-out`}>
                 <div className="flex items-center justify-between h-full">
 
-                    <Link to="/" className="flex items-center cursor-pointer group flex-shrink-0">
+                    <Link to="/" className="flex items-center cursor-pointer group flex-shrink-0 mr-8">
                         <img
                             src={logoSrc}
                             alt="Modtale"
@@ -115,23 +115,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                         />
                     </Link>
 
-                    <div className="hidden lg:flex items-center gap-2 ml-8 flex-1">
+                    <div className="flex-1"></div>
+
+                    <div className="hidden lg:flex items-center gap-2">
                         <div className="relative" ref={browseDropdownRef}>
                             <button
                                 onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
-                                className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                                     ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'].includes(currentPage) || currentPage.startsWith('mod/') || currentPage.startsWith('world/') || currentPage.startsWith('modpack/')
                                         ? 'text-modtale-accent bg-modtale-accent/10'
                                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                 }`}
                             >
-                                <Home className="w-4 h-4 mr-2" />
-                                Browse
-                                <ChevronDown className={`w-4 h-4 ml-1 transition-transform duration-200 ${isBrowseDropdownOpen ? 'rotate-180' : ''}`} />
+                                <LayoutGrid className="w-4 h-4 mr-2" />
+                                Mods
+                                <ChevronDown className={`w-3.5 h-3.5 ml-1 transition-transform duration-200 opacity-60 ${isBrowseDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {isBrowseDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
                                     <Link
                                         to="/"
                                         onClick={() => setIsBrowseDropdownOpen(false)}
@@ -184,9 +186,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 </div>
                             )}
                         </div>
+
                         <Link
                             to="/api-docs"
-                            className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                            className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                                 currentPage === 'api-docs'
                                     ? 'text-modtale-accent bg-modtale-accent/10'
                                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
@@ -199,7 +202,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <>
                                 <Link
                                     to="/dashboard"
-                                    className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                                         currentPage.startsWith('dashboard')
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
@@ -210,7 +213,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 </Link>
                                 <Link
                                     to="/upload"
-                                    className={`flex items-center px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                                         currentPage === 'upload'
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
@@ -221,89 +224,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 </Link>
                             </>
                         )}
-                    </div>
 
-                    <div className="hidden md:flex lg:hidden items-center justify-end flex-1">
-                        <div className="flex items-center gap-2">
-                            {user && (
-                                <div className="flex items-center gap-1 mr-3">
-                                    <NavLink id="home" icon={Home} label="Mods" />
-                                    <NavLink id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-                                    <NavLink id="upload" icon={Upload} label="Create" />
-                                </div>
-                            )}
+                        <div className="h-5 w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
 
-                            <div className="h-5 w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
-
-                            <div className="flex items-center gap-2">
-                                {user && <NotificationMenu />}
-
-                                <AnimatedThemeToggler
-                                    onToggle={toggleDarkMode}
-                                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors"
-                                />
-
-                                {user ? (
-                                    <div className="relative" ref={profileRef}>
-                                        <button
-                                            onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                            className={`group relative flex items-center justify-center rounded-full transition-all duration-200 ${
-                                                isProfileOpen
-                                                    ? 'ring-2 ring-modtale-accent ring-offset-2 dark:ring-offset-[#141d30]'
-                                                    : 'hover:ring-2 hover:ring-slate-200 dark:hover:ring-white/10 ring-offset-2 dark:ring-offset-[#141d30]'
-                                            }`}
-                                        >
-                                            <img
-                                                src={user.avatarUrl}
-                                                alt={user.username}
-                                                className="h-9 w-9 rounded-full transition-transform group-active:scale-95"
-                                            />
-                                        </button>
-
-                                        {isProfileOpen && (
-                                            <div className="absolute right-0 mt-4 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 origin-top-right">
-                                                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 mb-2 bg-slate-50/50 dark:bg-white/5 mx-2 rounded-xl">
-                                                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Signed in as</p>
-                                                    <p className="text-base font-black text-slate-900 dark:text-white truncate">{user.username}</p>
-                                                </div>
-
-                                                <div className="px-2 space-y-0.5">
-                                                    <button onClick={() => { setIsProfileOpen(false); onAuthorClick(user.username); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
-                                                        <UserIcon className="w-4 h-4 text-slate-400" /> Your Profile
-                                                    </button>
-                                                    <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
-                                                        <Users className="w-4 h-4 text-slate-400" /> Following
-                                                    </button>
-                                                    <Link to="/dashboard" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
-                                                        <LayoutDashboard className="w-4 h-4 text-slate-400" /> Creator Dashboard
-                                                    </Link>
-                                                    {(user.roles?.includes('ADMIN')) && (
-                                                        <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
-                                                            <Shield className="w-4 h-4" /> Admin Panel
-                                                        </Link>
-                                                    )}
-                                                </div>
-
-                                                <div className="border-t border-slate-100 dark:border-white/5 my-2 mx-4"></div>
-
-                                                <div className="px-2">
-                                                    <button onClick={() => { setIsProfileOpen(false); onLogout(); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-3 transition-colors">
-                                                        <LogOut className="w-4 h-4" /> Sign Out
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <button onClick={() => setIsSignInOpen(true)} className="flex items-center bg-slate-900 dark:bg-modtale-accent text-white dark:text-white hover:opacity-90 font-black py-2 px-5 rounded-lg transition-all text-sm shadow-sm dark:shadow-none ml-2 hover:scale-105 active:scale-95">
-                                        <LogIn className="w-4 h-4 mr-2" /> Sign in
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="hidden lg:flex items-center gap-2">
                         {user && <NotificationMenu />}
 
                         <AnimatedThemeToggler
@@ -369,7 +292,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         )}
                     </div>
 
-                    <div className="-mr-2 flex md:hidden items-center gap-2">
+                    <div className="flex md:hidden items-center justify-end flex-1 gap-2">
                         {user && <NotificationMenu />}
                         <button id="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 focus:outline-none">
                             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
