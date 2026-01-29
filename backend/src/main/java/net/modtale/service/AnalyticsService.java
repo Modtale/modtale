@@ -80,7 +80,7 @@ public class AnalyticsService {
         pipeline.add(Aggregation.addFields().addField("daysArray").withValue(ObjectOperators.ObjectToArray.valueOfToArray("days")).build());
         pipeline.add(Aggregation.unwind("daysArray", true));
         pipeline.add(Aggregation.addFields().addField("logDate")
-                .withValue(DateOperators.DateFromParts.dateFromParts().year("year").month("month").day(ConvertOperators.ToInt.toInt("$daysArray.k")))
+                .withValue(DateOperators.DateFromParts.dateFromParts().year("$year").month("$month").day(ConvertOperators.ToInt.toInt("$daysArray.k")))
                 .build());
 
         pipeline.add(Aggregation.group("projectId")
@@ -172,7 +172,7 @@ public class AnalyticsService {
         pipeline.add(Aggregation.addFields().addField("daysArray").withValue(ObjectOperators.ObjectToArray.valueOfToArray("days")).build());
         pipeline.add(Aggregation.unwind("daysArray", true));
         pipeline.add(Aggregation.addFields().addField("logDate")
-                .withValue(DateOperators.DateFromParts.dateFromParts().year("year").month("month").day(ConvertOperators.ToInt.toInt("$daysArray.k")))
+                .withValue(DateOperators.DateFromParts.dateFromParts().year("$year").month("$month").day(ConvertOperators.ToInt.toInt("$daysArray.k")))
                 .build());
 
         pipeline.add(Aggregation.group("projectId")
