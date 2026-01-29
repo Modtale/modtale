@@ -2,7 +2,6 @@ package net.modtale.repository.resources;
 
 import net.modtale.model.resources.Mod;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.AnalyticsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

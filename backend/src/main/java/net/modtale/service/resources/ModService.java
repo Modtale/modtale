@@ -299,6 +299,23 @@ public class ModService {
         );
     }
 
+    @Scheduled(cron = "0 50 0 * * ?")
+    public void warmupCaches() {
+        logger.info("Warming up project search caches...");
+        List<String> sorts = List.of("trending", "popular", "relevance", "newest");
+
+        for (String sort : sorts) {
+            try {
+                self.getModsCached(null, null, 0, 12, sort, null, null, null, null, sort, null, null);
+                self.getModsCached(null, null, 1, 12, sort, null, null, null, null, sort, null, null);
+                self.getModsCached(null, null, 2, 12, sort, null, null, null, null, sort, null, null);
+            } catch (Exception e) {
+                logger.error("Failed to warmup cache for sort: " + sort, e);
+            }
+        }
+        logger.info("Cache warmup complete.");
+    }
+
     public List<Mod> getAllMods() { return modRepository.findAll(); }
     public List<Mod> getPublishedMods() { return modRepository.findAllPublished(); }
 
