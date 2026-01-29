@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, FileText, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationMenu } from './user/NotificationMenu';
 import { FollowingModal } from './user/FollowingModal';
@@ -25,6 +25,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     const [isFollowingOpen, setIsFollowingOpen] = useState(false);
     const [isSignInOpen, setIsSignInOpen] = useState(false);
     const [isBrowseDropdownOpen, setIsBrowseDropdownOpen] = useState(false);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const prevRectRef = useRef<{ width: number; padL: string; padR: string } | null>(null);
 
     const profileRef = useRef<HTMLDivElement>(null);
     const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -52,49 +55,70 @@ export const Navbar: React.FC<NavbarProps> = ({
         setIsMobileMenuOpen(false);
     }, [currentPage]);
 
-    const NavLink = ({ id, icon: Icon, label }: any) => {
-        let isActive = false;
-        let toPath = '/';
-
-        if (id === 'home') {
-            toPath = '/';
-            const homeCategories = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
-            const detailPrefixes = ['mod/', 'world/', 'modpack/'];
-
-            isActive = homeCategories.includes(currentPage) ||
-                detailPrefixes.some(prefix => currentPage.startsWith(prefix));
-        } else if (id === 'dashboard') {
-            toPath = '/dashboard';
-            isActive = currentPage.startsWith('dashboard');
-        } else if (id === 'upload') {
-            toPath = '/upload';
-            isActive = currentPage === 'upload';
-        } else {
-            toPath = `/${id}`;
-            isActive = currentPage === id;
-        }
-
-        return (
-            <Link
-                to={toPath}
-                className={`flex items-center px-3 py-1.5 rounded-md text-sm transition-all duration-200 ${
-                    isActive
-                        ? 'text-slate-900 dark:text-white font-extrabold bg-slate-100/50 dark:bg-white/5'
-                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-medium hover:bg-slate-50 dark:hover:bg-white/5'
-                }`}
-            >
-                <Icon className={`w-4 h-4 mr-2 transition-transform duration-200 ${isActive ? 'scale-110 text-modtale-accent' : 'scale-100 opacity-70'}`} />
-                {label}
-            </Link>
-        );
-    };
-
     const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
-    const isHomeLayout = homeLikePages.includes(currentPage);
+    const detailPrefixes = ['mod/', 'world/', 'modpack/'];
+
+    const isHomeLayout = homeLikePages.includes(currentPage) ||
+        detailPrefixes.some(prefix => currentPage.startsWith(prefix));
 
     const widthClass = isHomeLayout
         ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
         : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+
+    useLayoutEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const originalTransition = el.style.transition;
+        el.style.transition = 'none';
+
+        el.style.width = '';
+        el.style.maxWidth = '';
+        el.style.paddingLeft = '';
+        el.style.paddingRight = '';
+
+        const rect = el.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(el);
+
+        const newWidth = rect.width;
+        const newPadL = computedStyle.paddingLeft;
+        const newPadR = computedStyle.paddingRight;
+
+        if (prevRectRef.current) {
+            const { width: oldWidth, padL: oldPadL, padR: oldPadR } = prevRectRef.current;
+
+            if (Math.abs(oldWidth - newWidth) > 1 || oldPadL !== newPadL) {
+
+                el.style.width = `${oldWidth}px`;
+                el.style.maxWidth = 'none';
+                el.style.paddingLeft = oldPadL;
+                el.style.paddingRight = oldPadR;
+
+                el.offsetHeight;
+
+                el.style.transition = 'all 700ms cubic-bezier(0.2, 0.0, 0.2, 1)';
+                el.style.width = `${newWidth}px`;
+                el.style.paddingLeft = newPadL;
+                el.style.paddingRight = newPadR;
+
+                const handleTransitionEnd = () => {
+                    el.style.transition = '';
+                    el.style.width = '';
+                    el.style.maxWidth = '';
+                    el.style.paddingLeft = '';
+                    el.style.paddingRight = '';
+                    el.removeEventListener('transitionend', handleTransitionEnd);
+                };
+
+                el.addEventListener('transitionend', handleTransitionEnd);
+
+                setTimeout(handleTransitionEnd, 750);
+            }
+        }
+
+        prevRectRef.current = { width: newWidth, padL: newPadL, padR: newPadR };
+
+    }, [isHomeLayout]);
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
@@ -105,7 +129,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
 
             <div className="flex justify-center w-full h-full">
-                <div className={`${widthClass} w-full h-full transition-[max-width,padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)] will-change-[max-width,padding]`}>
+                <div
+                    ref={containerRef}
+                    className={`${widthClass} w-full h-full will-change-[width,padding]`}
+                >
                     <div className="flex items-center justify-between h-full">
 
                         <Link to="/" className="flex items-center cursor-pointer group flex-shrink-0 mr-8">
@@ -123,7 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 <button
                                     onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
                                     className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                        ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'].includes(currentPage) || currentPage.startsWith('mod/') || currentPage.startsWith('world/') || currentPage.startsWith('modpack/')
+                                        isHomeLayout
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                     }`}
