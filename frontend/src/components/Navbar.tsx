@@ -57,7 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const maxWidthClass = isHomeLayout
         ? "max-w-7xl"
-        : "max-w-[100rem]";
+        : "max-w-[85rem]";
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
