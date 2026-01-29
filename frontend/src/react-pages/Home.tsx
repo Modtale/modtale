@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, {useState, useRef, useEffect, useCallback, useMemo} from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import type { Mod, Modpack, World } from '../types';
@@ -14,6 +14,7 @@ import { getProjectUrl } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getCategorySEO } from '../data/seo-constants';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
+import { AdUnit } from '../components/ads/AdUnit';
 
 interface HomeProps {
     onModClick: (mod: Mod) => void;
@@ -292,6 +293,10 @@ export const Home: React.FC<HomeProps> = ({
                                 ))}
                             </div>
                         </div>
+
+                        <div className="mt-6">
+                            <AdUnit variant="sidebar" trackingSource="HomePage" />
+                        </div>
                     </div>
 
                     <div className="flex-1 min-h-[500px]" ref={cardsSectionRef}>
@@ -341,7 +346,7 @@ export const Home: React.FC<HomeProps> = ({
                                 {items.map((item, index) => (
                                     <div
                                         key={item.id}
-                                        className="animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards"
+                                        className="animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards h-full"
                                         style={{ animationDelay: `${index * 50}ms` }}
                                     >
                                         <ModCard
@@ -364,6 +369,10 @@ export const Home: React.FC<HomeProps> = ({
                                 />
                             </div>
                         )}
+
+                        <div className="mt-12 mb-8">
+                            <AdUnit variant="banner" className="max-w-4xl mx-auto" trackingSource="HomePage" />
+                        </div>
 
                         {totalPages > 1 && (
                             <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">

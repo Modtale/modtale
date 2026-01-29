@@ -1,3 +1,23 @@
+export interface AdCreative {
+    id: string;
+    imageUrl: string;
+    width: number;
+    height: number;
+    type: 'BANNER' | 'SIDEBAR' | 'CARD';
+}
+
+export interface AffiliateAd {
+    id: string;
+    title: string;
+    linkUrl: string;
+    active: boolean;
+    creatives: AdCreative[];
+    trackingParam?: string;
+    views?: number;
+    clicks?: number;
+    imageUrl?: string;
+}
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;

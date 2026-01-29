@@ -27,6 +27,7 @@ import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLay
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
 import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
+import { AdUnit } from '../../components/ads/AdUnit';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
@@ -139,6 +140,8 @@ const ProjectSidebar: React.FC<{
                     </div>
                 </div>
             </div>
+
+            <AdUnit variant="card" className="my-2 shadow-sm" trackingSource={mod.title || mod.id} />
 
             {gameVersions.length > 0 && (
                 <SidebarSection title="Supported Versions" icon={Gamepad2}>
