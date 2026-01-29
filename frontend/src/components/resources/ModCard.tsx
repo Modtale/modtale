@@ -89,7 +89,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
         <Link
             to={canonicalPath}
             onMouseEnter={handleMouseEnter}
-            className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:ring-1 hover:ring-modtale-accent border border-slate-200 dark:border-white/5 overflow-hidden"
+            className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden"
         >
             <div className="relative h-24 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-200/50 dark:border-white/5">
                 {resolvedBanner ? (
@@ -97,16 +97,16 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                         src={resolvedBanner}
                         alt=""
                         decoding="async"
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="w-full h-full object-cover"
                     />
                 ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900" />
+                    <div className="w-full h-full bg-slate-200 dark:bg-slate-700" />
                 )}
 
                 <div className="absolute top-2 right-2 z-20">
-                    <div className="bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded flex items-center shadow-sm border border-white/10">
+                    <div className="bg-slate-900/80 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center">
                         <span className="mr-1 text-modtale-accent">{getClassificationIcon(classification)}</span>
-                        <span className="tracking-wide">{displayClassification}</span>
+                        <span>{displayClassification}</span>
                     </div>
                 </div>
             </div>
@@ -124,7 +124,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                             className="w-full h-full object-cover"
                         />
                         {classification === 'MODPACK' && modCount > 0 && (
-                            <div className="absolute bottom-0 right-0 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-xs text-[10px] font-bold px-1 py-0.5 rounded-tl border-l border-t border-slate-300 dark:border-white/10 flex items-center text-slate-700 dark:text-slate-300">
+                            <div className="absolute bottom-0 right-0 bg-slate-900/75 text-white text-[10px] font-bold px-1 py-0.5 rounded-tl flex items-center">
                                 <Box className="w-2.5 h-2.5 mr-0.5" /> {modCount}
                             </div>
                         )}
