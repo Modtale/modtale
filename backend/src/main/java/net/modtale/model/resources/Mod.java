@@ -1,5 +1,6 @@
 package net.modtale.model.resources;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.time.LocalDateTime;
 
 @Document(collection = "projects")
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @CompoundIndexes({
         @CompoundIndex(name = "class_tags_rating_idx", def = "{'classification': 1, 'tags': 1, 'rating': -1}"),
         @CompoundIndex(name = "class_tags_downloads_idx", def = "{'classification': 1, 'tags': 1, 'downloadCount': -1}"),
