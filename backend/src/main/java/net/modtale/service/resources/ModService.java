@@ -257,46 +257,56 @@ public class ModService {
             String gameVersion, String contentType, Double minRating, Integer minDownloads, String viewCategory,
             String dateRange, String author
     ) {
+        Page<Mod> results;
         if ("Favorites".equals(viewCategory)) {
             User currentUserObj = userService.getCurrentUser();
             List<String> likedIds = (currentUserObj != null && currentUserObj.getLikedModIds() != null)
                     ? currentUserObj.getLikedModIds()
                     : new ArrayList<>();
             PageRequest pageable = PageRequest.of(page, size, Sort.by("title"));
-            return modRepository.findFavorites(likedIds, search != null ? search : "", pageable);
-        }
+            results = modRepository.findFavorites(likedIds, search != null ? search : "", pageable);
+        } else {
+            Sort sort = switch (sortBy != null ? sortBy : "relevance") {
+                case "rating" -> Sort.by("rating").descending();
+                case "downloads" -> Sort.by("downloadCount").descending();
+                case "updated" -> Sort.by("updatedAt").descending();
+                case "new", "newest" -> Sort.by("createdAt").descending();
+                case "favorites" -> Sort.by("favoriteCount").descending();
+                default -> Sort.unsorted();
+            };
 
-        Sort sort = switch (sortBy != null ? sortBy : "relevance") {
-            case "rating" -> Sort.by("rating").descending();
-            case "downloads" -> Sort.by("downloadCount").descending();
-            case "updated" -> Sort.by("updatedAt").descending();
-            case "new", "newest" -> Sort.by("createdAt").descending();
-            case "favorites" -> Sort.by("favoriteCount").descending();
-            default -> Sort.unsorted();
-        };
+            PageRequest pageable = PageRequest.of(page, size, sort);
+            User currentUserObj = userService.getCurrentUser();
+            String currentUsername = (currentUserObj != null) ? currentUserObj.getUsername() : null;
 
-        PageRequest pageable = PageRequest.of(page, size, sort);
-        User currentUserObj = userService.getCurrentUser();
-        String currentUsername = (currentUserObj != null) ? currentUserObj.getUsername() : null;
-
-        LocalDate dateCutoff = null;
-        if (dateRange != null && !dateRange.equals("all") && !dateRange.isEmpty()) {
-            try {
-                if (dateRange.equals("7d")) dateCutoff = LocalDate.now().minusDays(7);
-                else if (dateRange.equals("30d")) dateCutoff = LocalDate.now().minusDays(30);
-                else if (dateRange.equals("90d")) dateCutoff = LocalDate.now().minusDays(90);
-                else if (dateRange.equals("1y")) dateCutoff = LocalDate.now().minusYears(1);
-                else dateCutoff = LocalDate.parse(dateRange.substring(0, 10));
-            } catch (Exception e) {
-                logger.warn("Invalid date range: " + dateRange);
+            LocalDate dateCutoff = null;
+            if (dateRange != null && !dateRange.equals("all") && !dateRange.isEmpty()) {
+                try {
+                    if (dateRange.equals("7d")) dateCutoff = LocalDate.now().minusDays(7);
+                    else if (dateRange.equals("30d")) dateCutoff = LocalDate.now().minusDays(30);
+                    else if (dateRange.equals("90d")) dateCutoff = LocalDate.now().minusDays(90);
+                    else if (dateRange.equals("1y")) dateCutoff = LocalDate.now().minusYears(1);
+                    else dateCutoff = LocalDate.parse(dateRange.substring(0, 10));
+                } catch (Exception e) {
+                    logger.warn("Invalid date range: " + dateRange);
+                }
             }
+
+            results = modRepository.searchMods(
+                    search, tags, gameVersion, contentType, minRating, minDownloads, pageable,
+                    currentUsername, sortBy, viewCategory,
+                    dateCutoff, author
+            );
         }
 
-        return modRepository.searchMods(
-                search, tags, gameVersion, contentType, minRating, minDownloads, pageable,
-                currentUsername, sortBy, viewCategory,
-                dateCutoff, author
-        );
+        if (results != null && results.hasContent()) {
+            results.getContent().forEach(mod -> {
+                if (mod.getVersions() != null) {
+                    mod.getVersions().forEach(v -> v.setScanResult(null));
+                }
+            });
+        }
+        return results;
     }
 
     @Scheduled(cron = "0 50 0 * * ?")
@@ -361,6 +371,10 @@ public class ModService {
                 mod.setVersions(visibleVersions);
             }
 
+            if (!isPrivileged && mod.getVersions() != null) {
+                mod.getVersions().forEach(v -> v.setScanResult(null));
+            }
+
             if (!mod.isAllowReviews() && !isPrivileged) {
                 mod.setReviews(new ArrayList<>());
             }
@@ -402,11 +416,19 @@ public class ModService {
     }
 
     public Page<Mod> getContributedProjects(String username, Pageable pageable) {
-        return modRepository.findByContributors(username, pageable);
+        Page<Mod> results = modRepository.findByContributors(username, pageable);
+        if (results.hasContent()) results.getContent().forEach(m -> {
+            if (m.getVersions() != null) m.getVersions().forEach(v -> v.setScanResult(null));
+        });
+        return results;
     }
 
     public Page<Mod> getCreatorProjects(String username, Pageable pageable) {
-        return modRepository.findByAuthorAndStatus(username, "PUBLISHED", pageable);
+        Page<Mod> results = modRepository.findByAuthorAndStatus(username, "PUBLISHED", pageable);
+        if (results.hasContent()) results.getContent().forEach(m -> {
+            if (m.getVersions() != null) m.getVersions().forEach(v -> v.setScanResult(null));
+        });
+        return results;
     }
 
     public Page<Mod> getPrivilegedCreatorProjects(String username, Pageable pageable) {

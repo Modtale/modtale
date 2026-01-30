@@ -126,6 +126,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
         pipeline.add(Aggregation.project()
+                .and("versions").slice(1).as("versions")
                 .andExclude(
                         "about",
                         "reviews",
@@ -133,12 +134,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                         "contributors",
                         "pendingInvites",
                         "modIds",
-                        "childProjectIds",
-                        "versions.scanResult",
-                        "versions.rejectionReason",
-                        "versions.changelog",
-                        "versions.dependencies",
-                        "versions.fileUrl"
+                        "childProjectIds"
                 )
         );
 
@@ -177,20 +173,17 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             ));
         }
 
-        query.fields().exclude(
-                "about",
-                "reviews",
-                "galleryImages",
-                "contributors",
-                "pendingInvites",
-                "modIds",
-                "childProjectIds",
-                "versions.scanResult",
-                "versions.rejectionReason",
-                "versions.changelog",
-                "versions.dependencies",
-                "versions.fileUrl"
-        );
+        query.fields()
+                .slice("versions", 1)
+                .exclude(
+                        "about",
+                        "reviews",
+                        "galleryImages",
+                        "contributors",
+                        "pendingInvites",
+                        "modIds",
+                        "childProjectIds"
+                );
 
         query.with(pageable);
         List<Mod> list = mongoTemplate.find(query, Mod.class);

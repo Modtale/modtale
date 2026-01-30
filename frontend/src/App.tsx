@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
@@ -51,9 +51,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const [user, setUser] = useState<User | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [mods, setMods] = useState<Mod[]>([]);
-    // Removed separate modpacks state
-    const [worlds, setWorlds] = useState<World[]>([]);
     const [downloadedSessionIds, setDownloadedSessionIds] = useState<Set<string>>(new Set());
     const [globalError, setGlobalError] = useState<string | null>(null);
     const [showOnboarding, setShowOnboarding] = useState(false);
@@ -95,17 +92,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
         });
     };
 
-    const refreshData = useCallback(async () => {
-        try {
-            const res = await api.get('/projects?size=1000');
-            const allProjects = res.data?.content || [];
-
-            // Group all non-SAVE projects (plugins, modpacks, art, data) into 'mods'
-            setMods(allProjects.filter((p: any) => p.classification !== 'SAVE'));
-            setWorlds(allProjects.filter((p: any) => p.classification === 'SAVE'));
-        } catch (e) { console.error("Background fetch failed", e); }
-    }, []);
-
     const fetchUser = async () => {
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
@@ -130,16 +116,14 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
             try {
                 await fetchUser();
             } catch (e) { setUser(null); } finally { setLoadingAuth(false); }
-            refreshData();
         };
         init();
-    }, [refreshData]);
+    }, []);
 
     const handleLogout = async () => { try { await api.post(`${BACKEND_URL}/logout`); } catch (e) {} setUser(null); navigate('/'); };
     const handleNavigate = (page: string) => { navigate(page === 'home' ? '/' : `/${page}`); };
     const handleAuthorClick = (author: string) => { navigate(`/creator/${author}`); };
     const handleModClick = (mod: Mod) => { navigate(`/mod/${createSlug(mod.title, mod.id)}`); }
-    // handleModpackClick removed, use handleModClick or direct navigation
     const handleWorldClick = (world: World) => { navigate(`/world/${createSlug(world.title, world.id)}`); }
 
     const handleToggleFavorite = async (id: string) => {
@@ -149,10 +133,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
         const newModLikes = isLiked ? (user.likedModIds || []).filter(lid => lid !== id) : [...(user.likedModIds || []), id];
         setUser({ ...user, likedModIds: newModLikes });
 
-        setMods(prev => prev.map(m => m.id === id ? { ...m, favoriteCount: isLiked ? Math.max(0, m.favoriteCount - 1) : m.favoriteCount + 1 } : m));
-        setWorlds(prev => prev.map(w => w.id === id ? { ...w, favoriteCount: isLiked ? Math.max(0, w.favoriteCount - 1) : w.favoriteCount + 1 } : w));
-
-        try { await api.post(`/projects/${id}/favorite`); } catch (e) { refreshData(); }
+        try { await api.post(`/projects/${id}/favorite`); } catch (e) { fetchUser(); }
     };
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
@@ -166,7 +147,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const renderHome = (classification?: Classification) => (
         <Home
             onModClick={handleModClick}
-            onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)} // Unified handler
+            onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
             onWorldClick={handleWorldClick}
             onAuthorClick={handleAuthorClick}
             likedModIds={user?.likedModIds || []}
@@ -215,17 +196,17 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                         <Route path="/art" element={renderHome('ART')} />
                         <Route path="/data" element={renderHome('DATA')} />
 
-                        <Route path="/upload" element={<Upload onNavigate={handleNavigate} onRefresh={refreshData} currentUser={user} />} />
+                        <Route path="/upload" element={<Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />} />
                         <Route path="/dashboard/*" element={<Dashboard user={user} onRefreshUser={fetchUser} />} />
                         <Route path="/analytics/project/:id" element={<Analytics />} />
 
-                        <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
                         <Route path="/mod/:id/edit" element={<EditMod currentUser={user} />} />
 
-                        <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
                         <Route path="/modpack/:id/edit" element={<EditMod currentUser={user} />} />
 
-                        <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={refreshData} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                        <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
 
                         <Route path="/creator/:username" element={
                             <CreatorProfile
