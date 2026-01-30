@@ -125,8 +125,12 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
+        pipeline.add(Aggregation.addFields()
+                .addField("versions")
+                .withValue(ArrayOperators.Slice.sliceArrayOf("versions").itemCount(1))
+                .build());
+
         pipeline.add(Aggregation.project()
-                .and("versions").slice(1).as("versions")
                 .andExclude(
                         "about",
                         "reviews",
@@ -146,7 +150,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         long total;
         if ("hidden_gems".equals(viewCategory)) {
             List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
-            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation);
+            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation || op instanceof AddFieldsOperation);
             countPipeline.add(Aggregation.count().as("total"));
 
             Aggregation countAgg = Aggregation.newAggregation(Mod.class, countPipeline);
