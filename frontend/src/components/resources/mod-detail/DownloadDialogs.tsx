@@ -5,7 +5,7 @@ import { formatTimeAgo, ChannelBadge, compareSemVer } from '../../../utils/modHe
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
-import { api, BACKEND_URL } from '../../../utils/api';
+import { api, API_BASE_URL } from '../../../utils/api';
 
 let scrollLockCount = 0;
 
@@ -92,7 +92,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                     const { downloadUrl } = response.data;
 
                     const link = document.createElement('a');
-                    link.href = `${BACKEND_URL}${downloadUrl}`;
+                    link.href = `${API_BASE_URL}${downloadUrl}`;
                     link.setAttribute('download', '');
                     document.body.appendChild(link);
                     link.click();
@@ -107,7 +107,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
 
     const getIconUrl = (path?: string) => {
         if (!path) return '/assets/favicon.svg';
-        return path.startsWith('http') ? path : `${BACKEND_URL}${path}`;
+        return path.startsWith('http') ? path : `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
     };
 
     return (
