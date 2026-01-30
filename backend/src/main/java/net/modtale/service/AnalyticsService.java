@@ -56,7 +56,7 @@ public class AnalyticsService {
 
     @Scheduled(cron = "0 30 0 * * ?")
     public void updateProjectScores() {
-        logger.info("Starting daily project score calculation...");
+        logger.info("Starting optimized activity-based score calculation...");
         LocalDate today = LocalDate.now();
 
         Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
@@ -71,17 +71,21 @@ public class AnalyticsService {
         int prevMonth = prevMonthDate.getMonthValue();
 
         List<AggregationOperation> pipeline = new ArrayList<>();
+
         pipeline.add(Aggregation.match(
                 new Criteria().orOperator(
                         Criteria.where("year").is(currYear).and("month").is(currMonth),
                         Criteria.where("year").is(prevYear).and("month").is(prevMonth)
                 )
         ));
+
         pipeline.add(Aggregation.addFields().addField("daysArray").withValue(ObjectOperators.ObjectToArray.valueOfToArray("days")).build());
         pipeline.add(Aggregation.unwind("daysArray", true));
         pipeline.add(Aggregation.addFields().addField("logDate")
                 .withValue(DateOperators.DateFromParts.dateFromParts().year("$year").month("$month").day(ConvertOperators.ToInt.toInt("$daysArray.k")))
                 .build());
+
+        pipeline.add(Aggregation.match(Criteria.where("logDate").gte(monthStart).lt(todayStart)));
 
         pipeline.add(Aggregation.group("projectId")
                 .sum(ConditionalOperators.when(
@@ -101,39 +105,94 @@ public class AnalyticsService {
                         )).then("$daysArray.v.d").otherwise(0)).as("recent")
         );
 
+        pipeline.add(LookupOperation.newLookup()
+                .from("projects")
+                .localField("_id")
+                .foreignField("_id")
+                .as("projectData"));
+
+        pipeline.add(Aggregation.unwind("projectData", false));
+
+        pipeline.add(Aggregation.project("currentWeek", "prevWeek", "recent")
+                .and("projectData.rating").as("rating")
+                .and("projectData.downloadCount").as("totalDownloads"));
+
         Aggregation agg = Aggregation.newAggregation(ProjectMonthlyStats.class, pipeline);
-        AggregationResults<Document> statsResults = mongoTemplate.aggregate(agg, ProjectMonthlyStats.class, Document.class);
+        AggregationResults<Document> results = mongoTemplate.aggregate(agg, ProjectMonthlyStats.class, Document.class);
 
-        Map<String, Document> statsMap = new HashMap<>();
-        for (Document d : statsResults) {
-            statsMap.put(d.getString("_id"), d);
-        }
-
+        Set<String> activeProjectIds = new HashSet<>();
         BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
-        AtomicInteger counter = new AtomicInteger(0);
-        AtomicInteger batchCount = new AtomicInteger(0);
+        int counter = 0;
 
-        Query projectQuery = new Query();
-        projectQuery.fields().include("_id", "rating", "downloadCount");
+        for (Document doc : results) {
+            String projectId = doc.getString("_id");
+            if (projectId == null) continue;
 
-        try (Stream<Mod> projectStream = mongoTemplate.stream(projectQuery, Mod.class)) {
-            projectStream.forEach(mod -> {
-                Document stats = statsMap.get(mod.getId());
-                calculateAndQueueUpdate(mod, stats, bulkOps);
+            activeProjectIds.add(projectId);
 
-                if (counter.incrementAndGet() >= 1000) {
-                    bulkOps.execute();
-                    batchCount.incrementAndGet();
-                    counter.set(0);
-                }
-            });
+            int currentWeek = doc.getInteger("currentWeek", 0);
+            int prevWeek = doc.getInteger("prevWeek", 0);
+            int recent = doc.getInteger("recent", 0);
+            Double ratingObj = doc.getDouble("rating");
+            double rating = ratingObj != null ? ratingObj : 0.0;
+            Integer totalDlObj = doc.getInteger("totalDownloads");
+            int totalDownloads = totalDlObj != null ? totalDlObj : 0;
+
+            int trendScore = currentWeek - prevWeek;
+
+            double ratingWeight;
+            if (rating >= 4.5) ratingWeight = 1.0;
+            else if (rating > 0) ratingWeight = rating / 4.5;
+            else ratingWeight = 0.5;
+
+            double relevanceScore = recent * ratingWeight;
+            double popularScore = totalDownloads * ratingWeight;
+
+            Update update = new Update()
+                    .set("trendScore", trendScore)
+                    .set("relevanceScore", relevanceScore)
+                    .set("popularScore", popularScore);
+
+            bulkOps.updateOne(new Query(Criteria.where("_id").is(projectId)), update);
+            counter++;
+
+            if (counter >= 1000) {
+                bulkOps.execute();
+                bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
+                counter = 0;
+            }
         }
 
-        if (counter.get() > 0) {
+        Query decayQuery = new Query();
+        decayQuery.fields().include("_id");
+        decayQuery.addCriteria(new Criteria().orOperator(
+                Criteria.where("trendScore").ne(0),
+                Criteria.where("relevanceScore").gt(0.0)
+        ));
+
+        List<Mod> currentlyScored = mongoTemplate.find(decayQuery, Mod.class);
+
+        for (Mod mod : currentlyScored) {
+            if (!activeProjectIds.contains(mod.getId())) {
+                bulkOps.updateOne(
+                        new Query(Criteria.where("_id").is(mod.getId())),
+                        new Update().set("trendScore", 0).set("relevanceScore", 0.0)
+                );
+                counter++;
+
+                if (counter >= 1000) {
+                    bulkOps.execute();
+                    bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
+                    counter = 0;
+                }
+            }
+        }
+
+        if (counter > 0) {
             bulkOps.execute();
         }
 
-        logger.info("Daily scores updated. Processed {} projects in {} batches.", (batchCount.get() * 1000 + counter.get()), batchCount.get() + 1);
+        logger.info("Scores updated. Active: {}, Decayed checked: {}", activeProjectIds.size(), currentlyScored.size());
     }
 
     public void ensureScores(List<Mod> mods) {
