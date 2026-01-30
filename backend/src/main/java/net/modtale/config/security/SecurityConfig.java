@@ -212,7 +212,8 @@ public class SecurityConfig {
                                 "/api/v1/files/**",
                                 "/api/v1/user/profile/**",
                                 "/api/v1/og/**",
-                                "/api/v1/download/**"
+                                "/api/v1/download/**",
+                                "/api/v1/meta/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(

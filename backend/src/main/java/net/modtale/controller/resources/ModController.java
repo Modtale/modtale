@@ -125,7 +125,7 @@ public class ModController {
             if (targetVersion == null) return ResponseEntity.notFound().build();
 
             String token = downloadTokenService.generateToken(id, version);
-            String downloadUrl = "/api/v1/download/" + token;
+            String downloadUrl = "/download/" + token;
 
             return ResponseEntity.ok(Map.of(
                     "downloadUrl", downloadUrl,
