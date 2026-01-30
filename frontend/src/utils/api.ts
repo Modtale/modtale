@@ -7,7 +7,7 @@ export const API_BASE_URL = RAW_URL.endsWith('/')
     ? RAW_URL.slice(0, -1)
     : RAW_URL;
 
-export const BACKEND_URL = API_BASE_URL.replace(/\/api(\/v1)?$/, '');
+export const BACKEND_URL = new URL(API_BASE_URL).origin;
 
 export const getCookie = (name: string): string | null => {
     if (typeof document === 'undefined') return null;

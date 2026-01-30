@@ -84,7 +84,7 @@ public class SecurityConfig {
         if (frontendUrl == null || frontendUrl.isBlank()) return false;
         try {
             String host = URI.create(frontendUrl).getHost();
-            return host != null && host.endsWith(".run.app");
+            return (host != null && host.endsWith(".run.app")) || "dev.modtale.net".equalsIgnoreCase(host);
         } catch (Exception e) {
             return false;
         }
@@ -100,10 +100,8 @@ public class SecurityConfig {
 
         if (isPreview) {
             serializer.setSameSite("None");
-            logger.info("CookieSerializer: Detected Preview Environment. Using SameSite=None.");
         } else {
             serializer.setSameSite("Lax");
-            logger.info("CookieSerializer: Detected Prod/Dev Environment. Using SameSite=Lax.");
 
             if (frontendUrl != null && !frontendUrl.isBlank()) {
                 try {
@@ -208,7 +206,14 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/projects/**",
+                                "/api/v1/tags",
+                                "/api/v1/files/**",
+                                "/api/v1/user/profile/**",
+                                "/api/v1/og/**",
+                                "/api/v1/download/**"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/user/analytics",
@@ -273,6 +278,9 @@ public class SecurityConfig {
 
         if (isPreview) {
             restrictedOrigins.add("https://*.run.app");
+            if (frontendUrl != null && frontendUrl.contains("dev.modtale.net")) {
+                restrictedOrigins.add(frontendUrl);
+            }
         } else {
             if (frontendUrl != null && !frontendUrl.isBlank()) {
                 restrictedOrigins.add(frontendUrl);
