@@ -140,7 +140,7 @@ public class AnalyticsService {
         if (mods == null || mods.isEmpty()) return;
 
         List<Mod> missingScores = mods.stream()
-                .filter(m -> m.getDownloadCount() > 0 && m.getPopularScore() == 0.0 && m.getRelevanceScore() == 0.0)
+                .filter(m -> m.getDownloadCount() > 0 && (m.getPopularScore() == 0.0 || m.getRelevanceScore() == 0.0 || m.getTrendScore() == 0))
                 .collect(Collectors.toList());
 
         if (missingScores.isEmpty()) return;
