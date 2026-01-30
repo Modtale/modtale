@@ -115,7 +115,8 @@ public class AnalyticsService {
 
         pipeline.add(Aggregation.project("currentWeek", "prevWeek", "recent")
                 .and("projectData.rating").as("rating")
-                .and("projectData.downloadCount").as("totalDownloads"));
+                .and("projectData.downloadCount").as("totalDownloads")
+                .and("projectData.favoriteCount").as("favoriteCount"));
 
         Aggregation agg = Aggregation.newAggregation(ProjectMonthlyStats.class, pipeline);
         AggregationResults<Document> results = mongoTemplate.aggregate(agg, ProjectMonthlyStats.class, Document.class);
@@ -133,10 +134,15 @@ public class AnalyticsService {
             int currentWeek = doc.getInteger("currentWeek", 0);
             int prevWeek = doc.getInteger("prevWeek", 0);
             int recent = doc.getInteger("recent", 0);
+
             Double ratingObj = doc.getDouble("rating");
             double rating = ratingObj != null ? ratingObj : 0.0;
+
             Integer totalDlObj = doc.getInteger("totalDownloads");
             int totalDownloads = totalDlObj != null ? totalDlObj : 0;
+
+            Integer favObj = doc.getInteger("favoriteCount");
+            int favoriteCount = favObj != null ? favObj : 0;
 
             int trendScore = currentWeek - prevWeek;
 
@@ -145,8 +151,13 @@ public class AnalyticsService {
             else if (rating > 0) ratingWeight = rating / 4.5;
             else ratingWeight = 0.5;
 
-            double relevanceScore = recent * ratingWeight;
-            double popularScore = totalDownloads * ratingWeight;
+            double rawRatio = (double) totalDownloads / Math.max(1, favoriteCount);
+            double clampedRatio = Math.min(400.0, Math.max(40.0, rawRatio));
+            double normalizedPerformance = (400.0 - clampedRatio) / (400.0 - 40.0);
+            double favoriteMultiplier = 1.0 + (normalizedPerformance * 0.5);
+
+            double relevanceScore = recent * ratingWeight * favoriteMultiplier;
+            double popularScore = totalDownloads * ratingWeight * favoriteMultiplier;
 
             Update update = new Update()
                     .set("trendScore", trendScore)
@@ -289,8 +300,13 @@ public class AnalyticsService {
         else if (mod.getRating() > 0) ratingWeight = mod.getRating() / 4.5;
         else ratingWeight = 0.5;
 
-        double relevanceScore = recent * ratingWeight;
-        double popularScore = mod.getDownloadCount() * ratingWeight;
+        double rawRatio = (double) mod.getDownloadCount() / Math.max(1, mod.getFavoriteCount());
+        double clampedRatio = Math.min(400.0, Math.max(40.0, rawRatio));
+        double normalizedPerformance = (400.0 - clampedRatio) / (400.0 - 40.0);
+        double favoriteMultiplier = 1.0 + (normalizedPerformance * 0.5);
+
+        double relevanceScore = recent * ratingWeight * favoriteMultiplier;
+        double popularScore = mod.getDownloadCount() * ratingWeight * favoriteMultiplier;
 
         boolean changed = mod.getTrendScore() != trendScore ||
                 Math.abs(mod.getRelevanceScore() - relevanceScore) > 0.01 ||
