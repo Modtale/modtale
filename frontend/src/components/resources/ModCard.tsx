@@ -97,7 +97,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                         src={resolvedBanner}
                         alt=""
                         decoding="async"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                 ) : (
                     <div className="w-full h-full bg-slate-200 dark:bg-slate-700" />
