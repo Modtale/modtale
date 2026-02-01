@@ -12,5 +12,5 @@ steps:
     args: ['push', 'gcr.io/$PROJECT_ID/modtale-frontend:${_TAG}']
 
 substitutions:
-  _PUBLIC_API_URL: https://api.modtale.net/api/v1
+  _PUBLIC_API_URL: http://localhost:8080/api/v1
   _TAG: latest

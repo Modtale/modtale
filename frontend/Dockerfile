@@ -17,7 +17,6 @@ COPY --from=builder /app/node_modules ./node_modules
 
 ENV HOST=0.0.0.0
 ENV PORT=8080
-ENV PUBLIC_API_URL=https://api.modtale.net/api
 
 EXPOSE 8080
 

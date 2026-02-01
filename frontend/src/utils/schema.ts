@@ -1,7 +1,7 @@
 import type { Mod, Modpack, World } from '../types';
 import { getProjectUrl } from './slug';
 
-const API_URL = import.meta.env.PUBLIC_API_URL || 'https://api.modtale.net/api/v1';
+const API_URL = import.meta.env.PUBLIC_API_URL;
 const BACKEND_URL = new URL(API_URL).origin;
 
 export const generateItemListSchema = (items: (Mod | Modpack | World)[]) => {
