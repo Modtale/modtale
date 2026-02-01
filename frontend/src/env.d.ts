@@ -1,3 +1,4 @@
+/// <reference path="../.astro/types.d.ts" />
 interface Window {
     INITIAL_DATA?: any;
 }

@@ -11,7 +11,7 @@ const { all } = Astro.params;
 const path = Astro.url.pathname;
 const cleanPath = path.replace(/\/$/, "");
 
-const API_URL = import.meta.env.PUBLIC_API_URL || 'https://api.modtale.net/api/v1';
+const API_URL = import.meta.env.PUBLIC_API_URL;
 
 if (cleanPath === '/mods') {
     return Astro.redirect('/', 301);

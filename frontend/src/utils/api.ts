@@ -1,7 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 
 const RAW_URL =
-    import.meta.env.PUBLIC_API_URL || 'https://api.modtale.net/api';
+    import.meta.env.PUBLIC_API_URL;
 
 export const API_BASE_URL = RAW_URL.endsWith('/')
     ? RAW_URL.slice(0, -1)

@@ -9,7 +9,7 @@ import { ROUTE_SEO } from '../../data/seo-constants';
 const { slug } = Astro.params;
 const id = extractId(slug || '');
 const path = Astro.url.pathname;
-const API_URL = import.meta.env.PUBLIC_API_URL || 'https://api.modtale.net/api/v1';
+const API_URL = import.meta.env.PUBLIC_API_URL;
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
