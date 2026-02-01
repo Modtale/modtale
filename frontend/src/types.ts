@@ -37,6 +37,8 @@ export interface User {
     tier?: string;
     accountType?: 'USER' | 'ORGANIZATION';
     organizationMembers?: OrganizationMember[];
+    stripeConnectId?: string;
+    platformFeePercent?: number;
 }
 
 export interface ModDependency {
@@ -124,6 +126,7 @@ export interface Mod {
     lastTrendingNotification?: string;
     allowModpacks?: boolean;
     allowReviews?: boolean;
+    donationsEnabled?: boolean;
     status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;

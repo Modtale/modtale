@@ -75,6 +75,7 @@ public class Mod {
     private List<String> modIds;
     private boolean allowModpacks = true;
     private boolean allowReviews = true;
+    private boolean donationsEnabled = false;
 
     @Indexed
     private String status = "PUBLISHED";
@@ -171,6 +172,9 @@ public class Mod {
 
     public boolean isAllowReviews() { return allowReviews; }
     public void setAllowReviews(boolean allowReviews) { this.allowReviews = allowReviews; }
+
+    public boolean isDonationsEnabled() { return donationsEnabled; }
+    public void setDonationsEnabled(boolean donationsEnabled) { this.donationsEnabled = donationsEnabled; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

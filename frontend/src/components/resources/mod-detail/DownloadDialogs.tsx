@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ProjectVersion } from '../../../types';
-import { Download, X, ChevronDown, ChevronUp, Link as LinkIcon, List, AlertCircle, FileText, ChevronRight } from 'lucide-react';
+import { Download, X, ChevronDown, ChevronUp, Link as LinkIcon, List, AlertCircle, FileText, ChevronRight, Heart, Mail, Check, CreditCard, Bell } from 'lucide-react';
 import { formatTimeAgo, ChannelBadge, compareSemVer } from '../../../utils/modHelpers';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -27,20 +27,102 @@ const useScrollLock = (lock: boolean) => {
     }, [lock]);
 };
 
+interface DonationPromptProps {
+    modId: string;
+    modTitle: string;
+    authorName: string;
+    onClose: () => void;
+    isLoggedIn?: boolean;
+}
+
+const DonationPrompt: React.FC<DonationPromptProps> = ({ modId, modTitle, authorName, onClose, isLoggedIn }) => {
+    const donationAmounts = [3, 5, 10, 20];
+
+    return (
+        <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
+                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-pink-500 fill-pink-500" /> Support the Creator
+                </h3>
+                <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500" /></button>
+            </div>
+
+            <div className="p-8 flex-1 flex flex-col items-center justify-center text-center space-y-6 overflow-y-auto bg-slate-900">
+                <div className="space-y-2 max-w-sm">
+                    <h4 className="text-lg font-bold text-white">Enjoying {modTitle}?</h4>
+                    <p className="text-sm text-slate-400">
+                        Creating content takes time and effort. Consider supporting <strong>{authorName}</strong> to help them keep building amazing things.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-4 gap-3 w-full max-w-sm">
+                    {donationAmounts.map(amount => (
+                        <button
+                            key={amount}
+                            onClick={() => window.open(`${BACKEND_URL}/api/projects/${modId}/donate?amount=${amount}`, '_blank')}
+                            className="py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-pink-500 hover:border-pink-500 hover:text-white transition-all font-bold text-slate-300 flex flex-col items-center gap-1 group"
+                        >
+                            <span className="text-xs opacity-50 font-normal group-hover:opacity-100">Donate</span>
+                            ${amount}
+                        </button>
+                    ))}
+                </div>
+
+                <button
+                    onClick={() => window.open(`${BACKEND_URL}/api/projects/${modId}/donate`, '_blank')}
+                    className="w-full max-w-sm py-3 rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                >
+                    <CreditCard className="w-4 h-4" /> Custom Amount
+                </button>
+
+                {isLoggedIn && (
+                    <div className="w-full max-w-sm pt-6 border-t border-white/10">
+                        <div className="bg-slate-800/50 rounded-xl p-4 border border-white/5 text-left flex items-start gap-3">
+                            <div className="p-2 rounded-lg bg-modtale-accent/10 text-modtale-accent shrink-0">
+                                <Bell className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h5 className="text-xs font-bold text-white uppercase tracking-wider mb-1">
+                                    7-Day Reminder
+                                </h5>
+                                <p className="text-xs text-slate-400 leading-relaxed">
+                                    We'll send you a notification in a week to remind you about donating if you're still enjoying the mod.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="p-4 bg-black/20 border-t border-white/10 text-center shrink-0">
+                <button onClick={onClose} className="text-xs text-slate-500 hover:text-white font-bold transition-colors">
+                    No thanks, just take me to my download
+                </button>
+            </div>
+        </div>
+    );
+};
+
 interface DependencyModalProps {
     dependencies: NonNullable<ProjectVersion['dependencies']>;
     onClose: () => void;
     onConfirm: () => void;
+    modTitle: string;
+    modId: string;
+    authorName: string;
+    donationsEnabled?: boolean;
+    isLoggedIn?: boolean;
 }
 
 interface MetaCache {
     [key: string]: { title: string; author: string; icon: string };
 }
 
-export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, onClose, onConfirm }) => {
+export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, onClose, onConfirm, modTitle, modId, authorName, donationsEnabled, isLoggedIn }) => {
     useScrollLock(true);
     const [selected, setSelected] = useState<Set<string>>(new Set(dependencies.map(d => d.modId)));
     const [metaCache, setMetaCache] = useState<MetaCache>({});
+    const [showDonation, setShowDonation] = useState(false);
 
     useEffect(() => {
         const fetchMeta = async () => {
@@ -103,6 +185,12 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
             }
         }
         onConfirm();
+
+        if (donationsEnabled) {
+            setShowDonation(true);
+        } else {
+            onClose();
+        }
     };
 
     const getIconUrl = (path?: string) => {
@@ -113,86 +201,98 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
             <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden relative flex flex-col max-h-[85dvh]">
-                <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
-                    <h3 className="text-xl font-black text-white flex items-center gap-2">
-                        <LinkIcon className="w-5 h-5 text-modtale-accent" /> Dependencies
-                    </h3>
-                    <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500" /></button>
-                </div>
-
-                <div className="p-6 space-y-4 overflow-y-auto bg-slate-900 custom-scrollbar">
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm text-slate-400">
-                            Select dependencies to download automatically.
+                {showDonation ? (
+                    <DonationPrompt
+                        modId={modId}
+                        modTitle={modTitle}
+                        authorName={authorName}
+                        onClose={onClose}
+                        isLoggedIn={isLoggedIn}
+                    />
+                ) : (
+                    <>
+                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
+                            <h3 className="text-xl font-black text-white flex items-center gap-2">
+                                <LinkIcon className="w-5 h-5 text-modtale-accent" /> Dependencies
+                            </h3>
+                            <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500" /></button>
                         </div>
-                        <button onClick={toggleAll} className="text-xs font-bold text-modtale-accent hover:underline">
-                            {selected.size === dependencies.length ? 'Deselect All' : 'Select All'}
-                        </button>
-                    </div>
 
-                    <div className="space-y-2">
-                        {dependencies.map(dep => {
-                            const meta = metaCache[dep.modId];
-                            const isSelected = selected.has(dep.modId);
+                        <div className="p-6 space-y-4 overflow-y-auto bg-slate-900 custom-scrollbar">
+                            <div className="flex items-center justify-between">
+                                <div className="text-sm text-slate-400">
+                                    Select dependencies to download automatically.
+                                </div>
+                                <button onClick={toggleAll} className="text-xs font-bold text-modtale-accent hover:underline">
+                                    {selected.size === dependencies.length ? 'Deselect All' : 'Select All'}
+                                </button>
+                            </div>
 
-                            return (
-                                <div
-                                    key={dep.modId}
-                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isSelected ? 'border-modtale-accent/30 bg-modtale-accent/5' : 'border-white/10 bg-white/5'}`}
-                                >
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => toggleDep(dep.modId)}
-                                            className="w-5 h-5 rounded text-modtale-accent focus:ring-modtale-accent border-slate-600 bg-slate-800 cursor-pointer flex-shrink-0"
-                                        />
-                                        <img
-                                            src={getIconUrl(meta?.icon)}
-                                            alt=""
-                                            className="w-10 h-10 rounded-lg bg-slate-800 object-cover flex-shrink-0"
-                                            onError={(e) => e.currentTarget.src='/assets/favicon.svg'}
-                                        />
-                                        <div className="cursor-pointer min-w-0" onClick={() => toggleDep(dep.modId)}>
-                                            <div className="font-bold text-white text-sm truncate">
-                                                {meta?.title || dep.modTitle || dep.modId}
+                            <div className="space-y-2">
+                                {dependencies.map(dep => {
+                                    const meta = metaCache[dep.modId];
+                                    const isSelected = selected.has(dep.modId);
+
+                                    return (
+                                        <div
+                                            key={dep.modId}
+                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${isSelected ? 'border-modtale-accent/30 bg-modtale-accent/5' : 'border-white/10 bg-white/5'}`}
+                                        >
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleDep(dep.modId)}
+                                                    className="w-5 h-5 rounded text-modtale-accent focus:ring-modtale-accent border-slate-600 bg-slate-800 cursor-pointer flex-shrink-0"
+                                                />
+                                                <img
+                                                    src={getIconUrl(meta?.icon)}
+                                                    alt=""
+                                                    className="w-10 h-10 rounded-lg bg-slate-800 object-cover flex-shrink-0"
+                                                    onError={(e) => e.currentTarget.src='/assets/favicon.svg'}
+                                                />
+                                                <div className="cursor-pointer min-w-0" onClick={() => toggleDep(dep.modId)}>
+                                                    <div className="font-bold text-white text-sm truncate">
+                                                        {meta?.title || dep.modTitle || dep.modId}
+                                                    </div>
+                                                    <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                                                        <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
+                                                        <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                                                        <span className="font-mono opacity-80">v{dep.versionNumber}</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                                                <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                                                <span className="font-mono opacity-80">v{dep.versionNumber}</span>
+                                            <div className="flex-shrink-0 ml-2">
+                                                {!dep.isOptional && <span className="text-[10px] font-bold uppercase bg-amber-500/10 text-amber-500 px-2 py-1 rounded-md border border-amber-500/20">Required</span>}
+                                                {dep.isOptional && <span className="text-[10px] font-bold uppercase bg-white/10 text-slate-400 px-2 py-1 rounded-md border border-white/5">Optional</span>}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="flex-shrink-0 ml-2">
-                                        {!dep.isOptional && <span className="text-[10px] font-bold uppercase bg-amber-500/10 text-amber-500 px-2 py-1 rounded-md border border-amber-500/20">Required</span>}
-                                        {dep.isOptional && <span className="text-[10px] font-bold uppercase bg-white/10 text-slate-400 px-2 py-1 rounded-md border border-white/5">Optional</span>}
-                                    </div>
+                                    );
+                                })}
+                            </div>
+
+                            {missingRequired && (
+                                <div className="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <p>Some <span className="font-bold">Required</span> dependencies are unchecked.</p>
                                 </div>
-                            );
-                        })}
-                    </div>
-
-                    {missingRequired && (
-                        <div className="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
-                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <p>Some <span className="font-bold">Required</span> dependencies are unchecked.</p>
+                            )}
                         </div>
-                    )}
-                </div>
 
-                <div className="p-6 border-t border-white/10 bg-black/20 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-5 py-2.5 font-bold text-slate-400 hover:bg-white/10 rounded-xl transition-colors text-sm">
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleDownload}
-                        className="px-6 py-2.5 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-colors flex items-center gap-2 bg-modtale-accent hover:bg-modtale-accentHover text-white text-sm"
-                    >
-                        <Download className="w-4 h-4" />
-                        {selected.size > 0 ? `Download (${selected.size})` : "Continue without Downloading"}
-                    </button>
-                </div>
+                        <div className="p-6 border-t border-white/10 bg-black/20 flex justify-end gap-3 shrink-0">
+                            <button onClick={onClose} className="px-5 py-2.5 font-bold text-slate-400 hover:bg-white/10 rounded-xl transition-colors text-sm">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDownload}
+                                className="px-6 py-2.5 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-colors flex items-center gap-2 bg-modtale-accent hover:bg-modtale-accentHover text-white text-sm"
+                            >
+                                <Download className="w-4 h-4" />
+                                {selected.size > 0 ? `Download (${selected.size})` : "Continue without Downloading"}
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -252,10 +352,26 @@ const CustomDropdown = ({ options, value, onChange, placeholder }: any) => {
     );
 };
 
-export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, onDownload, showExperimental, onToggleExperimental, onViewHistory }) => {
+interface DownloadModalProps {
+    show: boolean;
+    onClose: () => void;
+    versionsByGame: any;
+    onDownload: (url: string, version: string, deps: any[]) => void;
+    showExperimental: boolean;
+    onToggleExperimental: () => void;
+    onViewHistory: () => void;
+    modTitle: string;
+    modId: string;
+    authorName: string;
+    donationsEnabled?: boolean;
+    isLoggedIn?: boolean;
+}
+
+export const DownloadModal: React.FC<DownloadModalProps> = ({ show, onClose, versionsByGame, onDownload, showExperimental, onToggleExperimental, onViewHistory, modTitle, modId, authorName, donationsEnabled, isLoggedIn }) => {
     useScrollLock(show);
     const [selectedGameVer, setSelectedGameVer] = useState<string>('');
     const [isListExpanded, setIsListExpanded] = useState(false);
+    const [showDonation, setShowDonation] = useState(false);
 
     useEffect(() => {
         if (show) {
@@ -263,6 +379,7 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
             if (keys.length > 0 && (!selectedGameVer || !keys.includes(selectedGameVer))) {
                 setSelectedGameVer(keys[0]);
             }
+            setShowDonation(false);
         }
     }, [show, versionsByGame]);
 
@@ -277,6 +394,15 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
     }, [selectedGameVer, versionsByGame, showExperimental, onToggleExperimental]);
 
     if (!show) return null;
+
+    const handleDownloadClick = (url: string, version: string, deps: any[]) => {
+        onDownload(url, version, deps);
+        if (donationsEnabled) {
+            setShowDonation(true);
+        } else {
+            onClose();
+        }
+    };
 
     const gameVersions = Object.keys(versionsByGame).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
     const currentVersions = versionsByGame[selectedGameVer] || [];
@@ -303,91 +429,103 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" onClick={onClose}>
             <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden relative flex flex-col max-h-[90dvh]" onClick={e => e.stopPropagation()}>
 
-                <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
-                    <div>
-                        <h3 className="text-xl font-black text-white flex items-center gap-2"><Download className="w-5 h-5 text-modtale-accent" /> Download</h3>
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
-                            <div className={`w-8 h-4 rounded-full relative transition-colors ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-700'}`}>
-                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showExperimental ? 'translate-x-4' : ''}`} />
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">Show Beta/Alpha</span>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
-                </div>
-
-                <div className="p-6 bg-slate-900 overflow-y-auto custom-scrollbar">
-                    <div className="mb-6">
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
-                        <CustomDropdown
-                            options={gameVersions}
-                            value={selectedGameVer}
-                            onChange={setSelectedGameVer}
-                            placeholder="Select Game Version"
-                        />
-                    </div>
-
-                    {latestVer ? (
-                        <>
-                            <button
-                                onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies)}
-                                className="w-full bg-modtale-accent hover:bg-modtale-accentHover text-white p-5 rounded-2xl shadow-lg shadow-modtale-accent/20 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden"
-                            >
-                                <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
-                                <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
-                                    v{latestVer.versionNumber}
-                                    {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
+                {showDonation ? (
+                    <DonationPrompt
+                        modId={modId}
+                        modTitle={modTitle}
+                        authorName={authorName}
+                        onClose={onClose}
+                        isLoggedIn={isLoggedIn}
+                    />
+                ) : (
+                    <>
+                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
+                            <div>
+                                <h3 className="text-xl font-black text-white flex items-center gap-2"><Download className="w-5 h-5 text-modtale-accent" /> Download</h3>
+                                <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                                    <div className={`w-8 h-4 rounded-full relative transition-colors ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-700'}`}>
+                                        <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showExperimental ? 'translate-x-4' : ''}`} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">Show Beta/Alpha</span>
                                 </div>
-                            </button>
+                            </div>
+                            <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
+                        </div>
 
-                            <div className="relative mb-6">
-                                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                                <div className="relative flex justify-center"><span className="bg-slate-900 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Other Versions</span></div>
+                        <div className="p-6 bg-slate-900 overflow-y-auto custom-scrollbar">
+                            <div className="mb-6">
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
+                                <CustomDropdown
+                                    options={gameVersions}
+                                    value={selectedGameVer}
+                                    onChange={setSelectedGameVer}
+                                    placeholder="Select Game Version"
+                                />
                             </div>
 
-                            <button
-                                onClick={() => setIsListExpanded(!isListExpanded)}
-                                className="w-full flex items-center justify-between p-3 rounded-xl border border-white/10 hover:bg-white/5 transition-colors group"
-                            >
-                                <span className="font-bold text-slate-300 text-sm">View all files for {selectedGameVer}</span>
-                                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isListExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {isListExpanded && (
-                                <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    {sortedVersions.map((ver: any) => (
-                                        <div key={ver.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-white/5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400"><FileText className="w-5 h-5" /></div>
-                                                <div>
-                                                    <div className="font-bold text-white text-sm flex items-center gap-2">v{ver.versionNumber} <ChannelBadge channel={ver.channel} /></div>
-                                                    <div className="text-xs text-slate-500">{formatTimeAgo(ver.releaseDate)}</div>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies)} className="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-modtale-accent hover:bg-modtale-accent/10 transition-colors"><Download className="w-4 h-4" /></button>
+                            {latestVer ? (
+                                <>
+                                    <button
+                                        onClick={() => handleDownloadClick(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies)}
+                                        className="w-full bg-modtale-accent hover:bg-modtale-accentHover text-white p-5 rounded-2xl shadow-lg shadow-modtale-accent/20 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden"
+                                    >
+                                        <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
+                                        <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
+                                            v{latestVer.versionNumber}
+                                            {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
                                         </div>
-                                    ))}
+                                    </button>
+
+                                    <div className="relative mb-6">
+                                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                                        <div className="relative flex justify-center"><span className="bg-slate-900 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Other Versions</span></div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setIsListExpanded(!isListExpanded)}
+                                        className="w-full flex items-center justify-between p-3 rounded-xl border border-white/10 hover:bg-white/5 transition-colors group"
+                                    >
+                                        <span className="font-bold text-slate-300 text-sm">View all files for {selectedGameVer}</span>
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isListExpanded ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {isListExpanded && (
+                                        <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            {sortedVersions.map((ver: any) => (
+                                                <div key={ver.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-white/5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400"><FileText className="w-5 h-5" /></div>
+                                                        <div>
+                                                            <div className="font-bold text-white text-sm flex items-center gap-2">v{ver.versionNumber} <ChannelBadge channel={ver.channel} /></div>
+                                                            <div className="text-xs text-slate-500">{formatTimeAgo(ver.releaseDate)}</div>
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => handleDownloadClick(ver.fileUrl, ver.versionNumber, ver.dependencies)} className="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-modtale-accent hover:bg-modtale-accent/10 transition-colors"><Download className="w-4 h-4" /></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-12 text-slate-500 flex flex-col items-center gap-2">
+                                    <AlertCircle className="w-8 h-8 opacity-50" />
+                                    <p className="font-medium">No compatible versions found.</p>
+                                    {!showExperimental && currentVersions.length > 0 && (
+                                        <button onClick={onToggleExperimental} className="text-xs text-modtale-accent font-bold hover:underline">
+                                            Show Beta/Alpha versions
+                                        </button>
+                                    )}
                                 </div>
                             )}
-                        </>
-                    ) : (
-                        <div className="text-center py-12 text-slate-500 flex flex-col items-center gap-2">
-                            <AlertCircle className="w-8 h-8 opacity-50" />
-                            <p className="font-medium">No compatible versions found.</p>
-                            {!showExperimental && currentVersions.length > 0 && (
-                                <button onClick={onToggleExperimental} className="text-xs text-modtale-accent font-bold hover:underline">
-                                    Show Beta/Alpha versions
-                                </button>
-                            )}
                         </div>
-                    )}
-                </div>
 
-                <div className="p-4 bg-black/20 border-t border-white/10 text-center shrink-0">
-                    <button onClick={onViewHistory} className="text-xs text-slate-500 hover:text-modtale-accent font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors">
-                        View Full Changelog <ChevronRight className="w-3 h-3" />
-                    </button>
-                </div>
+                        <div className="p-4 bg-black/20 border-t border-white/10 text-center shrink-0">
+                            <button onClick={onViewHistory} className="text-xs text-slate-500 hover:text-modtale-accent font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors">
+                                View Full Changelog <ChevronRight className="w-3 h-3" />
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
