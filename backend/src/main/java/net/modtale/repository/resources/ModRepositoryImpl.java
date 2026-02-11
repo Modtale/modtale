@@ -44,12 +44,13 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             String search, List<String> tags, String gameVersion, String classification,
             Double minRating, Integer minDownloads, Pageable pageable,
             String currentUsername, String sortBy,
-            String viewCategory, LocalDate dateCutoff, String author
+            String viewCategory, LocalDate dateCutoff, String authorId
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
 
         if ("Your Projects".equals(viewCategory) && currentUsername != null) {
             criteriaList.add(new Criteria().orOperator(
+                    authorId != null ? Criteria.where("authorId").is(authorId) : new Criteria(),
                     Criteria.where("author").is(currentUsername),
                     Criteria.where("contributors").is(currentUsername)
             ));
@@ -57,8 +58,11 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             criteriaList.add(Criteria.where("status").in("PUBLISHED", "ARCHIVED"));
         }
 
-        if (author != null && !author.trim().isEmpty()) {
-            criteriaList.add(Criteria.where("author").regex("^" + Pattern.quote(author) + "$", "i"));
+        if (authorId != null && !authorId.trim().isEmpty()) {
+            criteriaList.add(new Criteria().orOperator(
+                    Criteria.where("authorId").is(authorId),
+                    Criteria.where("author").is(authorId)
+            ));
         }
 
         if (search != null && !search.trim().isEmpty()) {
@@ -82,6 +86,21 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
         List<AggregationOperation> pipeline = new ArrayList<>();
         pipeline.add(Aggregation.match(baseCriteria));
+
+        pipeline.add(LookupOperation.newLookup()
+                .from("users")
+                .localField("authorId")
+                .foreignField("_id")
+                .as("authorInfo"));
+
+        pipeline.add(Aggregation.addFields()
+                .addField("author")
+                .withValue(ConditionalOperators.ifNull(
+                        ArrayOperators.ArrayElemAt.arrayOf("authorInfo.username").elementAt(0)
+                ).then("$author"))
+                .build());
+
+        pipeline.add(Aggregation.project().andExclude("authorInfo"));
 
         if ("hidden_gems".equals(viewCategory)) {
             long totalDocs = mongoTemplate.count(new Query(baseCriteria), Mod.class);
@@ -150,7 +169,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         long total;
         if ("hidden_gems".equals(viewCategory)) {
             List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
-            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation || op instanceof AddFieldsOperation);
+            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation || op instanceof AddFieldsOperation || op instanceof LookupOperation);
             countPipeline.add(Aggregation.count().as("total"));
 
             Aggregation countAgg = Aggregation.newAggregation(Mod.class, countPipeline);
@@ -191,6 +210,13 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
         query.with(pageable);
         List<Mod> list = mongoTemplate.find(query, Mod.class);
+
+        for(Mod m : list) {
+            if (m.getAuthorId() != null && m.getAuthor() == null) {
+                userRepository.findById(m.getAuthorId()).ifPresent(u -> m.setAuthor(u.getUsername()));
+            }
+        }
+
         long count = mongoTemplate.count(Query.of(query).limit(0).skip(0), Mod.class);
 
         return PageableExecutionUtils.getPage(list, pageable, () -> count);
