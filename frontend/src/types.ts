@@ -98,6 +98,7 @@ export interface Mod {
     title: string;
     about?: string;
     description: string;
+    authorId: string;
     author: string;
     imageUrl: string;
     bannerUrl?: string;

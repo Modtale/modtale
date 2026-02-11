@@ -26,27 +26,34 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
             "'versions.fileUrl': 0 " +
             "}";
 
-    @Query(value = "{ 'author': {$regex: '^?0$', $options: 'i'}, 'deletedAt': null }", fields = CARD_FIELDS)
-    Page<Mod> findByAuthorIgnoreCase(String author, Pageable pageable);
+    // Legacy support: finds by username regex. Updated to also check if author matches (legacy data)
+    @Query(value = "{ '$or': [ { 'authorId': ?0 }, { 'author': { $regex: '^?0$', $options: 'i' } } ], 'deletedAt': null }", fields = CARD_FIELDS)
+    Page<Mod> findByAuthorIdOrAuthorIgnoreCase(String authorIdOrName, Pageable pageable);
 
-    @Query(value = "{ 'author': ?0, 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = CARD_FIELDS)
-    Page<Mod> findByAuthor(String author, Pageable pageable);
+    @Query(value = "{ 'authorId': ?0, 'deletedAt': null }", fields = CARD_FIELDS)
+    Page<Mod> findByAuthorId(String authorId, Pageable pageable);
 
-    @Query(value = "{ 'author': ?0, 'status': ?1, 'deletedAt': null }", fields = CARD_FIELDS)
-    Page<Mod> findByAuthorAndStatus(String author, String status, Pageable pageable);
+    @Query(value = "{ 'authorId': ?0, 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = CARD_FIELDS)
+    Page<Mod> findByAuthorIdAndStatus(String authorId, String status, Pageable pageable);
+
+    @Query(value = "{ 'authorId': ?0, 'status': ?1, 'deletedAt': null }", fields = CARD_FIELDS)
+    Page<Mod> findByAuthorIdAndStatusExact(String authorId, String status, Pageable pageable);
+
+    @Query(value = "{ 'authorId': ?0, 'deletedAt': null }")
+    List<Mod> findByAuthorIdList(String authorId);
 
     @Query(value = "{ 'author': ?0, 'deletedAt': null }")
     List<Mod> findByAuthor(String author);
 
-    @Query(value = "{ 'author': ?0, 'deletedAt': null }", fields = "{ 'title': 1, 'rating': 1, 'downloadCount': 1 }")
-    List<Mod> findMetaByAuthor(String author);
+    @Query(value = "{ 'authorId': ?0, 'deletedAt': null }", fields = "{ 'title': 1, 'rating': 1, 'downloadCount': 1 }")
+    List<Mod> findMetaByAuthorId(String authorId);
 
     Optional<Mod> findBySlug(String slug);
 
     boolean existsBySlug(String slug);
 
-    @Query(value = "{ 'author': ?0, 'deletedAt': null }", count = true)
-    long countByAuthor(String author);
+    @Query(value = "{ 'authorId': ?0, 'deletedAt': null }", count = true)
+    long countByAuthorId(String authorId);
 
     boolean existsByTitleIgnoreCase(String title);
 
@@ -65,7 +72,7 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
     @Query(value = "{ 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = CARD_FIELDS)
     List<Mod> findAllPublished();
 
-    @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null }", fields = "{ 'id': 1, 'title': 1, 'slug': 1, 'updatedAt': 1, 'classification': 1, 'author': 1 }")
+    @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null }", fields = "{ 'id': 1, 'title': 1, 'slug': 1, 'updatedAt': 1, 'classification': 1, 'author': 1, 'authorId': 1 }")
     List<Mod> findAllForSitemap();
 
     List<Mod> findByDeletedAtBefore(LocalDateTime date);
