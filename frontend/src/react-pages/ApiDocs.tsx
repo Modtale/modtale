@@ -895,11 +895,10 @@ export const ApiDocs: React.FC = () => {
 
                         <Endpoint
                             method="POST"
-                            path="/api/v1/projects/{id}/reviews"
+                            path="/api/v1/projects/{id}/comments"
                             auth={true}
-                            desc="Post a review."
+                            desc="Post a comment."
                             body={`{
-  "rating": 5,
   "comment": "Amazing mod!",
   "version": "1.0.0"
 }`}
