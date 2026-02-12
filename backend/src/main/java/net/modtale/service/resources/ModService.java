@@ -446,8 +446,8 @@ public class ModService {
         return results;
     }
 
-    public Page<Mod> getCreatorProjects(String username, Pageable pageable) {
-        User u = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+    public Page<Mod> getCreatorProjects(String userId, Pageable pageable) {
+        User u = userRepository.findById(userId).orElse(null);
         if (u == null) return Page.empty();
 
         Page<Mod> results = modRepository.findByAuthorIdAndStatusExact(u.getId(), "PUBLISHED", pageable);
@@ -458,8 +458,8 @@ public class ModService {
         return results;
     }
 
-    public Page<Mod> getPrivilegedCreatorProjects(String username, Pageable pageable) {
-        User u = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+    public Page<Mod> getPrivilegedCreatorProjects(String userId, Pageable pageable) {
+        User u = userRepository.findById(userId).orElse(null);
         if (u == null) return Page.empty();
 
         Page<Mod> results = modRepository.findByAuthorId(u.getId(), pageable);
