@@ -17,7 +17,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user
 
     const [projectUpdates, setProjectUpdates] = useState<PrefLevel>(user.notificationPreferences?.projectUpdates === 'OFF' ? 'OFF' : 'ON');
     const [creatorUploads, setCreatorUploads] = useState<PrefLevel>(user.notificationPreferences?.creatorUploads === 'OFF' ? 'OFF' : 'ON');
-    const [newReviews, setNewReviews] = useState<PrefLevel>(user.notificationPreferences?.newReviews === 'OFF' ? 'OFF' : 'ON');
+    const [newComments, setNewComments] = useState<PrefLevel>(user.notificationPreferences?.newComments === 'OFF' ? 'OFF' : 'ON');
     const [newFollowers, setNewFollowers] = useState<PrefLevel>(user.notificationPreferences?.newFollowers === 'OFF' ? 'OFF' : 'ON');
     const [dependencyUpdates, setDependencyUpdates] = useState<PrefLevel>(user.notificationPreferences?.dependencyUpdates === 'OFF' ? 'OFF' : 'ON');
 
@@ -28,7 +28,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user
         setSaving(true);
         try {
             await api.put('/user/settings/notifications', {
-                projectUpdates, creatorUploads, newReviews, newFollowers, dependencyUpdates
+                projectUpdates, creatorUploads, newComments, newFollowers, dependencyUpdates
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
@@ -76,7 +76,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user
                 <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-xl shadow-sm overflow-hidden">
                     <Toggle label="Favorite Project Updates" desc="Notify me when projects I've favorited release new versions." value={projectUpdates} onChange={setProjectUpdates} />
                     <Toggle label="New Creator Uploads" desc="Notify me when creators I follow upload new projects." value={creatorUploads} onChange={setCreatorUploads} />
-                    <Toggle label="New Reviews" desc="Get notified when someone reviews your project." value={newReviews} onChange={setNewReviews} />
+                    <Toggle label="New Comments" desc="Get notified when someone comments on your project." value={newComments} onChange={setNewComments} />
                     <Toggle label="New Followers" desc="Notify me when someone starts following me." value={newFollowers} onChange={setNewFollowers} />
                     <Toggle label="Dependency Updates" desc="Alert me when a project I depend on releases a new version." value={dependencyUpdates} onChange={setDependencyUpdates} />
                 </div>

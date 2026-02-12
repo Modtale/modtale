@@ -256,12 +256,11 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         updatedAt: new Date().toISOString(),
         downloadCount: modData?.downloadCount || 0,
         favoriteCount: modData?.favoriteCount || 0,
-        rating: modData?.rating || 0,
         sizeBytes: modData?.sizeBytes || 0,
         modIds: modData?.modIds || [],
         childProjectIds: modData?.childProjectIds || [],
         versions: modData?.versions || [],
-        reviews: [],
+        comments: [],
         galleryImages: [],
         pendingInvites: modData?.pendingInvites || []
     };
@@ -615,8 +614,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     </div>
 
                                     <div className="flex items-center justify-between mb-4">
-                                        <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Reviews</h3><p className="text-xs text-slate-500">Enable community reviews?</p></div>
-                                        <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowReviews: !prev.allowReviews} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowReviews ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowReviews ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                                        <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Comments</h3><p className="text-xs text-slate-500">Enable community comments?</p></div>
+                                        <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowComments: !prev.allowComments} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowComments ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowComments ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
                                     <div className="pt-4 border-t border-slate-200 dark:border-white/5">

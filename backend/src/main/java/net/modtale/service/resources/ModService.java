@@ -1820,7 +1820,7 @@ public class ModService {
             evictProjectDetails(mod);
 
             User author = getAuthorUser(mod);
-            if (author != null && !author.getUsername().equals(username) && author.getNotificationPreferences().getNewReviews() != User.NotificationLevel.OFF) {
+            if (author != null && !author.getUsername().equals(username) && author.getNotificationPreferences().getNewComments() != User.NotificationLevel.OFF) {
                 notificationService.sendNotification(
                         List.of(author.getId()),
                         "New Comment",

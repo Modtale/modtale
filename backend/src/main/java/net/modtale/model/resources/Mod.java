@@ -91,11 +91,7 @@ public class Mod {
 
     private List<String> galleryImages = new ArrayList<>();
 
-    // Replaces reviews
     private List<Comment> comments = new ArrayList<>();
-
-    // Legacy field for migration purposes if needed, not exposed via getter/setter usually unless for migration tool
-    // private List<Review> reviews;
 
     private List<ModVersion> versions = new ArrayList<>();
 
