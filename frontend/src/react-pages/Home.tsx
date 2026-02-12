@@ -14,6 +14,7 @@ import { getProjectUrl } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getCategorySEO } from '../data/seo-constants';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
+import { useMobile } from '../context/MobileContext';
 
 interface HomeProps {
     onModClick: (mod: Mod) => void;
@@ -46,6 +47,7 @@ export const Home: React.FC<HomeProps> = ({
                                               initialClassification
                                           }) => {
     const navigate = useNavigate();
+    const { isMobile } = useMobile();
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [selectedClassification, setSelectedClassification] = useState<Classification | 'All'>(initialClassification || 'All');
@@ -65,7 +67,6 @@ export const Home: React.FC<HomeProps> = ({
     const [jumpPage, setJumpPage] = useState('');
     const [activeViewId, setActiveViewId] = useState('all');
     const [showMiniSearch, setShowMiniSearch] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
     const [isTopFilterOpen, setIsTopFilterOpen] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(12);
 
@@ -97,7 +98,6 @@ export const Home: React.FC<HomeProps> = ({
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
-            setIsMobile(width < 768);
             const threshold = width < 768 ? 200 : 260;
             setShowMiniSearch(window.scrollY > threshold);
 
