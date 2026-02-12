@@ -13,7 +13,7 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
 
     String CARD_FIELDS = "{ " +
             "'about': 0, " +
-            "'reviews': 0, " +
+            "'comments': 0, " +
             "'galleryImages': 0, " +
             "'contributors': 0, " +
             "'pendingInvites': 0, " +

@@ -52,7 +52,6 @@ if (isBot) {
                 "aggregateRating": modData.rating > 0 ? {
                     "@type": "AggregateRating",
                     "ratingValue": modData.rating,
-                    "ratingCount": Math.max(1, modData.reviews ? modData.reviews.length : 0)
                 } : undefined
             };
         }

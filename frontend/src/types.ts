@@ -29,7 +29,7 @@ export interface User {
     notificationPreferences?: {
         projectUpdates: 'OFF' | 'ON';
         creatorUploads: 'OFF' | 'ON';
-        newReviews: 'OFF' | 'ON';
+        newComments: 'OFF' | 'ON';
         newFollowers: 'OFF' | 'ON';
         dependencyUpdates: 'OFF' | 'ON';
     };

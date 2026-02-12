@@ -124,7 +124,7 @@ public class User implements Serializable {
 
         private NotificationLevel projectUpdates = NotificationLevel.ON;
         private NotificationLevel creatorUploads = NotificationLevel.ON;
-        private NotificationLevel newReviews = NotificationLevel.ON;
+        private NotificationLevel newComments = NotificationLevel.ON;
         private NotificationLevel newFollowers = NotificationLevel.ON;
         private NotificationLevel dependencyUpdates = NotificationLevel.ON;
 
@@ -132,8 +132,8 @@ public class User implements Serializable {
         public void setProjectUpdates(NotificationLevel projectUpdates) { this.projectUpdates = projectUpdates; }
         public NotificationLevel getCreatorUploads() { return creatorUploads; }
         public void setCreatorUploads(NotificationLevel creatorUploads) { this.creatorUploads = creatorUploads; }
-        public NotificationLevel getNewReviews() { return newReviews; }
-        public void setNewReviews(NotificationLevel newReviews) { this.newReviews = newReviews; }
+        public NotificationLevel getNewComments() { return newComments; }
+        public void setNewComments(NotificationLevel newComments) { this.newComments = newComments; }
         public NotificationLevel getNewFollowers() { return newFollowers; }
         public void setNewFollowers(NotificationLevel newFollowers) { this.newFollowers = newFollowers; }
         public NotificationLevel getDependencyUpdates() { return dependencyUpdates; }

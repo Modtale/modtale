@@ -442,7 +442,7 @@ export const ModDetail: React.FC<{
     const [showMobileDeps, setShowMobileDeps] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
 
-    const reviewsRef = useRef<HTMLDivElement>(null);
+    const commentsRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const depsDropdownRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
@@ -872,7 +872,7 @@ export const ModDetail: React.FC<{
                                     <button onClick={() => {if(mod.galleryImages?.length) setGalleryIndex(0)}} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" /> Gallery</button>
                                 )}
                                 <button onClick={() => setShowAllVersionsModal(true)} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" /> Changelog</button>
-                                <button onClick={() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" /> Comments</button>
+                                <button onClick={() => commentsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" /> Comments</button>
                             </div>
                         </div>
 
@@ -983,7 +983,7 @@ export const ModDetail: React.FC<{
                             onCommentSubmitted={(c) => { setMod(prev => prev ? {...prev, comments: c} : null); if(onRefresh) onRefresh(); }}
                             onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})}
                             onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})}
-                            innerRef={reviewsRef}
+                            innerRef={commentsRef}
                         />
                     </>
                 }
