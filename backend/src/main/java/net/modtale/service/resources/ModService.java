@@ -1075,7 +1075,7 @@ public class ModService {
         if ("MODPACK".equals(depMod.getClassification()) || "SAVE".equals(depMod.getClassification())) throw new IllegalArgumentException("Modpacks and Worlds cannot be added as dependencies.");
     }
 
-    public void updateVersionDependencies(String modId, String versionId, List<String> modIds) {
+    public void updateVersion(String modId, String versionId, List<String> modIds, List<String> gameVersions, String changelog, ModVersion.Channel channel) {
         User user = userService.getCurrentUser();
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
@@ -1084,15 +1084,33 @@ public class ModService {
 
         ModVersion version = mod.getVersions().stream().filter(v -> v.getId().equals(versionId)).findFirst().orElse(null);
         if (version == null) throw new IllegalArgumentException("Version not found");
-        List<ModDependency> newDeps = new ArrayList<>();
-        List<String> simpleModIds = new ArrayList<>();
+
+        if (gameVersions != null) {
+            for (String gv : gameVersions) {
+                if (!ALLOWED_GAME_VERSIONS.contains(gv)) {
+                    throw new IllegalArgumentException("Invalid game version: " + gv);
+                }
+            }
+            version.setGameVersions(gameVersions);
+        }
+
+        if (changelog != null) {
+            version.setChangelog(sanitizer.sanitizePlainText(changelog));
+        }
+
+        if (channel != null) {
+            version.setChannel(channel);
+        }
 
         boolean isModpack = "MODPACK".equals(mod.getClassification());
 
         if (modIds != null) {
+            List<ModDependency> newDeps = new ArrayList<>();
+            List<String> simpleModIds = new ArrayList<>();
+
             for (String entry : modIds) {
                 String[] parts = entry.split(":");
-                if (parts.length < 2) throw new IllegalArgumentException("Invalid format: " + entry);
+                if (parts.length < 2) throw new IllegalArgumentException("Invalid dependency format: " + entry);
                 String depId = parts[0].trim();
                 String depVer = parts[1].trim();
 
@@ -1106,21 +1124,24 @@ public class ModService {
                 newDeps.add(new ModDependency(depMod.getId(), depMod.getTitle(), depVer, isOptional));
                 simpleModIds.add(depId);
             }
+
+            if (isModpack && newDeps.size() < 2) {
+                throw new IllegalArgumentException("Modpacks must have at least two valid dependencies.");
+            }
+
+            if (isModpack && !newDeps.equals(version.getDependencies())) {
+                if (version.getFileUrl() != null && version.getFileUrl().endsWith(".zip")) {
+                    try { storageService.deleteFile(version.getFileUrl()); } catch (Exception ignore) {}
+                    version.setFileUrl(null);
+                }
+            }
+
+            version.setDependencies(newDeps);
+            if (isModpack && mod.getVersions().get(0).getId().equals(versionId)) {
+                mod.setModIds(simpleModIds);
+            }
         }
 
-        if (isModpack && newDeps.size() < 2) {
-            throw new IllegalArgumentException("Modpacks must have at least two valid dependencies.");
-        }
-
-        if (version.getFileUrl() != null && version.getFileUrl().endsWith(".zip")) {
-            try { storageService.deleteFile(version.getFileUrl()); } catch (Exception ignore) {}
-            version.setFileUrl(null);
-        }
-
-        version.setDependencies(newDeps);
-        if (isModpack && mod.getVersions().get(0).getId().equals(versionId)) {
-            mod.setModIds(simpleModIds);
-        }
         mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
         evictProjectDetails(mod);
