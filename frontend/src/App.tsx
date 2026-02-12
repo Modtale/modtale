@@ -39,22 +39,19 @@ import { ToastProvider } from './components/ui/Toast';
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
-
     useEffect(() => {
         window.scrollTo(0, 0);
     }, [pathname]);
-
     return null;
 };
 
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [loadingAuth, setLoadingAuth] = useState(false);
+    const [loadingAuth, setLoadingAuth] = useState(true);
     const [mounted, setMounted] = useState(false);
     const [downloadedSessionIds, setDownloadedSessionIds] = useState<Set<string>>(new Set());
     const [globalError, setGlobalError] = useState<string | null>(null);
     const [showOnboarding, setShowOnboarding] = useState(false);
-
     const [isDarkMode, setIsDarkMode] = useState(true);
 
     const navigate = useNavigate();
@@ -96,35 +93,27 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             setUser(res.data);
-
             if (res.data && (res.data as any).is_new_account) {
                 setShowOnboarding(true);
             }
         } catch (e: any) {
-            if (e.response && e.response.status === 401) {
-                setUser(null);
-            } else {
-                console.error("Failed to refresh user", e);
-            }
+            setUser(null);
+        } finally {
+            setLoadingAuth(false);
         }
     };
 
     useEffect(() => {
         setMounted(true);
-        const init = async () => {
-            setLoadingAuth(true);
-            try {
-                await fetchUser();
-            } catch (e) {
-                setUser(null);
-            } finally {
-                setLoadingAuth(false);
-            }
-        };
-        init();
+        fetchUser();
     }, []);
 
-    const handleLogout = async () => { try { await api.post(`${BACKEND_URL}/logout`); } catch (e) {} setUser(null); navigate('/'); };
+    const handleLogout = async () => {
+        try { await api.post(`${BACKEND_URL}/logout`); } catch (e) {}
+        setUser(null);
+        navigate('/');
+    };
+
     const handleNavigate = (page: string) => { navigate(page === 'home' ? '/' : `/${page}`); };
     const handleAuthorClick = (author: string) => { navigate(`/creator/${author}`); };
     const handleModClick = (mod: Mod) => { navigate(`/mod/${createSlug(mod.title, mod.id)}`); }
@@ -133,10 +122,8 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const handleToggleFavorite = async (id: string) => {
         if (!user) return;
         const isLiked = user.likedModIds?.includes(id);
-
         const newModLikes = isLiked ? (user.likedModIds || []).filter(lid => lid !== id) : [...(user.likedModIds || []), id];
         setUser({ ...user, likedModIds: newModLikes });
-
         try { await api.post(`/projects/${id}/favorite`); } catch (e) { fetchUser(); }
     };
 
@@ -181,9 +168,16 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                     />
                 )}
 
-                <Navbar user={user} onLogout={handleLogout}
-                        currentPage={location.pathname.replace('/', '') || 'home'} onNavigate={handleNavigate}
-                        isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} onAuthorClick={handleAuthorClick} />
+                <Navbar
+                    user={user}
+                    onLogout={handleLogout}
+                    currentPage={location.pathname.replace('/', '') || 'home'}
+                    onNavigate={handleNavigate}
+                    isDarkMode={isDarkMode}
+                    toggleDarkMode={toggleDarkMode}
+                    onAuthorClick={handleAuthorClick}
+                />
+
                 <div className="flex-1">
                     <Routes>
                         <Route path="/" element={renderHome()} />
@@ -194,15 +188,37 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                         <Route path="/art" element={renderHome('ART')} />
                         <Route path="/data" element={renderHome('DATA')} />
 
-                        <Route path="/upload" element={<Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />} />
-                        <Route path="/dashboard/*" element={<Dashboard user={user} onRefreshUser={fetchUser} />} />
-                        <Route path="/analytics/project/:id" element={<Analytics />} />
+                        <Route path="/upload" element={
+                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                user ? <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} /> :
+                                    <Navigate to="/" />
+                        } />
+
+                        <Route path="/dashboard/*" element={
+                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
+                                    <Navigate to="/" />
+                        } />
+
+                        <Route path="/analytics/project/:id" element={
+                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                user ? <Analytics /> :
+                                    <Navigate to="/" />
+                        } />
 
                         <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
-                        <Route path="/mod/:id/edit" element={<EditMod currentUser={user} />} />
+                        <Route path="/mod/:id/edit" element={
+                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                user ? <EditMod currentUser={user} /> :
+                                    <Navigate to="/" />
+                        } />
 
                         <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
-                        <Route path="/modpack/:id/edit" element={<EditMod currentUser={user} />} />
+                        <Route path="/modpack/:id/edit" element={
+                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                user ? <EditMod currentUser={user} /> :
+                                    <Navigate to="/" />
+                        } />
 
                         <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
 
@@ -248,9 +264,11 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                         <Route path="/terms" element={<TermsOfService />} />
                         <Route path="/privacy" element={<PrivacyPolicy />} />
                         <Route path="/api-docs" element={<ApiDocs />} />
-                        <Route path="/settings/developer" element={<Navigate to="/dashboard/developer" replace />} />
-                        <Route path="/analytics" element={<Navigate to="/dashboard/analytics" replace />} />
-                        <Route path="/admin" element={user ? <AdminPanel currentUser={user} /> : <Navigate to="/" />} />
+                        <Route path="/admin" element={
+                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                user ? <AdminPanel currentUser={user} /> :
+                                    <Navigate to="/" />
+                        } />
                         <Route path="*" element={<NotFound />} />
                     </Routes>
                 </div>
