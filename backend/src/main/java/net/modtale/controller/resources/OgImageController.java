@@ -38,7 +38,6 @@ public class OgImageController {
     private static final Color BORDER_COLOR = new Color(255, 255, 255, 25);
 
     private static final String LOGO_SVG = """
-        <?xml version="1.0" encoding="UTF-8" standalone="no"?>
         <svg
                 version="1.1"
                 id="svg1"
