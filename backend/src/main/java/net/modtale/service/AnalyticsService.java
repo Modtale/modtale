@@ -143,9 +143,12 @@ public class AnalyticsService {
 
             int trendScore = 0;
             if (currentWeek > previousWeek) {
-                double growthVelocity = Math.sqrt(currentWeek - previousWeek);
-                double growthMultiplier = (double) currentWeek / Math.max(1, previousWeek);
-                trendScore = (int) (growthVelocity * growthMultiplier * 100);
+                double dampenedRatio = (double) (currentWeek + 25) / (previousWeek + 25);
+                double growthDelta = Math.sqrt(currentWeek - previousWeek);
+                double logTotal = Math.log10(Math.max(10, totalDownloads));
+                double sizeWeight = Math.exp(-Math.pow(logTotal - 3.2, 2) / 1.8);
+
+                trendScore = (int) (dampenedRatio * growthDelta * sizeWeight * 1000);
             }
 
             double popularScore = totalDownloads + (favoriteCount * 10.0);
@@ -288,9 +291,12 @@ public class AnalyticsService {
 
         int trendScore = 0;
         if (currentWeek > previousWeek) {
-            double growthVelocity = Math.sqrt(currentWeek - previousWeek);
-            double growthMultiplier = (double) currentWeek / Math.max(1, previousWeek);
-            trendScore = (int) (growthVelocity * growthMultiplier * 100);
+            double dampenedRatio = (double) (currentWeek + 25) / (previousWeek + 25);
+            double growthDelta = Math.sqrt(currentWeek - previousWeek);
+            double logTotal = Math.log10(Math.max(10, mod.getDownloadCount()));
+            double sizeWeight = Math.exp(-Math.pow(logTotal - 3.2, 2) / 1.8);
+
+            trendScore = (int) (dampenedRatio * growthDelta * sizeWeight * 1000);
         }
 
         double popularScore = mod.getDownloadCount() + (mod.getFavoriteCount() * 10.0);
