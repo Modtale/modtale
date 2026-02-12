@@ -253,7 +253,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         imageUrl: metaData.iconPreview || modData?.imageUrl || '',
         bannerUrl: bannerPreview || modData?.bannerUrl || '',
         classification: (typeof classification === 'string' ? classification : 'PLUGIN') as any,
-        categories: metaData.tags.length > 0 ? metaData.tags : (modData?.categories || ['Misc']),
         updatedAt: new Date().toISOString(),
         downloadCount: modData?.downloadCount || 0,
         favoriteCount: modData?.favoriteCount || 0,

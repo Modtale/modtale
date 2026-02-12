@@ -11,6 +11,7 @@ import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.service.security.ApiKeyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     @Autowired
+    @Lazy
     private ApiKeyService apiKeyService;
 
     private final Map<String, Bucket> bucketCache = new ConcurrentHashMap<>();

@@ -330,6 +330,11 @@ public class ModController {
             }
 
             String effectiveAuthor = author != null && !author.isEmpty() ? author : creator;
+            String authorId = null;
+            if (effectiveAuthor != null) {
+                Optional<User> u = userRepository.findByUsernameIgnoreCase(effectiveAuthor);
+                if (u.isPresent()) authorId = u.get().getId();
+            }
 
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             boolean isApiKeyUser = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"));
@@ -348,7 +353,7 @@ public class ModController {
                     minDownloads,
                     effectiveCategory,
                     dateRange,
-                    effectiveAuthor
+                    authorId
             );
 
             CacheControl cacheControl;
@@ -449,17 +454,17 @@ public class ModController {
             @RequestParam(defaultValue = "10") int size
     ) {
         User currentUser = userService.getCurrentUser();
+        User targetUser = userRepository.findByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
         boolean hasPrivilege = false;
 
         if (currentUser != null) {
-            if (currentUser.getUsername().equalsIgnoreCase(username)) {
+            if (currentUser.getId().equals(targetUser.getId())) {
                 hasPrivilege = true;
-            } else {
-                Optional<User> targetUser = userRepository.findByUsername(username);
-                if (targetUser.isPresent() && targetUser.get().getAccountType() == User.AccountType.ORGANIZATION) {
-                    hasPrivilege = targetUser.get().getOrganizationMembers().stream()
-                            .anyMatch(m -> m.getUserId().equals(currentUser.getId()));
-                }
+            } else if (targetUser.getAccountType() == User.AccountType.ORGANIZATION) {
+                hasPrivilege = targetUser.getOrganizationMembers().stream()
+                        .anyMatch(m -> m.getUserId().equals(currentUser.getId()));
             }
         }
 
@@ -467,9 +472,9 @@ public class ModController {
 
         Page<Mod> pageResult;
         if (hasPrivilege) {
-            pageResult = modService.getPrivilegedCreatorProjects(username, pageable);
+            pageResult = modService.getPrivilegedCreatorProjects(targetUser.getId(), pageable);
         } else {
-            pageResult = modService.getCreatorProjects(username, pageable);
+            pageResult = modService.getCreatorProjects(targetUser.getId(), pageable);
         }
 
         if (currentUser != null) {
@@ -490,7 +495,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-        Page<Mod> pageResult = modService.getContributedProjects(user.getUsername(), PageRequest.of(page, size, Sort.by("updatedAt").descending()));
+        Page<Mod> pageResult = modService.getContributedProjects(user.getId(), PageRequest.of(page, size, Sort.by("updatedAt").descending()));
 
         pageResult.getContent().forEach(m -> {
             m.setCanEdit(modService.hasEditPermission(m, user));
@@ -504,7 +509,7 @@ public class ModController {
     public ResponseEntity<?> toggleFavorite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        modService.toggleFavorite(id, user.getUsername());
+        modService.toggleFavorite(id, user.getId());
         return ResponseEntity.ok().build();
     }
 
@@ -516,7 +521,7 @@ public class ModController {
         int rating = (int) body.get("rating");
         String version = (String) body.get("version");
         try {
-            modService.addReview(id, user.getUsername(), comment, rating, version);
+            modService.addReview(id, user.getId(), comment, rating, version);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -532,7 +537,7 @@ public class ModController {
         String comment = (String) body.get("comment");
         int rating = (int) body.get("rating");
         try {
-            modService.editReview(id, reviewId, user.getUsername(), comment, rating);
+            modService.editReview(id, reviewId, user.getId(), comment, rating);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -547,7 +552,7 @@ public class ModController {
         if (user == null) return ResponseEntity.status(401).build();
         String reply = (String) body.get("reply");
         try {
-            modService.replyToReview(id, reviewId, reply, user.getUsername());
+            modService.replyToReview(id, reviewId, reply, user.getId());
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -618,7 +623,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            modService.deleteMod(id, user.getUsername());
+            modService.deleteMod(id, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -630,7 +635,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            modService.submitMod(id, user.getUsername());
+            modService.submitMod(id, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -644,7 +649,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            modService.revertModToDraft(id, user.getUsername());
+            modService.revertModToDraft(id, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -658,7 +663,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            modService.archiveMod(id, user.getUsername());
+            modService.archiveMod(id, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -672,7 +677,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            modService.unlistMod(id, user.getUsername());
+            modService.unlistMod(id, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -686,7 +691,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            modService.publishMod(id, user.getUsername());
+            modService.publishMod(id, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -728,7 +733,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            modService.deleteVersion(id, versionId, user.getUsername());
+            modService.deleteVersion(id, versionId, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -751,31 +756,53 @@ public class ModController {
     public ResponseEntity<?> removeGalleryImage(@PathVariable String id, @RequestParam("imageUrl") String imageUrl) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        modService.removeGalleryImage(id, imageUrl, user.getUsername());
+        modService.removeGalleryImage(id, imageUrl, user.getId());
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/invite")
     public ResponseEntity<?> inviteContributor(@PathVariable String id, @RequestParam String username) {
-        try { modService.inviteContributor(id, username); return ResponseEntity.ok().build(); }
+        User targetUser = userRepository.findByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        try {
+            modService.inviteContributor(id, targetUser.getId());
+            return ResponseEntity.ok().build();
+        }
         catch (SecurityException e) { return ResponseEntity.status(403).body(e.getMessage()); }
         catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
     }
 
     @PostMapping("/projects/{id}/invite/accept")
     public ResponseEntity<?> acceptInvite(@PathVariable String id) {
-        try { modService.acceptInvite(id); return ResponseEntity.ok().build(); }
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        try {
+            modService.acceptInvite(id, user.getId());
+            return ResponseEntity.ok().build();
+        }
         catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
     }
 
     @PostMapping("/projects/{id}/invite/decline")
     public ResponseEntity<?> declineInvite(@PathVariable String id) {
-        modService.declineInvite(id); return ResponseEntity.ok().build();
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        modService.declineInvite(id, user.getId());
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/projects/{id}/contributors/{username}")
     public ResponseEntity<?> removeContributor(@PathVariable String id, @PathVariable String username) {
-        try { modService.removeContributor(id, username); return ResponseEntity.ok().build(); }
+        User targetUser = userRepository.findByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        try {
+            modService.removeContributor(id, targetUser.getId());
+            return ResponseEntity.ok().build();
+        }
         catch (Exception e) { return ResponseEntity.status(403).body(e.getMessage()); }
     }
 
@@ -785,8 +812,11 @@ public class ModController {
         if (user == null) return ResponseEntity.status(401).build();
         String targetUsername = body.get("username");
 
+        User targetUser = userRepository.findByUsernameIgnoreCase(targetUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Target user not found"));
+
         try {
-            modService.requestTransfer(id, targetUsername, user);
+            modService.requestTransfer(id, targetUser.getId(), user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) { return ResponseEntity.status(403).body(e.getMessage()); }
         catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }

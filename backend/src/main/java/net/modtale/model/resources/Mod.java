@@ -22,8 +22,7 @@ import java.time.LocalDateTime;
         @CompoundIndex(name = "status_expires_idx", def = "{'status': 1, 'expiresAt': 1}"),
         @CompoundIndex(name = "trend_score_idx", def = "{'trendScore': -1}"),
         @CompoundIndex(name = "relevance_score_idx", def = "{'relevanceScore': -1}"),
-        @CompoundIndex(name = "popular_score_idx", def = "{'popularScore': -1}"),
-        @CompoundIndex(name = "author_id_idx", def = "{'authorId': 1}")
+        @CompoundIndex(name = "popular_score_idx", def = "{'popularScore': -1}")
 })
 public class Mod {
     @Id
@@ -63,7 +62,6 @@ public class Mod {
     private double relevanceScore;
     private double popularScore;
 
-    private String category;
     private String repositoryUrl;
     private String updatedAt;
     private String createdAt;
@@ -149,9 +147,6 @@ public class Mod {
     public void setRelevanceScore(double relevanceScore) { this.relevanceScore = relevanceScore; }
     public double getPopularScore() { return popularScore; }
     public void setPopularScore(double popularScore) { this.popularScore = popularScore; }
-
-    public String getCategory() { return category; }
-    public void setCategory(String category) { this.category = category; }
 
     public String getRepositoryUrl() { return repositoryUrl; }
     public void setRepositoryUrl(String repositoryUrl) { this.repositoryUrl = repositoryUrl; }

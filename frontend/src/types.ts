@@ -105,8 +105,6 @@ export interface Mod {
     license?: string;
     links?: Record<string, string>;
     classification: 'PLUGIN' | 'DATA' | 'ART' | 'SAVE' | 'MODPACK';
-    categories: string[];
-    category?: string;
     tags?: string[];
     downloadCount: number;
     favoriteCount: number;

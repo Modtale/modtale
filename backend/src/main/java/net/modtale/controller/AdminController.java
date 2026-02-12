@@ -59,8 +59,8 @@ public class AdminController {
         }
     }
 
-    private void logAction(String admin, String action, String targetId, String targetType, String details) {
-        adminLogRepository.save(new AdminLog(admin, action, targetId, targetType, details));
+    private void logAction(String adminId, String action, String targetId, String targetType, String details) {
+        adminLogRepository.save(new AdminLog(adminId, action, targetId, targetType, details));
     }
 
     @GetMapping("/users/bans")
@@ -81,8 +81,8 @@ public class AdminController {
         String email = body.get("email");
         String reason = body.get("reason");
         try {
-            userService.banEmail(email, reason, currentUser.getUsername());
-            logAction(currentUser.getUsername(), "BAN_EMAIL", email, "EMAIL", "Reason: " + reason);
+            userService.banEmail(email, reason, currentUser.getId());
+            logAction(currentUser.getId(), "BAN_EMAIL", email, "EMAIL", "Reason: " + reason);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -96,7 +96,7 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         userService.unbanEmail(email);
-        logAction(currentUser.getUsername(), "UNBAN_EMAIL", email, "EMAIL", null);
+        logAction(currentUser.getId(), "UNBAN_EMAIL", email, "EMAIL", null);
         return ResponseEntity.ok().build();
     }
 
@@ -111,7 +111,7 @@ public class AdminController {
 
         try {
             userService.deleteUser(target.getId());
-            logAction(currentUser.getUsername(), "DELETE_USER", target.getId(), "USER", "Username: " + username);
+            logAction(currentUser.getId(), "DELETE_USER", target.getId(), "USER", "Username: " + username);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -135,7 +135,7 @@ public class AdminController {
             }
 
             userService.setUserTier(username, tierEnum);
-            logAction(currentUser.getUsername(), "UPDATE_TIER", username, "USER", "New Tier: " + tierEnum);
+            logAction(currentUser.getId(), "UPDATE_TIER", username, "USER", "New Tier: " + tierEnum);
             return ResponseEntity.ok(Map.of(
                     "status", "success",
                     "message", "User " + username + " updated to tier " + tierEnum
@@ -160,7 +160,7 @@ public class AdminController {
             target.getRoles().add(role);
         }
         userRepository.save(target);
-        logAction(currentUser.getUsername(), "ADD_ROLE", target.getId(), "USER", "Role: " + role);
+        logAction(currentUser.getId(), "ADD_ROLE", target.getId(), "USER", "Role: " + role);
         return ResponseEntity.ok().build();
     }
 
@@ -178,7 +178,7 @@ public class AdminController {
             target.getRoles().remove(role);
             userRepository.save(target);
         }
-        logAction(currentUser.getUsername(), "REMOVE_ROLE", target.getId(), "USER", "Role: " + role);
+        logAction(currentUser.getId(), "REMOVE_ROLE", target.getId(), "USER", "Role: " + role);
         return ResponseEntity.ok().build();
     }
 
@@ -202,11 +202,15 @@ public class AdminController {
         if (mod == null) return ResponseEntity.notFound().build();
 
         User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
+        if (author == null) {
+            author = userRepository.findById(mod.getAuthor()).orElse(null);
+        }
+
         Map<String, Object> authorStats = Map.of(
                 "accountAge", author != null ? author.getCreatedAt() : "Unknown",
                 "tier", author != null ? author.getTier() : "Unknown",
                 "avatarUrl", author != null ? (author.getAvatarUrl() != null ? author.getAvatarUrl() : "") : "",
-                "totalProjects", author != null ? modService.getCreatorProjects(author.getUsername(), Pageable.unpaged()).getTotalElements() : 0
+                "totalProjects", author != null ? modService.getCreatorProjects(author.getId(), Pageable.unpaged()).getTotalElements() : 0
         );
 
         return ResponseEntity.ok(Map.of(
@@ -220,8 +224,8 @@ public class AdminController {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
-            modService.publishMod(id, currentUser.getUsername());
-            logAction(currentUser.getUsername(), "PUBLISH_PROJECT", id, "PROJECT", null);
+            modService.publishMod(id, currentUser.getId());
+            logAction(currentUser.getId(), "PUBLISH_PROJECT", id, "PROJECT", null);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -234,7 +238,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.approveVersion(id, versionId);
-            logAction(currentUser.getUsername(), "APPROVE_VERSION", id, "VERSION", "VerID: " + versionId);
+            logAction(currentUser.getId(), "APPROVE_VERSION", id, "VERSION", "VerID: " + versionId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -247,7 +251,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.rejectVersion(id, versionId, body.get("reason"));
-            logAction(currentUser.getUsername(), "REJECT_VERSION", id, "VERSION", "VerID: " + versionId + ", Reason: " + body.get("reason"));
+            logAction(currentUser.getId(), "REJECT_VERSION", id, "VERSION", "VerID: " + versionId + ", Reason: " + body.get("reason"));
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -262,7 +266,7 @@ public class AdminController {
         }
         try {
             modService.rejectMod(id, body.get("reason"));
-            logAction(currentUser.getUsername(), "REJECT_PROJECT", id, "PROJECT", "Reason: " + body.get("reason"));
+            logAction(currentUser.getId(), "REJECT_PROJECT", id, "PROJECT", "Reason: " + body.get("reason"));
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -275,7 +279,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminDeleteProject(id);
-            logAction(currentUser.getUsername(), "DELETE_PROJECT", id, "PROJECT", null);
+            logAction(currentUser.getId(), "DELETE_PROJECT", id, "PROJECT", null);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -290,7 +294,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminRestoreProject(id);
-            logAction(currentUser.getUsername(), "RESTORE_PROJECT", id, "PROJECT", null);
+            logAction(currentUser.getId(), "RESTORE_PROJECT", id, "PROJECT", null);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -303,7 +307,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminUnlistProject(id);
-            logAction(currentUser.getUsername(), "UNLIST_PROJECT", id, "PROJECT", null);
+            logAction(currentUser.getId(), "UNLIST_PROJECT", id, "PROJECT", null);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -318,7 +322,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.adminDeleteVersion(id, versionId);
-            logAction(currentUser.getUsername(), "DELETE_VERSION", id, "VERSION", "VerID: " + versionId);
+            logAction(currentUser.getId(), "DELETE_VERSION", id, "VERSION", "VerID: " + versionId);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -446,7 +450,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             modService.triggerRescan(id, versionId);
-            logAction(currentUser.getUsername(), "RESCAN_VERSION", id, "VERSION", "VerID: " + versionId);
+            logAction(currentUser.getId(), "RESCAN_VERSION", id, "VERSION", "VerID: " + versionId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());

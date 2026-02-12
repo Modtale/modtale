@@ -10,7 +10,6 @@ export interface MetadataFormData {
     slug?: string;
     summary: string;
     description: string;
-    category: string;
     tags: string[];
     links: Record<string, string>;
     repositoryUrl: string;
