@@ -115,7 +115,11 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
             setLoadingAuth(true);
             try {
                 await fetchUser();
-            } catch (e) { setUser(null); } finally { setLoadingAuth(false); }
+            } catch (e) {
+                setUser(null);
+            } finally {
+                setLoadingAuth(false);
+            }
         };
         init();
     }, []);
@@ -137,12 +141,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     };
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
-
-    if (mounted && loadingAuth) return (
-        <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark flex items-center justify-center">
-            <Spinner fullScreen={false} label="Authenticating..." />
-        </div>
-    );
 
     const renderHome = (classification?: Classification) => (
         <Home
