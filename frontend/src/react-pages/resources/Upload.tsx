@@ -39,7 +39,7 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     const [activeTab, setActiveTab] = useState<'details' | 'files' | 'gallery' | 'settings'>('details');
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
-        title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, license: '', slug: ''
+        title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, license: '', slug: ''
     });
     const [bannerFile, setBannerFile] = useState<File | null>(null);
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
@@ -115,7 +115,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 title: res.data.title,
                 summary: res.data.description,
                 description: '',
-                category: 'Technology',
                 tags: [],
                 links: {},
                 repositoryUrl: '',
@@ -139,7 +138,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 title: metaData.title,
                 description: metaData.summary,
                 about: metaData.description,
-                category: metaData.category,
                 tags: metaData.tags,
                 links: metaData.links,
                 repositoryUrl: metaData.repositoryUrl,

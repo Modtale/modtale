@@ -59,7 +59,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
 
     const desc = mod.description ? mod.description : 'No description provided.';
     const classification = mod.classification || 'PLUGIN';
-    const displayCategory = (mod.categories && mod.categories.length > 0) ? mod.categories[0] : (mod.category || 'Misc');
 
     const rating = mod.rating || 0;
     const downloads = (mod.downloadCount || 0).toLocaleString();
@@ -160,16 +159,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
 
             <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/5">
                 <div className="flex items-center gap-3">
-                    {sizeMB ? (
-                        <span className="flex items-center text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-white/10 px-2 py-1 rounded">
-                            <HardDrive className="w-3 h-3 mr-1" /> {sizeMB}
-                        </span>
-                    ) : (
-                        <span className="bg-slate-200 dark:bg-white/10 px-2 py-1 rounded text-slate-700 dark:text-slate-300">
-                            {displayCategory}
-                        </span>
-                    )}
-
                     {rating > 0 && (
                         <span className="flex items-center text-slate-700 dark:text-slate-200" title={`Rated ${rating.toFixed(1)}/5`}>
                             <Star className="w-3 h-3 mr-1 text-amber-500 fill-current" />

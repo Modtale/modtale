@@ -37,7 +37,7 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
     const [formData, setFormData] = useState<MetadataFormData>({
-        title: '', summary: '', description: '', category: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
+        title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
     });
     const [versionData, setVersionData] = useState<VersionFormData>({
         versionNumber: '1.0.0', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
@@ -87,7 +87,6 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                     slug: data.slug || '',
                     summary: data.description,
                     description: data.about || '',
-                    category: data.category || '',
                     tags: data.tags || [],
                     links: data.links || {},
                     repositoryUrl: data.repositoryUrl || '',
@@ -122,7 +121,6 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 slug: formData.slug,
                 description: formData.summary,
                 about: formData.description,
-                category: formData.category,
                 tags: formData.tags,
                 links: formData.links,
                 repositoryUrl: formData.repositoryUrl,

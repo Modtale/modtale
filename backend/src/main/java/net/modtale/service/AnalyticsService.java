@@ -7,9 +7,11 @@ import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.analytics.PlatformMonthlyStats;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ProjectMeta;
+import net.modtale.model.user.User;
 import net.modtale.repository.analytics.PlatformMonthlyStatsRepository;
 import net.modtale.repository.analytics.ProjectMonthlyStatsRepository;
 import net.modtale.repository.resources.ModRepository;
+import net.modtale.repository.user.UserRepository;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +35,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class AnalyticsService {
@@ -44,6 +45,7 @@ public class AnalyticsService {
     @Autowired private ProjectMonthlyStatsRepository statsRepository;
     @Autowired private PlatformMonthlyStatsRepository platformStatsRepository;
     @Autowired private ModRepository modRepository;
+    @Autowired private UserRepository userRepository;
     @Autowired private MongoTemplate mongoTemplate;
 
     private final ConcurrentLinkedQueue<DownloadEvent> downloadBuffer = new ConcurrentLinkedQueue<>();
@@ -56,12 +58,10 @@ public class AnalyticsService {
 
     @Scheduled(cron = "0 30 0 * * ?")
     public void updateProjectScores() {
-        logger.info("Starting optimized activity-based score calculation...");
         LocalDate today = LocalDate.now();
 
         Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
-        Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         int currYear = today.getYear();
@@ -95,11 +95,6 @@ public class AnalyticsService {
                         )).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
-                                Criteria.where("logDate").gte(week2Start),
-                                Criteria.where("logDate").lt(week1Start)
-                        )).then("$daysArray.v.d").otherwise(0)).as("prevWeek")
-                .sum(ConditionalOperators.when(
-                        new Criteria().andOperator(
                                 Criteria.where("logDate").gte(monthStart),
                                 Criteria.where("logDate").lt(todayStart)
                         )).then("$daysArray.v.d").otherwise(0)).as("recent")
@@ -113,7 +108,7 @@ public class AnalyticsService {
 
         pipeline.add(Aggregation.unwind("projectData", false));
 
-        pipeline.add(Aggregation.project("currentWeek", "prevWeek", "recent")
+        pipeline.add(Aggregation.project("currentWeek", "recent")
                 .and("projectData.rating").as("rating")
                 .and("projectData.downloadCount").as("totalDownloads")
                 .and("projectData.favoriteCount").as("favoriteCount"));
@@ -132,7 +127,6 @@ public class AnalyticsService {
             activeProjectIds.add(projectId);
 
             int currentWeek = doc.getInteger("currentWeek", 0);
-            int prevWeek = doc.getInteger("prevWeek", 0);
             int recent = doc.getInteger("recent", 0);
 
             Double ratingObj = doc.getDouble("rating");
@@ -144,7 +138,9 @@ public class AnalyticsService {
             Integer favObj = doc.getInteger("favoriteCount");
             int favoriteCount = favObj != null ? favObj : 0;
 
-            int trendScore = currentWeek - prevWeek;
+            double trendDenominator = Math.pow(Math.max(1, totalDownloads), 0.4);
+            double normalizedTrend = currentWeek / trendDenominator;
+            int trendScore = (int) (normalizedTrend * 100);
 
             double ratingWeight;
             if (rating >= 4.5) ratingWeight = 1.0;
@@ -202,8 +198,6 @@ public class AnalyticsService {
         if (counter > 0) {
             bulkOps.execute();
         }
-
-        logger.info("Scores updated. Active: {}, Decayed checked: {}", activeProjectIds.size(), currentlyScored.size());
     }
 
     public void ensureScores(List<Mod> mods) {
@@ -220,7 +214,6 @@ public class AnalyticsService {
 
         Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
-        Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         int currYear = today.getYear();
@@ -251,11 +244,6 @@ public class AnalyticsService {
                                 Criteria.where("logDate").gte(week1Start),
                                 Criteria.where("logDate").lt(todayStart)
                         )).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
-                .sum(ConditionalOperators.when(
-                        new Criteria().andOperator(
-                                Criteria.where("logDate").gte(week2Start),
-                                Criteria.where("logDate").lt(week1Start)
-                        )).then("$daysArray.v.d").otherwise(0)).as("prevWeek")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(monthStart),
@@ -290,10 +278,11 @@ public class AnalyticsService {
 
     private boolean calculateAndQueueUpdate(Mod mod, Document stats, BulkOperations bulkOps) {
         int currentWeek = stats != null ? stats.getInteger("currentWeek", 0) : 0;
-        int prevWeek = stats != null ? stats.getInteger("prevWeek", 0) : 0;
         int recent = stats != null ? stats.getInteger("recent", 0) : 0;
 
-        int trendScore = currentWeek - prevWeek;
+        double trendDenominator = Math.pow(Math.max(1, mod.getDownloadCount()), 0.4);
+        double normalizedTrend = currentWeek / trendDenominator;
+        int trendScore = (int) (normalizedTrend * 100);
 
         double ratingWeight;
         if (mod.getRating() >= 4.5) ratingWeight = 1.0;
@@ -548,7 +537,7 @@ public class AnalyticsService {
         return summary;
     }
 
-    public CreatorAnalytics getCreatorDashboard(String username, String range, List<String> include) {
+    public CreatorAnalytics getCreatorDashboard(String userId, String range, List<String> include) {
         LocalDate end = LocalDate.now();
         LocalDate start = calculateStartDate(range);
 
@@ -558,14 +547,14 @@ public class AnalyticsService {
         StatsAccumulator currentPeriod = new StatsAccumulator();
         StatsAccumulator prevPeriod = new StatsAccumulator();
 
-        List<ProjectMonthlyStats> allStats = getStatsInMemory(username, comparisonStart, end, false, true);
+        List<ProjectMonthlyStats> allStats = getStatsInMemory(userId, comparisonStart, end, false, true);
 
         for (ProjectMonthlyStats stat : allStats) {
             accumulate(stat, start, end, currentPeriod);
             accumulate(stat, comparisonStart, comparisonEnd, prevPeriod);
         }
 
-        StatsSummary allTime = getAllTimeTotals(username, false);
+        StatsSummary allTime = getAllTimeTotals(userId, false);
 
         CreatorAnalytics analytics = new CreatorAnalytics();
         analytics.setTotalDownloads(allTime.downloads);
@@ -575,7 +564,8 @@ public class AnalyticsService {
         analytics.setPeriodViews(currentPeriod.totalViews);
         analytics.setPreviousPeriodViews(prevPeriod.totalViews);
 
-        List<Mod> projects = modRepository.findMetaByAuthor(username);
+        List<Mod> projects = modRepository.findMetaByAuthorId(userId);
+
         Map<String, ProjectMeta> metaMap = new HashMap<>();
         Map<String, List<AnalyticsDataPoint>> projectDownloads = new HashMap<>();
         Map<String, List<AnalyticsDataPoint>> projectViews = new HashMap<>();
@@ -600,7 +590,7 @@ public class AnalyticsService {
         return analytics;
     }
 
-    public ProjectAnalyticsDetail getProjectAnalytics(String projectId, String username, String range) {
+    public ProjectAnalyticsDetail getProjectAnalytics(String projectId, String userId, String range) {
         LocalDate end = LocalDate.now();
         LocalDate start = calculateStartDate(range);
         LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
