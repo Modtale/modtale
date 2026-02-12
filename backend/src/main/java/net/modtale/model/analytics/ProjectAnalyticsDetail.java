@@ -14,7 +14,6 @@ public class ProjectAnalyticsDetail {
 
     private List<AnalyticsDataPoint> views;
     private Map<String, List<AnalyticsDataPoint>> versionDownloads;
-    private List<AnalyticsDataPoint> ratingHistory;
 
     public ProjectAnalyticsDetail() {}
 
@@ -41,7 +40,4 @@ public class ProjectAnalyticsDetail {
 
     public Map<String, List<AnalyticsDataPoint>> getVersionDownloads() { return versionDownloads; }
     public void setVersionDownloads(Map<String, List<AnalyticsDataPoint>> versionDownloads) { this.versionDownloads = versionDownloads; }
-
-    public List<AnalyticsDataPoint> getRatingHistory() { return ratingHistory; }
-    public void setRatingHistory(List<AnalyticsDataPoint> ratingHistory) { this.ratingHistory = ratingHistory; }
 }

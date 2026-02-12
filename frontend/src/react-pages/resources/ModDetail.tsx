@@ -7,12 +7,12 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Helmet } from 'react-helmet-async';
-import type { Mod, User, ProjectVersion, Review, ModDependency } from '../../types';
+import type { Mod, User, ProjectVersion, Comment, ModDependency } from '../../types';
 import {
-    MessageSquare, Send, Star, StarHalf, Copy, X, Check,
+    MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, MessageCircle, Crown
+    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, Crown, Trash
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -35,7 +35,6 @@ const DiscordIcon = ({ className }: { className?: string }) => (
 
 const getLicenseInfo = (license: string) => {
     const l = license.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
     if (l.includes('MIT')) return { name: 'MIT', url: 'https://opensource.org/licenses/MIT' };
     if (l.includes('APACHE')) return { name: 'Apache 2.0', url: 'https://opensource.org/licenses/Apache-2.0' };
     if (l.includes('LGPL')) return { name: 'LGPL v3', url: 'https://www.gnu.org/licenses/lgpl-3.0.en.html' };
@@ -51,7 +50,6 @@ const getLicenseInfo = (license: string) => {
     if (l.includes('CCBY')) return { name: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' };
     if (l.includes('UNLICENSE')) return { name: 'The Unlicense', url: 'https://unlicense.org/' };
     if (l.includes('ARR') || l.includes('ALLRIGHTS')) return { name: 'All Rights Reserved', url: null };
-
     return { name: license, url: null };
 };
 
@@ -72,27 +70,13 @@ const toTitleCase = (str: string) => {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
-const StarRating = ({ rating, size = "w-4 h-4" }: { rating: number, size?: string }) => {
-    return (
-        <div className="flex gap-0.5 text-yellow-500">
-            {[1, 2, 3, 4, 5].map((i) => {
-                if (rating >= i) return <Star key={i} className={`${size} fill-current`} />;
-                if (rating >= i - 0.5) return <StarHalf key={i} className={`${size} fill-current`} />;
-                return <Star key={i} className={`${size} text-slate-300 dark:text-slate-700`} />;
-            })}
-        </div>
-    );
-};
-
 const ProjectSidebar: React.FC<{
     mod: Mod;
-    avgRating: string;
-    totalReviews: number;
     dependencies?: ModDependency[];
     depMeta: Record<string, { icon: string, title: string }>;
     sourceUrl?: string;
     navigate: (path: string) => void;
-}> = ({ mod, avgRating, totalReviews, dependencies, depMeta, navigate }) => {
+}> = ({ mod, dependencies, depMeta, navigate }) => {
     const [copiedId, setCopiedId] = useState(false);
 
     const licenseInfo = useMemo(() => {
@@ -125,9 +109,10 @@ const ProjectSidebar: React.FC<{
         <div className="flex flex-col gap-8">
             <div className="grid grid-cols-2 gap-2 py-2">
                 <div className="flex flex-col items-center justify-start">
-                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{avgRating}</div>
-                    <div className="flex items-center justify-center mt-1 h-5 w-full">
-                        <StarRating rating={Number(avgRating)} size="w-4 h-4" />
+                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.favoriteCount.toLocaleString()}</div>
+                    <div className="flex items-center justify-center mt-1 h-5 w-full gap-1.5 text-slate-400">
+                        <Heart className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest pt-0.5">Favorites</span>
                     </div>
                 </div>
 
@@ -224,171 +209,147 @@ const ProjectSidebar: React.FC<{
     );
 };
 
-interface ReviewSectionProps {
+interface CommentSectionProps {
     modId: string;
-    reviews: Review[];
-    rating: number;
+    comments: Comment[];
     currentUser: User | null;
     isCreator: boolean;
-    onReviewSubmitted: (newReviews: Review[]) => void;
+    onCommentSubmitted: (newComments: Comment[]) => void;
     onError: (msg: string) => void;
     onSuccess: (msg: string) => void;
     innerRef?: React.RefObject<HTMLDivElement | null>;
-    reviewsDisabled?: boolean;
+    commentsDisabled?: boolean;
 }
 
-const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: overallRating, currentUser, isCreator, onReviewSubmitted, onError, onSuccess, innerRef, reviewsDisabled }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, currentUser, isCreator, onCommentSubmitted, onError, onSuccess, innerRef, commentsDisabled }) => {
     const [text, setText] = useState('');
-    const [rating, setRating] = useState(5);
     const [submitting, setSubmitting] = useState(false);
 
-    const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
-    const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null);
+    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+    const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
 
-    const userReview = useMemo(() => {
-        if (!currentUser || !reviews) return null;
-        return reviews.find(r => r.user.toLowerCase() === currentUser.username.toLowerCase());
-    }, [currentUser, reviews]);
-
-    const startEditing = () => {
-        if (userReview) {
-            setText(userReview.comment);
-            setRating(userReview.rating);
-            setEditingReviewId(userReview.id);
-        }
+    const startEditing = (comment: Comment) => {
+        setText(comment.content);
+        setEditingCommentId(comment.id);
+        if(innerRef?.current) innerRef.current.scrollIntoView({behavior:'smooth'});
     };
 
     const cancelEdit = () => {
-        setEditingReviewId(null);
+        setEditingCommentId(null);
         setText('');
-        setRating(5);
     };
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            if (editingReviewId) {
-                await api.put(`/projects/${modId}/reviews/${editingReviewId}`, { comment: text, rating: rating });
-                onSuccess('Review updated!');
+            if (editingCommentId) {
+                await api.put(`/projects/${modId}/comments/${editingCommentId}`, { content: text });
+                onSuccess('Comment updated!');
             } else {
-                await api.post(`/projects/${modId}/reviews`, { comment: text, rating: rating, version: 'latest' });
-                onSuccess('Review posted!');
+                await api.post(`/projects/${modId}/comments`, { content: text });
+                onSuccess('Comment posted!');
             }
             const res = await api.get(`/projects/${modId}`);
-            onReviewSubmitted(res.data.reviews || []);
-            setEditingReviewId(null);
+            onCommentSubmitted(res.data.comments || []);
+            setEditingCommentId(null);
             setText('');
-        } catch (err: any) { onError(err.response?.data || 'Failed to post review.'); } finally { setSubmitting(false); }
+        } catch (err: any) { onError(err.response?.data || 'Failed to post comment.'); } finally { setSubmitting(false); }
     };
 
-    const startReplying = (review: Review) => {
-        setReplyingReviewId(review.id);
-        setReplyText(review.developerReply || '');
+    const deleteComment = async (commentId: string) => {
+        if(!window.confirm("Are you sure you want to delete this comment?")) return;
+        setSubmitting(true);
+        try {
+            await api.delete(`/projects/${modId}/comments/${commentId}`);
+            const res = await api.get(`/projects/${modId}`);
+            onCommentSubmitted(res.data.comments || []);
+            onSuccess('Comment deleted.');
+        } catch (err: any) { onError(err.response?.data || 'Failed to delete.'); } finally { setSubmitting(false); }
     };
 
     const submitReply = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!replyingReviewId) return;
+        if (!replyingCommentId) return;
         setSubmitting(true);
         try {
-            await api.post(`/projects/${modId}/reviews/${replyingReviewId}/reply`, { reply: replyText });
+            await api.post(`/projects/${modId}/comments/${replyingCommentId}/reply`, { reply: replyText });
             const res = await api.get(`/projects/${modId}`);
-            onReviewSubmitted(res.data.reviews || []);
-            setReplyingReviewId(null);
+            onCommentSubmitted(res.data.comments || []);
+            setReplyingCommentId(null);
             setReplyText('');
             onSuccess('Reply posted!');
         } catch (err: any) { onError(err.response?.data || 'Failed to post reply.'); } finally { setSubmitting(false); }
     };
 
-    if (reviewsDisabled && !isCreator) return null;
+    if (commentsDisabled && !isCreator) return null;
 
     return (
         <div ref={innerRef} className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-                <MessageSquare className="w-6 h-6 text-modtale-accent" /> Community Reviews
+                <MessageSquare className="w-6 h-6 text-modtale-accent" /> Comments <span className="text-sm font-medium text-slate-400">({comments.length})</span>
             </h2>
 
-            {reviewsDisabled && (
+            {commentsDisabled && (
                 <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 text-orange-500 rounded-xl flex items-center gap-2 text-sm font-bold">
-                    <Flag className="w-4 h-4"/> Reviews are currently disabled for this project. Only you can see them.
+                    <Flag className="w-4 h-4"/> Comments are currently disabled. Only you can see them.
                 </div>
             )}
-
-            <div className="flex items-center gap-6 mb-10 bg-slate-50 dark:bg-slate-950/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
-                <div className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{overallRating.toFixed(1)}</div>
-                <div className="flex flex-col justify-center">
-                    <StarRating rating={overallRating} size="w-6 h-6" />
-                    <span className="text-sm font-bold text-slate-500 mt-2">{reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}</span>
-                </div>
-            </div>
 
             {currentUser ? (
-                (!userReview || editingReviewId) && (
-                    <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
-                        <div className="flex justify-between mb-4">
-                            <h3 className="font-bold text-slate-900 dark:text-white">{editingReviewId ? 'Edit your review' : 'Write a review'}</h3>
-                            {editingReviewId && <button type="button" onClick={cancelEdit} className="text-xs text-slate-500 hover:text-red-500 font-bold">Cancel</button>}
-                        </div>
-                        <div className="flex gap-2 mb-4">
-                            {[1, 2, 3, 4, 5].map(star => (
-                                <button key={star} type="button" onClick={() => setRating(star)} className="hover:scale-110 transition-transform focus:outline-none">
-                                    <Star className={`w-8 h-8 ${star <= rating ? 'fill-yellow-500 text-yellow-500' : 'text-slate-300 dark:text-slate-700'}`} />
-                                </button>
-                            ))}
-                        </div>
-                        <textarea value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[120px]" placeholder="Share your experience..." required />
-                        <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50">
-                            <Send className="w-4 h-4" /> {editingReviewId ? 'Update Review' : 'Post Review'}
-                        </button>
-                    </form>
-                )
-            ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/5">Log in to review.</div>}
-
-            {userReview && !editingReviewId && (
-                <div className="mb-8 p-6 bg-modtale-accent/5 border border-modtale-accent/20 rounded-2xl">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <span className="font-bold text-modtale-accent">Your Review</span>
-                            <StarRating rating={userReview.rating} size="w-3 h-3" />
-                        </div>
-                        <button onClick={startEditing} className="text-xs font-bold bg-white dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-white/10 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 transition-colors flex items-center gap-1">
-                            <Edit className="w-3 h-3"/> Edit
-                        </button>
+                <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
+                    <div className="flex justify-between mb-4">
+                        <h3 className="font-bold text-slate-900 dark:text-white">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
+                        {editingCommentId && <button type="button" onClick={cancelEdit} className="text-xs text-slate-500 hover:text-red-500 font-bold">Cancel</button>}
                     </div>
-                    <p className="text-slate-700 dark:text-slate-300">{userReview.comment}</p>
-                </div>
-            )}
+                    <textarea value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[100px]" placeholder="Ask a question or share your thoughts..." required />
+                    <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50">
+                        <Send className="w-4 h-4" /> {editingCommentId ? 'Update Comment' : 'Post Comment'}
+                    </button>
+                </form>
+            ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/5">Log in to post a comment.</div>}
 
             <div className="space-y-4">
-                {reviews?.length > 0 ? reviews.filter(r => r.id !== userReview?.id || editingReviewId).map((review) => (
-                    <div key={review.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5">
+                {comments?.length > 0 ? comments.map((comment) => (
+                    <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0">
-                                    {review.userAvatarUrl ? (
-                                        <img src={review.userAvatarUrl} alt={review.user} className="w-full h-full object-cover" />
+                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-500 flex items-center justify-center font-black overflow-hidden shrink-0">
+                                    {comment.userAvatarUrl ? (
+                                        <img src={comment.userAvatarUrl} alt={comment.user} className="w-full h-full object-cover" />
                                     ) : (
-                                        review.user.charAt(0)
+                                        comment.user.charAt(0)
                                     )}
                                 </div>
-                                <div><span className="font-bold text-slate-900 dark:text-white block">{review.user}</span><StarRating rating={review.rating} size="w-3 h-3" /></div>
+                                <div><span className="font-bold text-slate-900 dark:text-white block">{comment.user}</span></div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
                                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                    {new Date(review.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                 </div>
-                                {isCreator && (
-                                    <button onClick={() => startReplying(review)} className="text-xs text-modtale-accent font-bold hover:underline">
-                                        {review.developerReply ? 'Edit Reply' : 'Reply'}
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {(currentUser && currentUser.username === comment.user) && (
+                                        <button onClick={() => startEditing(comment)} className="text-xs text-slate-500 hover:text-modtale-accent font-bold flex items-center gap-1">
+                                            <Edit className="w-3 h-3"/> Edit
+                                        </button>
+                                    )}
+                                    {(isCreator || (currentUser && currentUser.username === comment.user)) && (
+                                        <button onClick={() => deleteComment(comment.id)} className="text-xs text-slate-500 hover:text-red-500 font-bold flex items-center gap-1">
+                                            <Trash className="w-3 h-3"/> Delete
+                                        </button>
+                                    )}
+                                    {isCreator && (
+                                        <button onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs text-modtale-accent font-bold hover:underline">
+                                            {comment.developerReply ? 'Edit Reply' : 'Reply'}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{review.comment}</p>
+                        <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{comment.content}</p>
 
-                        {replyingReviewId === review.id ? (
+                        {replyingCommentId === comment.id ? (
                             <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
                                 <textarea
                                     value={replyText}
@@ -398,34 +359,41 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ modId, reviews, rating: o
                                     rows={3}
                                 />
                                 <div className="flex justify-end gap-2">
-                                    <button type="button" onClick={() => setReplyingReviewId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white">Cancel</button>
+                                    <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white">Cancel</button>
                                     <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1">
                                         <CornerDownRight className="w-3 h-3"/> Post Reply
                                     </button>
                                 </div>
                             </form>
-                        ) : review.developerReply && (
+                        ) : comment.developerReply && (
                             <div className="mt-6 ml-14 relative">
                                 <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-modtale-accent to-transparent rounded-full opacity-50"></div>
                                 <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/5">
                                     <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="px-2 py-0.5 rounded-md bg-modtale-accent text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                                                <Crown className="w-3 h-3" /> Developer Response
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-6 h-6 rounded-full bg-modtale-accent text-white flex items-center justify-center text-xs font-bold overflow-hidden">
+                                                {comment.developerReply.userAvatarUrl ? (
+                                                    <img src={comment.developerReply.userAvatarUrl} alt="" className="w-full h-full object-cover"/>
+                                                ) : (
+                                                    <Crown className="w-3 h-3" />
+                                                )}
                                             </div>
-                                            {review.developerReplyDate && (
-                                                <span className="text-xs text-slate-400 font-medium">
-                                                    {new Date(review.developerReplyDate).toLocaleDateString()}
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                                                    {comment.developerReply.user} <Crown className="w-3 h-3 text-modtale-accent" />
                                                 </span>
-                                            )}
+                                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                                                    Developer Response • {new Date(comment.developerReply.date).toLocaleDateString()}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{review.developerReply}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{comment.developerReply.content}</p>
                                 </div>
                             </div>
                         )}
                     </div>
-                )) : <div className="text-center py-12 text-slate-500 italic">No reviews yet.</div>}
+                )) : <div className="text-center py-12 text-slate-500 italic">No comments yet.</div>}
             </div>
         </div>
     );
@@ -904,7 +872,7 @@ export const ModDetail: React.FC<{
                                     <button onClick={() => {if(mod.galleryImages?.length) setGalleryIndex(0)}} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" /> Gallery</button>
                                 )}
                                 <button onClick={() => setShowAllVersionsModal(true)} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" /> Changelog</button>
-                                <button onClick={() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" /> Reviews</button>
+                                <button onClick={() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" /> Comments</button>
                             </div>
                         </div>
 
@@ -959,8 +927,6 @@ export const ModDetail: React.FC<{
                 sidebarContent={
                     <ProjectSidebar
                         mod={mod}
-                        avgRating={mod.rating?.toFixed(1) || "0.0"}
-                        totalReviews={mod.reviews?.length || 0}
                         navigate={navigate}
                         dependencies={latestDependencies}
                         depMeta={depMeta}
@@ -972,14 +938,13 @@ export const ModDetail: React.FC<{
                         <div className="prose dark:prose-invert prose-lg max-w-none">
                             {memoizedDescription}
                         </div>
-                        <ReviewSection
+                        <CommentSection
                             modId={mod.id}
-                            rating={mod.rating || 0}
-                            reviews={mod.reviews || []}
+                            comments={mod.comments || []}
                             currentUser={currentUser}
                             isCreator={Boolean(canEdit)}
-                            reviewsDisabled={mod.allowReviews === false}
-                            onReviewSubmitted={(r) => { setMod(prev => prev ? {...prev, reviews: r} : null); if(onRefresh) onRefresh(); }}
+                            commentsDisabled={mod.allowComments === false}
+                            onCommentSubmitted={(c) => { setMod(prev => prev ? {...prev, comments: c} : null); if(onRefresh) onRefresh(); }}
                             onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})}
                             onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})}
                             innerRef={reviewsRef}
