@@ -27,7 +27,7 @@ interface HomeProps {
     initialClassification?: Classification;
 }
 
-type SortOption = 'relevance' | 'downloads' | 'rating' | 'newest' | 'updated' | 'trending' | 'gems' | 'popular';
+type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'updated' | 'trending' | 'gems' | 'popular';
 
 const getRouteForClassification = (cls: Classification | 'All') => {
     switch(cls) {
@@ -51,8 +51,10 @@ export const Home: React.FC<HomeProps> = ({
     const [selectedClassification, setSelectedClassification] = useState<Classification | 'All'>(initialClassification || 'All');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedVersion, setSelectedVersion] = useState<string>('Any');
-    const [minRating, setMinRating] = useState<number>(0);
+
+    const [minFavorites, setMinFavorites] = useState<number>(0);
     const [minDownloads, setMinDownloads] = useState<number>(0);
+
     const [filterDate, setFilterDate] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<SortOption>('relevance');
     const [page, setPage] = useState(0);
@@ -122,7 +124,13 @@ export const Home: React.FC<HomeProps> = ({
 
     useEffect(() => {
         setPage(0);
-    }, [selectedClassification, selectedTags, debouncedSearch, selectedVersion, minRating, minDownloads, filterDate, activeViewId, sortBy]);
+        if (cardsSectionRef.current) {
+            const offset = cardsSectionRef.current.offsetTop - 120;
+            if (window.scrollY > offset) {
+                window.scrollTo({ top: offset, behavior: 'smooth' });
+            }
+        }
+    }, [selectedClassification, selectedTags, debouncedSearch, selectedVersion, minFavorites, minDownloads, filterDate, activeViewId, sortBy]);
 
     const fetchData = useCallback(async (targetPage: number) => {
         if (abortControllerRef.current) {
@@ -149,7 +157,7 @@ export const Home: React.FC<HomeProps> = ({
                     search: debouncedSearch,
                     sort: sortBy,
                     gameVersion: selectedVersion !== 'Any' ? selectedVersion : undefined,
-                    minRating: minRating > 0 ? minRating : undefined,
+                    minRating: undefined, // Removed rating param
                     minDownloads: minDownloads > 0 ? minDownloads : undefined,
                     dateRange: filterDate || 'all',
                     category: categoryParam,
@@ -172,7 +180,7 @@ export const Home: React.FC<HomeProps> = ({
                 setLoading(false);
             }
         }
-    }, [selectedClassification, selectedTags, debouncedSearch, sortBy, selectedVersion, minRating, minDownloads, filterDate, activeViewId, itemsPerPage]);
+    }, [selectedClassification, selectedTags, debouncedSearch, sortBy, selectedVersion, minDownloads, filterDate, activeViewId, itemsPerPage]);
 
     useEffect(() => {
         fetchData(page);
@@ -189,7 +197,7 @@ export const Home: React.FC<HomeProps> = ({
 
     const handleViewChange = (viewId: string) => {
         setActiveViewId(viewId);
-        if (viewId === 'hidden_gems') setSortBy('rating');
+        if (viewId === 'hidden_gems') setSortBy('favorites'); // Changed from rating to favorites for gems
         else if (viewId === 'popular') setSortBy('popular');
         else if (viewId === 'trending') setSortBy('trending');
         else if (viewId === 'new') setSortBy('newest');
@@ -225,7 +233,13 @@ export const Home: React.FC<HomeProps> = ({
         }
     };
 
-    const handlePageChange = (p: number) => { if (p >= 0 && p < totalPages) { setPage(p); window.scrollTo({ top: cardsSectionRef.current?.offsetTop ? cardsSectionRef.current.offsetTop - 120 : 0, behavior: 'smooth' }); } };
+    const handlePageChange = (p: number) => {
+        if (p >= 0 && p < totalPages) {
+            setPage(p);
+            window.scrollTo({ top: cardsSectionRef.current?.offsetTop ? cardsSectionRef.current.offsetTop - 120 : 0, behavior: 'smooth' });
+        }
+    };
+
     const handleJump = (e: React.FormEvent) => { e.preventDefault(); const p = parseInt(jumpPage); if (!isNaN(p) && p >= 1 && p <= totalPages) { handlePageChange(p - 1); setJumpPage(''); } };
 
     const handleToggleLocal = (id: string, isModpack: boolean) => {
@@ -248,8 +262,8 @@ export const Home: React.FC<HomeProps> = ({
 
     const getPageNumbers = () => { const total = totalPages; const current = page + 1; const delta = 2; const range = []; const rangeWithDots: (number | string)[] = []; let l; range.push(1); for (let i = current - delta; i <= current + delta; i++) { if (i < total && i > 1) { range.push(i); } } range.push(total); const uniqueRange = [...new Set(range)].sort((a, b) => a - b); for (const i of uniqueRange) { if (l) { if (i - l === 2) { rangeWithDots.push(l + 1); } else if (i - l !== 1) { rangeWithDots.push('...'); } } rangeWithDots.push(i); l = i; } return rangeWithDots; };
 
-    const resetFilters = () => { setSelectedVersion('Any'); setMinRating(0); setMinDownloads(0); setFilterDate(null); setIsTopFilterOpen(false); setSelectedTags([]); setPage(0); }
-    const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minRating > 0 ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (filterDate ? 1 : 0);
+    const resetFilters = () => { setSelectedVersion('Any'); setMinFavorites(0); setMinDownloads(0); setFilterDate(null); setIsTopFilterOpen(false); setSelectedTags([]); setPage(0); }
+    const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minFavorites > 0 ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (filterDate ? 1 : 0);
     const seoContent = getCategorySEO(selectedClassification);
 
     return (
@@ -313,8 +327,8 @@ export const Home: React.FC<HomeProps> = ({
                                 onSearchChange={setSearchTerm}
                                 selectedVersion={selectedVersion}
                                 setSelectedVersion={setSelectedVersion}
-                                minRating={minRating}
-                                setMinRating={setMinRating}
+                                minFavorites={minFavorites}
+                                setMinFavorites={setMinFavorites}
                                 minDownloads={minDownloads}
                                 setMinDownloads={setMinDownloads}
                                 filterDate={filterDate}
