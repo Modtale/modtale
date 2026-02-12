@@ -75,8 +75,10 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         }
 
         if (tags != null && !tags.isEmpty()) criteriaList.add(Criteria.where("tags").all(tags));
-        if (classification != null && !classification.isEmpty() && !"All".equals(classification)) criteriaList.add(Criteria.where("classification").is(classification));
-        if (gameVersion != null && !gameVersion.isEmpty()) criteriaList.add(Criteria.where("versions.gameVersions").is(gameVersion));
+        if (classification != null && !classification.isEmpty() && !"All".equals(classification))
+            criteriaList.add(Criteria.where("classification").is(classification));
+        if (gameVersion != null && !gameVersion.isEmpty())
+            criteriaList.add(Criteria.where("versions.gameVersions").is(gameVersion));
         if (minRating != null) criteriaList.add(Criteria.where("rating").gte(minRating));
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (dateCutoff != null) criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
@@ -105,24 +107,29 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         if ("hidden_gems".equals(viewCategory)) {
             long totalDocs = mongoTemplate.count(new Query(baseCriteria), Mod.class);
             int p5Index = Math.max(0, (int) (totalDocs * 0.05));
-            int p90Index = Math.max(0, (int) (totalDocs * 0.90));
+            int p20Index = Math.max(0, (int) (totalDocs * 0.20));
 
             Query p5Query = new Query(baseCriteria).with(Sort.by(Sort.Direction.ASC, "downloadCount")).skip(p5Index).limit(1);
             Mod p5Mod = mongoTemplate.findOne(p5Query, Mod.class);
             int minDl = p5Mod != null ? p5Mod.getDownloadCount() : 0;
 
-            Query p90Query = new Query(baseCriteria).with(Sort.by(Sort.Direction.ASC, "downloadCount")).skip(p90Index).limit(1);
-            Mod p90Mod = mongoTemplate.findOne(p90Query, Mod.class);
-            int maxDl = p90Mod != null ? p90Mod.getDownloadCount() : Integer.MAX_VALUE;
+            Query p20Query = new Query(baseCriteria).with(Sort.by(Sort.Direction.ASC, "downloadCount")).skip(p20Index).limit(1);
+            Mod p20Mod = mongoTemplate.findOne(p20Query, Mod.class);
+            int maxDl = p20Mod != null ? p20Mod.getDownloadCount() : Integer.MAX_VALUE;
 
             if (maxDl <= minDl) maxDl = minDl + 500;
 
             pipeline.add(Aggregation.match(new Criteria().andOperator(
                     Criteria.where("downloadCount").gt(minDl),
-                    Criteria.where("downloadCount").lt(maxDl),
-                    Criteria.where("rating").gte(4.5),
-                    Criteria.where("reviews.2").exists(true)
+                    Criteria.where("downloadCount").lt(maxDl)
             )));
+
+            pipeline.add(Aggregation.addFields()
+                    .addField("gemRatio")
+                    .withValue(ArithmeticOperators.Divide.valueOf("favoriteCount")
+                            .divideBy(ConditionalOperators.when(Criteria.where("downloadCount").gt(0))
+                                    .then("$downloadCount").otherwise(1)))
+                    .build());
         }
 
         if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
@@ -131,14 +138,12 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
         } else if ("relevance".equals(sortBy)) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
+        } else if ("hidden_gems".equals(viewCategory)) {
+            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "gemRatio"));
         } else if (pageable.getSort().isSorted()) {
             pipeline.add(Aggregation.sort(pageable.getSort()));
         } else {
-            if ("hidden_gems".equals(viewCategory)) {
-                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "rating"));
-            } else {
-                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "updatedAt"));
-            }
+            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "updatedAt"));
         }
 
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
@@ -152,7 +157,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.project()
                 .andExclude(
                         "about",
-                        "reviews",
+                        "comments",
                         "galleryImages",
                         "contributors",
                         "pendingInvites",
@@ -200,7 +205,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                 .slice("versions", 1)
                 .exclude(
                         "about",
-                        "reviews",
+                        "comments",
                         "galleryImages",
                         "contributors",
                         "pendingInvites",
@@ -211,7 +216,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         query.with(pageable);
         List<Mod> list = mongoTemplate.find(query, Mod.class);
 
-        for(Mod m : list) {
+        for (Mod m : list) {
             if (m.getAuthorId() != null && m.getAuthor() == null) {
                 userRepository.findById(m.getAuthorId()).ifPresent(u -> m.setAuthor(u.getUsername()));
             }
