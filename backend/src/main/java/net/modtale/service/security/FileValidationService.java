@@ -1,5 +1,7 @@
 package net.modtale.service.security;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,6 +33,9 @@ public class FileValidationService {
 
     private static final long MAX_UNCOMPRESSED_SIZE = 2L * 1024 * 1024 * 1024;
     private static final int MAX_FILE_COUNT = 10000;
+    private static final String PLUGIN_MANIFEST_PATH = "src/main/resources/manifest.json";
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void validateProjectFile(MultipartFile file, String classification) {
         if (file == null || file.isEmpty()) {
@@ -41,11 +46,7 @@ public class FileValidationService {
 
         if ("PLUGIN".equals(classification)) {
             if (!name.endsWith(".jar")) throw new IllegalArgumentException("Server Plugins must be .jar files.");
-            validateMagicNumber(file, ZIP_HEADER);
-            return;
-        }
-
-        if (!name.endsWith(".zip")) {
+        } else if (!name.endsWith(".zip")) {
             throw new IllegalArgumentException(classification + " projects must be uploaded as .zip archives.");
         }
 
@@ -73,6 +74,7 @@ public class FileValidationService {
     private void validateZipContents(MultipartFile file, String classification) throws IOException {
         long totalSize = 0;
         int fileCount = 0;
+        boolean manifestFound = false;
 
         try (ZipInputStream zis = new ZipInputStream(file.getInputStream())) {
             ZipEntry entry;
@@ -96,10 +98,16 @@ public class FileValidationService {
                     throw new IllegalArgumentException("Archive uncompressed size exceeds limit (Zip Bomb protection).");
                 }
 
-                String entryName = entry.getName().toLowerCase();
+                String entryName = entry.getName();
+                String entryNameLower = entryName.toLowerCase();
 
-                if (entryName.contains("..") || entryName.contains(":/") || entryName.startsWith("/")) {
+                if (entryNameLower.contains("..") || entryNameLower.contains(":/") || entryNameLower.startsWith("/")) {
                     throw new IllegalArgumentException("Archive contains malicious path traversal: " + entryName);
+                }
+
+                if ("PLUGIN".equals(classification) && entryName.equals(PLUGIN_MANIFEST_PATH)) {
+                    validatePluginManifest(zis);
+                    manifestFound = true;
                 }
 
                 switch (classification) {
@@ -107,19 +115,44 @@ public class FileValidationService {
                     case "ART":
                     case "SAVE":
                         for (String ext : STRICT_BLOCKLIST) {
-                            if (entryName.endsWith(ext)) {
+                            if (entryNameLower.endsWith(ext)) {
                                 throw new IllegalArgumentException("Security Violation: " + classification + " projects cannot contain " + ext + " files (" + entryName + ")");
                             }
                         }
                         for (String ext : ARCHIVE_EXTENSIONS) {
-                            if (entryName.endsWith(ext)) {
+                            if (entryNameLower.endsWith(ext)) {
                                 throw new IllegalArgumentException("Security Violation: Nested archives (" + ext + ") are not allowed in " + classification);
                             }
                         }
                         break;
                     case "MODPACK":
+                        break;
                 }
             }
+        }
+
+        if ("PLUGIN".equals(classification) && !manifestFound) {
+            throw new IllegalArgumentException("Invalid Plugin: Missing src/main/resources/manifest.json");
+        }
+    }
+
+    private void validatePluginManifest(InputStream is) {
+        try {
+            JsonNode root = objectMapper.readTree(is);
+
+            String[] requiredFields = {"Group", "Name", "Version", "Main"};
+            for (String field : requiredFields) {
+                if (!root.has(field) || root.get(field).asText().isEmpty()) {
+                    throw new IllegalArgumentException("Plugin manifest.json is missing required field: " + field);
+                }
+            }
+
+            if (!root.has("Authors") || !root.get("Authors").isArray() || root.get("Authors").isEmpty()) {
+                throw new IllegalArgumentException("Plugin manifest.json must contain at least one Author.");
+            }
+
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to parse manifest.json. Ensure it is valid JSON.");
         }
     }
 
