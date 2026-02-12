@@ -10,7 +10,7 @@ export const ROUTE_SEO: Record<string, { title: string, description: string, h1?
     '/plugins': {
         title: "Hytale Plugins & Server Scripts | Modtale",
         h1: "Hytale Plugins",
-        description: "Browse and download thousands of Hytale server plugins. Enhance your server with new mechanics, administration tools, and minigames.",
+        description: "Browse and download thousands of Hytale plugins. Enhance your server with new mechanics, administration tools, and minigames.",
         keywords: "hytale plugins, server scripts, hytale server mods, admin tools, hytale minigames, server management, economy plugins, anti-cheat, permission systems"
     },
     '/modpacks': {
