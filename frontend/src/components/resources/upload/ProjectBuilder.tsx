@@ -11,7 +11,7 @@ import {
     GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
     UserPlus, Scale, Check, Copy, Link2, Edit2, X, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
-    AlertCircle, Clock, Archive, Globe, EyeOff, Image, MessageSquare, ExternalLink
+    AlertCircle, Clock, Archive, Globe, EyeOff, Image as ImageIcon, MessageSquare, ExternalLink, Sparkles
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -37,7 +37,7 @@ interface ProjectBuilderProps {
     bannerPreview: string | null;
     setBannerPreview: (url: string | null) => void;
     setBannerFile: (file: File | null) => void;
-    handleSave: (silent?: boolean) => void;
+    handleSave: (silent?: boolean) => Promise<boolean>;
     handlePublish?: () => void;
     handleDelete?: () => void;
     handleDeleteVersion?: (versionId: string) => void;
@@ -69,6 +69,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [inviteUsername, setInviteUsername] = useState('');
     const [isInviting, setIsInviting] = useState(false);
     const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+    const [showSlugPrompt, setShowSlugPrompt] = useState(false);
     const [showCardPreview, setShowCardPreview] = useState(false);
 
     const [repos, setRepos] = useState<any[]>([]);
@@ -139,7 +140,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         if (!manualRepo && !readOnly) {
             fetchRepos();
         }
-    }, [classification, provider, manualRepo, readOnly]);
+    }, [classification, provider, manualRepo, readOnly, fetchRepos]);
 
     useEffect(() => {
         if (metaData.license && !LICENSES.some(l => l.id === metaData.license)) {
@@ -207,14 +208,18 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const validateSlugFormat = (val: string) => {
+        if (!val) return null;
+        const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;
+        if (!slugRegex.test(val)) return "Must be 3-50 chars, lowercase alphanumeric, no start/end dash.";
+        return null;
+    };
+
     const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         markDirty();
         const val = e.target.value;
         setMetaData({...metaData, slug: val});
-        if (!val) { setSlugError(null); return; }
-        const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;
-        if (!slugRegex.test(val)) setSlugError("Must be 3-50 chars, lowercase alphanumeric, no start/end dash.");
-        else setSlugError(null);
+        setSlugError(validateSlugFormat(val));
     };
 
     const getUrlPrefix = () => {
@@ -303,6 +308,27 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         ...(modData?.pendingInvites?.map(c => ({ username: c, status: 'pending' })) || [])
     ];
 
+    const handleSubmitClick = () => {
+        if (!metaData.slug && !modData?.slug) {
+            setShowSlugPrompt(true);
+        } else {
+            setShowPublishConfirm(true);
+        }
+    };
+
+    const handleConfirmSlug = async (useCurrent: boolean) => {
+        setShowSlugPrompt(false);
+        if (!useCurrent && metaData.slug) {
+            const success = await handleSave(true);
+            if (success) {
+                setIsDirty(false);
+                setShowPublishConfirm(true);
+            }
+        } else {
+            setShowPublishConfirm(true);
+        }
+    };
+
     return (
         <>
             {modData?.status === 'PENDING' && (
@@ -345,7 +371,71 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 </div>
             )}
 
-            {showPublishConfirm && handlePublish && <StatusModal type="info" title="Submit?" message="Submit for verification?" onClose={() => setShowPublishConfirm(false)} actionLabel="Submit" onAction={() => { setShowPublishConfirm(false); handlePublish(); }} secondaryLabel="Cancel" />}
+            {showSlugPrompt && (
+                <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
+                        <div className="p-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="bg-modtale-accent/10 p-3 rounded-2xl">
+                                    <Sparkles className="w-6 h-6 text-modtale-accent" />
+                                </div>
+                                <button onClick={() => setShowSlugPrompt(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Claim your custom URL</h2>
+                            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium leading-relaxed mb-8">
+                                Custom slugs make your project easier to share.
+                            </p>
+
+                            <div className="space-y-4">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Project URL Slug</label>
+                                    <div className="flex items-center w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                        <div className="px-4 py-3 bg-slate-100 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-400 text-xs font-mono whitespace-nowrap select-none">{getUrlPrefix()}</div>
+                                        <input
+                                            value={metaData.slug || ''}
+                                            onChange={handleSlugChange}
+                                            className={`flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`}
+                                            placeholder={createSlug(metaData.title, modData?.id || 'id')}
+                                        />
+                                    </div>
+                                    {slugError && <p className="text-[10px] text-red-500 font-bold px-1">{slugError}</p>}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-center gap-3 mt-10">
+                                <button
+                                    onClick={() => handleConfirmSlug(false)}
+                                    disabled={!!slugError || !metaData.slug}
+                                    className="w-full sm:flex-1 h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-base shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <Save className="w-5 h-5" /> Save & Continue
+                                </button>
+                                <button
+                                    onClick={() => handleConfirmSlug(true)}
+                                    className="w-full sm:w-auto px-8 h-14 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-2xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+                                >
+                                    Use Default
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showPublishConfirm && handlePublish && (
+                <StatusModal
+                    type="info"
+                    title="Ready to publish?"
+                    message="Your project will be submitted for verification. Once approved, it will be live on Modtale."
+                    onClose={() => setShowPublishConfirm(false)}
+                    actionLabel="Submit Now"
+                    onAction={() => { setShowPublishConfirm(false); handlePublish(); }}
+                    secondaryLabel="Cancel"
+                />
+            )}
 
             {showCardPreview && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -420,7 +510,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                     <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${req.met ? 'bg-green-500 text-white' : 'bg-slate-200 dark:bg-white/10 text-slate-400'}`}>
                                                         {req.met ? <Check className="w-2.5 h-2.5" strokeWidth={3} /> : <X className="w-2.5 h-2.5" strokeWidth={3} />}
                                                     </div>
-                                                    <span className={`text-xs font-bold ${req.met ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>{req.label}</span>
+                                                    <span className={`text-xs font-bold ${req.met ? 'text-slate-900 dark:text-white' : 'text-slate-50'}`}>{req.label}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -428,9 +518,9 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     </div>
 
                                     <button
-                                        onClick={() => setShowPublishConfirm(true)}
+                                        onClick={handleSubmitClick}
                                         disabled={isLoading || !isPublishable}
-                                        className="h-10 bg-green-500 hover:bg-green-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none text-white px-6 rounded-xl font-black flex items-center gap-2 shadow-lg transition-all"
+                                        className="h-10 bg-green-500 hover:bg-green-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:shadow-none text-white px-6 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg transition-all"
                                     >
                                         <UploadCloud className="w-5 h-5" /> Submit
                                     </button>
@@ -441,7 +531,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 }
                 tabs={
                     <div className="flex items-center gap-1">
-                        {[{id: 'details', icon: LayoutTemplate, label: 'Details'}, {id: 'files', icon: UploadCloud, label: `Files (${modData?.versions?.length||0})`}, {id: 'gallery', icon: Image, label: `Gallery (${modData?.galleryImages?.length||0})`}, {id: 'settings', icon: Settings, label: 'Settings'}].map(t => (
+                        {[{id: 'details', icon: FileText, label: 'Details'}, {id: 'files', icon: UploadCloud, label: `Files (${modData?.versions?.length||0})`}, {id: 'gallery', icon: ImageIcon, label: `Gallery (${modData?.galleryImages?.length||0})`}, {id: 'settings', icon: Settings, label: 'Settings'}].map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                                 <t.icon className="w-4 h-4"/> {t.label}
                             </button>
