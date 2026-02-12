@@ -3,8 +3,6 @@ package net.modtale.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import net.modtale.model.analytics.*;
-import net.modtale.model.analytics.PlatformAnalyticsSummary;
-import net.modtale.model.analytics.PlatformMonthlyStats;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ProjectMeta;
 import net.modtale.model.user.User;
@@ -64,6 +62,13 @@ public class AnalyticsService {
         Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED")), Mod.class);
+        double medianDownloads = calculatePercentileDownloads(totalPublished, 0.50);
+        double noiseFloor = calculatePercentileDownloads(totalPublished, 0.01);
+
+        double logMedian = Math.log10(Math.max(10, medianDownloads));
+        double dampeningK = Math.max(5, noiseFloor);
 
         int currYear = today.getYear();
         int currMonth = today.getMonthValue();
@@ -143,18 +148,19 @@ public class AnalyticsService {
 
             int trendScore = 0;
             if (currentWeek > previousWeek) {
-                double dampenedRatio = (double) (currentWeek + 25) / (previousWeek + 25);
+                double dynamicGrowthRatio = (double) (currentWeek + dampeningK) / (previousWeek + dampeningK);
                 double growthDelta = Math.sqrt(currentWeek - previousWeek);
                 double logTotal = Math.log10(Math.max(10, totalDownloads));
-                double sizeWeight = Math.exp(-Math.pow(logTotal - 3.2, 2) / 1.8);
 
-                trendScore = (int) (dampenedRatio * growthDelta * sizeWeight * 1000);
+                double sizeWeight = Math.exp(-Math.pow(logTotal - logMedian, 2) / 2.2);
+
+                trendScore = (int) (dynamicGrowthRatio * growthDelta * sizeWeight * 1000);
             }
 
             double popularScore = totalDownloads + (favoriteCount * 10.0);
 
             double engagementRatio = (double) favoriteCount / Math.max(1, totalDownloads);
-            if (totalDownloads < 100) engagementRatio = 0;
+            if (totalDownloads < dampeningK * 2) engagementRatio = 0;
             double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
             Update update = new Update()
@@ -202,6 +208,19 @@ public class AnalyticsService {
         }
     }
 
+    private double calculatePercentileDownloads(long totalCount, double percentile) {
+        if (totalCount == 0) return 10.0;
+
+        long skipCount = (long) (totalCount * percentile);
+        Query query = new Query(Criteria.where("status").is("PUBLISHED"))
+                .with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "downloadCount"))
+                .skip(skipCount)
+                .limit(1);
+
+        Mod mod = mongoTemplate.findOne(query, Mod.class);
+        return mod != null ? mod.getDownloadCount() : 10.0;
+    }
+
     public void ensureScores(List<Mod> mods) {
         if (mods == null || mods.isEmpty()) return;
 
@@ -210,6 +229,10 @@ public class AnalyticsService {
                 .collect(Collectors.toList());
 
         if (missingScores.isEmpty()) return;
+
+        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED")), Mod.class);
+        double logMedian = Math.log10(Math.max(10, calculatePercentileDownloads(totalPublished, 0.50)));
+        double dampeningK = Math.max(5, calculatePercentileDownloads(totalPublished, 0.01));
 
         List<String> modIds = missingScores.stream().map(Mod::getId).collect(Collectors.toList());
         LocalDate today = LocalDate.now();
@@ -271,7 +294,7 @@ public class AnalyticsService {
 
         for (Mod mod : missingScores) {
             Document stats = statsMap.get(mod.getId());
-            boolean queued = calculateAndQueueUpdate(mod, stats, bulkOps);
+            boolean queued = calculateAndQueueUpdate(mod, stats, bulkOps, logMedian, dampeningK);
             if (queued) needsExecution = true;
         }
 
@@ -284,25 +307,25 @@ public class AnalyticsService {
         }
     }
 
-    private boolean calculateAndQueueUpdate(Mod mod, Document stats, BulkOperations bulkOps) {
+    private boolean calculateAndQueueUpdate(Mod mod, Document stats, BulkOperations bulkOps, double logMedian, double dampeningK) {
         int currentWeek = stats != null ? stats.getInteger("currentWeek", 0) : 0;
         int previousWeek = stats != null ? stats.getInteger("previousWeek", 0) : 0;
         int recent = stats != null ? stats.getInteger("recent", 0) : 0;
 
         int trendScore = 0;
         if (currentWeek > previousWeek) {
-            double dampenedRatio = (double) (currentWeek + 25) / (previousWeek + 25);
+            double dynamicGrowthRatio = (double) (currentWeek + dampeningK) / (previousWeek + dampeningK);
             double growthDelta = Math.sqrt(currentWeek - previousWeek);
             double logTotal = Math.log10(Math.max(10, mod.getDownloadCount()));
-            double sizeWeight = Math.exp(-Math.pow(logTotal - 3.2, 2) / 1.8);
+            double sizeWeight = Math.exp(-Math.pow(logTotal - logMedian, 2) / 2.2);
 
-            trendScore = (int) (dampenedRatio * growthDelta * sizeWeight * 1000);
+            trendScore = (int) (dynamicGrowthRatio * growthDelta * sizeWeight * 1000);
         }
 
         double popularScore = mod.getDownloadCount() + (mod.getFavoriteCount() * 10.0);
 
         double engagementRatio = (double) mod.getFavoriteCount() / Math.max(1, mod.getDownloadCount());
-        if (mod.getDownloadCount() < 100) engagementRatio = 0;
+        if (mod.getDownloadCount() < dampeningK * 2) engagementRatio = 0;
         double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
         boolean changed = mod.getTrendScore() != trendScore ||
