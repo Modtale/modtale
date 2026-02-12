@@ -138,21 +138,14 @@ public class AnalyticsService {
             double normalizedTrend = currentWeek / trendDenominator;
             int trendScore = (int) (normalizedTrend * 100);
 
-            // Hidden Gems Logic: High favorites relative to downloads (underdogs)
-            // Or simply high favorites if we want to promote liked content regardless of downloads
-            // Given "hidden gems to use favorites instead of ratings", we'll favor projects with good engagement ratio
-            double engagementRatio = (double) favoriteCount / (Math.max(1, totalDownloads) * 0.01);
-            if (favoriteCount < 5) engagementRatio = 0; // Minimum threshold
-
-            // Relevance: Recent activity + Favorites
-            double relevanceScore = recent + (favoriteCount * 2.0);
-
-            // Popularity: Raw downloads + Favorites boost
             double popularScore = totalDownloads + (favoriteCount * 10.0);
+
+            double engagementRatio = (double) favoriteCount / Math.max(1, totalDownloads);
+            double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
             Update update = new Update()
                     .set("trendScore", trendScore)
-                    .set("relevanceScore", engagementRatio) // Storing gems score in relevance for sorting view
+                    .set("relevanceScore", relevanceScore)
                     .set("popularScore", popularScore);
 
             bulkOps.updateOne(new Query(Criteria.where("_id").is(projectId)), update);
@@ -279,11 +272,10 @@ public class AnalyticsService {
         double normalizedTrend = currentWeek / trendDenominator;
         int trendScore = (int) (normalizedTrend * 100);
 
-        double engagementRatio = (double) mod.getFavoriteCount() / (Math.max(1, mod.getDownloadCount()) * 0.01);
-        if (mod.getFavoriteCount() < 5) engagementRatio = 0;
-
         double popularScore = mod.getDownloadCount() + (mod.getFavoriteCount() * 10.0);
-        double relevanceScore = engagementRatio;
+
+        double engagementRatio = (double) mod.getFavoriteCount() / Math.max(1, mod.getDownloadCount());
+        double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
         boolean changed = mod.getTrendScore() != trendScore ||
                 Math.abs(mod.getRelevanceScore() - relevanceScore) > 0.01 ||
@@ -599,7 +591,6 @@ public class AnalyticsService {
         List<ProjectMonthlyStats> stats = getStatsInMemory(projectId, chartStart, end, true, false);
         detail.setViews(buildTimeSeries(stats, chartStart, end, false));
         detail.setVersionDownloads(buildVersionBreakdown(stats, start, end));
-        // Rating history removed
 
         return detail;
     }
