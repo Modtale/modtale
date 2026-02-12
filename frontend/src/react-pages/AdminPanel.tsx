@@ -31,9 +31,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
     useEffect(() => {
         if (isAdmin) {
             fetchQueue();
-            if (activeTab === 'reports') fetchReports();
+            fetchReports();
         }
-    }, [isAdmin, activeTab]);
+    }, [isAdmin]);
 
     const fetchQueue = async () => {
         setLoadingQueue(true);
