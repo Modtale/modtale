@@ -37,7 +37,7 @@ interface ProjectBuilderProps {
     bannerPreview: string | null;
     setBannerPreview: (url: string | null) => void;
     setBannerFile: (file: File | null) => void;
-    handleSave: (silent?: boolean) => Promise<boolean>;
+    handleSave: (silent?: boolean) => Promise<string | null>; // CHANGED: Returns error string or null
     handlePublish?: () => void;
     handleDelete?: () => void;
     handleDeleteVersion?: (versionId: string) => void;
@@ -317,14 +317,23 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     const handleConfirmSlug = async (useCurrent: boolean) => {
-        setShowSlugPrompt(false);
         if (!useCurrent && metaData.slug) {
-            const success = await handleSave(true);
-            if (success) {
+            const error = await handleSave(true);
+
+            if (error) {
+                if (error.toLowerCase().includes("taken")) {
+                    setSlugError(error);
+                } else {
+                    onShowStatus('error', 'Error', error);
+                    setShowSlugPrompt(false);
+                }
+            } else {
                 setIsDirty(false);
+                setShowSlugPrompt(false);
                 setShowPublishConfirm(true);
             }
         } else {
+            setShowSlugPrompt(false);
             setShowPublishConfirm(true);
         }
     };
@@ -376,9 +385,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                     <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
                         <div className="p-8">
                             <div className="flex items-center justify-between mb-6">
-                                <div className="bg-modtale-accent/10 p-3 rounded-2xl">
-                                    <Sparkles className="w-6 h-6 text-modtale-accent" />
-                                </div>
                                 <button onClick={() => setShowSlugPrompt(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
                                     <X className="w-6 h-6" />
                                 </button>
@@ -392,29 +398,30 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             <div className="space-y-4">
                                 <div className="flex flex-col gap-2">
                                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Project URL Slug</label>
-                                    <div className="flex items-center w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                    <div className={`flex items-center w-full bg-slate-50 dark:bg-black/20 border rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 dark:border-white/10'}`}>
                                         <div className="px-4 py-3 bg-slate-100 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-400 text-xs font-mono whitespace-nowrap select-none">{getUrlPrefix()}</div>
                                         <input
                                             value={metaData.slug || ''}
-                                            onChange={handleSlugChange}
-                                            className={`flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`}
+                                            onChange={(e) => { handleSlugChange(e); if(slugError) setSlugError(null); }}
+                                            className="flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400"
                                             placeholder={createSlug(metaData.title, modData?.id || 'id')}
                                         />
                                     </div>
-                                    {slugError && <p className="text-[10px] text-red-500 font-bold px-1">{slugError}</p>}
+                                    {slugError && <p className="text-[10px] text-red-500 font-bold px-1 animate-in slide-in-from-top-1">{slugError}</p>}
                                 </div>
                             </div>
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 mt-10">
                                 <button
                                     onClick={() => handleConfirmSlug(false)}
-                                    disabled={!!slugError || !metaData.slug}
+                                    disabled={isLoading || !!slugError || !metaData.slug}
                                     className="w-full sm:flex-1 h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-base shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                                 >
-                                    <Save className="w-5 h-5" /> Save & Continue
+                                    {isLoading ? <Spinner className="w-5 h-5 text-white" /> : <><Save className="w-5 h-5" /> Save & Continue</>}
                                 </button>
                                 <button
                                     onClick={() => handleConfirmSlug(true)}
+                                    disabled={isLoading}
                                     className="w-full sm:w-auto px-8 h-14 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-2xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
                                 >
                                     Use Default
@@ -766,7 +773,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             </div>
                             <p className="text-center text-[10px] text-slate-500 mt-2">Click to expand</p>
                         </SidebarSection>
-
                         <SidebarSection title="Repository Source" icon={GitMerge}>
                             <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2">
                                 <div className="flex bg-slate-200 dark:bg-black/40 rounded-lg p-1 mb-3">
@@ -774,7 +780,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     <button onClick={() => { setManualRepo(false); if (hasGitlab) { if (provider !== 'gitlab') setRepos([]); setProvider('gitlab'); } }} disabled={readOnly || !hasGitlab} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'gitlab' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitLab</button>
                                     <button onClick={() => setManualRepo(true)} disabled={readOnly} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${manualRepo ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>Link URL</button>
                                 </div>
-
                                 {manualRepo ? (
                                     <div className="relative">
                                         <input value={metaData.repositoryUrl} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, repositoryUrl: e.target.value}); checkRepoUrl(e.target.value); }} className={`w-full bg-slate-100 dark:bg-slate-900 border rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white outline-none transition-all pr-8 ${!repoValid && metaData.repositoryUrl ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`} placeholder="https://github.com/..." />
@@ -805,7 +810,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                 )}
                             </div>
                         </SidebarSection>
-
                         {!isModpack && (
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
                                 <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2 max-h-80 overflow-y-auto custom-scrollbar">
