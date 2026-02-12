@@ -26,7 +26,6 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
             "'versions.fileUrl': 0 " +
             "}";
 
-    // Legacy support: finds by username regex. Updated to also check if author matches (legacy data)
     @Query(value = "{ '$or': [ { 'authorId': ?0 }, { 'author': { $regex: '^?0$', $options: 'i' } } ], 'deletedAt': null }", fields = CARD_FIELDS)
     Page<Mod> findByAuthorIdOrAuthorIgnoreCase(String authorIdOrName, Pageable pageable);
 
