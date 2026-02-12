@@ -62,6 +62,7 @@ public class AnalyticsService {
 
         Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         int currYear = today.getYear();
@@ -95,6 +96,11 @@ public class AnalyticsService {
                         )).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
+                                Criteria.where("logDate").gte(week2Start),
+                                Criteria.where("logDate").lt(week1Start)
+                        )).then("$daysArray.v.d").otherwise(0)).as("previousWeek")
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
                                 Criteria.where("logDate").gte(monthStart),
                                 Criteria.where("logDate").lt(todayStart)
                         )).then("$daysArray.v.d").otherwise(0)).as("recent")
@@ -108,7 +114,7 @@ public class AnalyticsService {
 
         pipeline.add(Aggregation.unwind("projectData", false));
 
-        pipeline.add(Aggregation.project("currentWeek", "recent")
+        pipeline.add(Aggregation.project("currentWeek", "previousWeek", "recent")
                 .and("projectData.downloadCount").as("totalDownloads")
                 .and("projectData.favoriteCount").as("favoriteCount"));
 
@@ -126,6 +132,7 @@ public class AnalyticsService {
             activeProjectIds.add(projectId);
 
             int currentWeek = doc.getInteger("currentWeek", 0);
+            int previousWeek = doc.getInteger("previousWeek", 0);
             int recent = doc.getInteger("recent", 0);
 
             Integer totalDlObj = doc.getInteger("totalDownloads");
@@ -134,13 +141,17 @@ public class AnalyticsService {
             Integer favObj = doc.getInteger("favoriteCount");
             int favoriteCount = favObj != null ? favObj : 0;
 
-            double trendDenominator = Math.pow(Math.max(1, totalDownloads), 0.4);
-            double normalizedTrend = currentWeek / trendDenominator;
-            int trendScore = (int) (normalizedTrend * 100);
+            int trendScore = 0;
+            if (currentWeek > previousWeek) {
+                double growthVelocity = Math.sqrt(currentWeek - previousWeek);
+                double growthMultiplier = (double) currentWeek / Math.max(1, previousWeek);
+                trendScore = (int) (growthVelocity * growthMultiplier * 100);
+            }
 
             double popularScore = totalDownloads + (favoriteCount * 10.0);
 
             double engagementRatio = (double) favoriteCount / Math.max(1, totalDownloads);
+            if (totalDownloads < 100) engagementRatio = 0;
             double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
             Update update = new Update()
@@ -202,6 +213,7 @@ public class AnalyticsService {
 
         Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         int currYear = today.getYear();
@@ -232,6 +244,11 @@ public class AnalyticsService {
                                 Criteria.where("logDate").gte(week1Start),
                                 Criteria.where("logDate").lt(todayStart)
                         )).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
+                                Criteria.where("logDate").gte(week2Start),
+                                Criteria.where("logDate").lt(week1Start)
+                        )).then("$daysArray.v.d").otherwise(0)).as("previousWeek")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(monthStart),
@@ -266,15 +283,20 @@ public class AnalyticsService {
 
     private boolean calculateAndQueueUpdate(Mod mod, Document stats, BulkOperations bulkOps) {
         int currentWeek = stats != null ? stats.getInteger("currentWeek", 0) : 0;
+        int previousWeek = stats != null ? stats.getInteger("previousWeek", 0) : 0;
         int recent = stats != null ? stats.getInteger("recent", 0) : 0;
 
-        double trendDenominator = Math.pow(Math.max(1, mod.getDownloadCount()), 0.4);
-        double normalizedTrend = currentWeek / trendDenominator;
-        int trendScore = (int) (normalizedTrend * 100);
+        int trendScore = 0;
+        if (currentWeek > previousWeek) {
+            double growthVelocity = Math.sqrt(currentWeek - previousWeek);
+            double growthMultiplier = (double) currentWeek / Math.max(1, previousWeek);
+            trendScore = (int) (growthVelocity * growthMultiplier * 100);
+        }
 
         double popularScore = mod.getDownloadCount() + (mod.getFavoriteCount() * 10.0);
 
         double engagementRatio = (double) mod.getFavoriteCount() / Math.max(1, mod.getDownloadCount());
+        if (mod.getDownloadCount() < 100) engagementRatio = 0;
         double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
         boolean changed = mod.getTrendScore() != trendScore ||
