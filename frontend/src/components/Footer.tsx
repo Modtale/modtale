@@ -31,7 +31,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
     const getFooterDescription = () => {
         switch (path) {
             case '/plugins':
-                return "The premier community repository for Hytale server plugins. Discover, download, and share Hytale plugins, admin tools, gameplay scripts, and libraries.";
+                return "The premier community repository for Hytale plugins. Discover, download, and share Hytale plugins, admin tools, gameplay scripts, and libraries.";
             case '/modpacks':
                 return "The premier community repository for Hytale modpacks. Discover, download, and share curated Hytale modpacks, collections, and tech packs.";
             case '/worlds':
@@ -41,7 +41,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
             case '/data':
                 return "The premier community repository for Hytale data assets. Discover, download, and share Hytale configs, loot tables, and data packs.";
             default:
-                return "The premier community repository for Hytale. Discover, download, and share Hytale mods, worlds, server plugins, art + data assets, and modpacks.";
+                return "The premier community repository for Hytale. Discover, download, and share Hytale mods, worlds, plugins, art + data assets, and modpacks.";
         }
     };
 
