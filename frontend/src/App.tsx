@@ -36,6 +36,7 @@ import { SSRProvider } from './context/SSRContext';
 import { ExternalLinkProvider } from './context/ExternalLinkContext';
 import { NotificationProvider } from './context/NotificationsContext.tsx';
 import { ToastProvider } from './components/ui/Toast';
+import { MobileProvider } from './context/MobileContext';
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
@@ -282,19 +283,21 @@ export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData
     return (
         <SSRProvider data={ssrData}>
             <HelmetProvider>
-                <ExternalLinkProvider>
-                    <ToastProvider>
-                        {import.meta.env.SSR ? (
-                            <StaticRouter location={initialPath || "/"}>
-                                <AppContent initialClassification={initialClassification} />
-                            </StaticRouter>
-                        ) : (
-                            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                                <AppContent initialClassification={initialClassification} />
-                            </BrowserRouter>
-                        )}
-                    </ToastProvider>
-                </ExternalLinkProvider>
+                <MobileProvider>
+                    <ExternalLinkProvider>
+                        <ToastProvider>
+                            {import.meta.env.SSR ? (
+                                <StaticRouter location={initialPath || "/"}>
+                                    <AppContent initialClassification={initialClassification} />
+                                </StaticRouter>
+                            ) : (
+                                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                                    <AppContent initialClassification={initialClassification} />
+                                </BrowserRouter>
+                            )}
+                        </ToastProvider>
+                    </ExternalLinkProvider>
+                </MobileProvider>
             </HelmetProvider>
         </SSRProvider>
     );

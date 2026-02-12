@@ -27,6 +27,7 @@ import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLay
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
 import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
+import { useMobile } from '../../context/MobileContext';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
@@ -413,13 +414,13 @@ export const ModDetail: React.FC<{
     const navigate = useNavigate();
     const location = useLocation();
     const realId = extractId(id);
+    const { isMobile } = useMobile();
     const { initialData } = useSSRData();
     const initialMod = (initialData && extractId(initialData.id) === realId) ? initialData : null;
 
     const [mod, setMod] = useState<Mod | null>(initialMod);
     const [loading, setLoading] = useState(!initialMod);
     const [isNotFound, setIsNotFound] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
 
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [showAllVersionsModal, setShowAllVersionsModal] = useState(false);
@@ -457,13 +458,6 @@ export const ModDetail: React.FC<{
     const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
 
     const ogImageUrl = useMemo(() => mod ? `${API_BASE_URL}/og/project/${mod.id}.png` : '', [mod]);
-
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
 
     useEffect(() => {
         if (mod && mod.id && !analyticsFired.current) {
