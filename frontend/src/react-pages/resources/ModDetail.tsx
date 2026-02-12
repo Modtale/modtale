@@ -79,6 +79,12 @@ const ProjectSidebar: React.FC<{
 }> = ({ mod, dependencies, depMeta, navigate }) => {
     const [copiedId, setCopiedId] = useState(false);
 
+    const gameVersions = useMemo(() => {
+        const set = new Set<string>();
+        mod.versions.forEach(v => v.gameVersions?.forEach(gv => set.add(gv)));
+        return Array.from(set).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    }, [mod.versions]);
+
     const licenseInfo = useMemo(() => {
         if (mod.links?.LICENSE) {
             return { name: mod.license || 'Custom License', url: mod.links.LICENSE };
@@ -86,24 +92,14 @@ const ProjectSidebar: React.FC<{
         return mod.license ? getLicenseInfo(mod.license) : null;
     }, [mod.license, mod.links]);
 
-    const isModpack = mod.classification === 'MODPACK';
-
-    const gameVersions = useMemo(() => {
-        const set = new Set<string>();
-        mod.versions.forEach(v => v.gameVersions?.forEach(gv => set.add(gv)));
-        return Array.from(set).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-    }, [mod.versions]);
-
-    const getIconUrl = (path?: string) => {
-        if (!path) return null;
-        return path.startsWith('http') ? path : `${BACKEND_URL}${path}`;
-    };
-
     const handleCopyId = () => {
         navigator.clipboard.writeText(mod.id);
         setCopiedId(true);
         setTimeout(() => setCopiedId(false), 2000);
     };
+
+    const isModpack = mod.classification === 'MODPACK';
+    const getIconUrl = (path?: string) => path ? (path.startsWith('http') ? path : `${BACKEND_URL}${path}`) : null;
 
     return (
         <div className="flex flex-col gap-8">
@@ -224,7 +220,6 @@ interface CommentSectionProps {
 const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, currentUser, isCreator, onCommentSubmitted, onError, onSuccess, innerRef, commentsDisabled }) => {
     const [text, setText] = useState('');
     const [submitting, setSubmitting] = useState(false);
-
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
@@ -444,10 +439,12 @@ export const ModDetail: React.FC<{
     });
 
     const [showMobileLinks, setShowMobileLinks] = useState(false);
+    const [showMobileDeps, setShowMobileDeps] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
 
     const reviewsRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const depsDropdownRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
 
     const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
@@ -513,6 +510,9 @@ export const ModDetail: React.FC<{
         const handleClick = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
                 setShowMobileLinks(false);
+            }
+            if (depsDropdownRef.current && !depsDropdownRef.current.contains(e.target as Node)) {
+                setShowMobileDeps(false);
             }
         };
         document.addEventListener('mousedown', handleClick);
@@ -876,7 +876,43 @@ export const ModDetail: React.FC<{
                             </div>
                         </div>
 
-                        <div className="w-full xl:w-auto flex justify-start md:justify-end">
+                        <div className="w-full xl:w-auto flex flex-col md:flex-row justify-start md:justify-end gap-3">
+                            {isMobile && mod.classification === 'MODPACK' && latestDependencies.length > 0 && (
+                                <div className="relative w-full" ref={depsDropdownRef}>
+                                    <button
+                                        onClick={() => { setShowMobileDeps(!showMobileDeps); setShowMobileLinks(false); }}
+                                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-bold text-slate-600 dark:text-slate-300"
+                                    >
+                                        <Box className="w-4 h-4" /> Included Mods <ChevronDown className={`w-4 h-4 transition-transform ${showMobileDeps ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {showMobileDeps && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
+                                            {latestDependencies.map((dep, idx) => {
+                                                const meta = depMeta[dep.modId];
+                                                const title = meta?.title || dep.modTitle || dep.modId;
+                                                const path = `/mod/${createSlug(title, dep.modId)}`;
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => { navigate(path); setShowMobileDeps(false); }}
+                                                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white text-left"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center border border-white/5 shrink-0 overflow-hidden">
+                                                            {meta?.icon ? <img src={resolveUrl(meta.icon)} className="w-full h-full object-cover" alt="" /> : <Box className="w-4 h-4 text-slate-600" />}
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="text-sm font-bold truncate">{title}</div>
+                                                            <div className="text-[10px] text-slate-500 font-mono">v{dep.versionNumber}</div>
+                                                        </div>
+                                                        <ExternalLink className="w-3 h-3 opacity-50 shrink-0" />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="hidden md:flex gap-2 flex-wrap justify-end">
                                 {links.map((link, idx) => (
                                     <a
@@ -895,7 +931,7 @@ export const ModDetail: React.FC<{
                             {links.length > 0 && (
                                 <div className="md:hidden relative w-full" ref={dropdownRef}>
                                     <button
-                                        onClick={() => setShowMobileLinks(!showMobileLinks)}
+                                        onClick={() => { setShowMobileLinks(!showMobileLinks); setShowMobileDeps(false); }}
                                         className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-bold text-slate-600 dark:text-slate-300"
                                     >
                                         <LinkIcon className="w-4 h-4" /> External Links <ChevronDown className={`w-4 h-4 transition-transform ${showMobileLinks ? 'rotate-180' : ''}`} />
@@ -935,7 +971,7 @@ export const ModDetail: React.FC<{
                 }
                 mainContent={
                     <>
-                        <div className="prose dark:prose-invert prose-lg max-w-none">
+                        <div className="prose dark:prose-invert prose-lg max-none">
                             {memoizedDescription}
                         </div>
                         <CommentSection
