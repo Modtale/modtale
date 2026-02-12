@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, Eye, CheckCircle2, Square, RefreshCw } from 'lucide-react';
+import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, CheckCircle2, Square, RefreshCw } from 'lucide-react';
 import { api } from '../../utils/api';
 import type { ScanIssue } from '../../types';
 
@@ -129,7 +129,8 @@ const FileTreeNode: React.FC<{
 const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number }> = ({ content, filename, startLine, endLine }) => {
     let ext = filename.split('.').pop()?.toLowerCase();
     if (ext === 'class') ext = 'java';
-    const preRef = useRef<HTMLPreElement>(null);
+
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const scrollbarStyles = `
         .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -171,11 +172,11 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [safeContent, ext]);
 
     useEffect(() => {
-        if (startLine && preRef.current && startLine > 1) {
+        if (startLine && scrollContainerRef.current && startLine > 1) {
             setTimeout(() => {
-                if (preRef.current) {
-                    const lineHeight = 20; // Approx
-                    preRef.current.scrollTop = (startLine - 5) * lineHeight;
+                if (scrollContainerRef.current) {
+                    const lineHeight = 20; // Approx leading-5
+                    scrollContainerRef.current.scrollTop = (startLine - 5) * lineHeight;
                 }
             }, 100);
         }
@@ -184,15 +185,20 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     return (
         <>
             <style>{scrollbarStyles}</style>
-            <div className="flex h-full font-mono text-xs overflow-hidden">
-                <div className="w-12 bg-[#0d1117] border-r border-white/5 text-slate-600 text-right py-4 pr-3 select-none overflow-hidden leading-5">
+            <div ref={scrollContainerRef} className="flex h-full font-mono text-xs overflow-auto custom-scrollbar bg-[#0d1117] relative">
+                <div className="sticky left-0 z-10 w-12 bg-[#0d1117] border-r border-white/5 text-slate-600 text-right py-4 pr-3 select-none leading-5 min-h-full h-fit">
                     {lines.map((_, i) => (
-                        <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>{i + 1}</div>
+                        <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
+                            {i + 1}
+                        </div>
                     ))}
                 </div>
-                <pre ref={preRef} className="flex-1 text-slate-300 leading-5 p-4 pt-4 overflow-auto custom-scrollbar">
-                     <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
-                </pre>
+
+                <div className="flex-1 min-w-0">
+                    <pre className="text-slate-300 leading-5 p-4 pt-4 w-fit min-w-full">
+                         <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
+                    </pre>
+                </div>
             </div>
         </>
     );
@@ -212,7 +218,6 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         file: string;
         start: number;
         end: number;
-        snippet?: string;
     } | null>(null);
 
     const fileTree = useMemo(() => buildFileTree(structure), [structure]);
@@ -260,7 +265,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
     };
 
-    const handleJumpToIssue = (file: string, lineStart: number, lineEnd: number, snippet?: string) => {
+    const handleJumpToIssue = (file: string, lineStart: number, lineEnd: number) => {
         let targetFile = file;
         if (!structure.includes(targetFile) && structure.includes(targetFile + ".class")) {
             targetFile = targetFile + ".class";
@@ -279,7 +284,6 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             file: targetFile,
             start: lineStart,
             end: lineEnd,
-            snippet: snippet
         });
 
         loadInspectorFile(targetFile);
@@ -297,35 +301,21 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
     };
 
-    // Initialize with props
     useEffect(() => {
         if (initialFile) {
             const issue = issues.find(i => i.filePath === initialFile && i.lineStart === initialLine);
             const targetLineEnd = initialLineEnd || issue?.lineEnd || initialLine || 0;
-            const snippet = issue?.snippet;
-            handleJumpToIssue(initialFile, initialLine || 0, targetLineEnd, snippet);
+            handleJumpToIssue(initialFile, initialLine || 0, targetLineEnd);
         }
     }, [initialFile]);
 
     const dynamicHighlight = useMemo(() => {
         if (!activeHighlight || activeHighlight.file !== inspectorFile) return undefined;
-
         if (activeHighlight.start > 0) {
             return { start: activeHighlight.start, end: activeHighlight.end };
         }
-
-        if (activeHighlight.start <= 0 && activeHighlight.snippet && inspectorContent && typeof inspectorContent === 'string') {
-            const snippet = activeHighlight.snippet.trim();
-            const lines = inspectorContent.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].includes(snippet) || (snippet.length > 20 && lines[i].includes(snippet.substring(0, 20)))) {
-                    return { start: i + 1, end: i + 1 };
-                }
-            }
-        }
-
         return undefined;
-    }, [activeHighlight, inspectorFile, inspectorContent]);
+    }, [activeHighlight, inspectorFile]);
 
     const filteredFiles = useMemo(() => {
         if (!fileSearch) return [];
@@ -338,7 +328,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             className={`w-full text-left p-3 hover:bg-white/5 rounded-lg group border border-transparent hover:border-white/5 transition-all mb-1 ${isResolved ? 'opacity-50' : ''}`}
         >
             <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 cursor-pointer" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd, issue.snippet)}>
+                <div className="flex-1 cursor-pointer" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd)}>
                     <div className="flex items-center gap-2 mb-1">
                         <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase
                                                                 ${issue.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
@@ -349,13 +339,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                     <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
                         {issue.filePath.split('/').pop()} {issue.lineStart > 0 ? `:${issue.lineStart} - ${issue.lineEnd}` : ''}
                     </div>
-                    <p className="text-[10px] text-slate-400 line-clamp-2 mb-2">{issue.description}</p>
-
-                    {issue.snippet && (
-                        <div className="bg-black/30 p-2 rounded border border-white/5 font-mono text-[10px] text-slate-400 overflow-x-auto whitespace-pre">
-                            {issue.snippet}
-                        </div>
-                    )}
+                    <p className="text-[10px] text-slate-400 line-clamp-2">{issue.description}</p>
                 </div>
 
                 <button
