@@ -1005,7 +1005,7 @@ public class ModService {
 
                 Optional<Mod> conflict = modRepository.findBySlug(newSlug);
                 if (conflict.isPresent() && !conflict.get().getId().equals(existing.getId())) {
-                    throw new IllegalArgumentException("URL Slug '" + newSlug + "' is already taken.");
+                    throw new IllegalArgumentException("Project URL '" + newSlug + "' is already taken.");
                 }
 
                 existing.setSlug(newSlug);
