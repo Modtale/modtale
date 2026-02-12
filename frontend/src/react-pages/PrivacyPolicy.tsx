@@ -63,7 +63,7 @@ export const PrivacyPolicy: React.FC = () => {
                         <li>To create your user profile so people know who uploaded a mod.</li>
                         <li>To allow you to link multiple accounts (e.g., linking GitHub to an Email account) for easier login.</li>
                         <li>To track download counts and view statistics (these are aggregated).</li>
-                        <li>To allow you to post reviews and comments.</li>
+                        <li>To allow you to post comments.</li>
                         <li>To send important account notifications (like security alerts or transfer requests).</li>
                     </ul>
 

@@ -52,7 +52,7 @@ export const TermsOfService: React.FC = () => {
 
                     <h3>2. User Accounts</h3>
                     <p>
-                        To upload content or post reviews, you need to create an account. You can do this via standard email/password registration or by linking a third-party account (GitHub, GitLab, Discord, Google).
+                        To upload content or post comments, you need to create an account. You can do this via standard email/password registration or by linking a third-party account (GitHub, GitLab, Discord, Google).
                     </p>
                     <ul>
                         <li><strong>Security:</strong> If you use an email/password, you are responsible for keeping your password complex and secure. If you use a social login, you are responsible for securing that third-party account.</li>
