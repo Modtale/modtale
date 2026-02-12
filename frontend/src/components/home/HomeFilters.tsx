@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Star, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Heart, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GLOBAL_TAGS } from '../../data/categories';
 import { api } from '../../utils/api';
 import { compareSemVer } from '../../utils/modHelpers';
@@ -42,7 +42,7 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
         { id: 'popular', label: 'Popular', mobileOnly: true },
         { id: 'trending', label: 'Trending', mobileOnly: true },
         { id: 'downloads', label: 'Downloads', mobileOnly: false },
-        { id: 'rating', label: 'Rating', mobileOnly: false },
+        { id: 'favorites', label: 'Favorites', mobileOnly: false },
         { id: 'newest', label: 'Newest', mobileOnly: true },
         { id: 'updated', label: 'Updated', mobileOnly: true }
     ];
@@ -92,8 +92,8 @@ interface HomeFiltersProps {
     onSearchChange: (val: string) => void;
     selectedVersion: string;
     setSelectedVersion: (v: string) => void;
-    minRating: number;
-    setMinRating: (v: number) => void;
+    minFavorites: number;
+    setMinFavorites: (v: number) => void;
     minDownloads: number;
     setMinDownloads: (v: number) => void;
     filterDate: string | null;
@@ -107,7 +107,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                                             pageTitle, totalItems, loading, sortBy, onSortChange,
                                                             selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
                                                             isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
-                                                            selectedVersion, setSelectedVersion, minRating, setMinRating, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage, showMiniSearch,
+                                                            selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage, showMiniSearch,
                                                             isMobile
                                                         }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
@@ -214,11 +214,11 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                     <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val); setPage(0);}} />
 
                                     <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Minimum Rating</label>
-                                        <div className="flex gap-1">
-                                            {[1, 2, 3, 4].map(r => (
-                                                <button key={r} onClick={() => { setMinRating(r === minRating ? 0 : r); setPage(0); }} className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all flex justify-center items-center ${minRating === r ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-modtale-accent'}`}>
-                                                    {r}+ <Star className="w-3 h-3 ml-0.5 fill-current" />
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
+                                        <div className="grid grid-cols-4 gap-1">
+                                            {[10, 50, 100, 500].map(f => (
+                                                <button key={f} onClick={() => { setMinFavorites(f === minFavorites ? 0 : f); setPage(0); }} className={`py-2 rounded-lg text-[10px] font-bold border transition-all flex justify-center items-center ${minFavorites === f ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-modtale-accent'}`}>
+                                                    {f}+ <Heart className="w-3 h-3 ml-0.5 fill-current" />
                                                 </button>
                                             ))}
                                         </div>
