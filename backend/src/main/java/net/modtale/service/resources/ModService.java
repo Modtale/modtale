@@ -51,6 +51,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -69,6 +70,9 @@ public class ModService {
             "Decoration", "Vanilla+", "Kitchen Sink", "City", "Landscape", "Spawn", "Lobby",
             "Medieval", "Modern", "Futuristic", "Models", "Textures", "Animations", "Particles"
     );
+
+    private static final Map<String, String> CANONICAL_TAG_MAP = ALLOWED_TAGS.stream()
+            .collect(Collectors.toMap(String::toLowerCase, Function.identity()));
 
     private static final Set<String> ALLOWED_GAME_VERSIONS = Set.of(
             "2026.01.13-dcad8778f", "2026.01.17-4b0f30090", "2026.01.24-6e2d4fc36", "2026.01.28-87d03be09", "2026.02.06-aa1b071c2"
@@ -162,17 +166,28 @@ public class ModService {
         return null;
     }
 
-    public void validateTags(List<String> tags) {
+    public List<String> validateTags(List<String> tags) {
         if (tags == null || tags.isEmpty()) {
             throw new IllegalArgumentException("At least one tag is required.");
         }
-        List<String> invalidTags = tags.stream()
-                .filter(tag -> !ALLOWED_TAGS.contains(tag))
-                .collect(Collectors.toList());
+
+        List<String> normalized = new ArrayList<>();
+        List<String> invalidTags = new ArrayList<>();
+
+        for (String tag : tags) {
+            String canonical = CANONICAL_TAG_MAP.get(tag.toLowerCase());
+            if (canonical != null) {
+                normalized.add(canonical);
+            } else {
+                invalidTags.add(tag);
+            }
+        }
 
         if (!invalidTags.isEmpty()) {
             throw new IllegalArgumentException("Invalid tags detected: " + String.join(", ", invalidTags));
         }
+
+        return normalized;
     }
 
     public void validateVersionNumber(String version) {
@@ -254,7 +269,14 @@ public class ModService {
             String gameVersion, String contentType, Double minRating, Integer minDownloads, String viewCategory,
             String dateRange, String author
     ) {
-        return self.getModsCached(tags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
+        List<String> normalizedTags = null;
+        if (tags != null && !tags.isEmpty()) {
+            normalizedTags = tags.stream()
+                    .map(t -> CANONICAL_TAG_MAP.getOrDefault(t.toLowerCase(), t))
+                    .collect(Collectors.toList());
+        }
+
+        return self.getModsCached(normalizedTags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
     }
 
     @Cacheable(
@@ -521,6 +543,7 @@ public class ModService {
         mod.setVersions(new ArrayList<>());
         mod.setAllowModpacks(true);
         mod.setAllowComments(true);
+        mod.setTags(new ArrayList<>());
 
         return modRepository.save(mod);
     }
@@ -931,7 +954,7 @@ public class ModService {
     }
 
     public void addMod(Mod mod) {
-        validateTags(mod.getTags());
+        mod.setTags(validateTags(mod.getTags()));
         validateClassification(mod.getClassification());
 
         if (mod.getAuthorId() == null && mod.getAuthor() != null) {
@@ -954,7 +977,7 @@ public class ModService {
         boolean slugChanged = false;
 
         if (updatedMod.getTags() != null) {
-            existing.setTags(updatedMod.getTags());
+            existing.setTags(validateTags(updatedMod.getTags()));
         }
 
         if (updatedMod.getRepositoryUrl() != null && !updatedMod.getRepositoryUrl().isEmpty()) {
