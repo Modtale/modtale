@@ -114,6 +114,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
     const tagRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
     const [customDl, setCustomDl] = useState('');
+    const [customFav, setCustomFav] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
     const [selectedDateObj, setSelectedDateObj] = useState<Date | null>(null);
     const [gameVersionOptions, setGameVersionOptions] = useState<string[]>(['Any']);
@@ -152,7 +153,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
         const target = new Date(); target.setDate(target.getDate() - days); const targetStr = target.toISOString().split('T')[0];
         return filterDate === targetStr && !selectedDateObj;
     };
-    const resetAll = () => { onResetFilters(); setCustomDl(''); setFilterDate(null); setSelectedDateObj(null); setShowCalendar(false); };
+    const resetAll = () => { onResetFilters(); setCustomDl(''); setCustomFav(''); setFilterDate(null); setSelectedDateObj(null); setShowCalendar(false); };
 
     return (
         <div className="w-full">
@@ -215,12 +216,26 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
 
                                     <div>
                                         <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
-                                        <div className="grid grid-cols-4 gap-1">
-                                            {[10, 50, 100, 500].map(f => (
-                                                <button key={f} onClick={() => { setMinFavorites(f === minFavorites ? 0 : f); setPage(0); }} className={`py-2 rounded-lg text-[10px] font-bold border transition-all flex justify-center items-center ${minFavorites === f ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:border-modtale-accent'}`}>
-                                                    {f}+ <Heart className="w-3 h-3 ml-0.5 fill-current" />
+                                        <div className="grid grid-cols-4 gap-1 mb-2">
+                                            {[0, 10, 50, 100].map(f => (
+                                                <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); setPage(0); }} className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all ${minFavorites === f && customFav === '' ? 'bg-slate-800 dark:bg-white text-white dark:text-black border-transparent' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}>
+                                                    {f === 0 ? 'Any' : `${f}+`}
                                                 </button>
                                             ))}
+                                        </div>
+                                        <div className="relative">
+                                            <Heart className="absolute left-3 top-2 w-3.5 h-3.5 text-slate-400" />
+                                            <input
+                                                type="number"
+                                                placeholder="Custom min favorites..."
+                                                value={customFav}
+                                                onChange={e => {
+                                                    setCustomFav(e.target.value);
+                                                    setMinFavorites(Number(e.target.value));
+                                                    setPage(0);
+                                                }}
+                                                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-modtale-accent focus:border-modtale-accent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
                                         </div>
                                     </div>
 
