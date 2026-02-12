@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Mod } from '../../types';
-import { Download, Calendar, Heart, Star, Code, Paintbrush, Database, Layers, Layout, Box, HardDrive, Globe } from 'lucide-react';
+import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe } from 'lucide-react';
 import { BACKEND_URL } from '../../utils/api';
 import { Link } from 'react-router-dom';
 import { getProjectUrl } from '../../utils/slug';
@@ -60,13 +60,11 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
     const desc = mod.description ? mod.description : 'No description provided.';
     const classification = mod.classification || 'PLUGIN';
 
-    const rating = mod.rating || 0;
     const downloads = (mod.downloadCount || 0).toLocaleString();
     const favorites = (mod.favoriteCount || 0).toLocaleString();
 
     const timeAgo = formatTimeAgo(mod.updatedAt || '');
     const modCount = (mod.modIds || mod.childProjectIds || []).length;
-    const sizeMB = mod.sizeBytes ? (mod.sizeBytes / 1024 / 1024).toFixed(1) + ' MB' : null;
     const displayClassification = toTitleCase(classification);
 
     const resolveUrl = (url: string) => {
@@ -159,13 +157,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
 
             <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/5">
                 <div className="flex items-center gap-3">
-                    {rating > 0 && (
-                        <span className="flex items-center text-slate-700 dark:text-slate-200" title={`Rated ${rating.toFixed(1)}/5`}>
-                            <Star className="w-3 h-3 mr-1 text-amber-500 fill-current" />
-                            {rating.toFixed(1)}
-                        </span>
-                    )}
-
                     <span className="flex items-center"><Download className="w-3 h-3 mr-1" /> {downloads}</span>
 
                     <button

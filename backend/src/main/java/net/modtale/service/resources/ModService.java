@@ -277,7 +277,6 @@ public class ModService {
             results = modRepository.findFavorites(likedIds, search != null ? search : "", pageable);
         } else {
             Sort sort = switch (sortBy != null ? sortBy : "relevance") {
-                case "rating" -> Sort.by("rating").descending();
                 case "downloads" -> Sort.by("downloadCount").descending();
                 case "updated" -> Sort.by("updatedAt").descending();
                 case "new", "newest" -> Sort.by("createdAt").descending();
@@ -311,7 +310,7 @@ public class ModService {
             }
 
             results = modRepository.searchMods(
-                    search, tags, gameVersion, contentType, minRating, minDownloads, pageable,
+                    search, tags, gameVersion, contentType, null, minDownloads, pageable,
                     currentUsername, sortBy, viewCategory,
                     dateCutoff, authorIdParam
             );
@@ -383,21 +382,26 @@ public class ModService {
                 mod.getVersions().forEach(v -> v.setScanResult(null));
             }
 
-            if (!mod.isAllowReviews() && !isPrivileged) {
-                mod.setReviews(new ArrayList<>());
+            if (!mod.isAllowComments() && !isPrivileged) {
+                mod.setComments(new ArrayList<>());
             }
 
-            if (mod.getReviews() != null && !mod.getReviews().isEmpty()) {
-                Set<String> reviewersToFetch = new HashSet<>();
-                for (Review r : mod.getReviews()) {
-                    if (r.getUserAvatarUrl() == null || r.getUserAvatarUrl().isEmpty()) {
-                        reviewersToFetch.add(r.getUser());
+            if (mod.getComments() != null && !mod.getComments().isEmpty()) {
+                Set<String> usersToFetch = new HashSet<>();
+                for (Comment c : mod.getComments()) {
+                    if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
+                        usersToFetch.add(c.getUser());
+                    }
+                    if (c.getDeveloperReply() != null) {
+                        if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
+                            usersToFetch.add(c.getDeveloperReply().getUser());
+                        }
                     }
                 }
 
-                if (!reviewersToFetch.isEmpty()) {
+                if (!usersToFetch.isEmpty()) {
                     try {
-                        List<User> users = userRepository.findByUsernameIn(reviewersToFetch);
+                        List<User> users = userRepository.findByUsernameIn(usersToFetch);
                         Map<String, String> avatarMap = users.stream()
                                 .collect(Collectors.toMap(
                                         u -> u.getUsername().toLowerCase(),
@@ -405,16 +409,24 @@ public class ModService {
                                         (existing, replacement) -> existing
                                 ));
 
-                        for (Review r : mod.getReviews()) {
-                            if (r.getUserAvatarUrl() == null || r.getUserAvatarUrl().isEmpty()) {
-                                String avatar = avatarMap.get(r.getUser().toLowerCase());
+                        for (Comment c : mod.getComments()) {
+                            if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
+                                String avatar = avatarMap.get(c.getUser().toLowerCase());
                                 if (avatar != null && !avatar.isEmpty()) {
-                                    r.setUserAvatarUrl(avatar);
+                                    c.setUserAvatarUrl(avatar);
+                                }
+                            }
+                            if (c.getDeveloperReply() != null) {
+                                if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
+                                    String avatar = avatarMap.get(c.getDeveloperReply().getUser().toLowerCase());
+                                    if (avatar != null && !avatar.isEmpty()) {
+                                        c.getDeveloperReply().setUserAvatarUrl(avatar);
+                                    }
                                 }
                             }
                         }
                     } catch (Exception e) {
-                        logger.warn("Failed to batch load avatars for reviews", e);
+                        logger.warn("Failed to batch load avatars for comments", e);
                     }
                 }
             }
@@ -508,7 +520,7 @@ public class ModService {
         mod.setPendingInvites(new ArrayList<>());
         mod.setVersions(new ArrayList<>());
         mod.setAllowModpacks(true);
-        mod.setAllowReviews(true);
+        mod.setAllowComments(true);
 
         return modRepository.save(mod);
     }
@@ -818,11 +830,11 @@ public class ModService {
 
     public List<Mod> getVerificationQueue() {
         Query pendingProjectsQuery = new Query(Criteria.where("status").is("PENDING"));
-        pendingProjectsQuery.fields().exclude("about", "reviews", "galleryImages");
+        pendingProjectsQuery.fields().exclude("about", "comments", "galleryImages");
         List<Mod> pendingProjects = mongoTemplate.find(pendingProjectsQuery, Mod.class);
 
         Query pendingVersionsQuery = new Query(Criteria.where("status").is("PUBLISHED").and("versions.reviewStatus").is("PENDING"));
-        pendingVersionsQuery.fields().exclude("about", "reviews", "galleryImages");
+        pendingVersionsQuery.fields().exclude("about", "comments", "galleryImages");
         List<Mod> pendingVersions = mongoTemplate.find(pendingVersionsQuery, Mod.class);
 
         Set<Mod> combined = new HashSet<>(pendingProjects);
@@ -987,7 +999,7 @@ public class ModService {
         existing.setRepositoryUrl(updatedMod.getRepositoryUrl());
         existing.setTypes(updatedMod.getTypes());
         existing.setAllowModpacks(updatedMod.isAllowModpacks());
-        existing.setAllowReviews(updatedMod.isAllowReviews());
+        existing.setAllowComments(updatedMod.isAllowComments());
 
         if (updatedMod.getLinks() != null) existing.setLinks(updatedMod.getLinks());
         if (updatedMod.getImageUrl() != null) existing.setImageUrl(updatedMod.getImageUrl());
@@ -1448,7 +1460,7 @@ public class ModService {
 
             mod.setContributors(new ArrayList<>());
             mod.setPendingInvites(new ArrayList<>());
-            mod.setReviews(new ArrayList<>());
+            mod.setComments(new ArrayList<>());
             mod.setTags(new ArrayList<>());
 
             mod.setDeletedAt(null);
@@ -1785,43 +1797,34 @@ public class ModService {
         }
     }
 
-    public void addReview(String modId, String username, String comment, int rating, String version) {
+    public void addComment(String modId, String username, String content) {
         Mod mod = getRawModById(modId);
         if (mod != null) {
-            if (!mod.isAllowReviews()) {
-                throw new IllegalStateException("Reviews are disabled for this project.");
+            if (!mod.isAllowComments()) {
+                throw new IllegalStateException("Comments are disabled for this project.");
             }
 
-            User user = userRepository.findByUsername(username).orElse(null);
-            if (user != null && hasEditPermission(mod, user)) {
-                throw new IllegalArgumentException("You cannot review your own project.");
-            }
+            Comment comment = new Comment();
+            comment.setId(UUID.randomUUID().toString());
+            comment.setUser(username);
 
-            if (mod.getReviews() != null && mod.getReviews().stream().anyMatch(r -> r.getUser().equalsIgnoreCase(username))) {
-                throw new IllegalArgumentException("You have already reviewed this project. You can edit your existing review.");
-            }
+            userRepository.findByUsername(username).ifPresent(u -> comment.setUserAvatarUrl(u.getAvatarUrl()));
 
-            Review review = new Review();
-            review.setId(UUID.randomUUID().toString());
-            review.setUser(username);
+            comment.setContent(sanitizer.sanitizePlainText(content));
+            comment.setDate(LocalDate.now().toString());
 
-            userRepository.findByUsername(username).ifPresent(u -> review.setUserAvatarUrl(u.getAvatarUrl()));
+            if (mod.getComments() == null) mod.setComments(new ArrayList<>());
+            mod.getComments().add(0, comment);
 
-            review.setComment(sanitizer.sanitizePlainText(comment));
-            review.setRating(rating);
-            review.setDate(LocalDate.now().toString());
-            if (mod.getReviews() == null) mod.setReviews(new ArrayList<>());
-            mod.getReviews().add(0, review);
-            double avg = mod.getReviews().stream().mapToInt(Review::getRating).average().orElse(0.0);
-            mod.setRating(Math.round(avg * 10.0) / 10.0);
             modRepository.save(mod);
             evictProjectDetails(mod);
+
             User author = getAuthorUser(mod);
-            if (author != null && author.getNotificationPreferences().getNewReviews() != User.NotificationLevel.OFF) {
+            if (author != null && !author.getUsername().equals(username) && author.getNotificationPreferences().getNewReviews() != User.NotificationLevel.OFF) {
                 notificationService.sendNotification(
                         List.of(author.getId()),
-                        "New Review: " + rating + "/5",
-                        username + " reviewed " + mod.getTitle(),
+                        "New Comment",
+                        username + " commented on " + mod.getTitle(),
                         getProjectLink(mod),
                         mod.getImageUrl()
                 );
@@ -1829,55 +1832,77 @@ public class ModService {
         }
     }
 
-    public void editReview(String modId, String reviewId, String username, String newComment, int newRating) {
+    public void editComment(String modId, String commentId, String username, String newContent) {
         Mod mod = getRawModById(modId);
         if (mod != null) {
-            Review review = mod.getReviews().stream()
-                    .filter(r -> r.getId().equals(reviewId))
+            Comment comment = mod.getComments().stream()
+                    .filter(c -> c.getId().equals(commentId))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Review not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
-            if (!review.getUser().equalsIgnoreCase(username)) {
-                throw new SecurityException("You can only edit your own reviews.");
+            if (!comment.getUser().equalsIgnoreCase(username)) {
+                throw new SecurityException("You can only edit your own comments.");
             }
 
-            review.setComment(sanitizer.sanitizePlainText(newComment));
-            review.setRating(newRating);
-            review.setUpdatedAt(LocalDateTime.now().toString());
+            comment.setContent(sanitizer.sanitizePlainText(newContent));
+            comment.setUpdatedAt(LocalDateTime.now().toString());
 
-            double avg = mod.getReviews().stream().mapToInt(Review::getRating).average().orElse(0.0);
-            mod.setRating(Math.round(avg * 10.0) / 10.0);
             modRepository.save(mod);
             evictProjectDetails(mod);
         }
     }
 
-    public void replyToReview(String modId, String reviewId, String reply, String username) {
+    public void deleteComment(String modId, String commentId, String username) {
+        Mod mod = getRawModById(modId);
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (mod != null && user != null) {
+            boolean isModOwner = hasEditPermission(mod, user);
+
+            mod.getComments().removeIf(c -> {
+                if(c.getId().equals(commentId)) {
+                    if(!c.getUser().equalsIgnoreCase(username) && !isModOwner) {
+                        throw new SecurityException("Permission denied.");
+                    }
+                    return true;
+                }
+                return false;
+            });
+            modRepository.save(mod);
+            evictProjectDetails(mod);
+        }
+    }
+
+    public void replyToComment(String modId, String commentId, String replyContent, String username) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found"));
         Mod mod = getRawModById(modId);
 
         if (mod != null) {
             if (!hasEditPermission(mod, user)) {
-                throw new SecurityException("Only project team members can reply to reviews.");
+                throw new SecurityException("Only project team members can reply to comments.");
             }
 
-            Review review = mod.getReviews().stream()
-                    .filter(r -> r.getId().equals(reviewId))
+            Comment comment = mod.getComments().stream()
+                    .filter(c -> c.getId().equals(commentId))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Review not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
-            review.setDeveloperReply(sanitizer.sanitizePlainText(reply));
-            review.setDeveloperReplyDate(LocalDateTime.now().toString());
+            Comment.Reply reply = new Comment.Reply();
+            reply.setUser(user.getUsername());
+            reply.setUserAvatarUrl(user.getAvatarUrl());
+            reply.setContent(sanitizer.sanitizePlainText(replyContent));
+            reply.setDate(LocalDateTime.now().toString());
+
+            comment.setDeveloperReply(reply);
 
             modRepository.save(mod);
             evictProjectDetails(mod);
 
-            User reviewer = userRepository.findByUsername(review.getUser()).orElse(null);
-            if (reviewer != null) {
+            User commenter = userRepository.findByUsername(comment.getUser()).orElse(null);
+            if (commenter != null) {
                 notificationService.sendNotification(
-                        List.of(reviewer.getId()),
+                        List.of(commenter.getId()),
                         "Developer Reply",
-                        mod.getAuthor() + " replied to your review on " + mod.getTitle(),
+                        mod.getAuthor() + " replied to your comment on " + mod.getTitle(),
                         getProjectLink(mod),
                         mod.getImageUrl()
                 );

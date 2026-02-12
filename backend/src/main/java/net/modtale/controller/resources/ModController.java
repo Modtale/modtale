@@ -313,7 +313,6 @@ public class ModController {
             @RequestParam(defaultValue = "relevance") String sort,
             @RequestParam(required = false) String gameVersion,
             @RequestParam(required = false, name = "classification") String classification,
-            @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) Integer minDownloads,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String dateRange,
@@ -349,7 +348,7 @@ public class ModController {
                     sort,
                     gameVersion,
                     classification,
-                    minRating,
+                    null,
                     minDownloads,
                     effectiveCategory,
                     dateRange,
@@ -403,7 +402,6 @@ public class ModController {
                 "author", mod.getAuthor(),
                 "classification", mod.getClassification(),
                 "downloads", mod.getDownloadCount(),
-                "rating", mod.getRating(),
                 "repositoryUrl", mod.getRepositoryUrl() != null ? mod.getRepositoryUrl() : "",
                 "slug", mod.getSlug() != null ? mod.getSlug() : mod.getId()
         ));
@@ -513,15 +511,13 @@ public class ModController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/projects/{id}/reviews")
-    public ResponseEntity<?> addReview(@PathVariable String id, @RequestBody Map<String, Object> body) {
+    @PostMapping("/projects/{id}/comments")
+    public ResponseEntity<?> addComment(@PathVariable String id, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        String comment = (String) body.get("comment");
-        int rating = (int) body.get("rating");
-        String version = (String) body.get("version");
+        String content = (String) body.get("content");
         try {
-            modService.addReview(id, user.getId(), comment, rating, version);
+            modService.addComment(id, user.getUsername(), content);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -530,14 +526,13 @@ public class ModController {
         }
     }
 
-    @PutMapping("/projects/{id}/reviews/{reviewId}")
-    public ResponseEntity<?> editReview(@PathVariable String id, @PathVariable String reviewId, @RequestBody Map<String, Object> body) {
+    @PutMapping("/projects/{id}/comments/{commentId}")
+    public ResponseEntity<?> editComment(@PathVariable String id, @PathVariable String commentId, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        String comment = (String) body.get("comment");
-        int rating = (int) body.get("rating");
+        String content = (String) body.get("content");
         try {
-            modService.editReview(id, reviewId, user.getId(), comment, rating);
+            modService.editComment(id, commentId, user.getUsername(), content);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -546,13 +541,25 @@ public class ModController {
         }
     }
 
-    @PostMapping("/projects/{id}/reviews/{reviewId}/reply")
-    public ResponseEntity<?> replyToReview(@PathVariable String id, @PathVariable String reviewId, @RequestBody Map<String, Object> body) {
+    @DeleteMapping("/projects/{id}/comments/{commentId}")
+    public ResponseEntity<?> deleteComment(@PathVariable String id, @PathVariable String commentId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            modService.deleteComment(id, commentId, user.getUsername());
+            return ResponseEntity.ok().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/projects/{id}/comments/{commentId}/reply")
+    public ResponseEntity<?> replyToComment(@PathVariable String id, @PathVariable String commentId, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         String reply = (String) body.get("reply");
         try {
-            modService.replyToReview(id, reviewId, reply, user.getId());
+            modService.replyToComment(id, commentId, reply, user.getUsername());
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

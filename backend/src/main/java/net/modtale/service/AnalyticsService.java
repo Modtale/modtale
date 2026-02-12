@@ -109,7 +109,6 @@ public class AnalyticsService {
         pipeline.add(Aggregation.unwind("projectData", false));
 
         pipeline.add(Aggregation.project("currentWeek", "recent")
-                .and("projectData.rating").as("rating")
                 .and("projectData.downloadCount").as("totalDownloads")
                 .and("projectData.favoriteCount").as("favoriteCount"));
 
@@ -129,9 +128,6 @@ public class AnalyticsService {
             int currentWeek = doc.getInteger("currentWeek", 0);
             int recent = doc.getInteger("recent", 0);
 
-            Double ratingObj = doc.getDouble("rating");
-            double rating = ratingObj != null ? ratingObj : 0.0;
-
             Integer totalDlObj = doc.getInteger("totalDownloads");
             int totalDownloads = totalDlObj != null ? totalDlObj : 0;
 
@@ -142,22 +138,21 @@ public class AnalyticsService {
             double normalizedTrend = currentWeek / trendDenominator;
             int trendScore = (int) (normalizedTrend * 100);
 
-            double ratingWeight;
-            if (rating >= 4.5) ratingWeight = 1.0;
-            else if (rating > 0) ratingWeight = rating / 4.5;
-            else ratingWeight = 0.5;
+            // Hidden Gems Logic: High favorites relative to downloads (underdogs)
+            // Or simply high favorites if we want to promote liked content regardless of downloads
+            // Given "hidden gems to use favorites instead of ratings", we'll favor projects with good engagement ratio
+            double engagementRatio = (double) favoriteCount / (Math.max(1, totalDownloads) * 0.01);
+            if (favoriteCount < 5) engagementRatio = 0; // Minimum threshold
 
-            double rawRatio = (double) totalDownloads / Math.max(1, favoriteCount);
-            double clampedRatio = Math.min(400.0, Math.max(40.0, rawRatio));
-            double normalizedPerformance = (400.0 - clampedRatio) / (400.0 - 40.0);
-            double favoriteMultiplier = 1.0 + (normalizedPerformance * 0.5);
+            // Relevance: Recent activity + Favorites
+            double relevanceScore = recent + (favoriteCount * 2.0);
 
-            double relevanceScore = recent * ratingWeight * favoriteMultiplier;
-            double popularScore = totalDownloads * ratingWeight * favoriteMultiplier;
+            // Popularity: Raw downloads + Favorites boost
+            double popularScore = totalDownloads + (favoriteCount * 10.0);
 
             Update update = new Update()
                     .set("trendScore", trendScore)
-                    .set("relevanceScore", relevanceScore)
+                    .set("relevanceScore", engagementRatio) // Storing gems score in relevance for sorting view
                     .set("popularScore", popularScore);
 
             bulkOps.updateOne(new Query(Criteria.where("_id").is(projectId)), update);
@@ -284,18 +279,11 @@ public class AnalyticsService {
         double normalizedTrend = currentWeek / trendDenominator;
         int trendScore = (int) (normalizedTrend * 100);
 
-        double ratingWeight;
-        if (mod.getRating() >= 4.5) ratingWeight = 1.0;
-        else if (mod.getRating() > 0) ratingWeight = mod.getRating() / 4.5;
-        else ratingWeight = 0.5;
+        double engagementRatio = (double) mod.getFavoriteCount() / (Math.max(1, mod.getDownloadCount()) * 0.01);
+        if (mod.getFavoriteCount() < 5) engagementRatio = 0;
 
-        double rawRatio = (double) mod.getDownloadCount() / Math.max(1, mod.getFavoriteCount());
-        double clampedRatio = Math.min(400.0, Math.max(40.0, rawRatio));
-        double normalizedPerformance = (400.0 - clampedRatio) / (400.0 - 40.0);
-        double favoriteMultiplier = 1.0 + (normalizedPerformance * 0.5);
-
-        double relevanceScore = recent * ratingWeight * favoriteMultiplier;
-        double popularScore = mod.getDownloadCount() * ratingWeight * favoriteMultiplier;
+        double popularScore = mod.getDownloadCount() + (mod.getFavoriteCount() * 10.0);
+        double relevanceScore = engagementRatio;
 
         boolean changed = mod.getTrendScore() != trendScore ||
                 Math.abs(mod.getRelevanceScore() - relevanceScore) > 0.01 ||
@@ -573,7 +561,7 @@ public class AnalyticsService {
         LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
 
         for (Mod mod : projects) {
-            metaMap.put(mod.getId(), new ProjectMeta(mod.getId(), mod.getTitle(), mod.getRating(), mod.getDownloadCount()));
+            metaMap.put(mod.getId(), new ProjectMeta(mod.getId(), mod.getTitle(), mod.getDownloadCount()));
 
             List<ProjectMonthlyStats> modStats = allStats.stream()
                     .filter(s -> s.getProjectId().equals(mod.getId()))
@@ -611,7 +599,7 @@ public class AnalyticsService {
         List<ProjectMonthlyStats> stats = getStatsInMemory(projectId, chartStart, end, true, false);
         detail.setViews(buildTimeSeries(stats, chartStart, end, false));
         detail.setVersionDownloads(buildVersionBreakdown(stats, start, end));
-        detail.setRatingHistory(new ArrayList<>());
+        // Rating history removed
 
         return detail;
     }

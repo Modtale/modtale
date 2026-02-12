@@ -79,17 +79,21 @@ export interface ProjectVersion {
     rejectionReason?: string;
 }
 
-export interface Review {
+export interface Reply {
+    user: string;
+    userAvatarUrl?: string;
+    content: string;
+    date: string;
+}
+
+export interface Comment {
     id: string;
     user: string;
     userAvatarUrl?: string;
-    comment: string;
-    rating: number;
+    content: string;
     date: string;
-    version: string;
     updatedAt?: string;
-    developerReply?: string;
-    developerReplyDate?: string;
+    developerReply?: Reply;
 }
 
 export interface Mod {
@@ -108,13 +112,12 @@ export interface Mod {
     tags?: string[];
     downloadCount: number;
     favoriteCount: number;
-    rating: number;
     updatedAt: string;
     createdAt?: string;
     modIds?: string[];
     childProjectIds?: string[];
     sizeBytes?: number;
-    reviews: Review[];
+    comments: Comment[];
     versions: ProjectVersion[];
     galleryImages: string[];
     repositoryUrl?: string;
@@ -122,7 +125,7 @@ export interface Mod {
     pendingInvites?: string[];
     lastTrendingNotification?: string;
     allowModpacks?: boolean;
-    allowReviews?: boolean;
+    allowComments?: boolean;
     status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;
@@ -141,7 +144,6 @@ export interface AnalyticsDataPoint {
 export interface ProjectMeta {
     id: string;
     title: string;
-    currentRating: number;
     totalDownloads: number;
 }
 
@@ -164,7 +166,6 @@ export interface ProjectAnalyticsDetail {
     totalViews: number;
     versionDownloads: Record<string, AnalyticsDataPoint[]>;
     views: AnalyticsDataPoint[];
-    ratingHistory: AnalyticsDataPoint[];
 }
 
 export interface Report {

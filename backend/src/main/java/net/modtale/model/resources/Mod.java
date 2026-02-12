@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 @Document(collection = "projects")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @CompoundIndexes({
-        @CompoundIndex(name = "class_tags_rating_idx", def = "{'classification': 1, 'tags': 1, 'rating': -1}"),
         @CompoundIndex(name = "class_tags_downloads_idx", def = "{'classification': 1, 'tags': 1, 'downloadCount': -1}"),
         @CompoundIndex(name = "class_updated_idx", def = "{'classification': 1, 'updatedAt': -1}"),
         @CompoundIndex(name = "status_expires_idx", def = "{'status': 1, 'expiresAt': 1}"),
@@ -56,7 +55,6 @@ public class Mod {
 
     private int downloadCount;
     private int favoriteCount;
-    private double rating;
 
     private int trendScore;
     private double relevanceScore;
@@ -76,7 +74,7 @@ public class Mod {
 
     private List<String> modIds;
     private boolean allowModpacks = true;
-    private boolean allowReviews = true;
+    private boolean allowComments = true;
 
     @Indexed
     private String status = "PUBLISHED";
@@ -92,7 +90,13 @@ public class Mod {
     private String pendingTransferTo;
 
     private List<String> galleryImages = new ArrayList<>();
-    private List<Review> reviews = new ArrayList<>();
+
+    // Replaces reviews
+    private List<Comment> comments = new ArrayList<>();
+
+    // Legacy field for migration purposes if needed, not exposed via getter/setter usually unless for migration tool
+    // private List<Review> reviews;
+
     private List<ModVersion> versions = new ArrayList<>();
 
     @Transient
@@ -138,8 +142,6 @@ public class Mod {
     public void setDownloadCount(int downloadCount) { this.downloadCount = downloadCount; }
     public int getFavoriteCount() { return favoriteCount; }
     public void setFavoriteCount(int favoriteCount) { this.favoriteCount = favoriteCount; }
-    public double getRating() { return rating; }
-    public void setRating(double rating) { this.rating = rating; }
 
     public int getTrendScore() { return trendScore; }
     public void setTrendScore(int trendScore) { this.trendScore = trendScore; }
@@ -172,8 +174,8 @@ public class Mod {
     public boolean isAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
 
-    public boolean isAllowReviews() { return allowReviews; }
-    public void setAllowReviews(boolean allowReviews) { this.allowReviews = allowReviews; }
+    public boolean isAllowComments() { return allowComments; }
+    public void setAllowComments(boolean allowComments) { this.allowComments = allowComments; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
@@ -196,8 +198,10 @@ public class Mod {
 
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
-    public List<Review> getReviews() { return reviews; }
-    public void setReviews(List<Review> reviews) { this.reviews = reviews; }
+
+    public List<Comment> getComments() { return comments; }
+    public void setComments(List<Comment> comments) { this.comments = comments; }
+
     public List<ModVersion> getVersions() { return versions; }
     public void setVersions(List<ModVersion> versions) { this.versions = versions; }
 
