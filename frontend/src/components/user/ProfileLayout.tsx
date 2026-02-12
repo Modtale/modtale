@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     ChevronLeft, Upload, Plus, Image as ImageIcon,
     Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, X,
-    UserPlus, UserCheck, Building2
+    UserPlus, UserCheck, Building2, Settings
 } from 'lucide-react';
 import { ImageCropperModal } from '../ui/ImageCropperModal';
 import { Spinner } from '../ui/Spinner';
@@ -285,7 +285,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                 <div className="hidden md:flex items-center gap-2">
                                     {actionInput ? actionInput : (
                                         <>
-                                            {!isSelf && (
+                                            {isSelf ? (
+                                                <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5">
+                                                    <Settings className="w-5 h-5" /> Manage Profile
+                                                </a>
+                                            ) : (
                                                 <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
                                                     {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
                                                 </button>
@@ -319,7 +323,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         <div className="md:hidden flex items-center gap-3 w-full mb-6 h-12">
                             {actionInput ? actionInput : (
                                 <>
-                                    {!isSelf && (
+                                    {isSelf ? (
+                                        <a href="/dashboard/profile" className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10">
+                                            <Settings className="w-4 h-4" /> Manage Profile
+                                        </a>
+                                    ) : (
                                         <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                                             {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : "Sign in to Follow"}
                                         </button>
