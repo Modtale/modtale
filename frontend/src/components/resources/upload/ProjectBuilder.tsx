@@ -37,7 +37,7 @@ interface ProjectBuilderProps {
     bannerPreview: string | null;
     setBannerPreview: (url: string | null) => void;
     setBannerFile: (file: File | null) => void;
-    handleSave: (silent?: boolean) => Promise<string | null>; // CHANGED: Returns error string or null
+    handleSave: (silent?: boolean) => Promise<boolean>;
     handlePublish?: () => void;
     handleDelete?: () => void;
     handleDeleteVersion?: (versionId: string) => void;
@@ -317,20 +317,15 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     const handleConfirmSlug = async (useCurrent: boolean) => {
+        setSlugError(null);
         if (!useCurrent && metaData.slug) {
-            const error = await handleSave(true);
-
-            if (error) {
-                if (error.toLowerCase().includes("taken")) {
-                    setSlugError(error);
-                } else {
-                    onShowStatus('error', 'Error', error);
-                    setShowSlugPrompt(false);
-                }
-            } else {
-                setIsDirty(false);
+            const success = await handleSave(true);
+            if (success) {
                 setShowSlugPrompt(false);
+                setIsDirty(false);
                 setShowPublishConfirm(true);
+            } else {
+                setSlugError("Unable to save slug. It may be taken.");
             }
         } else {
             setShowSlugPrompt(false);
@@ -398,30 +393,29 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             <div className="space-y-4">
                                 <div className="flex flex-col gap-2">
                                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Project URL Slug</label>
-                                    <div className={`flex items-center w-full bg-slate-50 dark:bg-black/20 border rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 dark:border-white/10'}`}>
+                                    <div className={`flex items-center w-full bg-slate-50 dark:bg-black/20 border rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`}>
                                         <div className="px-4 py-3 bg-slate-100 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-400 text-xs font-mono whitespace-nowrap select-none">{getUrlPrefix()}</div>
                                         <input
                                             value={metaData.slug || ''}
-                                            onChange={(e) => { handleSlugChange(e); if(slugError) setSlugError(null); }}
-                                            className="flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400"
+                                            onChange={handleSlugChange}
+                                            className={`flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`}
                                             placeholder={createSlug(metaData.title, modData?.id || 'id')}
                                         />
                                     </div>
-                                    {slugError && <p className="text-[10px] text-red-500 font-bold px-1 animate-in slide-in-from-top-1">{slugError}</p>}
+                                    {slugError && <p className="text-[10px] text-red-500 font-bold px-1">{slugError}</p>}
                                 </div>
                             </div>
 
                             <div className="flex flex-col sm:flex-row items-center gap-3 mt-10">
                                 <button
                                     onClick={() => handleConfirmSlug(false)}
-                                    disabled={isLoading || !!slugError || !metaData.slug}
+                                    disabled={!!slugError || !metaData.slug}
                                     className="w-full sm:flex-1 h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-base shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                                 >
-                                    {isLoading ? <Spinner className="w-5 h-5 text-white" /> : <><Save className="w-5 h-5" /> Save & Continue</>}
+                                    <Save className="w-5 h-5" /> Save & Continue
                                 </button>
                                 <button
                                     onClick={() => handleConfirmSlug(true)}
-                                    disabled={isLoading}
                                     className="w-full sm:w-auto px-8 h-14 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-2xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
                                 >
                                     Use Default
@@ -697,7 +691,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
                                         <div className="flex flex-col gap-2">
                                             <div><h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-slate-500" /> Project Slug</h3><p className="text-xs text-slate-500">Customize the URL.</p></div>
-                                            <div className="flex items-center w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                            <div className={`flex items-center w-full bg-white dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`}>
                                                 <div className="px-4 py-2 bg-slate-50 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-500 text-sm font-mono whitespace-nowrap select-none">{getUrlPrefix()}</div>
                                                 <input disabled={readOnly} value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder={createSlug(metaData.title, modData?.id || 'id')} />
                                             </div>
