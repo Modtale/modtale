@@ -44,7 +44,7 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) 
                 <div key={report.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-6 flex flex-col md:flex-row gap-6 relative overflow-hidden group">
                     <div className="absolute top-0 left-0 bottom-0 w-1 bg-red-500"></div>
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                             <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-wider border border-red-500/20">
                                 {report.reason.replace('_', ' ')}
@@ -57,7 +57,7 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) 
                         </h3>
                         <div className="text-xs font-mono text-slate-400 mb-4">{report.projectId}</div>
 
-                        <p className="text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 p-4 rounded-xl text-sm italic mb-4 border border-slate-200 dark:border-white/5">
+                        <p className="text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 p-4 rounded-xl text-sm italic mb-4 border border-slate-200 dark:border-white/5 break-words">
                             "{report.description}"
                         </p>
 
