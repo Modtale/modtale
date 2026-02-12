@@ -618,7 +618,13 @@ public class ModController {
         try {
             @SuppressWarnings("unchecked")
             List<String> modIds = (List<String>) body.get("modIds");
-            modService.updateVersionDependencies(id, versionId, modIds);
+            @SuppressWarnings("unchecked")
+            List<String> gameVersions = (List<String>) body.get("gameVersions");
+            String changelog = (String) body.get("changelog");
+            String channelStr = (String) body.get("channel");
+            ModVersion.Channel channel = channelStr != null ? ModVersion.Channel.valueOf(channelStr) : null;
+
+            modService.updateVersion(id, versionId, modIds, gameVersions, changelog, channel);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) { return ResponseEntity.status(403).body(e.getMessage()); }
         catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }

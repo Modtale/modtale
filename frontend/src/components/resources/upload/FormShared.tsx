@@ -76,6 +76,7 @@ interface VersionFieldsProps {
     projectType?: string;
     existingVersions?: string[];
     disabled?: boolean;
+    hideFilePicker?: boolean;
 }
 
 export const VersionFields: React.FC<VersionFieldsProps> = ({
@@ -84,7 +85,8 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
                                                                 isModpack,
                                                                 projectType,
                                                                 existingVersions = [],
-                                                                disabled
+                                                                disabled,
+                                                                hideFilePicker = false
                                                             }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [availableGameVersions, setAvailableGameVersions] = useState<string[]>([]);
@@ -168,7 +170,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({
 
     return (
         <div className={`space-y-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
-            {!isModpack && (
+            {!isModpack && !hideFilePicker && (
                 <div>
                     <Label required>
                         Project File

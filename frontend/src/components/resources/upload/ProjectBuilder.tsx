@@ -22,7 +22,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { createSlug } from '../../../utils/slug';
-import type { Mod, User } from '../../../types';
+import type { Mod, User, ProjectVersion } from '../../../types';
 import { ModCard } from '../ModCard';
 import { VersionFields, ThemedInput } from './FormShared';
 import type { MetadataFormData, VersionFormData } from './FormShared';
@@ -85,6 +85,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [slugError, setSlugError] = useState<string | null>(null);
 
     const [isCustomLicense, setIsCustomLicense] = useState(false);
+
+    const [editingVersion, setEditingVersion] = useState<ProjectVersion | null>(null);
+    const [editVersionData, setEditVersionData] = useState<VersionFormData | null>(null);
+    const [isSavingVersion, setIsSavingVersion] = useState(false);
 
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
@@ -333,6 +337,46 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const handleEditVersion = (version: ProjectVersion) => {
+        const formattedDependencies = version.dependencies?.map(d =>
+            `${d.modId}:${d.versionNumber}${d.isOptional ? ':optional' : ''}`
+        ) || [];
+
+        setEditVersionData({
+            versionNumber: version.versionNumber,
+            gameVersions: version.gameVersions || [],
+            changelog: version.changelog || '',
+            file: null,
+            channel: version.channel || 'RELEASE',
+            modIds: formattedDependencies,
+            dependencies: []
+        });
+        setEditingVersion(version);
+    };
+
+    const saveVersionUpdates = async () => {
+        if (!modData || !editingVersion || !editVersionData) return;
+        setIsSavingVersion(true);
+        try {
+            await api.put(`/projects/${modData.id}/versions/${editingVersion.id}`, {
+                gameVersions: editVersionData.gameVersions,
+                changelog: editVersionData.changelog,
+                channel: editVersionData.channel,
+                modIds: editVersionData.modIds
+            });
+
+            const res = await api.get(`/projects/${modData.id}`);
+            setModData(res.data);
+            setEditingVersion(null);
+            setEditVersionData(null);
+            onShowStatus('success', 'Updated', 'Version metadata updated successfully.');
+        } catch (e: any) {
+            onShowStatus('error', 'Update Failed', e.response?.data?.message || 'Failed to update version.');
+        } finally {
+            setIsSavingVersion(false);
+        }
+    };
+
     return (
         <>
             {modData?.status === 'PENDING' && (
@@ -372,6 +416,50 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             Restore Project
                         </button>
                     )}
+                </div>
+            )}
+
+            {editingVersion && editVersionData && (
+                <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+                        <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-900 dark:text-white">Edit Version Metadata</h2>
+                                <p className="text-xs text-slate-500 font-mono mt-1">Editing {editingVersion.versionNumber}</p>
+                            </div>
+                            <button onClick={() => setEditingVersion(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto custom-scrollbar">
+                            <VersionFields
+                                data={editVersionData}
+                                onChange={setEditVersionData}
+                                isModpack={classification === 'MODPACK'}
+                                projectType={typeof classification === 'string' ? classification : 'PLUGIN'}
+                                disabled={isSavingVersion}
+                                hideFilePicker={true}
+                            />
+                        </div>
+
+                        <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex justify-end gap-3">
+                            <button
+                                onClick={() => setEditingVersion(null)}
+                                className="px-6 py-3 rounded-xl font-bold text-sm bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveVersionUpdates}
+                                disabled={isSavingVersion}
+                                className="px-6 py-3 rounded-xl font-bold text-sm bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg transition-all flex items-center gap-2"
+                            >
+                                {isSavingVersion ? <Spinner className="w-4 h-4 text-white" /> : <Save className="w-4 h-4" />}
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -582,12 +670,27 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     </div>
                                 )}
                                 {modData?.versions?.map(v => (
-                                    <div key={v.id} className="bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-white/5 rounded-xl p-4 flex justify-between items-center">
+                                    <div key={v.id} className="bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-white/5 rounded-xl p-4 flex justify-between items-center group">
                                         <div>
                                             <div className="flex items-center gap-3"><span className="font-mono font-bold text-slate-900 dark:text-white text-lg">{v.versionNumber}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${v.channel === 'RELEASE' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 'text-orange-500 border-orange-500/30 bg-orange-500/10'}`}>{v.channel}</span></div>
                                             <div className="text-xs text-slate-500 mt-1">{v.gameVersions?.join(', ') || 'Unknown'} • {new Date(v.releaseDate).toLocaleDateString()}</div>
                                         </div>
-                                        {!readOnly && handleDeleteVersion && <button onClick={() => handleDeleteVersion(v.id)} className="p-2 text-slate-500 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>}
+                                        {!readOnly && (
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleEditVersion(v)}
+                                                    className="p-2 text-slate-500 hover:text-modtale-accent hover:bg-modtale-accent/10 rounded-lg transition-colors"
+                                                    title="Edit Version Metadata"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                {handleDeleteVersion && (
+                                                    <button onClick={() => handleDeleteVersion(v.id)} className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
