@@ -235,8 +235,12 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                         href={`/creator/${member.username}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
                                     >
-                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
-                                            <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
+                                            {member.avatarUrl ? (
+                                                <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="font-bold text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
+                                            )}
                                         </div>
                                         <div>
                                             <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
@@ -263,8 +267,12 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                         href={`/creator/${org.username}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
                                     >
-                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
-                                            <img src={org.avatarUrl} alt={org.username} className="w-full h-full object-cover" />
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
+                                            {org.avatarUrl ? (
+                                                <img src={org.avatarUrl} alt={org.username} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="font-bold text-slate-400 text-xs">{org.username.charAt(0).toUpperCase()}</span>
+                                            )}
                                         </div>
                                         <div>
                                             <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{org.username}</div>

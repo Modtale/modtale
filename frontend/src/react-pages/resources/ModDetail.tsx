@@ -157,8 +157,12 @@ const ProjectSidebar: React.FC<{
                                 href={`/creator/${member.username}`}
                                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                             >
-                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
-                                    <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
+                                    {member.avatarUrl ? (
+                                        <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="font-bold text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
+                                    )}
                                 </div>
                                 <div>
                                     <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-modtale-accent">{member.username}</div>
@@ -181,8 +185,12 @@ const ProjectSidebar: React.FC<{
                                 href={`/creator/${contributor.username}`}
                                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                             >
-                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
-                                    <img src={contributor.avatarUrl} alt={contributor.username} className="w-full h-full object-cover" />
+                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
+                                    {contributor.avatarUrl ? (
+                                        <img src={contributor.avatarUrl} alt={contributor.username} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="font-bold text-slate-400 text-xs">{contributor.username.charAt(0).toUpperCase()}</span>
+                                    )}
                                 </div>
                                 <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-modtale-accent">{contributor.username}</div>
                             </a>
