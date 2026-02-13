@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Mod, Modpack, User } from '../../types.ts';
 import { ModCard } from '../../components/resources/ModCard.tsx';
 import { api } from '../../utils/api.ts';
-import { Package, Users, ChevronLeft, ChevronRight, CornerDownLeft } from 'lucide-react';
+import { Package, Users, ChevronLeft, ChevronRight, CornerDownLeft, Building2 } from 'lucide-react';
 import { createSlug } from '../../utils/slug.ts';
 import { ProfileLayout } from '../../components/user/ProfileLayout.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
@@ -30,6 +30,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
 
     const [creator, setCreator] = useState<User | null>(null);
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
+    const [memberOrgs, setMemberOrgs] = useState<User[]>([]);
     const [loadingCreator, setLoadingCreator] = useState(true);
     const [notFound, setNotFound] = useState(false);
 
@@ -78,10 +79,17 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
 
                 if (userData.accountType === 'ORGANIZATION') {
                     try {
-                        const membersRes = await api.get(`/user/org/${username}/members`);
+                        const membersRes = await api.get(`/orgs/${username}/members`);
                         setOrgMembers(membersRes.data);
                     } catch (e) {
                         console.warn("Could not fetch org members", e);
+                    }
+                } else {
+                    try {
+                        const orgsRes = await api.get(`/users/${username}/organizations`);
+                        setMemberOrgs(orgsRes.data);
+                    } catch (e) {
+                        console.warn("Could not fetch user organizations", e);
                     }
                 }
             } catch (error: any) {
@@ -227,13 +235,41 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                         href={`/creator/${member.username}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
                                     >
-                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100">
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
                                             <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
                                         </div>
                                         <div>
                                             <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
                                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                                                 {creator.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                                            </div>
+                                        </div>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {creator.accountType === 'USER' && memberOrgs.length > 0 && (
+                        <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Building2 className="w-5 h-5 text-blue-500" />
+                                Member Organizations
+                            </h2>
+                            <div className="flex flex-wrap gap-4">
+                                {memberOrgs.map(org => (
+                                    <a
+                                        key={org.id}
+                                        href={`/creator/${org.username}`}
+                                        className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
+                                            <img src={org.avatarUrl} alt={org.username} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{org.username}</div>
+                                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                Organization
                                             </div>
                                         </div>
                                     </a>

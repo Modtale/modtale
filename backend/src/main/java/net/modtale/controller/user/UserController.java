@@ -46,6 +46,15 @@ public class UserController {
         return ResponseEntity.ok(userService.searchUsers(query));
     }
 
+    @PostMapping("/users/batch")
+    public ResponseEntity<List<User>> getUsersBatch(@RequestBody Map<String, List<String>> body) {
+        List<String> usernames = body.get("usernames");
+        if (usernames == null || usernames.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(userService.getPublicProfilesByUsernames(usernames));
+    }
+
     @PostMapping("/orgs")
     public ResponseEntity<?> createOrganization(@RequestBody Map<String, String> payload) {
         User user = userService.getCurrentUser();
@@ -69,6 +78,11 @@ public class UserController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(userService.getUserOrganizations(user.getId()));
+    }
+
+    @GetMapping("/users/{username}/organizations")
+    public ResponseEntity<List<User>> getUserOrganizations(@PathVariable String username) {
+        return ResponseEntity.ok(userService.getUserOrganizationsByUsername(username));
     }
 
     @GetMapping("/orgs/{username}/members")

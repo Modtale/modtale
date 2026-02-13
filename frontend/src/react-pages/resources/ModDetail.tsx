@@ -12,7 +12,7 @@ import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, Crown, Trash
+    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, Crown, Trash, Users
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -77,7 +77,10 @@ const ProjectSidebar: React.FC<{
     depMeta: Record<string, { icon: string, title: string }>;
     sourceUrl?: string;
     navigate: (path: string) => void;
-}> = ({ mod, dependencies, depMeta, navigate }) => {
+    contributors: User[];
+    orgMembers: User[];
+    author: User | null;
+}> = ({ mod, dependencies, depMeta, navigate, contributors, orgMembers, author }) => {
     const [copiedId, setCopiedId] = useState(false);
 
     const gameVersions = useMemo(() => {
@@ -144,6 +147,49 @@ const ProjectSidebar: React.FC<{
                     {(!mod.tags || mod.tags.length === 0) && <span className="text-xs text-slate-500 italic">No tags.</span>}
                 </div>
             </SidebarSection>
+
+            {author && author.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
+                <SidebarSection title="Team Members" icon={Users}>
+                    <div className="flex flex-col gap-2">
+                        {orgMembers.map(member => (
+                            <a
+                                key={member.id}
+                                href={`/creator/${member.username}`}
+                                className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
+                            >
+                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
+                                    <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-modtale-accent">{member.username}</div>
+                                    <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                                        {author.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                                    </div>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                </SidebarSection>
+            )}
+
+            {contributors.length > 0 && (
+                <SidebarSection title="Contributors" icon={Users}>
+                    <div className="flex flex-col gap-2">
+                        {contributors.map(contributor => (
+                            <a
+                                key={contributor.id}
+                                href={`/creator/${contributor.username}`}
+                                className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
+                            >
+                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
+                                    <img src={contributor.avatarUrl} alt={contributor.username} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-modtale-accent">{contributor.username}</div>
+                            </a>
+                        ))}
+                    </div>
+                </SidebarSection>
+            )}
 
             {dependencies && dependencies.length > 0 && (
                 <SidebarSection title={isModpack ? "Included Mods" : "Dependencies"} icon={isModpack ? Box : LinkIcon}>
@@ -432,6 +478,10 @@ export const ModDetail: React.FC<{
     const [isFollowing, setIsFollowing] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
 
+    const [contributors, setContributors] = useState<User[]>([]);
+    const [orgMembers, setOrgMembers] = useState<User[]>([]);
+    const [authorProfile, setAuthorProfile] = useState<User | null>(null);
+
     const [showExperimental, setShowExperimental] = useState(() => {
         if (initialMod?.versions?.length) {
             return !initialMod.versions.some((v: any) => !v.channel || v.channel === 'RELEASE');
@@ -487,6 +537,36 @@ export const ModDetail: React.FC<{
             }).catch(() => setIsNotFound(true)).finally(() => setLoading(false));
         }
     }, [realId, currentUser]);
+
+    useEffect(() => {
+        const fetchTeam = async () => {
+            if (!mod) return;
+
+            try {
+                const authorRes = await api.get(`/user/profile/${mod.author}`);
+                const author = authorRes.data;
+                setAuthorProfile(author);
+
+                if (author.accountType === 'ORGANIZATION') {
+                    const membersRes = await api.get(`/orgs/${mod.author}/members`);
+                    setOrgMembers(membersRes.data);
+                }
+            } catch (e) {
+                console.error("Failed to fetch author profile/members", e);
+            }
+
+            if (mod.contributors && mod.contributors.length > 0) {
+                try {
+                    const res = await api.post('/users/batch', { usernames: mod.contributors });
+                    setContributors(res.data);
+                } catch (e) {
+                    console.error("Failed to fetch contributors", e);
+                }
+            }
+        };
+
+        if (mod) fetchTeam();
+    }, [mod?.id, mod?.author]);
 
     useEffect(() => {
         if (mod && !loading) {
@@ -961,6 +1041,9 @@ export const ModDetail: React.FC<{
                         dependencies={latestDependencies}
                         depMeta={depMeta}
                         sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
+                        contributors={contributors}
+                        orgMembers={orgMembers}
+                        author={authorProfile}
                     />
                 }
                 mainContent={

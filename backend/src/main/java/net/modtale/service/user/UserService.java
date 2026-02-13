@@ -333,6 +333,14 @@ public class UserService {
         return user;
     }
 
+    public List<User> getPublicProfilesByUsernames(List<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) return new ArrayList<>();
+
+        Query query = new Query(Criteria.where("username").in(usernames).and("deletedAt").is(null));
+        query.fields().include("username", "avatarUrl", "accountType", "badges", "id", "roles", "tier");
+        return mongoTemplate.find(query, User.class);
+    }
+
     public void deleteUser(String userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         user.setDeletedAt(LocalDateTime.now());
@@ -655,6 +663,21 @@ public class UserService {
     public List<User> getUserOrganizations(String userId) {
         List<User> orgs = userRepository.findOrganizationsByMemberId(userId);
         return orgs.stream().filter(o -> !o.isDeleted()).collect(Collectors.toList());
+    }
+
+    public List<User> getUserOrganizationsByUsername(String username) {
+        User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        if (user == null) return new ArrayList<>();
+
+        List<User> orgs = userRepository.findOrganizationsByMemberId(user.getId());
+        return orgs.stream()
+                .filter(o -> !o.isDeleted())
+                .peek(o -> {
+                    o.setEmail(null);
+                    o.setGithubAccessToken(null);
+                    o.setGitlabAccessToken(null);
+                })
+                .collect(Collectors.toList());
     }
 
     public DefaultOAuth2User linkAccountToOrg(String orgId, String provider, OAuth2User oauthUser, String accessToken) {
