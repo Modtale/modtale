@@ -3,6 +3,7 @@ package net.modtale.controller.user;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import net.modtale.model.dto.UserDTO;
 import net.modtale.model.user.User;
 import net.modtale.model.user.GitRepository;
 import net.modtale.service.user.UserService;
@@ -15,7 +16,6 @@ import org.springframework.http.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
@@ -42,17 +42,23 @@ public class UserController {
     @Autowired private FileValidationService validationService;
 
     @GetMapping("/users/search")
-    public ResponseEntity<List<User>> searchUsers(@RequestParam String query) {
-        return ResponseEntity.ok(userService.searchUsers(query));
+    public ResponseEntity<List<UserDTO>> searchUsers(@RequestParam String query) {
+        List<User> users = userService.searchUsers(query);
+        return ResponseEntity.ok(users.stream()
+                .map(u -> UserDTO.fromEntity(u, false))
+                .collect(Collectors.toList()));
     }
 
     @PostMapping("/users/batch")
-    public ResponseEntity<List<User>> getUsersBatch(@RequestBody Map<String, List<String>> body) {
+    public ResponseEntity<List<UserDTO>> getUsersBatch(@RequestBody Map<String, List<String>> body) {
         List<String> usernames = body.get("usernames");
         if (usernames == null || usernames.isEmpty()) {
             return ResponseEntity.ok(List.of());
         }
-        return ResponseEntity.ok(userService.getPublicProfilesByUsernames(usernames));
+        List<User> users = userService.getPublicProfilesByUsernames(usernames);
+        return ResponseEntity.ok(users.stream()
+                .map(u -> UserDTO.fromEntity(u, false))
+                .collect(Collectors.toList()));
     }
 
     @PostMapping("/orgs")
@@ -67,22 +73,28 @@ public class UserController {
 
         try {
             User org = userService.createOrganization(name, user);
-            return ResponseEntity.ok(org);
+            return ResponseEntity.ok(UserDTO.fromEntity(org, true));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     @GetMapping("/user/orgs")
-    public ResponseEntity<List<User>> getMyOrganizations() {
+    public ResponseEntity<List<UserDTO>> getMyOrganizations() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(userService.getUserOrganizations(user.getId()));
+        List<User> orgs = userService.getUserOrganizations(user.getId());
+        return ResponseEntity.ok(orgs.stream()
+                .map(u -> UserDTO.fromEntity(u, true))
+                .collect(Collectors.toList()));
     }
 
     @GetMapping("/users/{username}/organizations")
-    public ResponseEntity<List<User>> getUserOrganizations(@PathVariable String username) {
-        return ResponseEntity.ok(userService.getUserOrganizationsByUsername(username));
+    public ResponseEntity<List<UserDTO>> getUserOrganizations(@PathVariable String username) {
+        List<User> orgs = userService.getUserOrganizationsByUsername(username);
+        return ResponseEntity.ok(orgs.stream()
+                .map(u -> UserDTO.fromEntity(u, false))
+                .collect(Collectors.toList()));
     }
 
     @GetMapping("/orgs/{username}/members")
@@ -167,7 +179,7 @@ public class UserController {
 
         try {
             User updated = userService.updateOrganization(orgId, name, bio, user);
-            return ResponseEntity.ok(updated);
+            return ResponseEntity.ok(UserDTO.fromEntity(updated, true));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -308,7 +320,7 @@ public class UserController {
         if (org == null) return ResponseEntity.status(403).build();
 
         String accessToken = org.getGithubAccessToken();
-        if (accessToken == null) return ResponseEntity.status(404).body(List.of()); // No token found
+        if (accessToken == null) return ResponseEntity.status(404).body(List.of());
 
         try {
             return ResponseEntity.ok(githubService.getUserRepos(accessToken));
@@ -318,10 +330,10 @@ public class UserController {
     }
 
     @GetMapping("/user/me")
-    public ResponseEntity<?> getCurrentUser() {
+    public ResponseEntity<UserDTO> getCurrentUser() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(UserDTO.fromEntity(user, true));
     }
 
     @DeleteMapping("/user/me")
@@ -343,18 +355,10 @@ public class UserController {
     }
 
     @GetMapping("/user/profile/{username}")
-    public ResponseEntity<User> getUserProfile(@PathVariable String username) {
+    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String username) {
         User user = userService.getPublicProfile(username);
         if (user == null) return ResponseEntity.notFound().build();
-
-        user.setGithubAccessToken(null);
-        user.setGitlabAccessToken(null);
-        user.setEmail(null);
-        user.setNotificationPreferences(null);
-        if (user.getConnectedAccounts() != null) {
-            user.getConnectedAccounts().removeIf(a -> !a.isVisible());
-        }
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(UserDTO.fromEntity(user, false));
     }
 
     @PutMapping("/user/profile")
@@ -385,7 +389,7 @@ public class UserController {
                 }
             }
 
-            return ResponseEntity.ok(updated);
+            return ResponseEntity.ok(UserDTO.fromEntity(updated, true));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -595,12 +599,18 @@ public class UserController {
     }
 
     @GetMapping("/users/{username}/following")
-    public ResponseEntity<List<User>> getUserFollowing(@PathVariable String username) {
-        return ResponseEntity.ok(userService.getFollowing(username));
+    public ResponseEntity<List<UserDTO>> getUserFollowing(@PathVariable String username) {
+        List<User> following = userService.getFollowing(username);
+        return ResponseEntity.ok(following.stream()
+                .map(u -> UserDTO.fromEntity(u, false))
+                .collect(Collectors.toList()));
     }
 
     @GetMapping("/users/{username}/followers")
-    public ResponseEntity<List<User>> getUserFollowers(@PathVariable String username) {
-        return ResponseEntity.ok(userService.getFollowers(username));
+    public ResponseEntity<List<UserDTO>> getUserFollowers(@PathVariable String username) {
+        List<User> followers = userService.getFollowers(username);
+        return ResponseEntity.ok(followers.stream()
+                .map(u -> UserDTO.fromEntity(u, false))
+                .collect(Collectors.toList()));
     }
 }
