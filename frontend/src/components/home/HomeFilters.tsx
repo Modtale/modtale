@@ -190,6 +190,13 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
         setPage(0);
     }
 
+    const displayFilterCount = [
+        selectedVersion && selectedVersion !== 'Any',
+        minFavorites > 0,
+        minDownloads > 0,
+        (filterDate !== null && !isDownloadSort)
+    ].filter(Boolean).length;
+
     return (
         <div className="w-full">
             <div className={`md:hidden w-full transition-all duration-300 ease-in-out overflow-hidden ${showMiniSearch ? 'max-h-14 opacity-100 mb-3' : 'max-h-0 opacity-0 mb-0 pointer-events-none'}`}>
@@ -236,9 +243,9 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                     </div>
 
                     <div className="relative flex-1 md:flex-none" ref={filterRef}>
-                        <button onClick={onToggleFilterMenu} className={`w-full md:w-auto h-10 flex items-center justify-between md:justify-start gap-2 border rounded-lg px-3 md:px-4 text-xs md:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || activeFilterCount > 0 ? 'bg-modtale-accent text-white border-modtale-accent shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-modtale-accent'}`}>
+                        <button onClick={onToggleFilterMenu} className={`w-full md:w-auto h-10 flex items-center justify-between md:justify-start gap-2 border rounded-lg px-3 md:px-4 text-xs md:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-modtale-accent shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-modtale-accent'}`}>
                             <div className="flex items-center gap-2"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
-                            {activeFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px]">{activeFilterCount}</span>}
+                            {displayFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px]">{displayFilterCount}</span>}
                         </button>
 
                         {isFilterOpen && (
