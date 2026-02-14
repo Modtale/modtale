@@ -33,7 +33,7 @@ const WIZARD_STEPS: WizardStep[] = [
         id: 'content',
         title: 'Content',
         icon: <FileText className="w-4 h-4" />,
-        rejectReasons: ["Inappropriate imagery", "Description contains spam/links", "Low quality assets", "Insufficient description"]
+        rejectReasons: ["Inappropriate imagery", "Description contains spam/links", "Low quality assets", "Insufficient description", "Changelog missing or irrelevant"]
     },
     {
         id: 'files',
@@ -123,7 +123,7 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
     const canProceed = () => {
         switch (currentStep) {
             case 0: return checklist['title'] && checklist['tags'] && checklist['class'];
-            case 1: return checklist['desc'] && checklist['images'];
+            case 1: return checklist['desc'] && checklist['images'] && checklist['changelog'];
             case 2: return checklist['download'] && checklist['manual_check'];
             case 3: return checklist['author'];
             default: return true;
@@ -385,6 +385,13 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                 </div>
 
                                 <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
+                                    <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Version Changelog</label>
+                                    <div className="prose dark:prose-invert max-w-none text-sm prose-p:text-slate-600 dark:prose-p:text-slate-300 bg-white dark:bg-black/20 p-4 rounded-xl border border-slate-200 dark:border-white/5">
+                                        <div className="whitespace-pre-wrap font-mono text-xs">{pendingVersion.changelog || "No changelog provided."}</div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
                                     <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Long Description Preview</label>
                                     <div className="prose dark:prose-invert max-w-none text-sm prose-p:text-slate-600 dark:prose-p:text-slate-300">
                                         <div className="whitespace-pre-wrap">{mod.about}</div>
@@ -415,6 +422,13 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                         </div>
                                         <input type="checkbox" checked={!!checklist['desc']} onChange={() => toggleCheck('desc')} className="hidden" />
                                         <span className="font-bold text-slate-700 dark:text-slate-200">Description is clean</span>
+                                    </label>
+                                    <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                        <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${checklist['changelog'] ? 'bg-modtale-accent border-modtale-accent' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                            {checklist['changelog'] && <Check className="w-4 h-4 text-white" />}
+                                        </div>
+                                        <input type="checkbox" checked={!!checklist['changelog']} onChange={() => toggleCheck('changelog')} className="hidden" />
+                                        <span className="font-bold text-slate-700 dark:text-slate-200">Changelog is informative</span>
                                     </label>
                                 </div>
                             </div>
