@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Flag, ExternalLink, Check, X, ShieldAlert } from 'lucide-react';
+import { Flag, ExternalLink, Check, X, ShieldAlert, MessageSquare, User } from 'lucide-react';
 import { api } from '../../utils/api';
 import type { Report } from '../../types';
 
@@ -26,6 +26,20 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) 
         }
     };
 
+    const getTargetLink = (report: Report) => {
+        if (report.targetType === 'USER') return `/creator/${report.targetSummary}`;
+        if (report.targetType === 'PROJECT') return `/mod/${report.targetId}`;
+        return '#';
+    };
+
+    const getIcon = (type: string) => {
+        switch (type) {
+            case 'USER': return <User className="w-4 h-4" />;
+            case 'COMMENT': return <MessageSquare className="w-4 h-4" />;
+            default: return <Flag className="w-4 h-4" />;
+        }
+    };
+
     if (reports.length === 0) {
         return (
             <div className="text-center py-32 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-sm">
@@ -49,13 +63,16 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) 
                             <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-wider border border-red-500/20">
                                 {report.reason.replace('_', ' ')}
                             </span>
+                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                {getIcon(report.targetType)} {report.targetType}
+                            </span>
                             <span className="text-xs text-slate-400 font-medium">{new Date(report.createdAt).toLocaleString()}</span>
                         </div>
 
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-                            {report.projectTitle}
+                            {report.targetSummary || 'Unknown Target'}
                         </h3>
-                        <div className="text-xs font-mono text-slate-400 mb-4">{report.projectId}</div>
+                        <div className="text-xs font-mono text-slate-400 mb-4">{report.targetId}</div>
 
                         <p className="text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 p-4 rounded-xl text-sm italic mb-4 border border-slate-200 dark:border-white/5 break-words">
                             "{report.description}"
@@ -67,14 +84,16 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) 
                     </div>
 
                     <div className="flex flex-col gap-2 justify-center min-w-[180px]">
-                        <a
-                            href={`/mod/${report.projectId}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="w-full py-2 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
-                        >
-                            <ExternalLink className="w-3 h-3" /> View Project
-                        </a>
+                        {report.targetType !== 'COMMENT' && (
+                            <a
+                                href={getTargetLink(report)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="w-full py-2 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                            >
+                                <ExternalLink className="w-3 h-3" /> View Target
+                            </a>
+                        )}
                         <button
                             onClick={() => handleResolve(report.id, 'RESOLVED')}
                             disabled={!!processing}

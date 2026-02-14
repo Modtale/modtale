@@ -172,8 +172,9 @@ export interface Report {
     id: string;
     reporterId: string;
     reporterUsername: string;
-    projectId: string;
-    projectTitle: string;
+    targetId: string;
+    targetType: 'PROJECT' | 'COMMENT' | 'USER';
+    targetSummary: string;
     reason: string;
     description: string;
     status: 'OPEN' | 'RESOLVED' | 'DISMISSED';

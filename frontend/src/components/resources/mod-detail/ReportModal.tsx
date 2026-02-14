@@ -5,8 +5,10 @@ import { api } from '../../../utils/api';
 interface ReportModalProps {
     isOpen: boolean;
     onClose: () => void;
-    projectId: string;
-    projectTitle: string;
+    projectId?: string; // Legacy/Fallback
+    projectTitle?: string; // Legacy/Fallback
+    targetId?: string;
+    targetType?: 'PROJECT' | 'COMMENT' | 'USER';
 }
 
 const REPORT_REASONS = [
@@ -14,10 +16,11 @@ const REPORT_REASONS = [
     { id: 'SPAM', label: 'Spam / Misleading' },
     { id: 'INAPPROPRIATE', label: 'Inappropriate Content' },
     { id: 'IP_INFRINGEMENT', label: 'Intellectual Property Violation' },
+    { id: 'HARASSMENT', label: 'Harassment / Hate Speech' },
     { id: 'OTHER', label: 'Other' }
 ];
 
-export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, projectId, projectTitle }) => {
+export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, projectId, projectTitle, targetId, targetType = 'PROJECT' }) => {
     const [reason, setReason] = useState(REPORT_REASONS[0].id);
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
@@ -26,6 +29,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, proje
 
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const effectiveTargetId = targetId || projectId;
+    const effectiveTitle = projectTitle || (targetType === 'COMMENT' ? 'Comment' : (targetType === 'USER' ? 'User Profile' : 'Content'));
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -46,7 +52,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, proje
 
         try {
             await api.post('/reports', {
-                projectId,
+                targetId: effectiveTargetId,
+                targetType,
                 reason,
                 description
             });
@@ -72,7 +79,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, proje
                 <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
                     <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Flag className="w-5 h-5 text-red-500" />
-                        Report Project
+                        Report {targetType === 'USER' ? 'User' : (targetType === 'COMMENT' ? 'Comment' : 'Project')}
                     </h3>
                     <button onClick={onClose} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors">
                         <X className="w-4 h-4" />
@@ -91,7 +98,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, proje
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-lg text-sm text-slate-600 dark:text-slate-400">
-                                Reporting <span className="font-bold text-slate-900 dark:text-white">{projectTitle}</span>
+                                Reporting <span className="font-bold text-slate-900 dark:text-white">{effectiveTitle}</span>
                             </div>
 
                             {error && (

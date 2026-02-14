@@ -65,6 +65,9 @@ public interface ModRepository extends MongoRepository<Mod, String>, ModReposito
     @Query("{ 'versions.fileUrl': ?0 }")
     Optional<Mod> findByVersionsFileUrl(String fileUrl);
 
+    @Query("{ 'comments._id': ?0 }")
+    Optional<Mod> findByCommentsId(String commentId);
+
     @Query(value = "{ 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }", fields = "{ 'tags' : 1 }")
     List<Mod> findAllWithTags();
 
