@@ -27,7 +27,7 @@ const WIZARD_STEPS: WizardStep[] = [
         id: 'meta',
         title: 'Metadata',
         icon: <List className="w-4 h-4" />,
-        rejectReasons: ["Title violates naming conventions", "Incorrect classification selected", "Tags are irrelevant or spam", "Slug/URL is invalid"]
+        rejectReasons: ["Title violates naming conventions", "Incorrect classification selected", "Tags are irrelevant or spam", "Slug/URL is invalid", "External links are malicious/broken"]
     },
     {
         id: 'content',
@@ -333,6 +333,26 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                         ))}
                                     </div>
                                 </div>
+
+                                {mod.links && Object.keys(mod.links).length > 0 && (
+                                    <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                        <label className="text-xs font-bold text-slate-400 uppercase block mb-3 tracking-wider">External Links</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {Object.entries(mod.links).map(([key, url]) => (
+                                                <a
+                                                    key={key}
+                                                    href={url as string}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 shadow-sm flex items-center gap-2 hover:text-modtale-accent hover:border-modtale-accent/50 transition-colors"
+                                                >
+                                                    <ExternalLink className="w-3 h-3" />
+                                                    <span className="capitalize">{key}</span>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="space-y-3 pt-6 border-t border-slate-200 dark:border-white/5">
                                     <label className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
