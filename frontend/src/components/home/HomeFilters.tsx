@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Heart, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Heart, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { GLOBAL_TAGS } from '../../data/categories';
 import { api } from '../../utils/api';
 import { compareSemVer } from '../../utils/modHelpers';
@@ -41,10 +41,7 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
         { id: 'relevance', label: 'Relevance', mobileOnly: false },
         { id: 'popular', label: 'Popular', mobileOnly: true },
         { id: 'trending', label: 'Trending', mobileOnly: true },
-        { id: 'downloads', label: 'Downloads (All Time)', mobileOnly: false },
-        { id: 'downloads_week', label: 'Downloads (Week)', mobileOnly: false },
-        { id: 'downloads_month', label: 'Downloads (Month)', mobileOnly: false },
-        { id: 'downloads_quarter', label: 'Downloads (3 Months)', mobileOnly: true },
+        { id: 'downloads', label: 'Downloads', mobileOnly: false },
         { id: 'favorites', label: 'Favorites', mobileOnly: false },
         { id: 'newest', label: 'Newest', mobileOnly: true },
         { id: 'updated', label: 'Updated', mobileOnly: true }
@@ -62,7 +59,7 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
                 <div className="flex items-center gap-2"><ArrowDownUp className="w-4 h-4 text-slate-400" /><span className="truncate">{currentLabel}</span></div>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
-            {isOpen && <div className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-2 z-[70]">{visibleOptions.map(opt => (<button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium flex justify-between items-center transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-bold' : 'text-slate-700 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt.label}{value === opt.id && <Check className="w-3 h-3" />}</button>))}</div>}
+            {isOpen && <div className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-2 z-[70]">{visibleOptions.map(opt => (<button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium flex justify-between items-center transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-bold' : 'text-slate-700 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt.label}{value === opt.id && <Check className="w-3 h-3" />}</button>))}</div>}
         </div>
     );
 };
@@ -151,52 +148,47 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
         return d.toISOString().split('T')[0];
     };
 
-    const handleDateSelect = (date: Date) => { const isoDate = date.toISOString().split('T')[0]; setFilterDate(isoDate); setSelectedDateObj(date); setShowCalendar(false); setPage(0); };
+    const handleDateSelect = (date: Date) => {
+        if (sortBy === 'downloads') onSortChange('updated');
+        const isoDate = date.toISOString().split('T')[0];
+        setFilterDate(isoDate);
+        setSelectedDateObj(date);
+        setShowCalendar(false);
+        setPage(0);
+    };
 
     const handleDaysAgo = (days: number) => {
+        if (sortBy === 'downloads') onSortChange('updated');
         if (days === 0) { setFilterDate(null); setSelectedDateObj(null); }
         else { setFilterDate(getDateStringDaysAgo(days)); setSelectedDateObj(null); }
         setPage(0);
     };
 
+    const isDownloadSort = sortBy === 'downloads';
+
     const isPresetActive = (days: number) => {
+        if (isDownloadSort) return false;
         if (days === 0) return !filterDate;
         if (!filterDate) return false;
         const targetStr = getDateStringDaysAgo(days);
         return filterDate === targetStr && !selectedDateObj;
     };
 
+    const isDownloadPresetActive = (days: number) => {
+        if (!isDownloadSort) return false;
+        if (days === 0) return !filterDate;
+        if (!filterDate) return false;
+        const targetStr = getDateStringDaysAgo(days);
+        return filterDate === targetStr;
+    }
+
     const resetAll = () => { onResetFilters(); setCustomDl(''); setCustomFav(''); setFilterDate(null); setSelectedDateObj(null); setShowCalendar(false); };
 
-    // Custom handler to manage combined Sort + Date states
-    const handleSortChange = (val: string) => {
-        if (val === 'downloads_week') {
-            onSortChange('downloads');
-            setFilterDate(getDateStringDaysAgo(7));
-        } else if (val === 'downloads_month') {
-            onSortChange('downloads');
-            setFilterDate(getDateStringDaysAgo(30));
-        } else if (val === 'downloads_quarter') {
-            onSortChange('downloads');
-            setFilterDate(getDateStringDaysAgo(90));
-        } else if (val === 'downloads') {
-            onSortChange('downloads');
-            setFilterDate(null); // Reset date for All Time downloads
-        } else {
-            onSortChange(val);
-        }
+    const handleDownloadTimeframe = (days: number) => {
+        if (days === 0) setFilterDate(null);
+        else setFilterDate(getDateStringDaysAgo(days));
         setPage(0);
-    };
-
-    const getSortDisplayValue = () => {
-        if (sortBy === 'downloads') {
-            if (isPresetActive(7)) return 'downloads_week';
-            if (isPresetActive(30)) return 'downloads_month';
-            if (isPresetActive(90)) return 'downloads_quarter';
-            return 'downloads';
-        }
-        return sortBy;
-    };
+    }
 
     return (
         <div className="w-full">
@@ -310,8 +302,8 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                                         </button>
                                                     ))}
                                                 </div>
-                                                <button onClick={() => setShowCalendar(true)} className={`w-full flex items-center justify-between bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:border-modtale-accent ${filterDate && !isPresetActive(7) && !isPresetActive(30) && !isPresetActive(90) ? 'text-modtale-accent font-bold border-modtale-accent' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                    <span className="flex items-center gap-2"><CalendarIcon className="w-3.5 h-3.5" /> {filterDate ? `Since ${new Date(filterDate).toLocaleDateString()}` : 'Pick a Date'}</span>
+                                                <button onClick={() => setShowCalendar(true)} className={`w-full flex items-center justify-between bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:border-modtale-accent ${filterDate && !isPresetActive(7) && !isPresetActive(30) && !isPresetActive(90) && !isDownloadSort ? 'text-modtale-accent font-bold border-modtale-accent' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                    <span className="flex items-center gap-2"><CalendarIcon className="w-3.5 h-3.5" /> {filterDate && !isDownloadSort ? `Since ${new Date(filterDate).toLocaleDateString()}` : 'Pick a Date'}</span>
                                                     <ChevronDown className="w-3.5 h-3.5" />
                                                 </button>
                                             </>
@@ -328,11 +320,51 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                         )}
                     </div>
 
+                    {isDownloadSort && (
+                        <div className="hidden md:flex bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200">
+                            {[
+                                { label: '7d', val: 7 },
+                                { label: '30d', val: 30 },
+                                { label: '90d', val: 90 },
+                                { label: 'All', val: 0 }
+                            ].map((opt) => (
+                                <button
+                                    key={opt.label}
+                                    onClick={() => handleDownloadTimeframe(opt.val)}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${isDownloadPresetActive(opt.val) ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="flex-1 md:flex-none">
-                        <SortDropdown value={getSortDisplayValue()} onChange={handleSortChange} onOpen={handleSortOpen} isMobile={isMobile} />
+                        <SortDropdown value={sortBy} onChange={(val) => { onSortChange(val); if (val === 'downloads') setFilterDate(null); }} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
                 </div>
             </div>
+
+            {isDownloadSort && (
+                <div className="md:hidden mt-3 flex justify-center">
+                    <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg p-1 flex w-full max-w-xs justify-between">
+                        {[
+                            { label: '7 Days', val: 7 },
+                            { label: '30 Days', val: 30 },
+                            { label: '3 Months', val: 90 },
+                            { label: 'All Time', val: 0 }
+                        ].map((opt) => (
+                            <button
+                                key={opt.label}
+                                onClick={() => handleDownloadTimeframe(opt.val)}
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${isDownloadPresetActive(opt.val) ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
