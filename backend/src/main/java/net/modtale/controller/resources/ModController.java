@@ -1,5 +1,6 @@
 package net.modtale.controller.resources;
 
+import net.modtale.model.dto.ModDTO;
 import net.modtale.model.user.User;
 import net.modtale.model.resources.*;
 import net.modtale.repository.user.UserRepository;
@@ -305,7 +306,7 @@ public class ModController {
     }
 
     @GetMapping("/projects")
-    public ResponseEntity<Page<Mod>> getProjects(
+    public ResponseEntity<Page<ModDTO>> getProjects(
             @RequestParam(required = false) String tags,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
@@ -361,7 +362,7 @@ public class ModController {
             } else {
                 cacheControl = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
             }
-            return ResponseEntity.ok().cacheControl(cacheControl).body(data);
+            return ResponseEntity.ok().cacheControl(cacheControl).body(data.map(ModDTO::fromEntity));
         } catch (Exception e) {
             logger.error("Error in getProjects", e);
             return ResponseEntity.ok(Page.empty());
@@ -388,7 +389,7 @@ public class ModController {
             mod.setIsOwner(modService.isOwner(mod, user));
         }
 
-        return ResponseEntity.ok(mod);
+        return ResponseEntity.ok(ModDTO.fromEntity(mod));
     }
 
     @GetMapping("/projects/{id}/meta")
@@ -446,7 +447,7 @@ public class ModController {
     }
 
     @GetMapping("/creators/{username}/projects")
-    public ResponseEntity<Page<Mod>> getCreatorProjects(
+    public ResponseEntity<Page<ModDTO>> getCreatorProjects(
             @PathVariable String username,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
@@ -482,11 +483,11 @@ public class ModController {
             });
         }
 
-        return ResponseEntity.ok(pageResult);
+        return ResponseEntity.ok(pageResult.map(ModDTO::fromEntity));
     }
 
     @GetMapping("/projects/user/contributed")
-    public ResponseEntity<Page<Mod>> getContributedProjects(
+    public ResponseEntity<Page<ModDTO>> getContributedProjects(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
     ) {
@@ -500,7 +501,7 @@ public class ModController {
             m.setIsOwner(modService.isOwner(m, user));
         });
 
-        return ResponseEntity.ok(pageResult);
+        return ResponseEntity.ok(pageResult.map(ModDTO::fromEntity));
     }
 
     @PostMapping("/projects/{id}/favorite")
