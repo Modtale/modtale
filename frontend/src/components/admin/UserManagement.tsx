@@ -76,6 +76,9 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         setLoading(true);
         try {
             await api.post('/admin/users/bans', { email: foundUser.email, reason: banUserReason || "Banned from user management" });
+
+            await api.delete(`/admin/users/${foundUser.username}`);
+
             setStatus({ type: 'success', title: 'User Banned', msg: `Email ${foundUser.email} banned and account deleted.` });
             setFoundUser(null);
             setUsername('');
@@ -83,7 +86,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
             setBanUserReason('');
             setBanConfirmInput('');
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Ban Failed', msg: e.response?.data || 'Could not ban email.' });
+            setStatus({ type: 'error', title: 'Ban Failed', msg: e.response?.data || 'Could not ban user completely.' });
         } finally {
             setLoading(false);
         }
@@ -134,7 +137,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
     const fetchUserProfile = async (name: string) => {
         setLoading(true);
         try {
-            const res = await api.get(`/user/profile/${name}`);
+            const res = await api.get(`/admin/users/${name}`);
             setFoundUser(res.data);
         } catch (e) {
             setStatus({ type: 'error', title: 'User Not Found', msg: `Could not load details for "${name}"` });
@@ -424,7 +427,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                                     </div>
                                 </button>
 
-                                {foundUser.email && foundUser.emailVerified && (
+                                {foundUser.email && (
                                     <button
                                         onClick={() => setShowBanConfirm(true)}
                                         className="relative p-8 rounded-3xl border-2 border-red-500/20 hover:border-red-600 hover:bg-red-600/10 text-left transition-all duration-300 group overflow-hidden"

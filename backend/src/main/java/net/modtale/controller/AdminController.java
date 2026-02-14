@@ -1,5 +1,6 @@
 package net.modtale.controller;
 
+import net.modtale.model.dto.UserDTO;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.model.user.BannedEmail;
@@ -98,6 +99,18 @@ public class AdminController {
         userService.unbanEmail(email);
         logAction(currentUser.getId(), "UNBAN_EMAIL", email, "EMAIL", null);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/users/{username}")
+    public ResponseEntity<?> getUserDetails(@PathVariable String username) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        Optional<User> target = userRepository.findByUsernameIgnoreCase(username);
+        if (target.isEmpty()) return ResponseEntity.notFound().build();
+
+        return ResponseEntity.ok(UserDTO.fromEntity(target.get(), true));
     }
 
     @DeleteMapping("/users/{username}")
