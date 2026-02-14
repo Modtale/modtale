@@ -19,6 +19,7 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -81,7 +82,11 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             criteriaList.add(Criteria.where("versions.gameVersions").is(gameVersion));
         if (minRating != null) criteriaList.add(Criteria.where("rating").gte(minRating));
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
-        if (dateCutoff != null) criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
+
+        boolean isTimeBasedDownloadSort = "downloads".equals(sortBy) && dateCutoff != null;
+        if (dateCutoff != null && !isTimeBasedDownloadSort) {
+            criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
+        }
 
         Criteria baseCriteria = criteriaList.isEmpty() ? new Criteria() :
                 (criteriaList.size() == 1 ? criteriaList.get(0) : new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
@@ -140,6 +145,17 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
         } else if ("hidden_gems".equals(viewCategory)) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "gemRatio"));
+        } else if ("downloads".equals(sortBy) && dateCutoff != null) {
+            long daysDiff = ChronoUnit.DAYS.between(dateCutoff, LocalDate.now());
+            if (daysDiff <= 7) {
+                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloads7d"));
+            } else if (daysDiff <= 31) {
+                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloads30d"));
+            } else if (daysDiff <= 92) {
+                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloads90d"));
+            } else {
+                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloadCount"));
+            }
         } else if (pageable.getSort().isSorted()) {
             pipeline.add(Aggregation.sort(pageable.getSort()));
         } else {
