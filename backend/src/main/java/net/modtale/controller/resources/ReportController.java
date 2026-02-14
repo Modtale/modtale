@@ -23,19 +23,21 @@ public class ReportController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String projectId = payload.get("projectId");
+        String targetId = payload.get("targetId");
+        String targetTypeStr = payload.get("targetType");
         String reason = payload.get("reason");
         String description = payload.get("description");
 
-        if (projectId == null || reason == null) {
-            return ResponseEntity.badRequest().body("Project ID and Reason are required");
+        if (targetId == null || targetTypeStr == null || reason == null) {
+            return ResponseEntity.badRequest().body("Target ID, Type, and Reason are required");
         }
 
         try {
-            reportService.createReport(projectId, reason, description, user);
+            Report.TargetType targetType = Report.TargetType.valueOf(targetTypeStr);
+            reportService.createReport(targetId, targetType, reason, description, user);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body("Invalid target type or data: " + e.getMessage());
         }
     }
 

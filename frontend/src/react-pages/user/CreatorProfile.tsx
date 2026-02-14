@@ -9,6 +9,7 @@ import { ProfileLayout } from '../../components/user/ProfileLayout.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
 import { EmptyState } from '../../components/ui/EmptyState.tsx';
 import NotFound from '../../components/ui/error/NotFound.tsx';
+import { ReportModal } from '../../components/resources/mod-detail/ReportModal.tsx';
 
 interface CreatorProfileProps {
     onModClick: (mod: Mod) => void;
@@ -40,6 +41,8 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
     const [totalPages, setTotalPages] = useState(0);
     const [totalItems, setTotalItems] = useState(0);
     const [jumpPage, setJumpPage] = useState('');
+
+    const [showReportModal, setShowReportModal] = useState(false);
 
     const [itemsPerPage] = useState(12);
 
@@ -212,6 +215,14 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-20">
+            <ReportModal
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                targetId={creator.id}
+                projectTitle={creator.username}
+                targetType="USER"
+            />
+
             <ProfileLayout
                 user={creator}
                 stats={stats}
@@ -220,6 +231,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                 isSelf={currentUser?.username === creator.username}
                 isLoggedIn={!!currentUser}
                 onBack={onBack}
+                onReport={() => setShowReportModal(true)}
             >
                 <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16">
                     {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (

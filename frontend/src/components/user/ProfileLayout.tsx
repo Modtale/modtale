@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     ChevronLeft, Upload, Plus, Image as ImageIcon,
     Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, X,
-    UserPlus, UserCheck, Building2, Settings
+    UserPlus, UserCheck, Building2, Settings, Flag
 } from 'lucide-react';
 import { ImageCropperModal } from '../ui/ImageCropperModal';
 import { Spinner } from '../ui/Spinner';
@@ -34,6 +34,7 @@ interface ProfileLayoutProps {
     isLoggedIn?: boolean;
     onBack?: () => void;
     onToggleFollow?: () => void;
+    onReport?: () => void;
     onBannerUpload?: (file: File) => Promise<void>;
     onAvatarUpload?: (file: File) => Promise<void>;
     headerInput?: React.ReactNode;
@@ -44,7 +45,7 @@ interface ProfileLayoutProps {
 
 export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                                                 user, stats, isEditing = false, isSelf = false, isFollowing = false, isLoggedIn = false,
-                                                                onBack, onToggleFollow, onBannerUpload, onAvatarUpload, headerInput, bioInput, actionInput, children
+                                                                onBack, onToggleFollow, onReport, onBannerUpload, onAvatarUpload, headerInput, bioInput, actionInput, children
                                                             }) => {
     const [bannerToCrop, setBannerToCrop] = useState<string | null>(null);
     const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
@@ -297,6 +298,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                             <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all" title="Copy ID">
                                                 {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
                                             </button>
+                                            {onReport && (
+                                                <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-red-500 hover:border-red-500/20 transition-all" title="Report User">
+                                                    <Flag className="w-5 h-5" />
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -335,6 +341,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-200 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0" title="Copy ID">
                                         {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
                                     </button>
+                                    {onReport && (
+                                        <button onClick={onReport} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-200 dark:bg-white/5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0" title="Report User">
+                                            <Flag className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </>
                             )}
                         </div>

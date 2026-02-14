@@ -270,9 +270,10 @@ interface CommentSectionProps {
     onSuccess: (msg: string) => void;
     innerRef?: React.RefObject<HTMLDivElement | null>;
     commentsDisabled?: boolean;
+    onReport: (commentId: string) => void;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, currentUser, isCreator, onCommentSubmitted, onError, onSuccess, innerRef, commentsDisabled }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, currentUser, isCreator, onCommentSubmitted, onError, onSuccess, innerRef, commentsDisabled, onReport }) => {
     const [text, setText] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -379,6 +380,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, curren
                                     {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                 </div>
                                 <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {currentUser && (
+                                        <button onClick={() => onReport(comment.id)} className="text-xs text-slate-500 hover:text-red-500 font-bold flex items-center gap-1">
+                                            <Flag className="w-3 h-3"/> Report
+                                        </button>
+                                    )}
                                     {(currentUser && currentUser.username === comment.user) && (
                                         <button onClick={() => startEditing(comment)} className="text-xs text-slate-500 hover:text-modtale-accent font-bold flex items-center gap-1">
                                             <Edit className="w-3 h-3"/> Edit
@@ -499,7 +505,8 @@ export const ModDetail: React.FC<{
 
     const [showMobileLinks, setShowMobileLinks] = useState(false);
     const [showMobileDeps, setShowMobileDeps] = useState(false);
-    const [showReportModal, setShowReportModal] = useState(false);
+
+    const [reportTarget, setReportTarget] = useState<{id: string, type: 'PROJECT' | 'COMMENT' | 'USER', title?: string} | null>(null);
 
     const commentsRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -809,10 +816,12 @@ export const ModDetail: React.FC<{
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />
 
             <ReportModal
-                isOpen={showReportModal}
-                onClose={() => setShowReportModal(false)}
-                projectId={mod.id}
-                projectTitle={mod.title}
+                isOpen={!!reportTarget}
+                onClose={() => setReportTarget(null)}
+                projectId={reportTarget?.type === 'PROJECT' ? reportTarget.id : (mod?.id || '')}
+                projectTitle={reportTarget?.type === 'PROJECT' ? reportTarget.title : undefined}
+                targetId={reportTarget?.id}
+                targetType={reportTarget?.type}
             />
 
             {pendingDownloadVer && (
@@ -892,7 +901,7 @@ export const ModDetail: React.FC<{
                         <button onClick={handleShare} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-blue-400 hover:border-blue-400/30 transition-all" title="Share">
                             <Share2 className="w-5 h-5" />
                         </button>
-                        <button onClick={() => setShowReportModal(true)} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
+                        <button onClick={() => setReportTarget({id: mod.id, type: 'PROJECT', title: mod.title})} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
                             <Flag className="w-5 h-5" />
                         </button>
                         {Boolean(canEdit) && (
@@ -1069,6 +1078,7 @@ export const ModDetail: React.FC<{
                             onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})}
                             onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})}
                             innerRef={commentsRef}
+                            onReport={(commentId) => setReportTarget({id: commentId, type: 'COMMENT'})}
                         />
                     </>
                 }
