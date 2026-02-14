@@ -21,7 +21,10 @@ import java.time.LocalDateTime;
         @CompoundIndex(name = "status_expires_idx", def = "{'status': 1, 'expiresAt': 1}"),
         @CompoundIndex(name = "trend_score_idx", def = "{'trendScore': -1}"),
         @CompoundIndex(name = "relevance_score_idx", def = "{'relevanceScore': -1}"),
-        @CompoundIndex(name = "popular_score_idx", def = "{'popularScore': -1}")
+        @CompoundIndex(name = "popular_score_idx", def = "{'popularScore': -1}"),
+        @CompoundIndex(name = "downloads_7d_idx", def = "{'downloads7d': -1}"),
+        @CompoundIndex(name = "downloads_30d_idx", def = "{'downloads30d': -1}"),
+        @CompoundIndex(name = "downloads_90d_idx", def = "{'downloads90d': -1}")
 })
 public class Mod {
     @Id
@@ -55,6 +58,11 @@ public class Mod {
 
     private int downloadCount;
     private int favoriteCount;
+
+    // Cached analytics for time-based sorting
+    private int downloads7d;
+    private int downloads30d;
+    private int downloads90d;
 
     private int trendScore;
     private double relevanceScore;
@@ -138,6 +146,15 @@ public class Mod {
     public void setDownloadCount(int downloadCount) { this.downloadCount = downloadCount; }
     public int getFavoriteCount() { return favoriteCount; }
     public void setFavoriteCount(int favoriteCount) { this.favoriteCount = favoriteCount; }
+
+    public int getDownloads7d() { return downloads7d; }
+    public void setDownloads7d(int downloads7d) { this.downloads7d = downloads7d; }
+
+    public int getDownloads30d() { return downloads30d; }
+    public void setDownloads30d(int downloads30d) { this.downloads30d = downloads30d; }
+
+    public int getDownloads90d() { return downloads90d; }
+    public void setDownloads90d(int downloads90d) { this.downloads90d = downloads90d; }
 
     public int getTrendScore() { return trendScore; }
     public void setTrendScore(int trendScore) { this.trendScore = trendScore; }

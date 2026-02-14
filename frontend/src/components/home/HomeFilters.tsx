@@ -41,7 +41,10 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
         { id: 'relevance', label: 'Relevance', mobileOnly: false },
         { id: 'popular', label: 'Popular', mobileOnly: true },
         { id: 'trending', label: 'Trending', mobileOnly: true },
-        { id: 'downloads', label: 'Downloads', mobileOnly: false },
+        { id: 'downloads', label: 'Downloads (All Time)', mobileOnly: false },
+        { id: 'downloads_week', label: 'Downloads (Week)', mobileOnly: false },
+        { id: 'downloads_month', label: 'Downloads (Month)', mobileOnly: false },
+        { id: 'downloads_quarter', label: 'Downloads (3 Months)', mobileOnly: true },
         { id: 'favorites', label: 'Favorites', mobileOnly: false },
         { id: 'newest', label: 'Newest', mobileOnly: true },
         { id: 'updated', label: 'Updated', mobileOnly: true }
@@ -59,7 +62,7 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
                 <div className="flex items-center gap-2"><ArrowDownUp className="w-4 h-4 text-slate-400" /><span className="truncate">{currentLabel}</span></div>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
-            {isOpen && <div className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-2 z-[70]">{visibleOptions.map(opt => (<button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium flex justify-between items-center transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-bold' : 'text-slate-700 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt.label}{value === opt.id && <Check className="w-3 h-3" />}</button>))}</div>}
+            {isOpen && <div className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-2 z-[70]">{visibleOptions.map(opt => (<button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); }} className={`w-full text-left px-4 py-2.5 text-sm font-medium flex justify-between items-center transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-bold' : 'text-slate-700 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt.label}{value === opt.id && <Check className="w-3 h-3" />}</button>))}</div>}
         </div>
     );
 };
@@ -141,19 +144,59 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
     }, []);
 
     const handleSortOpen = () => { if (isFilterOpen) onToggleFilterMenu(); if (isTagsOpen) setIsTagsOpen(false); };
+
+    const getDateStringDaysAgo = (days: number) => {
+        const d = new Date();
+        d.setDate(d.getDate() - days);
+        return d.toISOString().split('T')[0];
+    };
+
     const handleDateSelect = (date: Date) => { const isoDate = date.toISOString().split('T')[0]; setFilterDate(isoDate); setSelectedDateObj(date); setShowCalendar(false); setPage(0); };
+
     const handleDaysAgo = (days: number) => {
         if (days === 0) { setFilterDate(null); setSelectedDateObj(null); }
-        else { const d = new Date(); d.setDate(d.getDate() - days); setFilterDate(d.toISOString().split('T')[0]); setSelectedDateObj(null); }
+        else { setFilterDate(getDateStringDaysAgo(days)); setSelectedDateObj(null); }
         setPage(0);
     };
+
     const isPresetActive = (days: number) => {
         if (days === 0) return !filterDate;
         if (!filterDate) return false;
-        const target = new Date(); target.setDate(target.getDate() - days); const targetStr = target.toISOString().split('T')[0];
+        const targetStr = getDateStringDaysAgo(days);
         return filterDate === targetStr && !selectedDateObj;
     };
+
     const resetAll = () => { onResetFilters(); setCustomDl(''); setCustomFav(''); setFilterDate(null); setSelectedDateObj(null); setShowCalendar(false); };
+
+    // Custom handler to manage combined Sort + Date states
+    const handleSortChange = (val: string) => {
+        if (val === 'downloads_week') {
+            onSortChange('downloads');
+            setFilterDate(getDateStringDaysAgo(7));
+        } else if (val === 'downloads_month') {
+            onSortChange('downloads');
+            setFilterDate(getDateStringDaysAgo(30));
+        } else if (val === 'downloads_quarter') {
+            onSortChange('downloads');
+            setFilterDate(getDateStringDaysAgo(90));
+        } else if (val === 'downloads') {
+            onSortChange('downloads');
+            setFilterDate(null); // Reset date for All Time downloads
+        } else {
+            onSortChange(val);
+        }
+        setPage(0);
+    };
+
+    const getSortDisplayValue = () => {
+        if (sortBy === 'downloads') {
+            if (isPresetActive(7)) return 'downloads_week';
+            if (isPresetActive(30)) return 'downloads_month';
+            if (isPresetActive(90)) return 'downloads_quarter';
+            return 'downloads';
+        }
+        return sortBy;
+    };
 
     return (
         <div className="w-full">
@@ -286,7 +329,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                     </div>
 
                     <div className="flex-1 md:flex-none">
-                        <SortDropdown value={sortBy} onChange={onSortChange} onOpen={handleSortOpen} isMobile={isMobile} />
+                        <SortDropdown value={getSortDisplayValue()} onChange={handleSortChange} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
                 </div>
             </div>

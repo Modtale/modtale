@@ -62,6 +62,7 @@ public class AnalyticsService {
         Date week1Start = Date.from(today.minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date week2Start = Date.from(today.minusDays(14).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date quarterStart = Date.from(today.minusDays(90).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED")), Mod.class);
         double medianDownloads = calculatePercentileDownloads(totalPublished, 0.50);
@@ -72,16 +73,17 @@ public class AnalyticsService {
 
         int currYear = today.getYear();
         int currMonth = today.getMonthValue();
-        LocalDate prevMonthDate = today.minusMonths(1);
+        LocalDate prevMonthDate = today.minusMonths(3); // Go back enough to cover 90d
         int prevYear = prevMonthDate.getYear();
         int prevMonth = prevMonthDate.getMonthValue();
 
         List<AggregationOperation> pipeline = new ArrayList<>();
 
+        // Match analytics documents within the relevant years/months
         pipeline.add(Aggregation.match(
                 new Criteria().orOperator(
-                        Criteria.where("year").is(currYear).and("month").is(currMonth),
-                        Criteria.where("year").is(prevYear).and("month").is(prevMonth)
+                        Criteria.where("year").gt(prevYear),
+                        Criteria.where("year").is(prevYear).and("month").gte(prevMonth)
                 )
         ));
 
@@ -91,14 +93,14 @@ public class AnalyticsService {
                 .withValue(DateOperators.DateFromParts.dateFromParts().year("$year").month("$month").day(ConvertOperators.ToInt.toInt("$daysArray.k")))
                 .build());
 
-        pipeline.add(Aggregation.match(Criteria.where("logDate").gte(monthStart).lt(todayStart)));
+        pipeline.add(Aggregation.match(Criteria.where("logDate").gte(quarterStart).lt(todayStart)));
 
         pipeline.add(Aggregation.group("projectId")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(week1Start),
                                 Criteria.where("logDate").lt(todayStart)
-                        )).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
+                        )).then("$daysArray.v.d").otherwise(0)).as("currentWeek") // downloads7d
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(week2Start),
@@ -108,7 +110,12 @@ public class AnalyticsService {
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(monthStart),
                                 Criteria.where("logDate").lt(todayStart)
-                        )).then("$daysArray.v.d").otherwise(0)).as("recent")
+                        )).then("$daysArray.v.d").otherwise(0)).as("recent") // downloads30d
+                .sum(ConditionalOperators.when(
+                        new Criteria().andOperator(
+                                Criteria.where("logDate").gte(quarterStart),
+                                Criteria.where("logDate").lt(todayStart)
+                        )).then("$daysArray.v.d").otherwise(0)).as("quarter") // downloads90d
         );
 
         pipeline.add(LookupOperation.newLookup()
@@ -119,7 +126,7 @@ public class AnalyticsService {
 
         pipeline.add(Aggregation.unwind("projectData", false));
 
-        pipeline.add(Aggregation.project("currentWeek", "previousWeek", "recent")
+        pipeline.add(Aggregation.project("currentWeek", "previousWeek", "recent", "quarter")
                 .and("projectData.downloadCount").as("totalDownloads")
                 .and("projectData.favoriteCount").as("favoriteCount"));
 
@@ -139,6 +146,7 @@ public class AnalyticsService {
             int currentWeek = doc.getInteger("currentWeek", 0);
             int previousWeek = doc.getInteger("previousWeek", 0);
             int recent = doc.getInteger("recent", 0);
+            int quarter = doc.getInteger("quarter", 0);
 
             Integer totalDlObj = doc.getInteger("totalDownloads");
             int totalDownloads = totalDlObj != null ? totalDlObj : 0;
@@ -166,7 +174,10 @@ public class AnalyticsService {
             Update update = new Update()
                     .set("trendScore", trendScore)
                     .set("relevanceScore", relevanceScore)
-                    .set("popularScore", popularScore);
+                    .set("popularScore", popularScore)
+                    .set("downloads7d", currentWeek)
+                    .set("downloads30d", recent)
+                    .set("downloads90d", quarter);
 
             bulkOps.updateOne(new Query(Criteria.where("_id").is(projectId)), update);
             counter++;
@@ -178,11 +189,14 @@ public class AnalyticsService {
             }
         }
 
+        // Decay logic for inactive projects (zero out scores and cached download stats)
         Query decayQuery = new Query();
         decayQuery.fields().include("_id");
         decayQuery.addCriteria(new Criteria().orOperator(
                 Criteria.where("trendScore").ne(0),
-                Criteria.where("relevanceScore").gt(0.0)
+                Criteria.where("relevanceScore").gt(0.0),
+                Criteria.where("downloads7d").gt(0),
+                Criteria.where("downloads30d").gt(0)
         ));
 
         List<Mod> currentlyScored = mongoTemplate.find(decayQuery, Mod.class);
@@ -191,7 +205,12 @@ public class AnalyticsService {
             if (!activeProjectIds.contains(mod.getId())) {
                 bulkOps.updateOne(
                         new Query(Criteria.where("_id").is(mod.getId())),
-                        new Update().set("trendScore", 0).set("relevanceScore", 0.0)
+                        new Update()
+                                .set("trendScore", 0)
+                                .set("relevanceScore", 0.0)
+                                .set("downloads7d", 0)
+                                .set("downloads30d", 0)
+                                .set("downloads90d", 0)
                 );
                 counter++;
 
@@ -328,6 +347,10 @@ public class AnalyticsService {
         if (mod.getDownloadCount() < dampeningK * 2) engagementRatio = 0;
         double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
+        // Update cached stats on demand
+        mod.setDownloads7d(currentWeek);
+        mod.setDownloads30d(recent);
+
         boolean changed = mod.getTrendScore() != trendScore ||
                 Math.abs(mod.getRelevanceScore() - relevanceScore) > 0.01 ||
                 Math.abs(mod.getPopularScore() - popularScore) > 0.01;
@@ -340,7 +363,9 @@ public class AnalyticsService {
             Update update = new Update()
                     .set("trendScore", trendScore)
                     .set("relevanceScore", relevanceScore)
-                    .set("popularScore", popularScore);
+                    .set("popularScore", popularScore)
+                    .set("downloads7d", currentWeek)
+                    .set("downloads30d", recent);
 
             bulkOps.updateOne(new Query(Criteria.where("_id").is(mod.getId())), update);
             return true;
