@@ -51,6 +51,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -692,6 +693,7 @@ public class ModService {
 
         ver.setReviewStatus(ModVersion.ReviewStatus.APPROVED);
         ver.setRejectionReason(null);
+        ver.setScheduledPublishDate(null);
         mod.setUpdatedAt(LocalDateTime.now().toString());
 
         modRepository.save(mod);
@@ -713,6 +715,7 @@ public class ModService {
 
         ver.setReviewStatus(ModVersion.ReviewStatus.REJECTED);
         ver.setRejectionReason(reason);
+        ver.setScheduledPublishDate(null);
         modRepository.save(mod);
         evictProjectDetails(mod);
 
@@ -794,7 +797,7 @@ public class ModService {
             originalFilename = originalFilename.substring(37);
         }
 
-        self.performBackgroundScan(modId, versionId, version.getFileUrl(), originalFilename);
+        self.performBackgroundScan(modId, versionId, version.getFileUrl(), originalFilename, true);
     }
 
     public void rejectMod(String id, String reason) {
@@ -1268,12 +1271,20 @@ public class ModService {
         evictProjectDetails(mod);
 
         if (file != null && !isModpack) {
-            self.performBackgroundScan(mod.getId(), ver.getId(), filePath, file.getOriginalFilename());
+            notificationService.sendNotification(
+                    List.of(user.getId()),
+                    "Version Submitted",
+                    "Your project update is pending approval.",
+                    "/dashboard/projects",
+                    mod.getImageUrl()
+            );
+
+            self.performBackgroundScan(mod.getId(), ver.getId(), filePath, file.getOriginalFilename(), false);
         }
     }
 
     @Async
-    public void performBackgroundScan(String modId, String versionId, String filePath, String originalFilename) {
+    public void performBackgroundScan(String modId, String versionId, String filePath, String originalFilename, boolean isManualRescan) {
         try {
             byte[] fileBytes = storageService.download(filePath);
             ScanResult scanResult = wardenService.scanFile(fileBytes, originalFilename);
@@ -1284,32 +1295,23 @@ public class ModService {
             Update update = new Update()
                     .set("versions.$.scanResult", scanResult);
 
-            boolean autoApproved = false;
+            boolean approvedImmediately = false;
 
             if ("CLEAN".equals(scanResult.getStatus())) {
-                update.set("versions.$.reviewStatus", ModVersion.ReviewStatus.APPROVED);
-                update.set("updatedAt", LocalDateTime.now().toString());
-                autoApproved = true;
-                logger.info("Auto-approved clean version {} for project {}", versionId, modId);
+                if (isManualRescan) {
+                    update.set("versions.$.reviewStatus", ModVersion.ReviewStatus.APPROVED);
+                    update.set("updatedAt", LocalDateTime.now().toString());
+                    approvedImmediately = true;
+                    logger.info("Manually re-scanned version {} for project {} approved immediately.", versionId, modId);
+                } else {
+                    long delayMinutes = ThreadLocalRandom.current().nextLong(30, 720);
+                    LocalDateTime scheduledTime = LocalDateTime.now().plusMinutes(delayMinutes);
+                    update.set("versions.$.scheduledPublishDate", scheduledTime.toString());
+                    logger.info("Clean version {} for project {} scheduled for release at {}", versionId, modId, scheduledTime);
+                }
             } else {
                 if ("INFECTED".equals(scanResult.getStatus())) {
                     logger.warn("Warden detected malware in project {} version {}", modId, versionId);
-                }
-                User author = getAuthorUser(mod);
-                if (author != null) {
-                    ModVersion ver = mod.getVersions().stream()
-                            .filter(v -> v.getId().equals(versionId))
-                            .findFirst()
-                            .orElse(null);
-                    String versionNumber = ver != null ? ver.getVersionNumber() : "New";
-
-                    notificationService.sendNotification(
-                            List.of(author.getId()),
-                            "Version Under Review",
-                            "Version " + versionNumber + " was flagged by our security scanner and is pending manual verification.",
-                            "/dashboard/projects",
-                            mod.getImageUrl()
-                    );
                 }
             }
 
@@ -1317,7 +1319,7 @@ public class ModService {
             mongoTemplate.updateFirst(query, update, Mod.class);
             evictProjectDetails(mod);
 
-            if (autoApproved && "PUBLISHED".equals(mod.getStatus())) {
+            if (approvedImmediately && "PUBLISHED".equals(mod.getStatus())) {
                 ModVersion ver = mod.getVersions().stream()
                         .filter(v -> v.getId().equals(versionId))
                         .findFirst()
@@ -1341,6 +1343,55 @@ public class ModService {
 
             Mod mod = modRepository.findById(modId).orElse(null);
             evictProjectDetails(mod);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${app.scheduler.release-check:900000}")
+    public void processScheduledReleases() {
+        Query query = new Query(Criteria.where("versions").elemMatch(
+                Criteria.where("reviewStatus").is("PENDING")
+                        .and("scheduledPublishDate").lte(LocalDateTime.now().toString())
+        ));
+
+        List<Mod> modsToUpdate = mongoTemplate.find(query, Mod.class);
+
+        for (Mod mod : modsToUpdate) {
+            boolean updated = false;
+            List<String> releasedVersions = new ArrayList<>();
+
+            for (ModVersion version : mod.getVersions()) {
+                if (version.getReviewStatus() == ModVersion.ReviewStatus.PENDING &&
+                        version.getScheduledPublishDate() != null &&
+                        LocalDateTime.parse(version.getScheduledPublishDate()).isBefore(LocalDateTime.now())) {
+
+                    version.setReviewStatus(ModVersion.ReviewStatus.APPROVED);
+                    version.setScheduledPublishDate(null);
+                    releasedVersions.add(version.getVersionNumber());
+                    updated = true;
+                }
+            }
+
+            if (updated) {
+                mod.setUpdatedAt(LocalDateTime.now().toString());
+                modRepository.save(mod);
+                evictProjectDetails(mod);
+
+                for (String verNum : releasedVersions) {
+                    notifyUpdates(mod, verNum);
+                    notifyDependents(mod, verNum);
+                }
+
+                User author = getAuthorUser(mod);
+                if (author != null) {
+                    notificationService.sendNotification(
+                            List.of(author.getId()),
+                            "Version Published",
+                            "Your version for " + mod.getTitle() + " has been processed and is now live.",
+                            getProjectLink(mod),
+                            mod.getImageUrl()
+                    );
+                }
+            }
         }
     }
 

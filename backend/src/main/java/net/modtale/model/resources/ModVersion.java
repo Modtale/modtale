@@ -18,6 +18,9 @@ public class ModVersion {
     private ReviewStatus reviewStatus = ReviewStatus.PENDING;
     private String rejectionReason;
 
+    // Determines when the version should automatically transition to APPROVED
+    private String scheduledPublishDate;
+
     public enum Channel { RELEASE, BETA, ALPHA }
     public enum ReviewStatus { PENDING, APPROVED, REJECTED }
 
@@ -56,4 +59,7 @@ public class ModVersion {
 
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
+    public String getScheduledPublishDate() { return scheduledPublishDate; }
+    public void setScheduledPublishDate(String scheduledPublishDate) { this.scheduledPublishDate = scheduledPublishDate; }
 }
