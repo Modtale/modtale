@@ -61,7 +61,6 @@ public class User implements Serializable {
     private List<OrganizationMember> pendingOrgInvites = new ArrayList<>();
 
     private List<String> likedModIds = new ArrayList<>();
-    private List<String> likedModpackIds = new ArrayList<>();
 
     private List<String> followingIds = new ArrayList<>();
     private List<String> followerIds = new ArrayList<>();
