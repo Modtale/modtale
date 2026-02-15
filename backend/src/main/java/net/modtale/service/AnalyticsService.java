@@ -154,21 +154,26 @@ public class AnalyticsService {
             int favoriteCount = favObj != null ? favObj : 0;
 
             int trendScore = 0;
-            if (currentWeek > previousWeek) {
-                double dynamicGrowthRatio = (double) (currentWeek + dampeningK) / (previousWeek + dampeningK);
-                double growthDelta = Math.sqrt(currentWeek - previousWeek);
-                double logTotal = Math.log10(Math.max(10, totalDownloads));
+            double popularScore = 0.0;
+            double relevanceScore = 0.0;
 
-                double sizeWeight = Math.exp(-Math.pow(logTotal - logMedian, 2) / 2.2);
+            if (totalDownloads >= 10) {
+                if (currentWeek > previousWeek) {
+                    double dynamicGrowthRatio = (double) (currentWeek + dampeningK) / (previousWeek + dampeningK);
+                    double growthDelta = Math.sqrt(currentWeek - previousWeek);
+                    double logTotal = Math.log10(Math.max(10, totalDownloads));
 
-                trendScore = (int) (dynamicGrowthRatio * growthDelta * sizeWeight * 1000);
+                    double sizeWeight = Math.exp(-Math.pow(logTotal - logMedian, 2) / 2.2);
+
+                    trendScore = (int) (dynamicGrowthRatio * growthDelta * sizeWeight * 1000);
+                }
+
+                popularScore = totalDownloads + (favoriteCount * 10.0);
+
+                double engagementRatio = (double) favoriteCount / Math.max(1, totalDownloads);
+                if (totalDownloads < dampeningK * 2) engagementRatio = 0;
+                relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
             }
-
-            double popularScore = totalDownloads + (favoriteCount * 10.0);
-
-            double engagementRatio = (double) favoriteCount / Math.max(1, totalDownloads);
-            if (totalDownloads < dampeningK * 2) engagementRatio = 0;
-            double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
             Update update = new Update()
                     .set("trendScore", trendScore)
@@ -330,20 +335,25 @@ public class AnalyticsService {
         int recent = stats != null ? stats.getInteger("recent", 0) : 0;
 
         int trendScore = 0;
-        if (currentWeek > previousWeek) {
-            double dynamicGrowthRatio = (double) (currentWeek + dampeningK) / (previousWeek + dampeningK);
-            double growthDelta = Math.sqrt(currentWeek - previousWeek);
-            double logTotal = Math.log10(Math.max(10, mod.getDownloadCount()));
-            double sizeWeight = Math.exp(-Math.pow(logTotal - logMedian, 2) / 2.2);
+        double popularScore = 0.0;
+        double relevanceScore = 0.0;
 
-            trendScore = (int) (dynamicGrowthRatio * growthDelta * sizeWeight * 1000);
+        if (mod.getDownloadCount() >= 10) {
+            if (currentWeek > previousWeek) {
+                double dynamicGrowthRatio = (double) (currentWeek + dampeningK) / (previousWeek + dampeningK);
+                double growthDelta = Math.sqrt(currentWeek - previousWeek);
+                double logTotal = Math.log10(Math.max(10, mod.getDownloadCount()));
+                double sizeWeight = Math.exp(-Math.pow(logTotal - logMedian, 2) / 2.2);
+
+                trendScore = (int) (dynamicGrowthRatio * growthDelta * sizeWeight * 1000);
+            }
+
+            popularScore = mod.getDownloadCount() + (mod.getFavoriteCount() * 10.0);
+
+            double engagementRatio = (double) mod.getFavoriteCount() / Math.max(1, mod.getDownloadCount());
+            if (mod.getDownloadCount() < dampeningK * 2) engagementRatio = 0;
+            relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
         }
-
-        double popularScore = mod.getDownloadCount() + (mod.getFavoriteCount() * 10.0);
-
-        double engagementRatio = (double) mod.getFavoriteCount() / Math.max(1, mod.getDownloadCount());
-        if (mod.getDownloadCount() < dampeningK * 2) engagementRatio = 0;
-        double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
         mod.setDownloads7d(currentWeek);
         mod.setDownloads30d(recent);
