@@ -231,7 +231,7 @@ public class OgImageController {
         String truncatedDesc = truncateText(g2d, desc, cardW - (padding * 2));
         g2d.drawString(truncatedDesc, cardX + padding, descY);
 
-        int statY = cardY + cardH - 50;
+        int statY = cardY + cardH - 45;
         int statX = cardX + padding;
 
         drawStatWithIcon(g2d, statX, statY, "download", formatNumber(mod.getDownloadCount()));
@@ -314,14 +314,14 @@ public class OgImageController {
         g2d.draw(iconPath);
 
         g2d.setColor(Color.WHITE);
-        g2d.drawString(display, iconX + iconW + gap, y + fm.getAscent() + (vPadding/2) - 1);
+        g2d.drawString(display, iconX + iconW + gap, y + fm.getAscent() + (vPadding/2) + 2);
     }
 
     private void drawStatWithIcon(Graphics2D g2d, int x, int y, String iconType, String value) {
         g2d.setColor(TEXT_SECONDARY);
         Graphics2D iconG = (Graphics2D) g2d.create();
 
-        iconG.translate(x, y - 24);
+        iconG.translate(x, y - 28);
         iconG.scale(1.5, 1.5);
         iconG.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
@@ -359,7 +359,7 @@ public class OgImageController {
 
         g2d.setColor(TEXT_PRIMARY);
         g2d.setFont(new Font("SansSerif", Font.BOLD, 26));
-        g2d.drawString(value, x + 42, y);
+        g2d.drawString(value, x + 42, y + 4);
     }
 
     private void drawBranding(Graphics2D g2d, int width, int height) {
@@ -372,7 +372,7 @@ public class OgImageController {
         float logoWidth = (float) (logoHeight * (svgDocument.size().width / svgDocument.size().height));
 
         float x = width - 100 - logoWidth;
-        float y = height - 80 - logoHeight;
+        float y = height - 98 - logoHeight;
 
         Graphics2D logoG = (Graphics2D) g2d.create();
         logoG.translate(x, y);
