@@ -111,15 +111,24 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.project().andExclude("authorInfo"));
 
         if ("hidden_gems".equals(viewCategory)) {
-            long totalDocs = mongoTemplate.count(new Query(baseCriteria), Mod.class);
+            Query statsQuery = new Query(baseCriteria);
+            statsQuery.addCriteria(Criteria.where("downloadCount").gte(10));
+
+            long totalDocs = mongoTemplate.count(statsQuery, Mod.class);
             int p5Index = Math.max(0, (int) (totalDocs * 0.05));
             int p20Index = Math.max(0, (int) (totalDocs * 0.20));
 
-            Query p5Query = new Query(baseCriteria).with(Sort.by(Sort.Direction.ASC, "downloadCount")).skip(p5Index).limit(1);
+            Query p5Query = new Query(baseCriteria)
+                    .addCriteria(Criteria.where("downloadCount").gte(10))
+                    .with(Sort.by(Sort.Direction.ASC, "downloadCount"))
+                    .skip(p5Index).limit(1);
             Mod p5Mod = mongoTemplate.findOne(p5Query, Mod.class);
             int minDl = p5Mod != null ? p5Mod.getDownloadCount() : 0;
 
-            Query p20Query = new Query(baseCriteria).with(Sort.by(Sort.Direction.ASC, "downloadCount")).skip(p20Index).limit(1);
+            Query p20Query = new Query(baseCriteria)
+                    .addCriteria(Criteria.where("downloadCount").gte(10))
+                    .with(Sort.by(Sort.Direction.ASC, "downloadCount"))
+                    .skip(p20Index).limit(1);
             Mod p20Mod = mongoTemplate.findOne(p20Query, Mod.class);
             int maxDl = p20Mod != null ? p20Mod.getDownloadCount() : Integer.MAX_VALUE;
 
