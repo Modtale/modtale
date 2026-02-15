@@ -50,15 +50,15 @@ export const Home: React.FC<HomeProps> = ({
     const [searchParams, setSearchParams] = useSearchParams();
     const { isMobile } = useMobile();
 
-    // Derive state from URL Search Params
     const page = parseInt(searchParams.get('page') || '0');
     const sortBy = (searchParams.get('sort') as SortOption) || 'relevance';
     const activeViewId = searchParams.get('view') || 'all';
     const selectedVersion = searchParams.get('version') || 'Any';
     const minDownloads = parseInt(searchParams.get('minDl') || '0');
     const minFavorites = parseInt(searchParams.get('minFav') || '0');
-    const filterDate = searchParams.get('date'); // null if missing
-    const selectedTags = searchParams.get('tags') ? searchParams.get('tags')!.split(',').filter(Boolean) : [];
+    const filterDate = searchParams.get('date');
+    const rawTags = searchParams.get('tags');
+    const selectedTags = useMemo(() => rawTags ? rawTags.split(',').filter(Boolean) : [], [rawTags]);
     const urlSearchTerm = searchParams.get('q') || '';
 
     const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
@@ -126,11 +126,6 @@ export const Home: React.FC<HomeProps> = ({
 
             setItemsPerPage(prev => {
                 if (prev !== targetSize) {
-                    setSearchParams(prevParams => {
-                        const next = new URLSearchParams(prevParams);
-                        next.set('page', '0');
-                        return next;
-                    }, { replace: true });
                     return targetSize;
                 }
                 return prev;
@@ -144,7 +139,19 @@ export const Home: React.FC<HomeProps> = ({
             window.removeEventListener('scroll', handleResize);
             window.removeEventListener('resize', handleResize);
         };
-    }, [setSearchParams]);
+    }, []);
+
+    useEffect(() => {
+        setSearchParams(prev => {
+            const current = parseInt(prev.get('page') || '0');
+            if (current !== 0) {
+                const next = new URLSearchParams(prev);
+                next.set('page', '0');
+                return next;
+            }
+            return prev;
+        }, { replace: true });
+    }, [itemsPerPage, setSearchParams]);
 
     useEffect(() => {
         if (cardsSectionRef.current && page === 0) {
