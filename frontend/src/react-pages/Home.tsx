@@ -126,6 +126,11 @@ export const Home: React.FC<HomeProps> = ({
 
             setItemsPerPage(prev => {
                 if (prev !== targetSize) {
+                    setSearchParams(prevParams => {
+                        const next = new URLSearchParams(prevParams);
+                        next.set('page', '0');
+                        return next;
+                    }, { replace: true });
                     return targetSize;
                 }
                 return prev;
@@ -139,19 +144,7 @@ export const Home: React.FC<HomeProps> = ({
             window.removeEventListener('scroll', handleResize);
             window.removeEventListener('resize', handleResize);
         };
-    }, []);
-
-    useEffect(() => {
-        setSearchParams(prev => {
-            const current = parseInt(prev.get('page') || '0');
-            if (current !== 0) {
-                const next = new URLSearchParams(prev);
-                next.set('page', '0');
-                return next;
-            }
-            return prev;
-        }, { replace: true });
-    }, [itemsPerPage, setSearchParams]);
+    }, [setSearchParams]);
 
     useEffect(() => {
         if (cardsSectionRef.current && page === 0) {
