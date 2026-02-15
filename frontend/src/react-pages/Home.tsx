@@ -189,6 +189,7 @@ export const Home: React.FC<HomeProps> = ({
                     gameVersion: selectedVersion !== 'Any' ? selectedVersion : undefined,
                     minRating: undefined,
                     minDownloads: minDownloads > 0 ? minDownloads : undefined,
+                    minFavorites: minFavorites > 0 ? minFavorites : undefined,
                     dateRange: filterDate || 'all',
                     category: categoryParam,
                 },
@@ -210,7 +211,7 @@ export const Home: React.FC<HomeProps> = ({
                 setLoading(false);
             }
         }
-    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, filterDate, activeViewId]);
+    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
 
     useEffect(() => {
         fetchData();
