@@ -64,7 +64,7 @@ public class AnalyticsService {
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date quarterStart = Date.from(today.minusDays(90).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
-        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED")), Mod.class);
+        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED").and("downloadCount").gte(10)), Mod.class);
         double medianDownloads = calculatePercentileDownloads(totalPublished, 0.50);
         double noiseFloor = calculatePercentileDownloads(totalPublished, 0.01);
 
@@ -73,13 +73,12 @@ public class AnalyticsService {
 
         int currYear = today.getYear();
         int currMonth = today.getMonthValue();
-        LocalDate prevMonthDate = today.minusMonths(3); // Go back enough to cover 90d
+        LocalDate prevMonthDate = today.minusMonths(3);
         int prevYear = prevMonthDate.getYear();
         int prevMonth = prevMonthDate.getMonthValue();
 
         List<AggregationOperation> pipeline = new ArrayList<>();
 
-        // Match analytics documents within the relevant years/months
         pipeline.add(Aggregation.match(
                 new Criteria().orOperator(
                         Criteria.where("year").gt(prevYear),
@@ -100,7 +99,7 @@ public class AnalyticsService {
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(week1Start),
                                 Criteria.where("logDate").lt(todayStart)
-                        )).then("$daysArray.v.d").otherwise(0)).as("currentWeek") // downloads7d
+                        )).then("$daysArray.v.d").otherwise(0)).as("currentWeek")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(week2Start),
@@ -110,12 +109,12 @@ public class AnalyticsService {
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(monthStart),
                                 Criteria.where("logDate").lt(todayStart)
-                        )).then("$daysArray.v.d").otherwise(0)).as("recent") // downloads30d
+                        )).then("$daysArray.v.d").otherwise(0)).as("recent")
                 .sum(ConditionalOperators.when(
                         new Criteria().andOperator(
                                 Criteria.where("logDate").gte(quarterStart),
                                 Criteria.where("logDate").lt(todayStart)
-                        )).then("$daysArray.v.d").otherwise(0)).as("quarter") // downloads90d
+                        )).then("$daysArray.v.d").otherwise(0)).as("quarter")
         );
 
         pipeline.add(LookupOperation.newLookup()
@@ -189,7 +188,6 @@ public class AnalyticsService {
             }
         }
 
-        // Decay logic for inactive projects (zero out scores and cached download stats)
         Query decayQuery = new Query();
         decayQuery.fields().include("_id");
         decayQuery.addCriteria(new Criteria().orOperator(
@@ -231,7 +229,7 @@ public class AnalyticsService {
         if (totalCount == 0) return 10.0;
 
         long skipCount = (long) (totalCount * percentile);
-        Query query = new Query(Criteria.where("status").is("PUBLISHED"))
+        Query query = new Query(Criteria.where("status").is("PUBLISHED").and("downloadCount").gte(10))
                 .with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "downloadCount"))
                 .skip(skipCount)
                 .limit(1);
@@ -249,7 +247,7 @@ public class AnalyticsService {
 
         if (missingScores.isEmpty()) return;
 
-        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED")), Mod.class);
+        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED").and("downloadCount").gte(10)), Mod.class);
         double logMedian = Math.log10(Math.max(10, calculatePercentileDownloads(totalPublished, 0.50)));
         double dampeningK = Math.max(5, calculatePercentileDownloads(totalPublished, 0.01));
 
@@ -347,7 +345,6 @@ public class AnalyticsService {
         if (mod.getDownloadCount() < dampeningK * 2) engagementRatio = 0;
         double relevanceScore = recent * (1.0 + (engagementRatio * 5.0));
 
-        // Update cached stats on demand
         mod.setDownloads7d(currentWeek);
         mod.setDownloads30d(recent);
 
