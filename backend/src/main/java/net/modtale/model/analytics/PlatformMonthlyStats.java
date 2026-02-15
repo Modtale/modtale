@@ -20,6 +20,7 @@ public class PlatformMonthlyStats {
     private long totalDownloads;
     private long apiDownloads;
     private long frontendDownloads;
+    private long newProjects;
 
     private Map<String, DayStats> days = new HashMap<>();
 
@@ -46,16 +47,22 @@ public class PlatformMonthlyStats {
     public long getFrontendDownloads() { return frontendDownloads; }
     public void setFrontendDownloads(long frontendDownloads) { this.frontendDownloads = frontendDownloads; }
 
+    public long getNewProjects() { return newProjects; }
+    public void setNewProjects(long newProjects) { this.newProjects = newProjects; }
+
     public Map<String, DayStats> getDays() { return days; }
     public void setDays(Map<String, DayStats> days) { this.days = days; }
 
     public static class DayStats {
         private int v;
         private int d;
+        private int n;
 
         public int getV() { return v; }
         public void setV(int v) { this.v = v; }
         public int getD() { return d; }
         public void setD(int d) { this.d = d; }
+        public int getN() { return n; }
+        public void setN(int n) { this.n = n; }
     }
 }
