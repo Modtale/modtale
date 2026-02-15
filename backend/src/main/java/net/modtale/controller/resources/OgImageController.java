@@ -321,8 +321,8 @@ public class OgImageController {
         g2d.setColor(TEXT_SECONDARY);
         Graphics2D iconG = (Graphics2D) g2d.create();
 
-        iconG.translate(x, y - 28);
-        iconG.scale(1.5, 1.5);
+        iconG.translate(x, y - 21);
+        iconG.scale(1.1, 1.1);
         iconG.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
         if ("download".equals(iconType)) {
@@ -359,7 +359,7 @@ public class OgImageController {
 
         g2d.setColor(TEXT_PRIMARY);
         g2d.setFont(new Font("SansSerif", Font.BOLD, 26));
-        g2d.drawString(value, x + 42, y + 4);
+        g2d.drawString(value, x + 35, y + 4);
     }
 
     private void drawBranding(Graphics2D g2d, int width, int height) {
