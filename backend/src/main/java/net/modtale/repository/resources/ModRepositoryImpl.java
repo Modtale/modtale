@@ -43,7 +43,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
     @Override
     public Page<Mod> searchMods(
             String search, List<String> tags, String gameVersion, String classification,
-            Double minRating, Integer minDownloads, Pageable pageable,
+            Double minRating, Integer minDownloads, Integer minFavorites, Pageable pageable,
             String currentUsername, String sortBy,
             String viewCategory, LocalDate dateCutoff, String authorId
     ) {
@@ -82,6 +82,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             criteriaList.add(Criteria.where("versions.gameVersions").is(gameVersion));
         if (minRating != null) criteriaList.add(Criteria.where("rating").gte(minRating));
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
+        if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
 
         boolean isTimeBasedDownloadSort = "downloads".equals(sortBy) && dateCutoff != null;
         if (dateCutoff != null && !isTimeBasedDownloadSort) {

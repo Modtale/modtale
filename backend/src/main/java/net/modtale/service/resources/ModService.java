@@ -267,7 +267,7 @@ public class ModService {
 
     public Page<Mod> getMods(
             List<String> tags, String search, int page, int size, String sortBy,
-            String gameVersion, String contentType, Double minRating, Integer minDownloads, String viewCategory,
+            String gameVersion, String contentType, Double minRating, Integer minDownloads, Integer minFavorites, String viewCategory,
             String dateRange, String author
     ) {
         List<String> normalizedTags = null;
@@ -277,17 +277,17 @@ public class ModService {
                     .collect(Collectors.toList());
         }
 
-        return self.getModsCached(normalizedTags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, viewCategory, dateRange, author);
+        return self.getModsCached(normalizedTags, search, page, size, sortBy, gameVersion, contentType, minRating, minDownloads, minFavorites, viewCategory, dateRange, author);
     }
 
     @Cacheable(
             value = "projectSearch",
-            key = "{#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minRating, #minDownloads, #viewCategory, #dateRange, #author}",
+            key = "{#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minRating, #minDownloads, #minFavorites, #viewCategory, #dateRange, #author}",
             condition = "!('Favorites'.equals(#viewCategory))"
     )
     public Page<Mod> getModsCached(
             List<String> tags, String search, int page, int size, String sortBy,
-            String gameVersion, String contentType, Double minRating, Integer minDownloads, String viewCategory,
+            String gameVersion, String contentType, Double minRating, Integer minDownloads, Integer minFavorites, String viewCategory,
             String dateRange, String author
     ) {
         Page<Mod> results;
@@ -333,7 +333,7 @@ public class ModService {
             }
 
             results = modRepository.searchMods(
-                    search, tags, gameVersion, contentType, null, minDownloads, pageable,
+                    search, tags, gameVersion, contentType, null, minDownloads, minFavorites, pageable,
                     currentUsername, sortBy, viewCategory,
                     dateCutoff, authorIdParam
             );
@@ -1274,7 +1274,7 @@ public class ModService {
             notificationService.sendNotification(
                     List.of(user.getId()),
                     "Version Submitted",
-                    "Your project update is pending approval.",
+                    "Your project update is pending approval and will likely be online in under 24 hours.",
                     "/dashboard/projects",
                     mod.getImageUrl()
             );
@@ -1304,7 +1304,7 @@ public class ModService {
                     approvedImmediately = true;
                     logger.info("Manually re-scanned version {} for project {} approved immediately.", versionId, modId);
                 } else {
-                    long delayMinutes = ThreadLocalRandom.current().nextLong(30, 720);
+                    long delayMinutes = ThreadLocalRandom.current().nextLong(30, 1440);
                     LocalDateTime scheduledTime = LocalDateTime.now().plusMinutes(delayMinutes);
                     update.set("versions.$.scheduledPublishDate", scheduledTime.toString());
                     logger.info("Clean version {} for project {} scheduled for release at {}", versionId, modId, scheduledTime);
@@ -1784,7 +1784,7 @@ public class ModService {
     public void checkTrendingNotifications() {
         String[] algos = {"trending", "popular", "gems", "relevance"};
         for (String algo : algos) {
-            Page<Mod> topMods = getMods(null, null, 0, 12, algo, null, null, null, null, algo, null, null);
+            Page<Mod> topMods = getMods(null, null, 0, 12, algo, null, null, null, null, null, algo, null, null);
             for (Mod mod : topMods.getContent()) {
                 LocalDateTime lastNotified = mod.getLastTrendingNotification() != null
                         ? LocalDateTime.parse(mod.getLastTrendingNotification()) : null;

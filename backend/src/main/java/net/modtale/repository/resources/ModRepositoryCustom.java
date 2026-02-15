@@ -15,6 +15,7 @@ public interface ModRepositoryCustom {
             String classification,
             Double minRating,
             Integer minDownloads,
+            Integer minFavorites,
             Pageable pageable,
             String currentUsername,
             String sortBy,

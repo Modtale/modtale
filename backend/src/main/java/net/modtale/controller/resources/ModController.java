@@ -315,6 +315,7 @@ public class ModController {
             @RequestParam(required = false) String gameVersion,
             @RequestParam(required = false, name = "classification") String classification,
             @RequestParam(required = false) Integer minDownloads,
+            @RequestParam(required = false) Integer minFavorites,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String dateRange,
             @RequestParam(required = false) String author,
@@ -351,6 +352,7 @@ public class ModController {
                     classification,
                     null,
                     minDownloads,
+                    minFavorites,
                     effectiveCategory,
                     dateRange,
                     authorId
