@@ -75,7 +75,7 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
             ));
         }
 
-        if (tags != null && !tags.isEmpty()) criteriaList.add(Criteria.where("tags").all(tags));
+        if (tags != null && !tags.isEmpty()) criteriaList.add(Criteria.where("tags").in(tags));
         if (classification != null && !classification.isEmpty() && !"All".equals(classification))
             criteriaList.add(Criteria.where("classification").is(classification));
         if (gameVersion != null && !gameVersion.isEmpty())
