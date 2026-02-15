@@ -35,7 +35,9 @@ public class OgImageController {
     private static final Color CARD_BG = new Color(30, 41, 59);
     private static final Color TEXT_PRIMARY = Color.WHITE;
     private static final Color TEXT_SECONDARY = new Color(148, 163, 184);
+    private static final Color TEXT_DESC = new Color(203, 213, 225);
     private static final Color BORDER_COLOR = new Color(255, 255, 255, 25);
+    private static final Color BADGE_BG = new Color(15, 23, 42, 204);
 
     private static final String LOGO_SVG = """
         <svg
@@ -156,9 +158,6 @@ public class OgImageController {
 
                 g2d.drawImage(banner, x + (w - scaledW) / 2, y + (headerH - scaledH) / 2, scaledW, scaledH, null);
 
-                g2d.setColor(new Color(15, 23, 42, 80));
-                g2d.fillRect(x, y, w, headerH);
-
                 g2d.setClip(null);
             }
         } catch (Exception ignored) {
@@ -169,6 +168,9 @@ public class OgImageController {
             g2d.drawImage(gradient, x, y, w, headerH, null);
             g2d.setClip(null);
         }
+
+        String type = mod.getClassification() != null ? mod.getClassification() : "PROJECT";
+        drawCategoryBadge(g2d, type, x + w - 16, y + 16);
 
         g2d.setColor(BORDER_COLOR);
         g2d.setStroke(new BasicStroke(2f));
@@ -204,29 +206,26 @@ public class OgImageController {
         int iconSize = 180;
         int headerH = 180;
 
-        String type = mod.getClassification() != null ? mod.getClassification() : "PROJECT";
-        drawTypePill(g2d, type, cardX + cardW - 30, cardY + 30);
-
         int iconX = cardX + padding;
-        int iconY = cardY + headerH - (iconSize / 3);
+        int iconY = cardY + headerH - (iconSize / 2) + 20;
         drawIcon(g2d, mod, iconX, iconY, iconSize);
 
         int textX = iconX + iconSize + 40;
-        int textStartY = cardY + headerH + 50;
+        int textStartY = cardY + headerH + 30;
         int maxTextWidth = (cardX + cardW) - textX - padding;
 
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 60));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 48));
         g2d.setColor(TEXT_PRIMARY);
         String title = truncateText(g2d, mod.getTitle(), maxTextWidth);
-        g2d.drawString(title, textX, textStartY + 20);
+        g2d.drawString(title, textX, textStartY + 30);
 
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 32));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 24));
         g2d.setColor(TEXT_SECONDARY);
-        g2d.drawString("by " + mod.getAuthor(), textX, textStartY + 70);
+        g2d.drawString("by " + mod.getAuthor(), textX, textStartY + 75);
 
         int descY = textStartY + 140;
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 28));
-        g2d.setColor(new Color(203, 213, 225));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 22));
+        g2d.setColor(TEXT_DESC);
 
         String desc = mod.getDescription() != null ? mod.getDescription() : "";
         String truncatedDesc = truncateText(g2d, desc, cardW - (padding * 2));
@@ -236,15 +235,15 @@ public class OgImageController {
         int statX = cardX + padding;
 
         drawStatWithIcon(g2d, statX, statY, "download", formatNumber(mod.getDownloadCount()));
-        drawStatWithIcon(g2d, statX + 180, statY, "heart", formatNumber(mod.getFavoriteCount()));
+        drawStatWithIcon(g2d, statX + 160, statY, "heart", formatNumber(mod.getFavoriteCount()));
     }
 
     private void drawIcon(Graphics2D g2d, Mod mod, int x, int y, int size) {
         g2d.setColor(new Color(0,0,0,80));
         g2d.fillRoundRect(x + 5, y + 5, size, size, 30, 30);
 
-        g2d.setColor(new Color(30, 41, 59));
-        g2d.fillRoundRect(x, y, size, size, 30, 30);
+        Shape clip = new RoundRectangle2D.Float(x, y, size, size, 30, 30);
+        g2d.setClip(clip);
 
         try {
             BufferedImage img = null;
@@ -252,8 +251,6 @@ public class OgImageController {
                 String u = mod.getImageUrl().startsWith("/") ? "http://localhost:8080" + mod.getImageUrl() : mod.getImageUrl();
                 img = fetchImageWithTimeout(u);
             }
-            Shape clip = new RoundRectangle2D.Float(x, y, size, size, 30, 30);
-            g2d.setClip(clip);
             if (img != null) {
                 g2d.drawImage(img, x, y, size, size, null);
             } else {
@@ -265,56 +262,104 @@ public class OgImageController {
                 FontMetrics fm = g2d.getFontMetrics();
                 g2d.drawString(l, x + (size - fm.stringWidth(l)) / 2, y + (size + fm.getAscent()) / 2 - 15);
             }
-            g2d.setClip(null);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            g2d.setColor(BRAND_ACCENT);
+            g2d.fillRect(x, y, size, size);
+        }
 
-        g2d.setColor(new Color(255, 255, 255, 20));
+        g2d.setClip(null);
+
+        g2d.setColor(new Color(255, 255, 255, 25));
         g2d.setStroke(new BasicStroke(4));
         g2d.drawRoundRect(x, y, size, size, 30, 30);
     }
 
-    private void drawTypePill(Graphics2D g2d, String text, int rightX, int topY) {
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
+    private void drawCategoryBadge(Graphics2D g2d, String text, int rightX, int topY) {
+        String display = text.length() > 1
+                ? text.charAt(0) + text.substring(1).toLowerCase()
+                : text;
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 20));
         FontMetrics fm = g2d.getFontMetrics();
-        int hPadding = 16;
+
+        int iconW = 20;
+        int gap = 8;
+        int hPadding = 12;
         int vPadding = 8;
-        int w = fm.stringWidth(text) + (hPadding * 2);
+
+        int textW = fm.stringWidth(display);
+        int w = hPadding + iconW + gap + textW + hPadding;
         int h = fm.getHeight() + vPadding;
+
         int x = rightX - w;
         int y = topY;
-        g2d.setColor(BRAND_ACCENT);
+
+        g2d.setColor(BADGE_BG);
         g2d.fillRoundRect(x, y, w, h, 12, 12);
+
+        int iconX = x + hPadding;
+        int iconY = y + (h/2);
+
+        g2d.setColor(BRAND_ACCENT);
+        g2d.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+        Path2D iconPath = new Path2D.Float();
+        iconPath.moveTo(iconX + 6, iconY - 4);
+        iconPath.lineTo(iconX + 1, iconY);
+        iconPath.lineTo(iconX + 6, iconY + 4);
+
+        iconPath.moveTo(iconX + 10, iconY - 4);
+        iconPath.lineTo(iconX + 15, iconY);
+        iconPath.lineTo(iconX + 10, iconY + 4);
+        g2d.draw(iconPath);
+
         g2d.setColor(Color.WHITE);
-        g2d.drawString(text, x + hPadding, y + fm.getAscent() + (vPadding/2) + 1);
+        g2d.drawString(display, iconX + iconW + gap, y + fm.getAscent() + (vPadding/2) - 1);
     }
 
     private void drawStatWithIcon(Graphics2D g2d, int x, int y, String iconType, String value) {
         g2d.setColor(TEXT_SECONDARY);
         Graphics2D iconG = (Graphics2D) g2d.create();
 
-        iconG.translate(x, y - 28);
-        iconG.scale(1.8, 1.8);
+        iconG.translate(x, y - 24);
+        iconG.scale(1.5, 1.5);
         iconG.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
         if ("download".equals(iconType)) {
-            iconG.drawLine(10, 0, 10, 14);
-            iconG.drawLine(4, 8, 10, 14);
-            iconG.drawLine(16, 8, 10, 14);
-            iconG.drawLine(2, 19, 18, 19);
+            Path2D path = new Path2D.Float();
+            path.moveTo(21, 15);
+            path.lineTo(21, 19);
+            path.curveTo(21, 20, 20, 21, 19, 21);
+            path.lineTo(5, 21);
+            path.curveTo(4, 21, 3, 20, 3, 19);
+            path.lineTo(3, 15);
+            iconG.draw(path);
+
+            Path2D arrow = new Path2D.Float();
+            arrow.moveTo(7, 10);
+            arrow.lineTo(12, 15);
+            arrow.lineTo(17, 10);
+            arrow.moveTo(12, 15);
+            arrow.lineTo(12, 3);
+            iconG.draw(arrow);
         } else {
-            GeneralPath heart = new GeneralPath();
-            heart.moveTo(10, 18);
-            heart.curveTo(10, 18, 1, 11, 1, 6);
-            heart.curveTo(1, 2, 7, 2, 10, 6);
-            heart.curveTo(13, 2, 19, 2, 19, 6);
-            heart.curveTo(19, 11, 10, 18, 10, 18);
-            iconG.fill(heart);
+            Path2D heart = new Path2D.Float();
+            heart.moveTo(12, 21.35);
+
+            heart.curveTo(12, 21.35, 2.5, 13, 2.5, 8.5);
+            heart.curveTo(2.5, 5, 5, 3, 8, 3);
+            heart.curveTo(10, 3, 11, 4, 12, 5.5);
+            heart.curveTo(13, 4, 14, 3, 16, 3);
+            heart.curveTo(19, 3, 21.5, 5, 21.5, 8.5);
+            heart.curveTo(21.5, 13, 12, 21.35, 12, 21.35);
+
+            iconG.draw(heart);
         }
         iconG.dispose();
 
         g2d.setColor(TEXT_PRIMARY);
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 30));
-        g2d.drawString(value, x + 45, y);
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 26));
+        g2d.drawString(value, x + 42, y);
     }
 
     private void drawBranding(Graphics2D g2d, int width, int height) {
@@ -327,7 +372,7 @@ public class OgImageController {
         float logoWidth = (float) (logoHeight * (svgDocument.size().width / svgDocument.size().height));
 
         float x = width - 100 - logoWidth;
-        float y = height - 100 - logoHeight;
+        float y = height - 80 - logoHeight;
 
         Graphics2D logoG = (Graphics2D) g2d.create();
         logoG.translate(x, y);
