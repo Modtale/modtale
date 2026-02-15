@@ -673,6 +673,7 @@ public class ModService {
         if (isNewRelease) {
             notifyNewProject(saved);
             triggerWebhook(saved);
+            analyticsService.logNewProject(saved.getId());
             User author = getAuthorUser(saved);
             if(author != null) {
                 notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", getProjectLink(saved), saved.getImageUrl());
