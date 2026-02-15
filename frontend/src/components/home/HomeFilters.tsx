@@ -149,19 +149,15 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
     };
 
     const handleDateSelect = (date: Date) => {
-        if (sortBy === 'downloads') onSortChange('updated');
         const isoDate = date.toISOString().split('T')[0];
         setFilterDate(isoDate);
         setSelectedDateObj(date);
         setShowCalendar(false);
-        setPage(0);
     };
 
     const handleDaysAgo = (days: number) => {
-        if (sortBy === 'downloads') onSortChange('updated');
         if (days === 0) { setFilterDate(null); setSelectedDateObj(null); }
         else { setFilterDate(getDateStringDaysAgo(days)); setSelectedDateObj(null); }
-        setPage(0);
     };
 
     const isDownloadSort = sortBy === 'downloads';
@@ -187,7 +183,6 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
     const handleDownloadTimeframe = (days: number) => {
         if (days === 0) setFilterDate(null);
         else setFilterDate(getDateStringDaysAgo(days));
-        setPage(0);
     }
 
     const displayFilterCount = [
@@ -254,13 +249,13 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</h3>
                                 </div>
                                 <div className="p-4 space-y-5">
-                                    <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val); setPage(0);}} />
+                                    <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
 
                                     <div>
                                         <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
                                         <div className="grid grid-cols-4 gap-1 mb-2">
                                             {[0, 10, 50, 100].map(f => (
-                                                <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); setPage(0); }} className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all ${minFavorites === f && customFav === '' ? 'bg-slate-800 dark:bg-white text-white dark:text-black border-transparent' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}>
+                                                <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); }} className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all ${minFavorites === f && customFav === '' ? 'bg-slate-800 dark:bg-white text-white dark:text-black border-transparent' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}>
                                                     {f === 0 ? 'Any' : `${f}+`}
                                                 </button>
                                             ))}
@@ -274,7 +269,6 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                                 onChange={e => {
                                                     setCustomFav(e.target.value);
                                                     setMinFavorites(Number(e.target.value));
-                                                    setPage(0);
                                                 }}
                                                 className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-modtale-accent focus:border-modtale-accent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
@@ -285,14 +279,14 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                         <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Downloads</label>
                                         <div className="grid grid-cols-4 gap-1 mb-2">
                                             {[0, 1000, 5000, 10000].map(d => (
-                                                <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); setPage(0); }} className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all ${minDownloads === d && customDl === '' ? 'bg-slate-800 dark:bg-white text-white dark:text-black border-transparent' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}>
+                                                <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); }} className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all ${minDownloads === d && customDl === '' ? 'bg-slate-800 dark:bg-white text-white dark:text-black border-transparent' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}>
                                                     {d === 0 ? 'Any' : `${d/1000}k+`}
                                                 </button>
                                             ))}
                                         </div>
                                         <div className="relative">
                                             <Download className="absolute left-3 top-2 w-3.5 h-3.5 text-slate-400" />
-                                            <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); setPage(0); }} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-modtale-accent focus:border-modtale-accent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-modtale-accent focus:border-modtale-accent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                                         </div>
                                     </div>
 
@@ -347,7 +341,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                     )}
 
                     <div className="flex-1 md:flex-none">
-                        <SortDropdown value={sortBy} onChange={(val) => { onSortChange(val); if (val === 'downloads') setFilterDate(null); }} onOpen={handleSortOpen} isMobile={isMobile} />
+                        <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
                 </div>
             </div>
