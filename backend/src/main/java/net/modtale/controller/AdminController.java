@@ -349,7 +349,7 @@ public class AdminController {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null).getContent());
+        return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null, null).getContent());
     }
 
     @GetMapping("/projects/{id}")
