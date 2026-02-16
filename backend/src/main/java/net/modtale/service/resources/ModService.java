@@ -45,6 +45,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -1243,7 +1244,28 @@ public class ModService {
         if (versionExists) throw new IllegalArgumentException("Version " + versionNumber + " already exists.");
 
         String filePath = null;
-        if (file != null) filePath = storageService.upload(file, "files/" + mod.getClassification().toLowerCase());
+        String fileHash = null;
+
+        if (file != null) {
+            if (!isModpack) {
+                try {
+                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                    byte[] encodedhash = digest.digest(file.getBytes());
+                    StringBuilder hexString = new StringBuilder(2 * encodedhash.length);
+                    for (byte b : encodedhash) {
+                        String hex = Integer.toHexString(0xff & b);
+                        if (hex.length() == 1) {
+                            hexString.append('0');
+                        }
+                        hexString.append(hex);
+                    }
+                    fileHash = hexString.toString();
+                } catch (Exception e) {
+                    logger.error("Failed to calculate file hash", e);
+                }
+            }
+            filePath = storageService.upload(file, "files/" + mod.getClassification().toLowerCase());
+        }
 
         ModVersion ver = new ModVersion();
         ver.setId(UUID.randomUUID().toString());
@@ -1254,6 +1276,7 @@ public class ModService {
         ver.setDownloadCount(0);
         ver.setChangelog(sanitizer.sanitizePlainText(changelog));
         ver.setChannel(channel);
+        ver.setHash(fileHash);
 
         ver.setReviewStatus(ModVersion.ReviewStatus.PENDING);
 
@@ -1310,6 +1333,16 @@ public class ModService {
 
             self.performBackgroundScan(mod.getId(), ver.getId(), filePath, file.getOriginalFilename(), false);
         }
+    }
+
+    public Optional<ModVersion> getVersionByHash(String hash) {
+        Query query = new Query(Criteria.where("versions.hash").is(hash));
+        query.fields().include("versions.$");
+        Mod mod = mongoTemplate.findOne(query, Mod.class);
+        if (mod != null && !mod.getVersions().isEmpty()) {
+            return Optional.of(mod.getVersions().get(0));
+        }
+        return Optional.empty();
     }
 
     @Async
