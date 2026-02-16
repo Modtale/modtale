@@ -352,6 +352,11 @@ public class ModService {
         return results;
     }
 
+    public Page<Mod> searchDeletedProjects(String query, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "deletedAt"));
+        return modRepository.searchDeletedMods(query, pageable);
+    }
+
     public List<Mod> getAllMods() { return modRepository.findAll(); }
     public List<Mod> getPublishedMods() { return modRepository.findAllPublished(); }
 
@@ -369,6 +374,17 @@ public class ModService {
             direct = modRepository.findBySlug(identifier.toLowerCase());
         }
         return direct.orElse(null);
+    }
+
+    public Mod getAdminProjectDetails(String identifier) {
+        Mod mod = getRawModById(identifier);
+        if (mod == null) return null;
+
+        if (mod.getAuthorId() != null) {
+            userRepository.findById(mod.getAuthorId()).ifPresent(u -> mod.setAuthor(u.getUsername()));
+        }
+
+        return mod;
     }
 
     @Cacheable(value = "projectDetails", key = "#identifier")

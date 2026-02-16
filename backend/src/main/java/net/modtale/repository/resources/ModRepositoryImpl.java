@@ -256,4 +256,32 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
         return PageableExecutionUtils.getPage(list, pageable, () -> count);
     }
+
+    @Override
+    public Page<Mod> searchDeletedMods(String search, Pageable pageable) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("status").is("DELETED"));
+        query.addCriteria(Criteria.where("deletedAt").ne(null));
+
+        if (search != null && !search.trim().isEmpty()) {
+            String regex = Pattern.quote(search);
+            query.addCriteria(new Criteria().orOperator(
+                    Criteria.where("title").regex(regex, "i"),
+                    Criteria.where("author").regex(regex, "i"),
+                    Criteria.where("_id").is(search)
+            ));
+        }
+
+        long total = mongoTemplate.count(query, Mod.class);
+        query.with(pageable);
+        List<Mod> results = mongoTemplate.find(query, Mod.class);
+
+        for (Mod m : results) {
+            if (m.getAuthorId() != null && m.getAuthor() == null) {
+                userRepository.findById(m.getAuthorId()).ifPresent(u -> m.setAuthor(u.getUsername()));
+            }
+        }
+
+        return new PageImpl<>(results, pageable, total);
+    }
 }
