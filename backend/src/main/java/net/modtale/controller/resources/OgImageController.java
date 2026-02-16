@@ -1,15 +1,20 @@
 package net.modtale.controller.resources;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.weisj.jsvg.SVGDocument;
 import com.github.weisj.jsvg.parser.SVGLoader;
 import net.modtale.model.resources.Mod;
 import net.modtale.service.resources.ModService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,6 +27,8 @@ import java.io.ByteArrayOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -29,6 +36,9 @@ import java.util.concurrent.TimeUnit;
 public class OgImageController {
 
     private final ModService modService;
+    private final Cache<String, CachedRender> renderCache;
+    private final Cache<String, BufferedImage> assetCache;
+    private final SVGDocument logoDocument;
 
     private static final Color BRAND_ACCENT = new Color(59, 130, 246);
     private static final Color BRAND_DARK = new Color(15, 23, 42);
@@ -67,51 +77,152 @@ public class OgImageController {
 
     public OgImageController(ModService modService) {
         this.modService = modService;
+        this.renderCache = Caffeine.newBuilder()
+                .maximumSize(5000)
+                .expireAfterWrite(4, TimeUnit.HOURS)
+                .recordStats()
+                .build();
+        this.assetCache = Caffeine.newBuilder()
+                .maximumSize(1000)
+                .expireAfterWrite(1, TimeUnit.HOURS)
+                .build();
+
+        SVGLoader loader = new SVGLoader();
+        this.logoDocument = loader.load(new ByteArrayInputStream(LOGO_SVG.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static class CachedRender {
+        final byte[] data;
+        final String versionHash;
+        final long timestamp;
+
+        CachedRender(byte[] data, String versionHash) {
+            this.data = data;
+            this.versionHash = versionHash;
+            this.timestamp = System.currentTimeMillis();
+        }
     }
 
     @GetMapping(value = {"/project/{id}", "/project/{id}.png"})
-    public ResponseEntity<ByteArrayResource> generateOgImage(@PathVariable String id) {
+    public ResponseEntity<ByteArrayResource> generateOgImage(
+            @PathVariable String id,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch
+    ) {
         try {
             Mod mod = modService.getModById(id);
             if (mod == null) return ResponseEntity.notFound().build();
 
-            int width = 1200;
-            int height = 630;
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = image.createGraphics();
+            String versionKey = generateEtag(mod);
 
-            setupRenderingHints(g2d);
+            if (ifNoneMatch != null && (ifNoneMatch.equals(versionKey) || ifNoneMatch.equals("\"" + versionKey + "\""))) {
+                return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                        .eTag(versionKey)
+                        .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                        .build();
+            }
 
-            drawBackground(g2d, width, height);
+            CachedRender cached = renderCache.getIfPresent(mod.getId());
+            if (cached != null && cached.versionHash.equals(versionKey)) {
+                return serveImage(cached.data, versionKey);
+            }
 
-            int margin = 60;
-            int cardW = width - (margin * 2);
-            int cardH = height - (margin * 2);
-            int arc = 40;
-            RoundRectangle2D cardShape = new RoundRectangle2D.Float(margin, margin, cardW, cardH, arc, arc);
+            CompletableFuture<BufferedImage> bannerFuture = CompletableFuture.supplyAsync(() ->
+                    getOrFetchImage(mod.getBannerUrl())
+            );
+            CompletableFuture<BufferedImage> iconFuture = CompletableFuture.supplyAsync(() ->
+                    getOrFetchImage(mod.getImageUrl())
+            );
 
-            drawCardBackgroundWithBanner(g2d, mod, cardShape, margin, margin, cardW, cardH);
+            BufferedImage banner = bannerFuture.get(2, TimeUnit.SECONDS);
+            BufferedImage icon = iconFuture.get(2, TimeUnit.SECONDS);
 
-            drawProjectContent(g2d, mod, margin, margin, cardW, cardH);
+            byte[] imageBytes = renderImage(mod, banner, icon);
+            renderCache.put(mod.getId(), new CachedRender(imageBytes, versionKey));
 
-            drawBranding(g2d, width, height);
-
-            g2d.dispose();
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(image, "png", baos);
-            ByteArrayResource resource = new ByteArrayResource(baos.toByteArray());
-
-            return ResponseEntity.ok()
-                    .cacheControl(CacheControl.maxAge(24, TimeUnit.HOURS))
-                    .contentType(MediaType.IMAGE_PNG)
-                    .contentLength(resource.contentLength())
-                    .body(resource);
+            return serveImage(imageBytes, versionKey);
 
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    private String generateEtag(Mod mod) {
+        try {
+            String raw = mod.getId() + "|" + mod.getUpdatedAt() + "|" + mod.getTitle() + "|" + mod.getDownloadCount() + "|" + mod.getFavoriteCount();
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return "\"" + hexString + "\"";
+        } catch (Exception e) {
+            return "\"" + mod.getId() + "_" + System.currentTimeMillis() + "\"";
+        }
+    }
+
+    private ResponseEntity<ByteArrayResource> serveImage(byte[] bytes, String etag) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                .eTag(etag)
+                .contentType(MediaType.IMAGE_PNG)
+                .contentLength(bytes.length)
+                .body(new ByteArrayResource(bytes));
+    }
+
+    private BufferedImage getOrFetchImage(String url) {
+        if (url == null || url.isEmpty()) return null;
+        try {
+            String cacheKey = url;
+            BufferedImage cached = assetCache.getIfPresent(cacheKey);
+            if (cached != null) return cached;
+
+            String fetchUrl = url.startsWith("/") ? "http://localhost:8080" + url : url;
+            URL targetUrl = new URL(fetchUrl);
+            HttpURLConnection connection = (HttpURLConnection) targetUrl.openConnection();
+            connection.setConnectTimeout(1000);
+            connection.setReadTimeout(1000);
+            connection.connect();
+
+            try (var is = connection.getInputStream()) {
+                BufferedImage img = ImageIO.read(is);
+                if (img != null) {
+                    assetCache.put(cacheKey, img);
+                }
+                return img;
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private byte[] renderImage(Mod mod, BufferedImage banner, BufferedImage icon) throws Exception {
+        int width = 1200;
+        int height = 630;
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = image.createGraphics();
+
+        setupRenderingHints(g2d);
+        drawBackground(g2d, width, height);
+
+        int margin = 60;
+        int cardW = width - (margin * 2);
+        int cardH = height - (margin * 2);
+        int arc = 40;
+        RoundRectangle2D cardShape = new RoundRectangle2D.Float(margin, margin, cardW, cardH, arc, arc);
+
+        drawCardBackgroundWithBanner(g2d, mod, banner, cardShape, margin, margin, cardW, cardH);
+        drawProjectContent(g2d, mod, icon, margin, margin, cardW, cardH);
+        drawBranding(g2d, width, height);
+
+        g2d.dispose();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", baos);
+        return baos.toByteArray();
     }
 
     private void setupRenderingHints(Graphics2D g2d) {
@@ -127,21 +238,13 @@ public class OgImageController {
         g2d.fillRect(0, 0, width, height);
     }
 
-    private void drawCardBackgroundWithBanner(Graphics2D g2d, Mod mod, RoundRectangle2D cardShape, int x, int y, int w, int h) {
+    private void drawCardBackgroundWithBanner(Graphics2D g2d, Mod mod, BufferedImage banner, RoundRectangle2D cardShape, int x, int y, int w, int h) {
         g2d.setColor(CARD_BG);
         g2d.fill(cardShape);
 
         int headerH = 180;
 
         try {
-            BufferedImage banner = null;
-            if (mod.getBannerUrl() != null && !mod.getBannerUrl().isEmpty()) {
-                String bannerUrl = mod.getBannerUrl().startsWith("/")
-                        ? "http://localhost:8080" + mod.getBannerUrl()
-                        : mod.getBannerUrl();
-                banner = fetchImageWithTimeout(bannerUrl);
-            }
-
             if (banner == null) {
                 banner = createGradientBanner(w, headerH);
             }
@@ -180,17 +283,6 @@ public class OgImageController {
         g2d.drawLine(x, y + headerH, x + w, y + headerH);
     }
 
-    private BufferedImage fetchImageWithTimeout(String urlString) throws Exception {
-        URL url = new URL(urlString);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setConnectTimeout(1000);
-        connection.setReadTimeout(1000);
-        connection.connect();
-        try (var is = connection.getInputStream()) {
-            return ImageIO.read(is);
-        }
-    }
-
     private BufferedImage createGradientBanner(int w, int h) {
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
@@ -201,14 +293,14 @@ public class OgImageController {
         return img;
     }
 
-    private void drawProjectContent(Graphics2D g2d, Mod mod, int cardX, int cardY, int cardW, int cardH) {
+    private void drawProjectContent(Graphics2D g2d, Mod mod, BufferedImage icon, int cardX, int cardY, int cardW, int cardH) {
         int padding = 50;
         int iconSize = 180;
         int headerH = 180;
 
         int iconX = cardX + padding;
         int iconY = cardY + headerH - (iconSize / 2) + 20;
-        drawIcon(g2d, mod, iconX, iconY, iconSize);
+        drawIcon(g2d, mod, icon, iconX, iconY, iconSize);
 
         int textX = iconX + iconSize + 40;
         int textStartY = cardY + headerH + 30;
@@ -238,7 +330,7 @@ public class OgImageController {
         drawStatWithIcon(g2d, statX + 160, statY, "heart", formatNumber(mod.getFavoriteCount()));
     }
 
-    private void drawIcon(Graphics2D g2d, Mod mod, int x, int y, int size) {
+    private void drawIcon(Graphics2D g2d, Mod mod, BufferedImage img, int x, int y, int size) {
         g2d.setColor(new Color(0,0,0,80));
         g2d.fillRoundRect(x + 5, y + 5, size, size, 30, 30);
 
@@ -246,11 +338,6 @@ public class OgImageController {
         g2d.setClip(clip);
 
         try {
-            BufferedImage img = null;
-            if (mod.getImageUrl() != null && !mod.getImageUrl().isEmpty()) {
-                String u = mod.getImageUrl().startsWith("/") ? "http://localhost:8080" + mod.getImageUrl() : mod.getImageUrl();
-                img = fetchImageWithTimeout(u);
-            }
             if (img != null) {
                 g2d.drawImage(img, x, y, size, size, null);
             } else {
@@ -363,13 +450,10 @@ public class OgImageController {
     }
 
     private void drawBranding(Graphics2D g2d, int width, int height) {
-        SVGLoader loader = new SVGLoader();
-        SVGDocument svgDocument = loader.load(new ByteArrayInputStream(LOGO_SVG.getBytes(StandardCharsets.UTF_8)));
-
-        if (svgDocument == null) return;
+        if (logoDocument == null) return;
 
         float logoHeight = 40f;
-        float logoWidth = (float) (logoHeight * (svgDocument.size().width / svgDocument.size().height));
+        float logoWidth = (float) (logoHeight * (logoDocument.size().width / logoDocument.size().height));
 
         float x = width - 100 - logoWidth;
         float y = height - 98 - logoHeight;
@@ -377,10 +461,10 @@ public class OgImageController {
         Graphics2D logoG = (Graphics2D) g2d.create();
         logoG.translate(x, y);
 
-        double scale = logoHeight / svgDocument.size().height;
+        double scale = logoHeight / logoDocument.size().height;
         logoG.scale(scale, scale);
 
-        svgDocument.render(null, logoG);
+        logoDocument.render(null, logoG);
         logoG.dispose();
     }
 
