@@ -155,12 +155,24 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
         if (!imageObj) return;
 
         try {
-            const finalScale = baseScale * zoom;
+            const currentScreenScale = baseScale * zoom;
+            const sourceCropWidth = layout.cropBoxWidth / currentScreenScale;
+
+            const targetWidth = Math.min(3840, Math.floor(sourceCropWidth));
+            const targetHeight = Math.floor(targetWidth / aspect);
+
+            const scaleFactor = targetWidth / layout.cropBoxWidth;
+
+            const highResScale = (baseScale * zoom) * scaleFactor;
+            const highResOffset = {
+                x: offset.x * scaleFactor,
+                y: offset.y * scaleFactor
+            };
 
             const file = await getCroppedImg(
                 imageSrc,
-                { x: offset.x, y: offset.y, zoom: finalScale },
-                { width: layout.cropBoxWidth, height: layout.cropBoxHeight },
+                { x: highResOffset.x, y: highResOffset.y, zoom: highResScale },
+                { width: targetWidth, height: targetHeight },
                 "cropped.png"
             );
             onCropComplete(file);
