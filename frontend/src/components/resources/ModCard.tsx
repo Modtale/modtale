@@ -84,8 +84,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
     };
 
     return (
-        <Link
-            to={canonicalPath}
+        <div
             onMouseEnter={handleMouseEnter}
             className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden"
         >
@@ -113,9 +112,14 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                 </div>
             </div>
 
-            <div className="flex px-4 relative z-10 flex-1">
-                <div className="flex-shrink-0 -mt-8 mb-2 relative">
-                    <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative">
+            <div className="flex px-4 relative flex-1">
+                <div className="flex-shrink-0 -mt-8 mb-2 relative z-10">
+                    <Link
+                        to={canonicalPath}
+                        className="block w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                    >
                         <img
                             src={resolvedImage}
                             onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
@@ -124,6 +128,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                             height="80"
                             decoding={priority ? "sync" : "async"}
                             loading={priority ? "eager" : "lazy"}
+                            // @ts-ignore
                             fetchPriority={priority ? "high" : "auto"}
                             className="w-full h-full object-cover"
                         />
@@ -132,21 +137,23 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                                 <Box className="w-2.5 h-2.5 mr-0.5" /> {modCount}
                             </div>
                         )}
-                    </div>
+                    </Link>
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
                     <div className="flex justify-between items-start gap-2 mb-0.5">
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 relative">
                             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors" title={title}>
-                                {title}
+                                <Link to={canonicalPath} className="before:absolute before:inset-0 focus:outline-none focus:underline">
+                                    {title}
+                                </Link>
                             </h3>
-                            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 relative z-20">
                                 <span>by</span>
                                 <Link
                                     to={`/creator/${author}`}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="text-slate-700 dark:text-slate-300 font-medium hover:text-modtale-accent hover:underline focus:outline-none relative z-20"
+                                    className="text-slate-700 dark:text-slate-300 font-medium hover:text-modtale-accent hover:underline focus:outline-none p-0.5 -m-0.5 rounded"
                                 >
                                     {author}
                                 </Link>
@@ -181,6 +188,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                                     : 'text-slate-400 hover:text-red-400'
                         }`}
                         title={!isLoggedIn ? "Log in to favorite" : ""}
+                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
                     >
                         <Heart className={`w-3 h-3 mr-1 ${isFavorite ? 'fill-current' : ''}`} />
                         {favorites}
@@ -191,6 +199,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                     <span>{timeAgo ? `Updated ${timeAgo}` : 'Unknown'}</span>
                 </div>
             </div>
-        </Link>
+        </div>
     );
 };

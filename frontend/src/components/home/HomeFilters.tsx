@@ -23,12 +23,12 @@ const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null,
     return (
         <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/10 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-3">
-                <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors"><ChevronLeft className="w-4 h-4 text-slate-500" /></button>
+                <button onClick={() => changeMonth(-1)} aria-label="Previous month" className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors"><ChevronLeft className="w-4 h-4 text-slate-500" /></button>
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                <button onClick={() => changeMonth(1)} disabled={viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear()} className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight className="w-4 h-4 text-slate-500" /></button>
+                <button onClick={() => changeMonth(1)} disabled={viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear()} aria-label="Next month" className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight className="w-4 h-4 text-slate-500" /></button>
             </div>
             <div className="grid grid-cols-7 gap-1 text-center mb-2">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (<div key={d} className="text-[10px] font-bold text-slate-400 uppercase">{d}</div>))}</div>
-            <div className="grid grid-cols-7 gap-1">{days.map((d, i) => (d ? (<button key={i} disabled={isDisabled(d)} onClick={() => !isDisabled(d) && onSelect(new Date(year, month, d))} className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium transition-all ${isDisabled(d) ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40' : isSelected(d) ? 'bg-modtale-accent text-white shadow-md shadow-modtale-accent/30' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}>{d}</button>) : <div key={i} />))}</div>
+            <div className="grid grid-cols-7 gap-1">{days.map((d, i) => (d ? (<button key={i} disabled={isDisabled(d)} onClick={() => !isDisabled(d) && onSelect(new Date(year, month, d))} aria-label={new Date(year, month, d).toDateString()} className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium transition-all ${isDisabled(d) ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40' : isSelected(d) ? 'bg-modtale-accent text-white shadow-md shadow-modtale-accent/30' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}>{d}</button>) : <div key={i} />))}</div>
         </div>
     );
 };
@@ -55,7 +55,7 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
 
     return (
         <div className="relative w-full md:w-auto" ref={containerRef}>
-            <button onClick={handleToggle} className="w-full md:w-auto h-10 flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg px-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:border-modtale-accent hover:shadow-sm transition-all whitespace-nowrap min-w-[120px] justify-between">
+            <button onClick={handleToggle} aria-label="Sort options" className="w-full md:w-auto h-10 flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg px-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:border-modtale-accent hover:shadow-sm transition-all whitespace-nowrap min-w-[120px] justify-between">
                 <div className="flex items-center gap-2"><ArrowDownUp className="w-4 h-4 text-slate-400" /><span className="truncate">{currentLabel}</span></div>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -68,7 +68,7 @@ const FilterDropdown = ({ label, value, options, onChange }: { label: string, va
     const [isOpen, setIsOpen] = useState(false);
     return (
         <div className="relative">
-            <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">{label}</label>
+            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">{label}</label>
             <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 flex justify-between items-center hover:border-modtale-accent transition-colors">{value}<ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button>
             {isOpen && <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg shadow-xl z-[250] max-h-48 overflow-y-auto py-1 custom-scrollbar">{options.map(opt => <button key={opt} onClick={(e) => { e.stopPropagation(); onChange(opt); setIsOpen(false); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${value === opt ? 'bg-modtale-accent/10 text-modtale-accent' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>{opt}{value === opt && <Check className="w-3 h-3" />}</button>)}</div>}
         </div>
@@ -203,6 +203,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                         placeholder="Search projects..."
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
+                        aria-label="Mobile search"
                     />
                 </div>
             </div>
@@ -210,7 +211,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="hidden md:block">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">{pageTitle}</h2>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-0.5 block">{loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}</span>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mt-0.5 block">{loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}</span>
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto">
@@ -252,7 +253,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                     <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
 
                                     <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
+                                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
                                         <div className="grid grid-cols-4 gap-1 mb-2">
                                             {[0, 10, 50, 100].map(f => (
                                                 <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); }} className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all ${minFavorites === f && customFav === '' ? 'bg-slate-800 dark:bg-white text-white dark:text-black border-transparent' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}>
@@ -270,13 +271,14 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                                     setCustomFav(e.target.value);
                                                     setMinFavorites(Number(e.target.value));
                                                 }}
+                                                aria-label="Custom minimum favorites"
                                                 className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-modtale-accent focus:border-modtale-accent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Downloads</label>
+                                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Downloads</label>
                                         <div className="grid grid-cols-4 gap-1 mb-2">
                                             {[0, 1000, 5000, 10000].map(d => (
                                                 <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); }} className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all ${minDownloads === d && customDl === '' ? 'bg-slate-800 dark:bg-white text-white dark:text-black border-transparent' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 hover:border-slate-400'}`}>
@@ -286,13 +288,13 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
                                         </div>
                                         <div className="relative">
                                             <Download className="absolute left-3 top-2 w-3.5 h-3.5 text-slate-400" />
-                                            <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-modtale-accent focus:border-modtale-accent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} aria-label="Custom minimum downloads" className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-modtale-accent focus:border-modtale-accent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                                         </div>
                                     </div>
 
                                     <div>
                                         <div className="flex justify-between items-center mb-1.5">
-                                            <label className="text-xs font-bold text-slate-400 uppercase block">Last Updated</label>
+                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Last Updated</label>
                                         </div>
                                         {showCalendar ? ( <CalendarWidget selectedDate={selectedDateObj} onSelect={handleDateSelect} /> ) : (
                                             <>
