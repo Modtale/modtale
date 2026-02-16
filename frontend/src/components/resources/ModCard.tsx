@@ -196,7 +196,7 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                 </div>
                 <div className="flex items-center">
                     <Calendar className="w-3 h-3 mr-1" />
-                    <span>{timeAgo ? `Updated ${timeAgo}` : 'Unknown'}</span>
+                    <span suppressHydrationWarning>{timeAgo ? `Updated ${timeAgo}` : 'Unknown'}</span>
                 </div>
             </div>
         </div>

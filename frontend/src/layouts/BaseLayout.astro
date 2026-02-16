@@ -31,6 +31,18 @@ if (initialData && initialData.id && initialData.classification) {
 
 const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
+
+const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: https://cdn.modtale.net https://api.modale.net",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://api.modtale.net https://cloudflareinsights.com",
+    "frame-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'"
+].join('; ');
 ---
 
 <!DOCTYPE html>
@@ -42,6 +54,8 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
 
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
+
+    <meta http-equiv="Content-Security-Policy" content={csp} />
 
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalUrl} />
