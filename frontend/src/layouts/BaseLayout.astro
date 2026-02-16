@@ -32,13 +32,21 @@ if (initialData && initialData.id && initialData.classification) {
 const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
 
+const rawApiUrl = import.meta.env.PUBLIC_API_URL || "https://modtale-backend-dev-ptpi2wdeva-uc.a.run.app"; // Fallback if env missing
+let apiOrigin = rawApiUrl;
+try {
+    apiOrigin = new URL(rawApiUrl).origin;
+} catch (e) {
+    console.warn("Invalid PUBLIC_API_URL, defaulting CSP to raw string", e);
+}
+
 const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: https://cdn.modtale.net https://api.modale.net",
+    `img-src 'self' data: https://cdn.modtale.net ${apiOrigin}`,
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://api.modtale.net https://cloudflareinsights.com",
+    `connect-src 'self' ${apiOrigin} https://cloudflareinsights.com`,
     "frame-src 'self'",
     "object-src 'none'",
     "base-uri 'self'"
