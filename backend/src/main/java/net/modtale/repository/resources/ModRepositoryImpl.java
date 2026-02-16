@@ -84,6 +84,10 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
 
+        if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
+            criteriaList.add(Criteria.where("downloadCount").gte(10));
+        }
+
         boolean isTimeBasedDownloadSort = "downloads".equals(sortBy) && dateCutoff != null;
         if (dateCutoff != null && !isTimeBasedDownloadSort) {
             criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
