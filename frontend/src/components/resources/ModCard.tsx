@@ -13,6 +13,7 @@ interface ModCardProps {
     onToggleFavorite: (modId: string) => void;
     isLoggedIn: boolean;
     onClick?: () => void;
+    priority?: boolean;
 }
 
 const getClassificationIcon = (cls: string) => {
@@ -51,7 +52,7 @@ const formatTimeAgo = (dateString: string) => {
     return "Just now";
 };
 
-export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggleFavorite, isLoggedIn }) => {
+export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false }) => {
     const title = mod.title || 'Untitled Project';
     const author = mod.author || 'Unknown';
 
@@ -93,7 +94,11 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                     <img
                         src={resolvedBanner}
                         alt=""
-                        decoding="async"
+                        decoding={priority ? "sync" : "async"}
+                        loading={priority ? "eager" : "lazy"}
+                        fetchPriority={priority ? "high" : "auto"}
+                        width={600}
+                        height={96}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                 ) : (
@@ -117,7 +122,9 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                             alt={title}
                             width="80"
                             height="80"
-                            decoding="async"
+                            decoding={priority ? "sync" : "async"}
+                            loading={priority ? "eager" : "lazy"}
+                            fetchPriority={priority ? "high" : "auto"}
                             className="w-full h-full object-cover"
                         />
                         {classification === 'MODPACK' && modCount > 0 && (
