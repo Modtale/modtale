@@ -245,7 +245,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                         <button onClick={() => setShowUnlinkModal({ provider, label })} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors" title="Unlink"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                 ) : (
-                    <button onClick={() => window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`} className="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:border-modtale-accent hover:text-modtale-accent transition-all flex items-center gap-1.5 shadow-sm"><Plus className="w-3 h-3" /> Link</button>
+                    <button onClick={() => window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`} className="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:border-modtale-accent hover:text-modtale-accent transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap"><Plus className="w-3 h-3" /> Link</button>
                 )}
             </div>
         );
@@ -274,9 +274,9 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     );
 
     const actionContent = (
-        <div className="flex flex-col items-end gap-2 w-full md:w-auto">
-            {isDirty && <div className="text-[10px] font-bold text-amber-500 animate-pulse uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded">Unsaved Changes</div>}
-            <button onClick={handleSave} disabled={saving} className="bg-modtale-accent text-white px-6 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 hover:bg-modtale-accentHover disabled:opacity-70 text-xs flex-shrink-0 h-10 w-full md:w-auto justify-center">
+        <div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+            {isDirty && <div className="text-[10px] font-bold text-amber-500 animate-pulse uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded whitespace-nowrap order-first md:order-none">Unsaved Changes</div>}
+            <button onClick={handleSave} disabled={saving} className="bg-modtale-accent text-white px-6 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 hover:bg-modtale-accentHover disabled:opacity-70 text-xs flex-shrink-0 h-10 w-full md:w-auto justify-center whitespace-nowrap">
                 {saving ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : (saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
                 {saved ? 'Saved' : 'Save Changes'}
             </button>
