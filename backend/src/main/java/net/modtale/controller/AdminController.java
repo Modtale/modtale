@@ -211,7 +211,7 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        Mod mod = modService.getModById(id);
+        Mod mod = modService.getRawModById(id);
         if (mod == null) return ResponseEntity.notFound().build();
 
         User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
@@ -345,11 +345,15 @@ public class AdminController {
     }
 
     @GetMapping("/projects/search")
-    public ResponseEntity<?> searchProjects(@RequestParam String query) {
+    public ResponseEntity<?> searchProjects(@RequestParam String query, @RequestParam(required = false, defaultValue = "false") boolean deleted) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null, null).getContent());
+        if (deleted) {
+            return ResponseEntity.ok(modService.searchDeletedProjects(query, 0, 10).getContent());
+        } else {
+            return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null, null).getContent());
+        }
     }
 
     @GetMapping("/projects/{id}")
@@ -357,7 +361,7 @@ public class AdminController {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        Mod mod = modService.getModById(id);
+        Mod mod = modService.getAdminProjectDetails(id);
         if (mod == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(mod);
     }
@@ -368,7 +372,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         try {
-            Mod mod = modService.getModById(id);
+            Mod mod = modService.getRawModById(id);
             if (mod == null) return ResponseEntity.notFound().build();
 
             ModVersion targetVer = modService.findVersion(mod, version);
@@ -416,7 +420,7 @@ public class AdminController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         try {
-            Mod mod = modService.getModById(id);
+            Mod mod = modService.getRawModById(id);
             if (mod == null) return ResponseEntity.notFound().build();
 
             ModVersion targetVer = modService.findVersion(mod, version);

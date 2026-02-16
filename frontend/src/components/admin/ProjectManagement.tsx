@@ -10,6 +10,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const [loading, setLoading] = useState(false);
     const [foundProject, setFoundProject] = useState<Mod | null>(null);
     const [showVersions, setShowVersions] = useState(false);
+    const [searchDeleted, setSearchDeleted] = useState(false);
 
     const [searchResults, setSearchResults] = useState<Mod[]>([]);
     const [showResults, setShowResults] = useState(false);
@@ -33,6 +34,15 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        setSearchResults([]);
+        setShowResults(false);
+        if (query.length > 1) {
+            const e = { target: { value: query } } as React.ChangeEvent<HTMLInputElement>;
+            handleInputChange(e);
+        }
+    }, [searchDeleted]);
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setQuery(val);
@@ -42,7 +52,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
         if (val.trim().length > 1) {
             searchTimeout.current = setTimeout(async () => {
                 try {
-                    const res = await api.get('/admin/projects/search', { params: { query: val } });
+                    const res = await api.get('/admin/projects/search', { params: { query: val, deleted: searchDeleted } });
                     setSearchResults(res.data);
                     setShowResults(true);
                 } catch (e) {
@@ -129,30 +139,39 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
 
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
-            {inspectorData && foundProject && (
-                <SourceInspector
-                    modId={foundProject.id}
-                    version={inspectorData.version}
-                    structure={inspectorData.structure}
-                    issues={inspectorData.issues}
-                    onClose={() => setInspectorData(null)}
-                />
-            )}
+            <div className="flex flex-col md:flex-row gap-4 mb-10 relative z-50 items-start">
+                <div className="relative flex-1 group w-full" ref={wrapperRef}>
+                    <div className="relative">
+                        <Package className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
+                        <input
+                            type="text"
+                            placeholder={searchDeleted ? "Search deleted projects..." : "Search active projects..."}
+                            className={`w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border ${searchDeleted ? 'border-red-500/30 focus:ring-red-500' : 'border-slate-200 dark:border-white/10 focus:ring-modtale-accent'} rounded-2xl focus:ring-2 outline-none dark:text-white font-bold transition-all placeholder:font-medium`}
+                            value={query}
+                            onChange={handleInputChange}
+                            onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
+                        />
+                    </div>
 
-            <div className="flex flex-col md:flex-row gap-4 mb-10 relative z-50">
-                <div className="relative flex-1 group" ref={wrapperRef}>
-                    <Package className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
-                    <input
-                        type="text"
-                        placeholder="Search projects by title..."
-                        className="w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium"
-                        value={query}
-                        onChange={handleInputChange}
-                        onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
-                    />
+                    <div className="mt-2 flex items-center gap-2 px-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none group/toggle">
+                            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${searchDeleted ? 'bg-red-500' : 'bg-slate-200 dark:bg-white/10'}`}>
+                                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${searchDeleted ? 'translate-x-4' : ''}`} />
+                            </div>
+                            <input
+                                type="checkbox"
+                                className="hidden"
+                                checked={searchDeleted}
+                                onChange={e => setSearchDeleted(e.target.checked)}
+                            />
+                            <span className={`text-xs font-bold ${searchDeleted ? 'text-red-500' : 'text-slate-500 group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-300'}`}>
+                                Search Deleted Projects
+                            </span>
+                        </label>
+                    </div>
 
                     {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
                             {searchResults.map(mod => (
                                 <button
                                     key={mod.id}
@@ -160,10 +179,15 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                                     className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0">
-                                        <img src={mod.imageUrl} alt="" className="w-full h-full object-cover" />
+                                        <img src={mod.imageUrl || 'https://modtale.net/assets/favicon.svg'} alt="" className="w-full h-full object-cover" />
                                     </div>
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{mod.title}</p>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{mod.title}</p>
+                                            {mod.status === 'DELETED' && (
+                                                <span className="text-[10px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded font-black uppercase">Deleted</span>
+                                            )}
+                                        </div>
                                         <p className="text-[10px] text-slate-500 font-mono">{mod.id}</p>
                                     </div>
                                 </button>
@@ -195,7 +219,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="border border-slate-200 dark:border-white/10 rounded-3xl p-8 bg-slate-50/50 dark:bg-white/[0.02] mb-8">
                         <div className="flex items-center gap-6 mb-6">
-                            <img src={foundProject.imageUrl} className="w-20 h-20 rounded-2xl shadow-lg object-cover" alt="" />
+                            <img src={foundProject.imageUrl || 'https://modtale.net/assets/favicon.svg'} className="w-20 h-20 rounded-2xl shadow-lg object-cover" alt="" />
                             <div>
                                 <h3 className="text-2xl font-black text-slate-900 dark:text-white">{foundProject.title}</h3>
                                 <p className="text-sm font-bold text-slate-500">by {foundProject.author} • <span className="font-mono">{foundProject.id}</span></p>
@@ -238,12 +262,12 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                                 onClick={() => setShowVersions(!showVersions)}
                                 className="flex-1 py-3 border-2 border-slate-200 dark:border-white/10 hover:border-modtale-accent bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-xl font-bold transition-all"
                             >
-                                {showVersions ? 'Hide Versions' : `Manage Versions (${foundProject.versions.length})`}
+                                {showVersions ? 'Hide Versions' : `Manage Versions (${foundProject.versions ? foundProject.versions.length : 0})`}
                             </button>
                         </div>
                     </div>
 
-                    {showVersions && (
+                    {showVersions && foundProject.versions && (
                         <div className="space-y-2 mb-8 animate-in fade-in slide-in-from-top-2">
                             {foundProject.versions.map(ver => (
                                 <div key={ver.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl">

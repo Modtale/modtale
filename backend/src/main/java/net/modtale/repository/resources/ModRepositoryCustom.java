@@ -25,4 +25,6 @@ public interface ModRepositoryCustom {
     );
 
     Page<Mod> findFavorites(List<String> modIds, String search, Pageable pageable);
+
+    Page<Mod> searchDeletedMods(String search, Pageable pageable);
 }
