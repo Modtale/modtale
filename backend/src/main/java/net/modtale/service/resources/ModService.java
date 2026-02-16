@@ -507,6 +507,10 @@ public class ModService {
     }
 
     public Mod createDraft(String title, String description, String classification, User user, String ownerName, String customSlug) {
+        if (!user.isEmailVerified()) {
+            throw new SecurityException("Email verification required.");
+        }
+
         validateClassification(classification);
         if(isTitleTaken(title)) throw new IllegalArgumentException("Title already taken.");
 
@@ -573,6 +577,10 @@ public class ModService {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
         if(mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
+
+        if (user != null && !user.isEmailVerified()) {
+            throw new SecurityException("Email verification required.");
+        }
 
         ensureEditable(mod);
         validateForPublishing(mod);
@@ -1175,6 +1183,10 @@ public class ModService {
     public void addVersionToMod(String modId, String versionNumber, List<String> gameVersions,
                                 MultipartFile file, String changelog, List<String> modIds, ModVersion.Channel channel) throws IOException {
         User user = userService.getCurrentUser();
+        if (user != null && !user.isEmailVerified()) {
+            throw new SecurityException("Email verification required.");
+        }
+
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (!hasEditPermission(mod, user)) throw new SecurityException("You do not have permission to update this project.");

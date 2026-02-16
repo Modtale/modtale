@@ -80,11 +80,28 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             });
             return;
         }
+        if (!currentUser.emailVerified) {
+            setStatusModal({
+                type: 'error',
+                title: 'Verification Required',
+                msg: "You must verify your email address before creating projects. Please check your inbox."
+            });
+            return;
+        }
         setClassification(typeId as Classification);
         setStep(1);
     };
 
     const handleCreateDraft = async () => {
+        if (!currentUser?.emailVerified) {
+            setStatusModal({
+                type: 'error',
+                title: 'Verification Required',
+                msg: "You must verify your email address before creating projects."
+            });
+            return;
+        }
+
         if (!title.trim() || !summary.trim() || !classification) {
             setError("Please fill in all fields."); return;
         }

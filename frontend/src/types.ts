@@ -147,27 +147,6 @@ export interface ProjectMeta {
     totalDownloads: number;
 }
 
-export interface CreatorAnalytics {
-    totalDownloads: number;
-    totalViews: number;
-    periodDownloads: number;
-    previousPeriodDownloads: number;
-    periodViews: number;
-    previousPeriodViews: number;
-    projectDownloads: Record<string, AnalyticsDataPoint[]>;
-    projectViews: Record<string, AnalyticsDataPoint[]>;
-    projectMeta: Record<string, ProjectMeta>;
-}
-
-export interface ProjectAnalyticsDetail {
-    projectId: string;
-    projectTitle: string;
-    totalDownloads: number;
-    totalViews: number;
-    versionDownloads: Record<string, AnalyticsDataPoint[]>;
-    views: AnalyticsDataPoint[];
-}
-
 export interface Report {
     id: string;
     reporterId: string;

@@ -40,8 +40,16 @@ export const DeveloperSettings: React.FC = () => {
             setNewKey(res.data.key);
             setKeyName('');
             fetchKeys();
-        } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to create key.' });
+        } catch (e: any) {
+            if (e.response?.status === 403 && e.response?.data?.error === "Email verification required.") {
+                setStatus({
+                    type: 'error',
+                    title: 'Verification Required',
+                    msg: "You must verify your email address to generate API keys. Please check your inbox."
+                });
+            } else {
+                setStatus({ type: 'error', title: 'Error', msg: 'Failed to create key.' });
+            }
         } finally { setIsCreating(false); }
     };
 
