@@ -228,8 +228,8 @@ public class OgImageController {
         g2d.setColor(TEXT_DESC);
 
         String desc = mod.getDescription() != null ? mod.getDescription() : "";
-        String truncatedDesc = truncateText(g2d, desc, cardW - (padding * 2));
-        g2d.drawString(truncatedDesc, cardX + padding, descY);
+        int descWidth = cardW - (padding * 2);
+        drawWrappedText(g2d, desc, cardX + padding, descY, descWidth, 2);
 
         int statY = cardY + cardH - 45;
         int statX = cardX + padding;
@@ -395,6 +395,42 @@ public class OgImageController {
             sb.setLength(sb.length() - 1);
         }
         return sb.toString() + ellipsis;
+    }
+
+    private void drawWrappedText(Graphics2D g2d, String text, int x, int y, int maxWidth, int maxLines) {
+        if (text == null || text.isEmpty()) return;
+
+        FontMetrics fm = g2d.getFontMetrics();
+        int lineHeight = fm.getHeight() + 4;
+        String[] words = text.split("\\s+");
+        StringBuilder currentLine = new StringBuilder();
+        int lineCount = 0;
+
+        for (String word : words) {
+            String separator = currentLine.length() == 0 ? "" : " ";
+            String testLine = currentLine + separator + word;
+
+            if (fm.stringWidth(testLine) <= maxWidth) {
+                currentLine.append(separator).append(word);
+            } else {
+                if (lineCount < maxLines - 1) {
+                    g2d.drawString(currentLine.toString(), x, y + (lineCount * lineHeight));
+                    currentLine = new StringBuilder(word);
+                    lineCount++;
+                } else {
+                    String line = currentLine.toString();
+                    String ellipsis = "...";
+                    while (fm.stringWidth(line + ellipsis) > maxWidth && line.length() > 0) {
+                        line = line.substring(0, line.length() - 1);
+                    }
+                    g2d.drawString(line + ellipsis, x, y + (lineCount * lineHeight));
+                    return;
+                }
+            }
+        }
+        if (currentLine.length() > 0 && lineCount < maxLines) {
+            g2d.drawString(currentLine.toString(), x, y + (lineCount * lineHeight));
+        }
     }
 
     private String formatNumber(long count) {
