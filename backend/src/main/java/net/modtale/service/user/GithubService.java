@@ -36,7 +36,7 @@ public class GithubService {
 
             while (hasMore) {
                 ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                        "https://api.github.com/user/repos?sort=updated&per_page=100&page=" + page,
+                        "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member&page=" + page,
                         HttpMethod.GET,
                         entity,
                         new ParameterizedTypeReference<List<Map<String, Object>>>() {}
