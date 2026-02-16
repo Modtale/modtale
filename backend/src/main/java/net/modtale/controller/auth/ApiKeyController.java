@@ -39,6 +39,11 @@ public class ApiKeyController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
+        if (!user.isEmailVerified()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Email verification required."));
+        }
+
         String name = payload.get("name");
         if (name == null || name.isBlank()) {
             return ResponseEntity.badRequest().build();

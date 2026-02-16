@@ -160,6 +160,15 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
         if(!currentProject) return;
         if(currentProject.status === 'PENDING' || currentProject.status === 'ARCHIVED') return;
 
+        if (!currentUser?.emailVerified) {
+            setStatusModal({
+                type: 'error',
+                title: 'Verification Required',
+                msg: "You must verify your email address before uploading versions."
+            });
+            return;
+        }
+
         if(!versionData.versionNumber) { setStatusModal({type: 'error', title: 'Error', msg: "Version number required"}); return; }
         if(currentProject.classification !== 'MODPACK' && !versionData.file) { setStatusModal({type: 'error', title: 'Error', msg: "File required"}); return; }
 
@@ -228,6 +237,16 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
     const handlePublish = async () => {
         const currentProject = project;
         if(!currentProject) return;
+
+        if (!currentUser?.emailVerified) {
+            setStatusModal({
+                type: 'error',
+                title: 'Verification Required',
+                msg: "You must verify your email address before publishing projects."
+            });
+            return;
+        }
+
         if(formData.summary.length < 10) { setStatusModal({type:'error', title:'Error', msg: "Short summary must be at least 10 characters."}); return; }
         if(!formData.tags.length) { setStatusModal({type:'error', title:'Error', msg: "At least one tag is required."}); return; }
         if(currentProject.classification !== 'MODPACK' && !formData.license) { setStatusModal({type:'error', title:'Error', msg: "License is required."}); return; }
