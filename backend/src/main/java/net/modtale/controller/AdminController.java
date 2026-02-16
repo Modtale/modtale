@@ -301,13 +301,28 @@ public class AdminController {
         }
     }
 
-    @PostMapping("/projects/{id}/restore")
-    public ResponseEntity<?> restoreProject(@PathVariable String id) {
+    @DeleteMapping("/projects/{id}/hard")
+    public ResponseEntity<?> hardDeleteProject(@PathVariable String id) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
-            modService.adminRestoreProject(id);
-            logAction(currentUser.getId(), "RESTORE_PROJECT", id, "PROJECT", null);
+            modService.adminHardDeleteProject(id);
+            logAction(currentUser.getId(), "HARD_DELETE_PROJECT", id, "PROJECT", null);
+            return ResponseEntity.ok().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/projects/{id}/restore")
+    public ResponseEntity<?> restoreProject(@PathVariable String id, @RequestParam(defaultValue = "PUBLISHED") String status) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            modService.adminRestoreProject(id, status);
+            logAction(currentUser.getId(), "RESTORE_PROJECT", id, "PROJECT", "To Status: " + status);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());

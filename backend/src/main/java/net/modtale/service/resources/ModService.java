@@ -1462,7 +1462,7 @@ public class ModService {
         performDeletionStrategy(mod);
     }
 
-    public void adminRestoreProject(String id) {
+    public void adminRestoreProject(String id, String targetStatus) {
         User user = userService.getCurrentUser();
         if (!isAdmin(user)) throw new SecurityException("Access Denied");
 
@@ -1473,11 +1473,31 @@ public class ModService {
             throw new IllegalArgumentException("Project is not in a recoverable state.");
         }
 
-        mod.setStatus("PUBLISHED");
+        List<String> validStates = List.of("PUBLISHED", "DRAFT", "UNLISTED", "ARCHIVED");
+        if (!validStates.contains(targetStatus)) {
+            throw new IllegalArgumentException("Invalid target status. Must be one of: " + validStates);
+        }
+
+        mod.setStatus(targetStatus);
         mod.setDeletedAt(null);
         modRepository.save(mod);
         evictProjectDetails(mod);
-        logger.info("Project " + mod.getId() + " restored by admin " + user.getUsername());
+        logger.info("Project " + mod.getId() + " restored to " + targetStatus + " by admin " + user.getUsername());
+    }
+
+    public void adminHardDeleteProject(String id) {
+        User user = userService.getCurrentUser();
+        if (!isAdmin(user)) throw new SecurityException("Access Denied");
+
+        Mod mod = getRawModById(id);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+
+        if (!"DELETED".equals(mod.getStatus())) {
+            throw new IllegalArgumentException("Project must be in DELETED state to perform a hard delete.");
+        }
+
+        logger.info("Admin " + user.getUsername() + " forcing hard delete of project " + id);
+        performHardDelete(mod);
     }
 
     public void adminUnlistProject(String id) {
