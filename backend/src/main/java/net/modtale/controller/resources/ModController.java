@@ -851,4 +851,11 @@ public class ModController {
         } catch (SecurityException e) { return ResponseEntity.status(403).body(e.getMessage()); }
         catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
     }
+
+    @GetMapping("/version/{hash}")
+    public ResponseEntity<?> getVersionByHash(@PathVariable String hash) {
+        Optional<ModVersion> version = modService.getVersionByHash(hash);
+        if (version.isEmpty()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(version.get());
+    }
 }

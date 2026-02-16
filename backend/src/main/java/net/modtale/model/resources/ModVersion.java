@@ -7,6 +7,7 @@ public class ModVersion {
     private String versionNumber;
     private List<String> gameVersions;
     private String fileUrl;
+    private String hash;
     private int downloadCount;
     private String releaseDate;
     private String changelog;
@@ -18,7 +19,6 @@ public class ModVersion {
     private ReviewStatus reviewStatus = ReviewStatus.PENDING;
     private String rejectionReason;
 
-    // Determines when the version should automatically transition to APPROVED
     private String scheduledPublishDate;
 
     public enum Channel { RELEASE, BETA, ALPHA }
@@ -35,6 +35,9 @@ public class ModVersion {
 
     public String getFileUrl() { return fileUrl; }
     public void setFileUrl(String fileUrl) { this.fileUrl = fileUrl; }
+
+    public String getHash() { return hash; }
+    public void setHash(String hash) { this.hash = hash; }
 
     public int getDownloadCount() { return downloadCount; }
     public void setDownloadCount(int downloadCount) { this.downloadCount = downloadCount; }
