@@ -111,8 +111,10 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
             } else if (confirmAction === 'RESTORE') {
                 await api.post(`/admin/projects/${foundProject.id}/restore`, null, { params: { status: restoreTargetStatus } });
                 setStatus({ type: 'success', title: 'Restored', msg: `Project successfully restored to ${restoreTargetStatus}.` });
-                setFoundProject({ ...foundProject, status: restoreTargetStatus });
-            } else if (confirmAction === 'UNLIST') {
+                setFoundProject({
+                    ...foundProject,
+                    status: restoreTargetStatus as Mod['status']
+                });            } else if (confirmAction === 'UNLIST') {
                 await api.post(`/admin/projects/${foundProject.id}/unlist`);
                 setStatus({ type: 'success', title: 'Unlisted', msg: 'Project is now unlisted.' });
                 setFoundProject({ ...foundProject, status: 'UNLISTED' });
