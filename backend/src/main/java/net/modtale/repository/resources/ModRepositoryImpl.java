@@ -116,38 +116,38 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
 
         if ("hidden_gems".equals(viewCategory)) {
             Query statsQuery = new Query(baseCriteria);
-            statsQuery.addCriteria(Criteria.where("downloadCount").gte(10));
+            statsQuery.addCriteria(Criteria.where("downloads30d").gte(10));
 
             long totalDocs = mongoTemplate.count(statsQuery, Mod.class);
             int p5Index = Math.max(0, (int) (totalDocs * 0.05));
             int p20Index = Math.max(0, (int) (totalDocs * 0.20));
 
             Query p5Query = new Query(baseCriteria)
-                    .addCriteria(Criteria.where("downloadCount").gte(10))
-                    .with(Sort.by(Sort.Direction.ASC, "downloadCount"))
+                    .addCriteria(Criteria.where("downloads30d").gte(10))
+                    .with(Sort.by(Sort.Direction.ASC, "downloads30d"))
                     .skip(p5Index).limit(1);
             Mod p5Mod = mongoTemplate.findOne(p5Query, Mod.class);
-            int minDl = p5Mod != null ? p5Mod.getDownloadCount() : 0;
+            int minDl = p5Mod != null ? p5Mod.getDownloads30d() : 0;
 
             Query p20Query = new Query(baseCriteria)
-                    .addCriteria(Criteria.where("downloadCount").gte(10))
-                    .with(Sort.by(Sort.Direction.ASC, "downloadCount"))
+                    .addCriteria(Criteria.where("downloads30d").gte(10))
+                    .with(Sort.by(Sort.Direction.ASC, "downloads30d"))
                     .skip(p20Index).limit(1);
             Mod p20Mod = mongoTemplate.findOne(p20Query, Mod.class);
-            int maxDl = p20Mod != null ? p20Mod.getDownloadCount() : Integer.MAX_VALUE;
+            int maxDl = p20Mod != null ? p20Mod.getDownloads30d() : Integer.MAX_VALUE;
 
             if (maxDl <= minDl) maxDl = minDl + 500;
 
             pipeline.add(Aggregation.match(new Criteria().andOperator(
-                    Criteria.where("downloadCount").gt(minDl),
-                    Criteria.where("downloadCount").lt(maxDl)
+                    Criteria.where("downloads30d").gt(minDl),
+                    Criteria.where("downloads30d").lt(maxDl)
             )));
 
             pipeline.add(Aggregation.addFields()
                     .addField("gemRatio")
                     .withValue(ArithmeticOperators.Divide.valueOf("favoriteCount")
-                            .divideBy(ConditionalOperators.when(Criteria.where("downloadCount").gt(0))
-                                    .then("$downloadCount").otherwise(1)))
+                            .divideBy(ConditionalOperators.when(Criteria.where("downloads30d").gt(0))
+                                    .then("$downloads30d").otherwise(1)))
                     .build());
         }
 
