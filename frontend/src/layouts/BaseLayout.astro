@@ -9,7 +9,7 @@ interface Props {
     image?: string;
     jsonLd?: object;
     initialData?: any;
-    }
+}
 
 const {
     title = DEFAULT_SEO.title,
@@ -18,7 +18,7 @@ const {
     image: propImage,
     jsonLd,
     initialData
-    } = Astro.props;
+} = Astro.props;
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
@@ -27,7 +27,7 @@ let image = propImage || defaultImage;
 
 if (initialData && initialData.id && initialData.classification) {
     image = `api.modale.net/api/v1/og/project/${initialData.id}.png`;
-    }
+}
 
 const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
@@ -57,6 +57,10 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
     <meta name="keywords" content={keywords} />
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <meta name="theme-color" content="#3b82f6" />
+
+    <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
 
