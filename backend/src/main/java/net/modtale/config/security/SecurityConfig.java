@@ -165,6 +165,7 @@ public class SecurityConfig {
                             .csrfTokenRequestHandler(requestHandler);
 
                     csrf.ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**");
+                    csrf.ignoringRequestMatchers("/api/v1/users/batch", "/api/v1/analytics/view/**");
                     csrf.ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null);
 
                     if (isPreviewEnvironment()) {
@@ -211,26 +212,31 @@ public class SecurityConfig {
                                 "/api/v1/tags",
                                 "/api/v1/files/**",
                                 "/api/v1/user/profile/**",
+                                "/api/v1/users/search",
+                                "/api/v1/users/*/organizations",
+                                "/api/v1/users/*/following",
+                                "/api/v1/users/*/followers",
+                                "/api/v1/orgs/*/members",
+                                "/api/v1/creators/**",
                                 "/api/v1/og/**",
                                 "/api/v1/download/**",
-                                "/api/v1/meta/**"
+                                "/api/v1/meta/**",
+                                "/api/v1/status",
+                                "/api/v1/version/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/users/batch",
+                                "/api/v1/analytics/view/**"
+                        ).permitAll()
                         .requestMatchers(
                                 "/api/v1/user/analytics",
-                                "/api/v1/projects/*/analytics",
-                                "/api/v1/analytics/view/**",
                                 "/api/v1/user/api-keys/**",
                                 "/api/v1/admin/**"
                         ).access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
                             if (isApiKeyUser) return new AuthorizationDecision(false);
-
-                            HttpServletRequest request = context.getRequest();
-                            String path = request.getRequestURI();
-
-                            if (path.contains("/analytics/view/")) return new AuthorizationDecision(true);
 
                             return new AuthorizationDecision(authentication.get().isAuthenticated());
                         })
@@ -297,9 +303,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/admin/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/api-keys/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/analytics", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/projects/*/analytics", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);
