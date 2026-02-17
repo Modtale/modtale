@@ -63,7 +63,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
             }
         };
         init();
-    }, [user.username, user.id]); // Optimized dependency array
+    }, [user.username, user.id]);
 
     const handleDelete = async () => {
         if (!deleteModal) return;

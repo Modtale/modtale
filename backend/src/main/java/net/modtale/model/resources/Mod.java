@@ -59,7 +59,6 @@ public class Mod {
     private int downloadCount;
     private int favoriteCount;
 
-    // Cached analytics for time-based sorting
     private int downloads7d;
     private int downloads30d;
     private int downloads90d;

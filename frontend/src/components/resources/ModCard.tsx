@@ -109,7 +109,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                         alt=""
                         decoding={priority ? "sync" : "async"}
                         loading={priority ? "eager" : "lazy"}
-                        // @ts-ignore
                         fetchPriority={priority ? "high" : "auto"}
                         width={600}
                         height={96}
@@ -138,7 +137,6 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
                             height={80}
                             decoding={priority ? "sync" : "async"}
                             loading={priority ? "eager" : "lazy"}
-                            // @ts-ignore
                             fetchPriority={priority ? "high" : "auto"}
                             className="w-full h-full object-cover"
                         />

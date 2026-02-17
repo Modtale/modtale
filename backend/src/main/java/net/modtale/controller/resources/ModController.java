@@ -510,7 +510,7 @@ public class ModController {
     public ResponseEntity<?> toggleFavorite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        modService.toggleFavorite(id, user.getId());
+        modService.toggleFavorite(id, user.getUsername());
         return ResponseEntity.ok().build();
     }
 

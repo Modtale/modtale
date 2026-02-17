@@ -175,7 +175,7 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
         if (startLine && scrollContainerRef.current && startLine > 1) {
             setTimeout(() => {
                 if (scrollContainerRef.current) {
-                    const lineHeight = 20; // Approx leading-5
+                    const lineHeight = 20;
                     scrollContainerRef.current.scrollTop = (startLine - 5) * lineHeight;
                 }
             }, 100);
