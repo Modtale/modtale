@@ -22,9 +22,12 @@ public class WardenClientService {
     @Value("${app.warden.enabled:true}")
     private boolean wardenEnabled;
 
-    public WardenClientService(@Value("${app.warden.url}") String wardenUrl) {
+    public WardenClientService(
+            @Value("${app.warden.url}") String wardenUrl,
+            @Value("${app.warden.api-key}") String wardenApiKey) {
         this.webClient = WebClient.builder()
                 .baseUrl(wardenUrl)
+                .defaultHeader("X-Warden-Api-Key", wardenApiKey)
                 .build();
     }
 
