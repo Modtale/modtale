@@ -22,7 +22,10 @@ import {
     FileText,
     Database,
     AlertTriangle,
-    Layers
+    Layers,
+    Code,
+    Cpu,
+    Box
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -198,14 +201,14 @@ export const ApiDocs: React.FC = () => {
                                 <Key className="w-6 h-6" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-black text-slate-900 dark:text-white">Authentication</h2>
+                                <h2 className="text-xl font-black text-slate-900 dark:text-white">Authentication & Security</h2>
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Secure your requests.</p>
                             </div>
                         </div>
                         <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-                            All API requests must be directed to <code>https://api.modtale.net</code>.
-                            For server-to-server communication or scripts, include your API key in the request header.
-                            Headers are also returned in every response to help you track your quota usage.
+                            All authenticated API requests must be directed to <code>https://api.modtale.net</code>.
+                            Include your API key in the request header to identify your client.
+
                         </p>
 
                         <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 border border-white/10 overflow-x-auto mb-8">
@@ -213,7 +216,7 @@ export const ApiDocs: React.FC = () => {
                         </div>
 
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-4 tracking-wider flex items-center gap-2">
-                            <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits
+                            <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (Token Bucket)
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
@@ -223,10 +226,11 @@ export const ApiDocs: React.FC = () => {
                                     <div className="p-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg text-blue-600 dark:text-blue-400">
                                         <Zap className="w-4 h-4" />
                                     </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Standard</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Standard Key</span>
                                 </div>
-                                <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">300 <span className="text-sm font-medium text-slate-500">req/min</span></div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Default for personal API keys.</p>
+                                <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">600 <span className="text-sm font-medium text-slate-500">read</span></div>
+                                <div className="text-xl font-bold text-slate-700 dark:text-slate-300">60 <span className="text-sm font-medium text-slate-500">write</span></div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Tokens refill 1:1 per minute.</p>
                             </div>
 
                             <div className="p-6 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-500/20 relative overflow-hidden group hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors">
@@ -235,10 +239,11 @@ export const ApiDocs: React.FC = () => {
                                     <div className="p-2 bg-purple-100 dark:bg-purple-500/20 rounded-lg text-purple-600 dark:text-purple-400">
                                         <Activity className="w-4 h-4" />
                                     </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise Key</span>
                                 </div>
-                                <div className="text-3xl font-black text-purple-900 dark:text-white mb-1">2,000 <span className="text-sm font-medium text-purple-400">req/min</span></div>
-                                <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">High volume application integration.</p>
+                                <div className="text-3xl font-black text-purple-900 dark:text-white mb-1">5,000 <span className="text-sm font-medium text-purple-400">read</span></div>
+                                <div className="text-xl font-bold text-purple-700 dark:text-purple-300">500 <span className="text-sm font-medium text-purple-400">write</span></div>
+                                <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">Contact support for access.</p>
                             </div>
 
                             <div className="p-6 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 relative overflow-hidden group hover:border-red-200 dark:hover:border-red-500/30 transition-colors">
@@ -247,10 +252,11 @@ export const ApiDocs: React.FC = () => {
                                     <div className="p-2 bg-red-100 dark:bg-red-500/20 rounded-lg text-red-600 dark:text-red-400">
                                         <Unlock className="w-4 h-4" />
                                     </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">No Auth</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">No Key (IP)</span>
                                 </div>
-                                <div className="text-3xl font-black text-red-900 dark:text-white mb-1">10 <span className="text-sm font-medium text-red-400">req/min</span></div>
-                                <p className="text-xs text-red-700 dark:text-red-300 mt-2">Aggressively throttled. Auth recommended.</p>
+                                <div className="text-3xl font-black text-red-900 dark:text-white mb-1">60 <span className="text-sm font-medium text-red-400">read</span></div>
+                                <div className="text-xl font-bold text-red-700 dark:text-red-300">5 <span className="text-sm font-medium text-red-400">write</span></div>
+                                <p className="text-xs text-red-700 dark:text-red-300 mt-2">Blocked for scripts without User-Agent.</p>
                             </div>
                         </div>
                     </div>
@@ -289,6 +295,20 @@ export const ApiDocs: React.FC = () => {
                             desc="Get supported game target versions."
                             response={`[ "2026.01.13-dcad8778f", "2026.01.17-4b0f30090" ]`}
                         />
+
+                        <Endpoint
+                            method="GET"
+                            path="/api/v1/status"
+                            desc="Get system health and latency statistics."
+                            response={`{
+  "overall": "operational",
+  "services": [
+    { "id": "api", "status": "operational", "latency": 12 },
+    { "id": "database", "status": "operational", "latency": 24 }
+  ],
+  "timestamp": 1740000000000
+}`}
+                        />
                     </div>
                 </section>
 
@@ -311,7 +331,9 @@ export const ApiDocs: React.FC = () => {
                                 "tags": "string (Comma-separated list)",
                                 "gameVersion": "string (Exact match)",
                                 "category": "string ('Favorites' | 'Your Projects' - Requires Auth)",
-                                "author": "string (Username)"
+                                "author": "string (Filter by Author Username)",
+                                "creator": "string (Alias for author)",
+                                "dateRange": "enum (7d, 30d, 90d, 1y, all)"
                             }}
                             response={`{
   "content": [
@@ -366,6 +388,13 @@ export const ApiDocs: React.FC = () => {
                             desc="Get a paginated list of all projects the authenticated user owns or has contributed to."
                             response={`{ "content": [ ...projects ], "totalPages": 1 }`}
                         />
+
+                        <Endpoint
+                            method="GET"
+                            path="/api/v1/creators/{username}/projects"
+                            desc="Get projects owned by a specific creator or organization."
+                            response={`{ "content": [ ...projects ] }`}
+                        />
                     </div>
                 </section>
 
@@ -374,6 +403,14 @@ export const ApiDocs: React.FC = () => {
                         <FileText className="w-6 h-6 text-slate-400" /> Project Management
                     </h2>
                     <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                        <div className="mb-8 p-4 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">
+                            <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2 text-sm flex items-center gap-2">
+                                <Code className="w-4 h-4"/> Project Lifecycle
+                            </h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Projects transition through these states:</p>
+
+                        </div>
+
                         <Endpoint
                             method="POST"
                             path="/api/v1/projects"
@@ -388,7 +425,8 @@ export const ApiDocs: React.FC = () => {
                                 "title": "string (Required)",
                                 "classification": "enum (Required)",
                                 "description": "string (Required)",
-                                "owner": "string (Optional Org Username)"
+                                "owner": "string (Optional Org Username for attribution)",
+                                "slug": "string (Optional URL slug)"
                             }}
                             response={`{
   "id": "new-uuid",
@@ -414,7 +452,8 @@ export const ApiDocs: React.FC = () => {
   "about": "# Header\\nUpdated markdown...",
   "tags": ["Tech", "Magic"],
   "license": "Apache-2.0",
-  "repositoryUrl": "https://github.com/me/repo"
+  "repositoryUrl": "https://github.com/me/repo",
+  "slug": "new-url-slug"
 }`}
                             response={`200 OK`}
                         />
@@ -426,10 +465,18 @@ export const ApiDocs: React.FC = () => {
                             desc="Submit a draft for publishing. This makes the project public."
                             validation={[
                                 "Must have at least one Version uploaded (except Modpacks).",
-                                "Must have a valid License.",
+                                "Must have a valid License (except Modpacks).",
                                 "Must have an Icon uploaded.",
                                 "Must have Tags selected."
                             ]}
+                            response={`200 OK`}
+                        />
+
+                        <Endpoint
+                            method="POST"
+                            path="/api/v1/projects/{id}/submit"
+                            auth={true}
+                            desc="Submit a project for admin review."
                             response={`200 OK`}
                         />
 
@@ -454,7 +501,7 @@ export const ApiDocs: React.FC = () => {
                             path="/api/v1/projects/{id}"
                             auth={true}
                             desc="Delete a project."
-                            note="If the project is a dependency for other active projects, it will be 'Soft Deleted' (metadata scrubbed, files kept). Otherwise, it is permanently purged."
+                            note="If the project is a dependency for other active projects, it will be 'Soft Deleted' (metadata scrubbed, files kept) to prevent breaking modpacks. Otherwise, it is permanently purged."
                             response={`200 OK`}
                         />
                     </div>
@@ -470,7 +517,7 @@ export const ApiDocs: React.FC = () => {
                             path="/api/v1/projects/{id}/icon"
                             auth={true}
                             desc="Upload project icon."
-                            validation={["Aspect Ratio: Exactly 1:1", "Formats: PNG, JPEG, WebP"]}
+                            validation={["Aspect Ratio: Exactly 1:1", "Formats: PNG, JPEG, WebP", "Max Size: 2MB"]}
                             params={{ "file": "MultipartFile (Binary)" }}
                             response={`200 OK`}
                         />
@@ -480,7 +527,7 @@ export const ApiDocs: React.FC = () => {
                             path="/api/v1/projects/{id}/banner"
                             auth={true}
                             desc="Upload project banner."
-                            validation={["Aspect Ratio: Exactly 3:1", "Formats: PNG, JPEG, WebP"]}
+                            validation={["Aspect Ratio: Exactly 3:1", "Formats: PNG, JPEG, WebP", "Max Size: 4MB"]}
                             params={{ "file": "MultipartFile (Binary)" }}
                             response={`200 OK`}
                         />
@@ -510,23 +557,34 @@ export const ApiDocs: React.FC = () => {
                         <Download className="w-6 h-6 text-slate-400" /> Version Management
                     </h2>
                     <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800 text-sm">
+                            <p className="flex items-start gap-2 text-blue-800 dark:text-blue-200">
+                                <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                                <span>
+                                     <strong>Modpack Logic:</strong> Modpacks do not have binary file uploads. They are defined by a list of dependencies (`modIds`).
+                                     When a user downloads a Modpack, the API dynamically generates a ZIP file containing the manifest and all dependent files.
+                                 </span>
+                            </p>
+
+                        </div>
+
                         <Endpoint
                             method="POST"
                             path="/api/v1/projects/{id}/versions"
                             auth={true}
-                            desc="Upload a new version. Handles file uploads for mods/art/data and dependency linking for modpacks."
+                            desc="Upload a new version. Handles file uploads for mods/art/data and dependency linking for modpacks. Files are automatically scanned for malware by Warden."
                             validation={[
-                                "Version string must be strictly X.Y.Z (e.g., 1.0.0).",
+                                "Version string must be strictly SemVer X.Y.Z (e.g., 1.0.0).",
                                 "File is required for standard projects (JAR/ZIP).",
                                 "File is ignored for Modpacks.",
                                 "Modpacks must have at least 2 dependencies.",
                             ]}
                             params={{
                                 "versionNumber": "string (Required, X.Y.Z)",
-                                "gameVersions": "string[] (Required)",
+                                "gameVersions": "string[] (Required, see meta/game-versions)",
                                 "changelog": "string",
                                 "channel": "enum (RELEASE | BETA | ALPHA)",
-                                "file": "MultipartFile",
+                                "file": "MultipartFile (Required for non-modpacks)",
                                 "modIds": "string[] (Format: 'UUID:Version' or 'UUID:Version:optional')"
                             }}
                             response={`200 OK`}
@@ -541,7 +599,9 @@ export const ApiDocs: React.FC = () => {
   "modIds": [
     "dependency-uuid-1:1.0.0",
     "dependency-uuid-2:2.1.0:optional"
-  ]
+  ],
+  "gameVersions": ["2026.01.17"],
+  "channel": "BETA"
 }`}
                             response={`200 OK`}
                         />
@@ -557,10 +617,19 @@ export const ApiDocs: React.FC = () => {
 
                         <Endpoint
                             method="GET"
-                            path="/api/v1/projects/{id}/versions/{version}/download"
-                            desc="Download version file."
-                            note="For Modpacks, this dynamically generates a .zip containing a manifest.json and all required dependency files."
-                            response={`Binary Stream (application/octet-stream)`}
+                            path="/api/v1/projects/{id}/versions/{version}/download-url"
+                            desc="Generate a temporary, signed download link for a version."
+                            response={`{
+  "downloadUrl": "/download/token-uuid",
+  "expiresIn": 300
+}`}
+                        />
+
+                        <Endpoint
+                            method="GET"
+                            path="/api/v1/version/{hash}"
+                            desc="Lookup version details by file hash (SHA-256)."
+                            response={`{ "id": "v1", "versionNumber": "1.0.0", "projectId": "..." }`}
                         />
                     </div>
                 </section>
@@ -673,7 +742,7 @@ export const ApiDocs: React.FC = () => {
                             method="PUT"
                             path="/api/v1/orgs/{id}/members/{userId}"
                             auth={true}
-                            desc="Update member role."
+                            desc="Update member role (ADMIN/MEMBER)."
                             body={`{ "role": "ADMIN" }`}
                             response={`200 OK`}
                         />
@@ -730,6 +799,22 @@ export const ApiDocs: React.FC = () => {
                     <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
                         <Endpoint
                             method="GET"
+                            path="/api/v1/users/search"
+                            desc="Public user search."
+                            params={{ "query": "string" }}
+                            response={`[ { "username": "Modder", "avatarUrl": "..." } ]`}
+                        />
+
+                        <Endpoint
+                            method="POST"
+                            path="/api/v1/users/batch"
+                            desc="Batch retrieve user profiles by username."
+                            body={`{ "usernames": ["User1", "User2"] }`}
+                            response={`[ { "username": "User1", ... }, { "username": "User2", ... } ]`}
+                        />
+
+                        <Endpoint
+                            method="GET"
                             path="/api/v1/user/me"
                             auth={true}
                             desc="Get authenticated user details."
@@ -776,6 +861,20 @@ export const ApiDocs: React.FC = () => {
                         />
 
                         <Endpoint
+                            method="GET"
+                            path="/api/v1/users/{username}/following"
+                            desc="Get list of users this user follows."
+                            response={`[ { "username": "..." } ]`}
+                        />
+
+                        <Endpoint
+                            method="GET"
+                            path="/api/v1/users/{username}/followers"
+                            desc="Get list of users following this user."
+                            response={`[ { "username": "..." } ]`}
+                        />
+
+                        <Endpoint
                             method="PUT"
                             path="/api/v1/user/settings/notifications"
                             auth={true}
@@ -817,7 +916,7 @@ export const ApiDocs: React.FC = () => {
 
                 <section>
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Bell className="w-6 h-6 text-slate-400" /> Notifications
+                        <Bell className="w-6 h-6 text-slate-400" /> Notifications & Analytics
                     </h2>
                     <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
                         <Endpoint
@@ -899,9 +998,26 @@ export const ApiDocs: React.FC = () => {
                             auth={true}
                             desc="Post a comment."
                             body={`{
-  "comment": "Amazing mod!",
-  "version": "1.0.0"
+  "content": "Amazing mod!"
 }`}
+                            response={`200 OK`}
+                        />
+
+                        <Endpoint
+                            method="PUT"
+                            path="/api/v1/projects/{id}/comments/{commentId}"
+                            auth={true}
+                            desc="Edit your comment."
+                            body={`{ "content": "Updated text" }`}
+                            response={`200 OK`}
+                        />
+
+                        <Endpoint
+                            method="POST"
+                            path="/api/v1/projects/{id}/comments/{commentId}/reply"
+                            auth={true}
+                            desc="Developer reply to a comment."
+                            body={`{ "reply": "Thanks!" }`}
                             response={`200 OK`}
                         />
                     </div>
