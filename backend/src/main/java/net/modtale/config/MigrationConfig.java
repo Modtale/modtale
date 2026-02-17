@@ -105,7 +105,6 @@ public class MigrationConfig {
                         Query authorQuery = new Query(Criteria.where("username").regex("^" + authorName + "$", "i"));
                         authorUser = mongoTemplate.findOne(authorQuery, Document.class, "users");
                         if (authorUser != null) {
-                            // SAFE ID SET: Ensure we convert ObjectId to String if necessary
                             project.put("authorId", authorUser.get("_id").toString());
                             changed = true;
                         } else {
