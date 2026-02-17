@@ -38,6 +38,7 @@ jobs:
             echo "TAG=latest" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
+            echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
             
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
@@ -49,6 +50,7 @@ jobs:
             echo "TAG=dev" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
+            echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
             
           else
             SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
@@ -60,6 +62,7 @@ jobs:
             echo "TAG=$SLUG" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://pub-dc8241faa0a343c080802bf00bc72bc5.r2.dev" >> $GITHUB_ENV
+            echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
           fi
 
       - id: 'auth'
@@ -80,15 +83,18 @@ jobs:
             "--region" "$REGION"
             "--allow-unauthenticated"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
-            "--update-env-vars" "APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
-            "--update-env-vars" "APP_SEEDING_SOURCE_DB=modtale"
-            "--update-env-vars" "APP_WARDEN_URL=${{ secrets.WARDEN_URL }}"
+            "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
+            "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
+            "--update-env-vars" "WARDEN_URL=${{ secrets.WARDEN_URL }}"
+            "--update-env-vars" "WARDEN_ENABLED=true"
             "--update-env-vars" "FRONTEND_URL=placeholder"
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
 
-          if [ "${{ env.ENV_TYPE }}" != "prod" ]; then
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
+          else
             ARGS+=("--update-secrets" "MONGODB_URI=MONGODB_URI:latest")
             ARGS+=("--update-secrets" "R2_ACCESS_KEY=R2_ACCESS_KEY:latest")
             ARGS+=("--update-secrets" "R2_SECRET_KEY=R2_SECRET_KEY:latest")
@@ -110,6 +116,7 @@ jobs:
             ARGS+=("--update-secrets" "TWITTER_CLIENT_ID=TWITTER_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
             ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
           fi
 
           gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
