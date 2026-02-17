@@ -216,7 +216,7 @@ export const ApiDocs: React.FC = () => {
                         </div>
 
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-4 tracking-wider flex items-center gap-2">
-                            <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (Token Bucket)
+                            <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (req/min)
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
