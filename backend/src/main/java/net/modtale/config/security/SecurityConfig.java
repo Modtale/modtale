@@ -165,7 +165,7 @@ public class SecurityConfig {
                             .csrfTokenRequestHandler(requestHandler);
 
                     csrf.ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**");
-                    csrf.ignoringRequestMatchers("/api/v1/users/batch", "/api/v1/analytics/view/**");
+                    csrf.ignoringRequestMatchers("/api/v1/users/batch");
                     csrf.ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null);
 
                     if (isPreviewEnvironment()) {
@@ -226,9 +226,27 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
-                                "/api/v1/users/batch",
-                                "/api/v1/analytics/view/**"
+                                "/api/v1/users/batch"
                         ).permitAll()
+                        .requestMatchers("/api/v1/analytics/view/**").access((authentication, context) -> {
+                            boolean isApiKeyUser = authentication.get().getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
+                            if (isApiKeyUser) return new AuthorizationDecision(false);
+
+                            HttpServletRequest request = context.getRequest();
+                            String origin = request.getHeader("Origin");
+                            String referer = request.getHeader("Referer");
+                            String validHost = frontendUrl != null ? URI.create(frontendUrl).getHost() : "localhost";
+
+                            boolean isValidOrigin = (origin != null && origin.contains(validHost));
+                            boolean isValidReferer = (referer != null && referer.contains(validHost));
+
+                            if (isPreviewEnvironment() && (origin != null && origin.contains(".run.app"))) {
+                                return new AuthorizationDecision(true);
+                            }
+
+                            return new AuthorizationDecision(isValidOrigin || isValidReferer);
+                        })
                         .requestMatchers(
                                 "/api/v1/user/analytics",
                                 "/api/v1/user/api-keys/**",
@@ -304,6 +322,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/user/api-keys/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/analytics", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
+        source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);
