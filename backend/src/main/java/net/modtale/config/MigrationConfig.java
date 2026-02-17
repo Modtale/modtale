@@ -92,14 +92,21 @@ public class MigrationConfig {
                     String projectTitle = project.getString("title");
 
                     String authorName = project.getString("author");
-                    String authorId = project.getString("authorId");
+
+                    String authorId = null;
+                    Object authorIdObj = project.get("authorId");
+                    if (authorIdObj != null) {
+                        authorId = authorIdObj.toString();
+                    }
+
                     Document authorUser = null;
 
                     if (authorId == null && authorName != null) {
                         Query authorQuery = new Query(Criteria.where("username").regex("^" + authorName + "$", "i"));
                         authorUser = mongoTemplate.findOne(authorQuery, Document.class, "users");
                         if (authorUser != null) {
-                            project.put("authorId", authorUser.getString("_id"));
+                            // SAFE ID SET: Ensure we convert ObjectId to String if necessary
+                            project.put("authorId", authorUser.get("_id").toString());
                             changed = true;
                         } else {
                             logger.warn("Project '{}' has author '{}' but no matching user found.", projectTitle, authorName);
