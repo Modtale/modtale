@@ -448,6 +448,7 @@ public class UserService {
         org.setAccountType(User.AccountType.ORGANIZATION);
         org.setCreatedAt(LocalDate.now().toString());
         org.setTier(owner.getTier());
+        org.setAvatarUrl("https://ui-avatars.com/api/?name=" + cleanName + "&background=random");
 
         List<User.OrganizationMember> members = new ArrayList<>();
         members.add(new User.OrganizationMember(owner.getId(), "ADMIN"));
