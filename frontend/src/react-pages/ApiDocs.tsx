@@ -207,7 +207,7 @@ export const ApiDocs: React.FC = () => {
                         </div>
                         <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
                             All authenticated API requests must be directed to <code>https://api.modtale.net</code>.
-                            Include your API key in the request header to identify your client.
+                            Include your API key in the request header to identify your client and get higher limits.
 
                         </p>
 
@@ -216,11 +216,24 @@ export const ApiDocs: React.FC = () => {
                         </div>
 
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-4 tracking-wider flex items-center gap-2">
-                            <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (req/min)
+                            <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (Token Bucket)
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
-                            <div className="p-6 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 relative overflow-hidden group hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors">
+                            <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 relative overflow-hidden group hover:border-slate-300 dark:hover:border-white/20 transition-colors">
+                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-slate-500"><Globe className="w-24 h-24" /></div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg text-slate-600 dark:text-slate-300">
+                                        <Unlock className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Public Access</span>
+                                </div>
+                                <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">60 <span className="text-sm font-medium text-slate-500">req/min</span></div>
+                                <div className="text-xl font-bold text-slate-700 dark:text-slate-300">5 <span className="text-sm font-medium text-slate-500">write/min</span></div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Perfect for browsing and testing. No key required.</p>
+                            </div>
+
+                            <div className="p-6 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-500/20 relative overflow-hidden group hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors">
                                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-blue-500"><Shield className="w-24 h-24" /></div>
                                 <div className="flex items-center gap-2 mb-3">
                                     <div className="p-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg text-blue-600 dark:text-blue-400">
@@ -228,9 +241,9 @@ export const ApiDocs: React.FC = () => {
                                     </div>
                                     <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Standard Key</span>
                                 </div>
-                                <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">600 <span className="text-sm font-medium text-slate-500">read</span></div>
-                                <div className="text-xl font-bold text-slate-700 dark:text-slate-300">60 <span className="text-sm font-medium text-slate-500">write</span></div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Tokens refill 1:1 per minute.</p>
+                                <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">600 <span className="text-sm font-medium text-slate-500">req/min</span></div>
+                                <div className="text-xl font-bold text-slate-700 dark:text-slate-300">60 <span className="text-sm font-medium text-slate-500">write/min</span></div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Ideal for most apps and scripts.</p>
                             </div>
 
                             <div className="p-6 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-500/20 relative overflow-hidden group hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors">
@@ -241,22 +254,9 @@ export const ApiDocs: React.FC = () => {
                                     </div>
                                     <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise Key</span>
                                 </div>
-                                <div className="text-3xl font-black text-purple-900 dark:text-white mb-1">5,000 <span className="text-sm font-medium text-purple-400">read</span></div>
-                                <div className="text-xl font-bold text-purple-700 dark:text-purple-300">500 <span className="text-sm font-medium text-purple-400">write</span></div>
-                                <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">Contact support for access.</p>
-                            </div>
-
-                            <div className="p-6 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 relative overflow-hidden group hover:border-red-200 dark:hover:border-red-500/30 transition-colors">
-                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-red-500"><AlertTriangle className="w-24 h-24" /></div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="p-2 bg-red-100 dark:bg-red-500/20 rounded-lg text-red-600 dark:text-red-400">
-                                        <Unlock className="w-4 h-4" />
-                                    </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">No Key (IP)</span>
-                                </div>
-                                <div className="text-3xl font-black text-red-900 dark:text-white mb-1">60 <span className="text-sm font-medium text-red-400">read</span></div>
-                                <div className="text-xl font-bold text-red-700 dark:text-red-300">5 <span className="text-sm font-medium text-red-400">write</span></div>
-                                <p className="text-xs text-red-700 dark:text-red-300 mt-2">Blocked for scripts without User-Agent.</p>
+                                <div className="text-3xl font-black text-purple-900 dark:text-white mb-1">5,000 <span className="text-sm font-medium text-purple-400">req/min</span></div>
+                                <div className="text-xl font-bold text-purple-700 dark:text-purple-300">500 <span className="text-sm font-medium text-purple-400">write/min</span></div>
+                                <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">For high-volume integrations.</p>
                             </div>
                         </div>
                     </div>
@@ -947,14 +947,6 @@ export const ApiDocs: React.FC = () => {
 
                         <Endpoint
                             method="POST"
-                            path="/api/v1/notifications/{id}/unread"
-                            auth={true}
-                            desc="Mark notification as unread."
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="POST"
                             path="/api/v1/notifications/read-all"
                             auth={true}
                             desc="Mark all notifications as read."
@@ -962,19 +954,11 @@ export const ApiDocs: React.FC = () => {
                         />
 
                         <Endpoint
-                            method="DELETE"
-                            path="/api/v1/notifications/{id}"
-                            auth={true}
-                            desc="Delete a notification."
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/notifications/clear-all"
-                            auth={true}
-                            desc="Delete all notifications."
-                            response={`200 OK`}
+                            method="GET"
+                            path="/api/v1/projects/{id}/analytics"
+                            desc="Get public stats for a project."
+                            params={{ "range": "30d | 90d | 1y" }}
+                            response={`{ "views": 500, "downloads": 120, "history": [...] }`}
                         />
                     </div>
                 </section>
