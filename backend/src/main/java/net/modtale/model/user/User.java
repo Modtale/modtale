@@ -239,16 +239,7 @@ public class User implements Serializable {
     public List<ConnectedAccount> getConnectedAccounts() { return connectedAccounts; }
     public void setConnectedAccounts(List<ConnectedAccount> connectedAccounts) { this.connectedAccounts = connectedAccounts; }
 
-    public List<String> getBadges() {
-        if (createdAt != null && LocalDate.parse(createdAt).isBefore(LocalDate.of(2026, 1, 14))) {
-            if (!badges.contains("OG")) {
-                List<String> dynamicBadges = new ArrayList<>(badges);
-                dynamicBadges.add("OG");
-                return dynamicBadges;
-            }
-        }
-        return badges;
-    }
+    public List<String> getBadges() { return badges; }
     public void setBadges(List<String> badges) { this.badges = badges; }
 
     public NotificationPreferences getNotificationPreferences() { return notificationPreferences; }
