@@ -1,6 +1,7 @@
 package net.modtale.config;
 
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -37,7 +38,7 @@ public class MigrationConfig {
                 try {
                     boolean changed = false;
 
-                    String createdAtStr = user.getString("createdAt");
+                    String createdAtStr = safeString(user, "createdAt");
                     if (createdAtStr != null) {
                         try {
                             LocalDate createdAt = LocalDate.parse(createdAtStr);
@@ -51,7 +52,7 @@ public class MigrationConfig {
                                 }
                             }
                         } catch (Exception e) {
-                            logger.warn("Could not parse date for user {}: {}", user.getString("username"), createdAtStr);
+                            logger.warn("Could not parse date for user {}: {}", safeString(user, "username"), createdAtStr);
                         }
                     }
 
@@ -89,15 +90,10 @@ public class MigrationConfig {
             for (Document project : projects) {
                 try {
                     boolean changed = false;
-                    String projectTitle = project.getString("title");
+                    String projectTitle = safeString(project, "title");
 
-                    String authorName = project.getString("author");
-
-                    String authorId = null;
-                    Object authorIdObj = project.get("authorId");
-                    if (authorIdObj != null) {
-                        authorId = authorIdObj.toString();
-                    }
+                    String authorName = safeString(project, "author");
+                    String authorId = safeString(project, "authorId");
 
                     Document authorUser = null;
 
@@ -105,7 +101,7 @@ public class MigrationConfig {
                         Query authorQuery = new Query(Criteria.where("username").regex("^" + authorName + "$", "i"));
                         authorUser = mongoTemplate.findOne(authorQuery, Document.class, "users");
                         if (authorUser != null) {
-                            project.put("authorId", authorUser.get("_id").toString());
+                            project.put("authorId", safeString(authorUser, "_id"));
                             changed = true;
                         } else {
                             logger.warn("Project '{}' has author '{}' but no matching user found.", projectTitle, authorName);
@@ -121,31 +117,31 @@ public class MigrationConfig {
 
                         int newCommentsAdded = 0;
                         for (Document review : reviews) {
-                            String reviewUser = review.getString("user");
-                            String reviewContent = review.getString("comment");
+                            String reviewUser = safeString(review, "user");
+                            String reviewContent = safeString(review, "comment");
 
                             boolean exists = comments.stream().anyMatch(c ->
-                                    reviewUser.equals(c.getString("user")) &&
-                                            reviewContent.equals(c.getString("content")));
+                                    reviewUser.equals(safeString(c, "user")) &&
+                                            reviewContent.equals(safeString(c, "content")));
 
                             if (!exists) {
                                 Document comment = new Document();
                                 comment.put("_id", UUID.randomUUID().toString());
                                 comment.put("user", reviewUser);
-                                comment.put("userAvatarUrl", review.getString("userAvatarUrl"));
+                                comment.put("userAvatarUrl", safeString(review, "userAvatarUrl"));
                                 comment.put("content", reviewContent);
-                                comment.put("date", review.getString("date"));
-                                comment.put("updatedAt", review.getString("updatedAt"));
+                                comment.put("date", safeString(review, "date"));
+                                comment.put("updatedAt", safeString(review, "updatedAt"));
 
-                                String devReplyContent = review.getString("developerReply");
+                                String devReplyContent = safeString(review, "developerReply");
                                 if (devReplyContent != null) {
                                     Document reply = new Document();
                                     reply.put("content", devReplyContent);
-                                    reply.put("date", review.getString("developerReplyDate"));
+                                    reply.put("date", safeString(review, "developerReplyDate"));
 
                                     if (authorUser != null) {
-                                        reply.put("user", authorUser.getString("username"));
-                                        reply.put("userAvatarUrl", authorUser.getString("avatarUrl"));
+                                        reply.put("user", safeString(authorUser, "username"));
+                                        reply.put("userAvatarUrl", safeString(authorUser, "avatarUrl"));
                                     } else {
                                         reply.put("user", authorName != null ? authorName : "Developer");
                                     }
@@ -173,11 +169,22 @@ public class MigrationConfig {
                     }
 
                 } catch (Exception e) {
-                    logger.error("Failed to process project: " + project.get("_id"), e);
+                    Object idObj = project.get("_id");
+                    String idStr = idObj != null ? idObj.toString() : "UNKNOWN";
+                    logger.error("Failed to process project: " + idStr, e);
                 }
             }
 
             logger.info("Migration completed. Users modified: {}, Projects modified: {}", usersModified.get(), projectsModified.get());
         };
+    }
+
+    private String safeString(Document doc, String key) {
+        if (doc == null || !doc.containsKey(key)) return null;
+        Object val = doc.get(key);
+        if (val == null) return null;
+        if (val instanceof String) return (String) val;
+        if (val instanceof ObjectId) return val.toString();
+        return String.valueOf(val);
     }
 }
