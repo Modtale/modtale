@@ -5,8 +5,6 @@ import { api } from '../../../utils/api';
 interface ReportModalProps {
     isOpen: boolean;
     onClose: () => void;
-    projectId?: string; // Legacy/Fallback
-    projectTitle?: string; // Legacy/Fallback
     targetId?: string;
     targetType?: 'PROJECT' | 'COMMENT' | 'USER';
 }

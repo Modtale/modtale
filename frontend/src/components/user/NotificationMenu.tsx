@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X, Trash2, Check, X as XIcon, RefreshCw, Circle } from 'lucide-react';
 import { api, BACKEND_URL } from '../../utils/api';
-import { useNotifications, type Notification } from '../../context/NotificationsContext.tsx'; // Update path as needed
+import { useNotifications, type Notification } from '../../context/NotificationsContext.tsx';
 
 export const NotificationMenu: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);

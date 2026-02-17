@@ -78,7 +78,6 @@ export const compareSemVer = (a: string, b: string) => {
         return va.prerelease.length > vb.prerelease.length ? 1 : -1;
     }
 
-    // 3. Ignore Build Metadata for precedence/sorting
     return 0;
 };
 

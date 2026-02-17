@@ -14,7 +14,7 @@ public class Report {
 
     private String targetId;
     private TargetType targetType;
-    private String targetSummary; // Project Title, Username, or Comment snippet
+    private String targetSummary;
 
     private String reason;
     private String description;
