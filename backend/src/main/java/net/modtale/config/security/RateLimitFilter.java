@@ -1,5 +1,7 @@
 package net.modtale.config.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
@@ -21,9 +23,8 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -32,108 +33,124 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Lazy
     private ApiKeyService apiKeyService;
 
-    private final Map<String, Bucket> bucketCache = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> bucketCache = Caffeine.newBuilder()
+            .maximumSize(100_000)
+            .expireAfterAccess(1, TimeUnit.HOURS)
+            .build();
 
     private static final List<String> BLOCKED_AGENTS = Arrays.asList(
-            "java", "python", "curl", "wget", "apache-httpclient", "libwww-perl"
+            "java", "python", "curl", "wget", "apache-httpclient", "libwww-perl", "scrapy", "go-http-client", "axios"
     );
 
     private static final Set<String> WRITE_METHODS = Set.of("POST", "PUT", "DELETE", "PATCH");
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws ServletException, IOException {
-        if (!req.getRequestURI().startsWith("/api/v1")) {
+        String path = req.getRequestURI();
+
+        if (!path.startsWith("/api/v1")) {
+            chain.doFilter(req, res);
+            return;
+        }
+
+        if (path.equals("/api/v1/status") || path.equals("/api/v1/auth/session")) {
             chain.doFilter(req, res);
             return;
         }
 
         boolean isWrite = WRITE_METHODS.contains(req.getMethod().toUpperCase());
-
-        String apiKeyHeader = req.getHeader("X-MODTALE-KEY");
+        String clientIp = getClientIp(req);
         String userAgent = req.getHeader("User-Agent");
-        String referer = req.getHeader("Referer");
-        String origin = req.getHeader("Origin");
+        String apiKeyHeader = req.getHeader("X-MODTALE-KEY");
 
-        String limitKey;
         long capacity;
         String tierName;
+        String limitKey;
 
         if (apiKeyHeader != null && !apiKeyHeader.isBlank()) {
             ApiKey apiKey = apiKeyService.resolveKey(apiKeyHeader);
 
             if (apiKey != null) {
-                limitKey = "USER:" + apiKey.getUserId();
+                limitKey = "API:" + apiKey.getId();
                 if (apiKey.getTier() == ApiKey.Tier.ENTERPRISE) {
-                    capacity = isWrite ? 200 : 2000;
-                    tierName = "Enterprise";
+                    capacity = isWrite ? 500 : 5000;
+                    tierName = "Enterprise-API";
                 } else {
-                    capacity = isWrite ? 50 : 300;
-                    tierName = "User-API";
+                    capacity = isWrite ? 60 : 600;
+                    tierName = "Standard-API";
                 }
             } else {
-                limitKey = "IP:" + getClientIp(req);
-                capacity = isWrite ? 2 : 10;
-                tierName = "Invalid-Key";
+                sendError(res, 401, "Unauthorized", "Invalid API Key.");
+                return;
             }
+        } else if (isAuthenticatedUser()) {
+            User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            limitKey = "USER:" + user.getId();
+
+            boolean isAdmin = user.getRoles() != null && user.getRoles().contains("ADMIN");
+
+            if (isAdmin) {
+                capacity = isWrite ? 1000 : 20000;
+                tierName = "Admin-Session";
+            } else {
+                capacity = isWrite ? 150 : 2000;
+                tierName = "User-Session";
+            }
+        } else if (isFrontendRequest(req)) {
+            limitKey = "IP:FE:" + clientIp;
+            capacity = isWrite ? 40 : 3000;
+            tierName = "Frontend-Public";
         } else {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isSessionUser = auth != null && auth.isAuthenticated() &&
-                    auth.getPrincipal() instanceof User &&
-                    !"anonymousUser".equals(auth.getName());
-
-            boolean isFrontend = (referer != null && (referer.contains("modtale.net") || referer.contains("localhost"))) ||
-                    (origin != null && (origin.contains("modtale.net") || origin.contains("localhost")));
-
-            if (isSessionUser) {
-                User user = (User) auth.getPrincipal();
-                limitKey = "USER:" + user.getId();
-                capacity = isWrite ? 100 : 1000;
-                tierName = "Frontend-User";
-            } else if (isFrontend) {
-                limitKey = "IP:" + getClientIp(req);
-                capacity = isWrite ? 30 : 2000;
-                tierName = "Frontend-Public";
-            } else {
-                if (userAgent == null || userAgent.isBlank() || isBlockedAgent(userAgent)) {
-                    res.setStatus(403);
-                    res.setContentType("application/json");
-                    res.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"Valid User-Agent or API Key required.\"}");
-                    return;
-                }
-
-                limitKey = "IP:" + getClientIp(req);
-                capacity = isWrite ? 5 : 60;
-                tierName = "Public";
+            if (isBlockedAgent(userAgent)) {
+                sendError(res, 403, "Forbidden", "Automated access requires an API Key.");
+                return;
             }
+
+            limitKey = "IP:PUB:" + clientIp;
+            capacity = isWrite ? 5 : 60;
+            tierName = "Public-IP";
         }
 
         limitKey = limitKey + (isWrite ? ":WRITE" : ":READ");
 
-        final long finalCapacity = capacity;
-        Bucket bucket = bucketCache.computeIfAbsent(limitKey, k -> createNewBucket(finalCapacity));
+        Bucket bucket = getBucket(limitKey, capacity);
 
-        res.setHeader("X-RateLimit-Limit", String.valueOf(finalCapacity));
-        res.setHeader("X-RateLimit-Tier", tierName);
+        res.setHeader("X-RateLimit-Limit", String.valueOf(capacity));
         res.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getAvailableTokens()));
+        res.setHeader("X-RateLimit-Tier", tierName);
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(req, res);
         } else {
-            res.setStatus(429);
-            res.setContentType("application/json");
-            res.getWriter().write("{\"error\": \"Too Many Requests\", \"message\": \"Rate limit exceeded for tier: " + tierName + " (" + (isWrite ? "Write" : "Read") + ")\"}");
+            sendError(res, 429, "Too Many Requests", "Rate limit exceeded for " + tierName + " tier.");
         }
     }
 
-    private Bucket createNewBucket(long capacity) {
-        Bandwidth limit = Bandwidth.classic(capacity, Refill.greedy(capacity, Duration.ofMinutes(1)));
-        return Bucket.builder().addLimit(limit).build();
+    private Bucket getBucket(String key, long capacity) {
+        return bucketCache.get(key, k -> {
+            Bandwidth limit = Bandwidth.classic(capacity, Refill.greedy(capacity, Duration.ofMinutes(1)));
+            return Bucket.builder().addLimit(limit).build();
+        });
+    }
+
+    private boolean isAuthenticatedUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.isAuthenticated() &&
+                auth.getPrincipal() instanceof User &&
+                !"anonymousUser".equals(auth.getName());
+    }
+
+    private boolean isFrontendRequest(HttpServletRequest req) {
+        String referer = req.getHeader("Referer");
+        String origin = req.getHeader("Origin");
+        return (referer != null && (referer.contains("modtale.net") || referer.contains("localhost"))) ||
+                (origin != null && (origin.contains("modtale.net") || origin.contains("localhost")));
     }
 
     private boolean isBlockedAgent(String ua) {
-        if (ua == null) return true;
+        if (ua == null || ua.isBlank()) return true;
         String lowerUA = ua.toLowerCase();
-        return BLOCKED_AGENTS.stream().anyMatch(lowerUA::startsWith);
+        return BLOCKED_AGENTS.stream().anyMatch(lowerUA::contains);
     }
 
     private String getClientIp(HttpServletRequest req) {
@@ -149,5 +166,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         String remoteAddr = req.getRemoteAddr();
         return remoteAddr != null ? remoteAddr : "unknown";
+    }
+
+    private void sendError(HttpServletResponse res, int status, String error, String message) throws IOException {
+        res.setStatus(status);
+        res.setContentType("application/json");
+        res.getWriter().write(String.format("{\"error\": \"%s\", \"message\": \"%s\"}", error, message));
     }
 }
