@@ -105,6 +105,7 @@ public class FileValidationService {
                     throw new IllegalArgumentException("Archive contains malicious path traversal: " + entryName);
                 }
 
+                manifestFound = true;
                 /*if ("PLUGIN".equals(classification) && entryName.equals(PLUGIN_MANIFEST_PATH)) {
                     validatePluginManifest(zis);
                     manifestFound = true;
