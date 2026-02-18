@@ -33,7 +33,7 @@ public class FileValidationService {
 
     private static final long MAX_UNCOMPRESSED_SIZE = 2L * 1024 * 1024 * 1024;
     private static final int MAX_FILE_COUNT = 10000;
-    private static final String PLUGIN_MANIFEST_PATH = "src/main/resources/manifest.json";
+    private static final String PLUGIN_MANIFEST_PATH = "manifest.json";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -132,7 +132,7 @@ public class FileValidationService {
         }
 
         if ("PLUGIN".equals(classification) && !manifestFound) {
-            throw new IllegalArgumentException("Invalid Plugin: Missing src/main/resources/manifest.json");
+            throw new IllegalArgumentException("Invalid Plugin: Missing manifest.json");
         }
     }
 
