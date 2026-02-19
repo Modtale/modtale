@@ -77,7 +77,7 @@ public class ModService {
             .collect(Collectors.toMap(String::toLowerCase, Function.identity()));
 
     private static final Set<String> ALLOWED_GAME_VERSIONS = Set.of(
-            "2026.01.13-dcad8778f", "2026.01.17-4b0f30090", "2026.01.24-6e2d4fc36", "2026.01.28-87d03be09", "2026.02.06-aa1b071c2", "2026.02.17-255364b8e"
+            "2026.01.13-dcad8778f", "2026.01.17-4b0f30090", "2026.01.24-6e2d4fc36", "2026.01.28-87d03be09", "2026.02.06-aa1b071c2", "2026.02.17-255364b8e", "2026.02.19-1a311a592"
     );
 
     private static final Set<String> ALLOWED_CLASSIFICATIONS = Set.of(
