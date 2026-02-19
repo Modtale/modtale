@@ -1,3 +1,4 @@
+// frontend/react-pages/resources/ModDetail.tsx
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -12,7 +13,7 @@ import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    Code, Paintbrush, Database, Layers, Layout, Flag, CornerDownRight, Crown, Trash, Users
+    CornerDownRight, Crown, Trash, Users, Flag
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -21,55 +22,13 @@ import { extractId, createSlug, getProjectUrl } from '../../utils/slug';
 import { useSSRData } from '../../context/SSRContext';
 import NotFound from '../../components/ui/error/NotFound';
 import { Spinner } from '../../components/ui/Spinner';
-import { compareSemVer, formatTimeAgo } from '../../utils/modHelpers';
+import { compareSemVer, formatTimeAgo, DiscordIcon, getLicenseInfo, getClassificationIcon, toTitleCase } from '../../utils/modHelpers';
 import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
 import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
 import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
 import { useMobile } from '../../context/MobileContext';
-
-const DiscordIcon = ({ className }: { className?: string }) => (
-    <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
-        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-4.2-48.62-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />    </svg>
-);
-
-const getLicenseInfo = (license: string) => {
-    const l = license.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (l.includes('MIT')) return { name: 'MIT', url: 'https://opensource.org/licenses/MIT' };
-    if (l.includes('APACHE')) return { name: 'Apache 2.0', url: 'https://opensource.org/licenses/Apache-2.0' };
-    if (l.includes('LGPL')) return { name: 'LGPL v3', url: 'https://www.gnu.org/licenses/lgpl-3.0.en.html' };
-    if (l.includes('AGPL')) return { name: 'AGPL v3', url: 'https://www.gnu.org/licenses/agpl-3.0.en.html' };
-    if (l.includes('GPL')) return { name: 'GPL v3', url: 'https://www.gnu.org/licenses/gpl-3.0.en.html' };
-    if (l.includes('MPL')) return { name: 'MPL 2.0', url: 'https://opensource.org/licenses/MPL-2.0' };
-    if (l.includes('BSD')) return { name: 'BSD 3-Clause', url: 'https://opensource.org/licenses/BSD-3-Clause' };
-    if (l.includes('CC0')) return { name: 'CC0', url: 'https://creativecommons.org/publicdomain/zero/1.0/' };
-    if (l.includes('CCBYNCND')) return { name: 'CC BY-NC-ND 4.0', url: 'https://creativecommons.org/licenses/by-nc-nd/4.0/' };
-    if (l.includes('CCBYNCSA')) return { name: 'CC BY-NC-SA 4.0', url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/' };
-    if (l.includes('CCBYNC')) return { name: 'CC BY-NC 4.0', url: 'https://creativecommons.org/licenses/by-nc/4.0/' };
-    if (l.includes('CCBYSA')) return { name: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/' };
-    if (l.includes('CCBY')) return { name: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' };
-    if (l.includes('UNLICENSE')) return { name: 'The Unlicense', url: 'https://unlicense.org/' };
-    if (l.includes('ARR') || l.includes('ALLRIGHTS')) return { name: 'All Rights Reserved', url: null };
-    return { name: license, url: null };
-};
-
-const getClassificationIcon = (cls: string) => {
-    switch (cls) {
-        case 'PLUGIN': return <Code className="w-3.5 h-3.5" />;
-        case 'ART': return <Paintbrush className="w-3.5 h-3.5" />;
-        case 'DATA': return <Database className="w-3.5 h-3.5" />;
-        case 'SAVE': return <Globe className="w-3.5 h-3.5" />;
-        case 'MODPACK': return <Layers className="w-3.5 h-3.5" />;
-        default: return <Layout className="w-3.5 h-3.5" />;
-    }
-};
-
-const toTitleCase = (str: string) => {
-    if (!str) return '';
-    if (str === 'SAVE') return 'World';
-    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-};
 
 const ProjectSidebar: React.FC<{
     mod: Mod;
@@ -567,7 +526,6 @@ export const ModDetail: React.FC<{
                     setOrgMembers(membersRes.data);
                 }
             } catch (e) {
-                console.error("Failed to fetch author profile/members", e);
             }
 
             if (mod.contributors && mod.contributors.length > 0) {
@@ -575,7 +533,6 @@ export const ModDetail: React.FC<{
                     const res = await api.post('/users/batch', { usernames: mod.contributors });
                     setContributors(res.data);
                 } catch (e) {
-                    console.error("Failed to fetch contributors", e);
                 }
             }
         };
@@ -589,7 +546,6 @@ export const ModDetail: React.FC<{
             const currentPath = location.pathname;
 
             if (currentPath.replace(/\/$/, "") !== canonicalPath.replace(/\/$/, "")) {
-                console.log(`[SEO] CSR Redirecting: ${currentPath} -> ${canonicalPath}`);
                 navigate(canonicalPath, { replace: true });
             }
         }
@@ -710,7 +666,6 @@ export const ModDetail: React.FC<{
             setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
             setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
         } catch (error) {
-            console.error('Failed to initiate download:', error);
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
     };
@@ -818,10 +773,9 @@ export const ModDetail: React.FC<{
             <ReportModal
                 isOpen={!!reportTarget}
                 onClose={() => setReportTarget(null)}
-                projectId={reportTarget?.type === 'PROJECT' ? reportTarget.id : (mod?.id || '')}
-                projectTitle={reportTarget?.type === 'PROJECT' ? reportTarget.title : undefined}
-                targetId={reportTarget?.id}
-                targetType={reportTarget?.type}
+                targetId={reportTarget?.id || mod?.id}
+                targetType={reportTarget?.type || 'PROJECT'}
+                targetTitle={reportTarget?.type === 'PROJECT' ? (reportTarget.title || mod?.title) : undefined}
             />
 
             {pendingDownloadVer && (
@@ -916,7 +870,7 @@ export const ModDetail: React.FC<{
                         <div className="flex flex-wrap items-center gap-3 mb-3">
                             <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-sm leading-tight break-words">{mod.title}</h1>
                             <span className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 py-1 rounded-full text-xs font-bold text-modtale-accent tracking-widest uppercase flex items-center gap-1.5 shadow-sm whitespace-nowrap">
-                                {getClassificationIcon(mod.classification || 'PLUGIN')}{displayClassification}
+                                {getClassificationIcon(mod.classification || 'PLUGIN', "w-3.5 h-3.5")}{displayClassification}
                             </span>
                         </div>
 

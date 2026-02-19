@@ -7,6 +7,7 @@ interface ReportModalProps {
     onClose: () => void;
     targetId?: string;
     targetType?: 'PROJECT' | 'COMMENT' | 'USER';
+    targetTitle?: string;
 }
 
 const REPORT_REASONS = [
@@ -18,7 +19,7 @@ const REPORT_REASONS = [
     { id: 'OTHER', label: 'Other' }
 ];
 
-export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, projectId, projectTitle, targetId, targetType = 'PROJECT' }) => {
+export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targetId, targetType = 'PROJECT', targetTitle }) => {
     const [reason, setReason] = useState(REPORT_REASONS[0].id);
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
@@ -28,8 +29,31 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, proje
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const effectiveTargetId = targetId || projectId;
-    const effectiveTitle = projectTitle || (targetType === 'COMMENT' ? 'Comment' : (targetType === 'USER' ? 'User Profile' : 'Content'));
+    const effectiveTargetId = targetId || '';
+    const effectiveTitle = targetTitle || (targetType === 'COMMENT' ? 'Comment' : (targetType === 'USER' ? 'User Profile' : 'Content'));
+
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (dropdownOpen) {
+            const preventScroll = (e: Event) => e.preventDefault();
+            window.addEventListener('wheel', preventScroll, { passive: false });
+            window.addEventListener('touchmove', preventScroll, { passive: false });
+            return () => {
+                window.removeEventListener('wheel', preventScroll);
+                window.removeEventListener('touchmove', preventScroll);
+            };
+        }
+    }, [dropdownOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -73,8 +97,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, proje
 
     return (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
-                <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col">
+                <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5 rounded-t-2xl">
                     <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Flag className="w-5 h-5 text-red-500" />
                         Report {targetType === 'USER' ? 'User' : (targetType === 'COMMENT' ? 'Comment' : 'Project')}
