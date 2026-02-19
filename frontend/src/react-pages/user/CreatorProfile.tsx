@@ -1,3 +1,4 @@
+// frontend/react-pages/user/CreatorProfile.tsx
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Mod, Modpack, User } from '../../types.ts';
@@ -219,8 +220,8 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                 isOpen={showReportModal}
                 onClose={() => setShowReportModal(false)}
                 targetId={creator.id}
-                projectTitle={creator.username}
                 targetType="USER"
+                targetTitle={creator.username}
             />
 
             <ProfileLayout
