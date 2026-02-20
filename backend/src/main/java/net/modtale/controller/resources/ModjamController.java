@@ -1,0 +1,75 @@
+package net.modtale.controller.resources;
+
+import net.modtale.model.resources.Modjam;
+import net.modtale.model.resources.ModjamSubmission;
+import net.modtale.model.user.User;
+import net.modtale.service.resources.ModjamService;
+import net.modtale.service.user.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/modjams")
+public class ModjamController {
+
+    @Autowired private ModjamService modjamService;
+    @Autowired private UserService userService;
+
+    private User getAuthenticatedUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) return null;
+        return userService.getPublicProfile(authentication.getName());
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Modjam>> getAllJams() {
+        return ResponseEntity.ok(modjamService.getAllJams());
+    }
+
+    @GetMapping("/{slug}")
+    public ResponseEntity<Modjam> getJamBySlug(@PathVariable String slug) {
+        return ResponseEntity.ok(modjamService.getJamBySlug(slug));
+    }
+
+    @PostMapping
+    public ResponseEntity<Modjam> createJam(@RequestBody Modjam jam, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.createJam(jam, user.getId(), user.getUsername()));
+    }
+
+    @GetMapping("/{jamId}/submissions")
+    public ResponseEntity<List<ModjamSubmission>> getSubmissions(@PathVariable String jamId) {
+        return ResponseEntity.ok(modjamService.getSubmissions(jamId));
+    }
+
+    @PostMapping("/{jamId}/participate")
+    public ResponseEntity<Modjam> participate(@PathVariable String jamId, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.participate(jamId, user.getId()));
+    }
+
+    @PostMapping("/{jamId}/submit")
+    public ResponseEntity<ModjamSubmission> submitProject(@PathVariable String jamId, @RequestBody Map<String, String> body, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.submitProject(jamId, body.get("projectId"), user.getId()));
+    }
+
+    @PostMapping("/{jamId}/vote")
+    public ResponseEntity<ModjamSubmission> vote(@PathVariable String jamId, @RequestBody Map<String, Object> body, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
+        if (user == null) return ResponseEntity.status(401).build();
+
+        String submissionId = (String) body.get("submissionId");
+        String categoryId = (String) body.get("categoryId");
+        int score = (Integer) body.get("score");
+
+        return ResponseEntity.ok(modjamService.vote(jamId, submissionId, categoryId, score, user.getId()));
+    }
+}
