@@ -41,7 +41,9 @@ export const NotificationMenu: React.FC = () => {
         };
     }, []);
 
-    const handleAction = async (n: Notification, accept: boolean) => {
+    const handleAction = async (e: React.MouseEvent, n: Notification, accept: boolean) => {
+        e.preventDefault();
+        e.stopPropagation();
         setActionLoading(n.id);
         try {
             if (n.type === 'TRANSFER_REQUEST' && n.metadata?.modId) {
@@ -54,8 +56,8 @@ export const NotificationMenu: React.FC = () => {
                 await api.post(endpoint);
             }
             dismiss(n.id);
-        } catch (e) {
-            console.error("Action failed", e);
+        } catch (err) {
+            console.error("Action failed", err);
             alert("Action failed. The request may have expired.");
         } finally {
             setActionLoading(null);
@@ -106,7 +108,11 @@ export const NotificationMenu: React.FC = () => {
                         ) : (
                             <div className="divide-y divide-slate-100 dark:divide-white/5">
                                 {notifications.map(n => (
-                                    <div key={n.id} className={`p-4 transition-colors group relative flex items-start gap-3 ${n.read ? 'bg-white dark:bg-modtale-card' : 'bg-slate-50 dark:bg-white/5'}`}>
+                                    <a
+                                        href={n.link}
+                                        key={n.id}
+                                        className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-white/10 ${n.read ? 'bg-white dark:bg-modtale-card' : 'bg-slate-50 dark:bg-white/5'}`}
+                                    >
                                         <img
                                             src={n.iconUrl ? (n.iconUrl.startsWith('/api') ? `${BACKEND_URL}${n.iconUrl}` : n.iconUrl) : "https://modtale.net/assets/favicon.svg"}
                                             alt=""
@@ -129,8 +135,8 @@ export const NotificationMenu: React.FC = () => {
                                                         <span className="text-xs text-slate-400 italic">Processing...</span>
                                                     ) : (
                                                         <>
-                                                            <button onClick={() => handleAction(n, true)} className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"><Check className="w-3 h-3" /> Accept</button>
-                                                            <button onClick={() => handleAction(n, false)} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"><XIcon className="w-3 h-3" /> Decline</button>
+                                                            <button onClick={(e) => handleAction(e, n, true)} className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"><Check className="w-3 h-3" /> Accept</button>
+                                                            <button onClick={(e) => handleAction(e, n, false)} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"><XIcon className="w-3 h-3" /> Decline</button>
                                                         </>
                                                     )}
                                                 </div>
@@ -141,7 +147,7 @@ export const NotificationMenu: React.FC = () => {
 
                                         <div className="absolute top-3 right-3 flex flex-col gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                             <button
-                                                onClick={() => dismiss(n.id)}
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); dismiss(n.id); }}
                                                 className="p-1 text-slate-300 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md transition-colors"
                                                 title="Dismiss"
                                             >
@@ -155,7 +161,7 @@ export const NotificationMenu: React.FC = () => {
                                                 <Circle className={`w-3.5 h-3.5 ${!n.read ? 'fill-modtale-accent text-modtale-accent' : ''}`} />
                                             </button>
                                         </div>
-                                    </div>
+                                    </a>
                                 ))}
                             </div>
                         )}
