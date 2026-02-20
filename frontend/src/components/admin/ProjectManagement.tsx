@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson } from 'lucide-react';
+import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson, Lock } from 'lucide-react';
 import { api, API_BASE_URL } from '../../utils/api';
 import type { Mod, ScanIssue } from '../../types';
 
@@ -10,6 +10,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const [foundProject, setFoundProject] = useState<Mod | null>(null);
     const [showVersions, setShowVersions] = useState(false);
     const [searchDeleted, setSearchDeleted] = useState(false);
+    const [currentAdmin, setCurrentAdmin] = useState<any>(null);
 
     const [searchResults, setSearchResults] = useState<Mod[]>([]);
     const [showResults, setShowResults] = useState(false);
@@ -28,6 +29,12 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const [showRawModal, setShowRawModal] = useState(false);
     const [rawJsonStr, setRawJsonStr] = useState('');
     const [jsonError, setJsonError] = useState<string | null>(null);
+
+    useEffect(() => {
+        api.get('/user/me').then(res => setCurrentAdmin(res.data)).catch(() => {});
+    }, []);
+
+    const isSuperAdmin = currentAdmin?.id === '692620f7c2f3266e23ac0ded';
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -311,9 +318,14 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                         <div className="flex flex-wrap gap-4">
                             <button
                                 onClick={openRawEdit}
-                                className="flex-1 py-3 border-2 border-indigo-500/20 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px]"
+                                disabled={!isSuperAdmin}
+                                className={`flex-1 py-3 border-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px] ${
+                                    !isSuperAdmin
+                                        ? 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 opacity-50 cursor-not-allowed'
+                                        : 'border-indigo-500/20 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-500'
+                                }`}
                             >
-                                <Code className="w-4 h-4" /> Edit Raw JSON
+                                <Code className="w-4 h-4" /> Edit Raw JSON {!isSuperAdmin && <Lock className="w-4 h-4" />}
                             </button>
 
                             {foundProject.status === 'DELETED' ? (
