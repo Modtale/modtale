@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Trash2, LayoutGrid, List, Sparkles, Trophy, FileText, Scale } from 'lucide-react';
+import { Settings, Plus, Trash2, LayoutGrid, List, Sparkles, Trophy, FileText, Scale, Globe } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamDateInput } from '@/components/jams/JamCalendar';
 import ReactMarkdown from 'react-markdown';
@@ -17,10 +17,10 @@ export const JamBuilder: React.FC<any> = ({
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
 
     const publishChecklist = [
-        { label: 'Title (min 5 chars)', met: (metaData.title?.trim().length || 0) >= 5 },
-        { label: 'Description (min 20 chars)', met: (metaData.description?.trim().length || 0) >= 20 },
-        { label: 'Start Date set in future', met: !!metaData.startDate && new Date(metaData.startDate) > new Date() },
-        { label: 'Submission & Voting dates', met: !!metaData.endDate && !!metaData.votingEndDate && new Date(metaData.votingEndDate) > new Date(metaData.endDate) && new Date(metaData.endDate) > new Date(metaData.startDate) },
+        { label: 'Title (min 5 chars)', met: (metaData.title || '').trim().length >= 5 },
+        { label: 'Description (min 10 chars)', met: (metaData.description || '').trim().length >= 10 },
+        { label: 'Start Date set', met: !!metaData.startDate },
+        { label: 'Timeline follows order', met: !!metaData.endDate && !!metaData.votingEndDate && new Date(metaData.votingEndDate) > new Date(metaData.endDate) && new Date(metaData.endDate) > new Date(metaData.startDate) },
         { label: 'Scoring criteria set', met: (metaData.categories?.length || 0) > 0 }
     ];
 
