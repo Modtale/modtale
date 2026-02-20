@@ -2,131 +2,125 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import type { Modjam, User } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
-import { Trophy, Calendar, Users, Plus, ArrowRight } from 'lucide-react';
+import { Trophy, Plus, ArrowLeft, Sparkles, Wand2, CalendarDays } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CreateJamModal } from './CreateJamModal';
+import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 
 export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
-    const navigate = useNavigate();
     const [jams, setJams] = useState<Modjam[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [step, setStep] = useState(0);
+
+    const [metaData, setMetaData] = useState({
+        title: '',
+        description: '',
+        bannerUrl: '',
+        startDate: '',
+        endDate: '',
+        votingEndDate: '',
+        allowPublicVoting: true,
+        categories: []
+    });
+
+    const [activeTab, setActiveTab] = useState<'details' | 'categories' | 'settings'>('details');
 
     useEffect(() => {
-        const fetchJams = async () => {
-            try {
-                const res = await api.get('/modjams');
-                setJams(res.data);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchJams();
+        api.get('/modjams').then(res => {
+            setJams(res.data);
+            setLoading(false);
+        }).catch(() => setLoading(false));
     }, []);
 
-    const handleJamCreated = (newJam: Modjam) => {
-        setJams(prev => [newJam, ...prev]);
+    const handleCreateDraft = () => {
+        if (!metaData.title || !metaData.description) return;
+        setStep(2);
     };
 
-    if (loading) {
-        return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
+    const handleSaveJam = async () => {
+        try {
+            const res = await api.post('/modjams', metaData);
+            setIsCreating(false);
+            setJams([res.data, ...jams]);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    if (isCreating) {
+        if (step === 1) {
+            return (
+                <div className="max-w-xl mx-auto pt-20 px-6 animate-in fade-in zoom-in-95">
+                    <button onClick={() => setIsCreating(false)} className="text-slate-500 font-bold mb-8 flex items-center gap-2 hover:text-slate-900 transition-colors">
+                        <ArrowLeft className="w-4 h-4" /> Cancel
+                    </button>
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-modtale-accent/10 text-modtale-accent flex items-center justify-center">
+                            <Wand2 className="w-5 h-5" />
+                        </div>
+                        <h1 className="text-3xl font-black">Let's build a jam.</h1>
+                    </div>
+                    <p className="text-slate-500 font-medium mb-8">Every great event starts with a solid foundation.</p>
+
+                    <div className="space-y-6 bg-white dark:bg-modtale-card p-8 rounded-3xl border border-slate-200 dark:border-white/5 shadow-xl">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Event Title</label>
+                            <input
+                                value={metaData.title}
+                                onChange={e => setMetaData({...metaData, title: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-2xl px-5 py-4 font-bold text-lg"
+                                placeholder="Summer Hackathon 2026"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">One-Sentence Summary</label>
+                            <input
+                                value={metaData.description}
+                                onChange={e => setMetaData({...metaData, description: e.target.value})}
+                                className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-slate-600 dark:text-slate-300"
+                                placeholder="Create the best aesthetic world in 48 hours."
+                            />
+                        </div>
+                        <button
+                            onClick={handleCreateDraft}
+                            disabled={!metaData.title || !metaData.description}
+                            className="w-full h-16 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-lg shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        >
+                            Continue to Builder <Sparkles className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <JamBuilder
+                jamData={null}
+                metaData={metaData}
+                setMetaData={setMetaData}
+                handleSave={handleSaveJam}
+                isLoading={loading}
+                currentUser={currentUser}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+            />
+        );
     }
 
-    const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
-
     return (
-        <div className={`${containerClasses} mx-auto pt-12 pb-20 min-h-screen flex flex-col transition-[max-width,padding] duration-300`}>
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-12 pb-20">
+            <div className="flex items-end justify-between mb-12">
                 <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 rounded-2xl bg-modtale-accent/10 text-modtale-accent flex items-center justify-center">
-                            <Trophy className="w-6 h-6" />
-                        </div>
-                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Modjams</h1>
-                    </div>
-                    <p className="text-lg text-slate-500 dark:text-slate-400 font-medium">Compete, create, and vote on community events.</p>
+                    <h1 className="text-5xl font-black tracking-tight mb-2">Modjams</h1>
+                    <p className="text-lg text-slate-500 font-medium">Join community events and show off your skills.</p>
                 </div>
-
                 {currentUser && (
-                    <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="h-14 bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all hover:-translate-y-1 active:scale-95 flex-shrink-0"
-                    >
+                    <button onClick={() => { setIsCreating(true); setStep(1); }} className="h-14 px-8 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black flex items-center gap-2 shadow-lg transition-all hover:-translate-y-1">
                         <Plus className="w-5 h-5" /> Host a Jam
                     </button>
                 )}
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                {jams.map((jam) => {
-                    const isParticipating = currentUser?.joinedModjamIds?.includes(jam.id);
-
-                    return (
-                        <Link
-                            key={jam.id}
-                            to={`/jam/${jam.slug}`}
-                            className="flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl overflow-hidden hover:border-modtale-accent dark:hover:border-modtale-accent hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
-                        >
-                            <div className="h-48 bg-slate-100 dark:bg-slate-800 relative flex-shrink-0 overflow-hidden">
-                                {jam.bannerUrl ? (
-                                    <img src={jam.bannerUrl} alt={jam.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-400 bg-gradient-to-br from-slate-100 dark:from-slate-800 to-slate-200 dark:to-slate-900">
-                                        <Trophy className="w-16 h-16 opacity-20 group-hover:scale-110 transition-transform duration-500" />
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                <div className="absolute top-4 right-4 bg-white/90 dark:bg-black/60 backdrop-blur-md text-slate-900 dark:text-white px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg">
-                                    {jam.status}
-                                </div>
-                            </div>
-
-                            <div className="p-6 flex flex-col flex-grow relative z-10 bg-white dark:bg-slate-900">
-                                <h2 className="text-2xl font-black mb-3 text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors line-clamp-1">{jam.title}</h2>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2 flex-grow font-medium leading-relaxed">{jam.description}</p>
-
-                                <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 dark:border-white/5">
-                                    <div className="flex items-center gap-4 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">
-                                        <div className="flex items-center gap-1.5">
-                                            <Calendar className="w-4 h-4" />
-                                            <span>{new Date(jam.startDate).toLocaleDateString()}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <Users className="w-4 h-4" />
-                                            <span>{jam.participantIds.length} Joined</span>
-                                        </div>
-                                    </div>
-                                    <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-white/5 flex items-center justify-center text-slate-400 group-hover:bg-modtale-accent group-hover:text-white transition-colors">
-                                        <ArrowRight className="w-4 h-4" />
-                                    </div>
-                                </div>
-
-                                {isParticipating && (
-                                    <div className="absolute top-0 right-6 -translate-y-1/2 bg-modtale-accent text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg border-2 border-white dark:border-slate-900">
-                                        Participating
-                                    </div>
-                                )}
-                            </div>
-                        </Link>
-                    )
-                })}
-            </div>
-
-            {jams.length === 0 && (
-                <div className="text-center py-32 text-slate-500 animate-in fade-in">
-                    <Trophy className="w-16 h-16 mx-auto mb-6 opacity-20" />
-                    <p className="text-xl font-black text-slate-700 dark:text-slate-300">No jams available right now.</p>
-                    <p className="font-medium mt-2">Check back later or host your own!</p>
-                </div>
-            )}
-
-            <CreateJamModal
-                isOpen={isCreateModalOpen}
-                onClose={() => setIsCreateModalOpen(false)}
-                onSuccess={handleJamCreated}
-            />
         </div>
     );
 };
