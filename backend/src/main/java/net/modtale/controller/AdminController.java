@@ -119,12 +119,13 @@ public class AdminController {
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        User target = userRepository.findByUsername(username).orElse(null);
+
+        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
 
         try {
             userService.deleteUser(target.getId());
-            logAction(currentUser.getId(), "DELETE_USER", target.getId(), "USER", "Username: " + username);
+            logAction(currentUser.getId(), "DELETE_USER", target.getId(), "USER", "Username: " + target.getUsername());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -139,6 +140,10 @@ public class AdminController {
                     .body(Map.of("error", "Access Denied", "message", "You do not have permission."));
         }
 
+        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        if (target == null) return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Not Found", "message", "User not found."));
+
         try {
             ApiKey.Tier tierEnum;
             if ("USER".equalsIgnoreCase(tier) || "FREE".equalsIgnoreCase(tier)) {
@@ -147,11 +152,11 @@ public class AdminController {
                 tierEnum = ApiKey.Tier.valueOf(tier.toUpperCase());
             }
 
-            userService.setUserTier(username, tierEnum);
-            logAction(currentUser.getId(), "UPDATE_TIER", username, "USER", "New Tier: " + tierEnum);
+            userService.setUserTier(target.getUsername(), tierEnum);
+            logAction(currentUser.getId(), "UPDATE_TIER", target.getId(), "USER", "New Tier: " + tierEnum);
             return ResponseEntity.ok(Map.of(
                     "status", "success",
-                    "message", "User " + username + " updated to tier " + tierEnum
+                    "message", "User " + target.getUsername() + " updated to tier " + tierEnum
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid Tier", "message", "Tier must be USER or ENTERPRISE"));
@@ -165,7 +170,7 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
 
-        User target = userRepository.findByUsername(username).orElse(null);
+        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
 
         if (target.getRoles() == null) target.setRoles(new ArrayList<>());
@@ -184,7 +189,7 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
 
-        User target = userRepository.findByUsername(username).orElse(null);
+        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
 
         if (target.getRoles() != null) {
