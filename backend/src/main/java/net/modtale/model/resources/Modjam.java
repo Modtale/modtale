@@ -23,7 +23,6 @@ public class Modjam {
 
     private String description;
     private String bannerUrl;
-    private String imageUrl;
 
     @Indexed
     private String hostId;
@@ -48,7 +47,6 @@ public class Modjam {
     private boolean allowPublicVoting = true;
 
     private LocalDateTime createdAt = LocalDateTime.now();
-    private LocalDateTime updatedAt = LocalDateTime.now();
 
     public static class Category {
         private String id;
@@ -86,8 +84,6 @@ public class Modjam {
     public void setDescription(String description) { this.description = description; }
     public String getBannerUrl() { return bannerUrl; }
     public void setBannerUrl(String bannerUrl) { this.bannerUrl = bannerUrl; }
-    public String getImageUrl() { return imageUrl; }
-    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getHostId() { return hostId; }
     public void setHostId(String hostId) { this.hostId = hostId; }
     public String getHostName() { return hostName; }
@@ -108,6 +104,4 @@ public class Modjam {
     public void setAllowPublicVoting(boolean allowPublicVoting) { this.allowPublicVoting = allowPublicVoting; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

@@ -60,8 +60,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         }
     }, [isMobile]);
 
-    const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
-    const detailPrefixes = ['mod/', 'world/', 'modpack/'];
+    const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data', 'jams'];
+    const detailPrefixes = ['mod/', 'world/', 'modpack/', 'jam/'];
     const isHomeLayout = homeLikePages.includes(currentPage) || detailPrefixes.some(prefix => currentPage.startsWith(prefix) && currentPage.split('/').length < 2);
 
     const widthClass = isHomeLayout
@@ -100,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     <button
                                         onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
                                         className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                            isHomeLayout
+                                            isHomeLayout && currentPage !== 'jams'
                                                 ? 'text-modtale-accent bg-modtale-accent/10'
                                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                         }`}
