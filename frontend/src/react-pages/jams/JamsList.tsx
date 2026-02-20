@@ -16,6 +16,7 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
     };
 
     const resolvedBanner = resolveUrl(jam.bannerUrl);
+    const resolvedIcon = resolveUrl((jam as any).imageUrl || null);
 
     const formatJamDate = () => {
         if (!jam.startDate || !jam.endDate) return 'Unknown dates';
@@ -33,46 +34,60 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
     };
 
     return (
-        <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-[380px] rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-slate-200 dark:border-white/10">
-            <div className="absolute inset-0 z-0 bg-slate-900">
+        <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-full bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-white/5 hover:border-modtale-accent dark:hover:border-modtale-accent transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden">
+
+            <div className="relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 border-b border-slate-200/50 dark:border-white/5">
                 {resolvedBanner ? (
-                    <img src={resolvedBanner} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80" />
+                    <img
+                        src={resolvedBanner}
+                        alt=""
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
                 ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 opacity-80" />
+                    <div className="w-full h-full flex items-center justify-center bg-slate-200 dark:bg-slate-800">
+                        <Trophy className="w-8 h-8 opacity-20 text-slate-500" />
+                    </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent" />
-            </div>
-
-            <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
-                <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center backdrop-blur-md border shadow-sm ${jam.status === 'ACTIVE' ? 'bg-modtale-accent/80 border-modtale-accent text-white' : 'bg-white/10 border-white/20 text-white'}`}>
-                    <Trophy className="w-3 h-3 mr-1.5" />
-                    <span>{jam.status}</span>
-                </div>
-            </div>
-
-            <div className="relative z-10 mt-auto p-6 flex flex-col gap-3">
-                <div>
-                    <h3 className="text-2xl font-black text-white group-hover:text-modtale-accent transition-colors drop-shadow-md line-clamp-1" title={jam.title}>
-                        {jam.title}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-xs text-white/70 font-medium mt-1">
-                        <span>Hosted by</span>
-                        <span className="text-white font-bold">{jam.hostName}</span>
+                <div className="absolute top-3 right-3 z-20">
+                    <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center shadow-sm backdrop-blur-md border ${jam.status === 'ACTIVE' ? 'bg-modtale-accent/90 border-modtale-accent text-white' : 'bg-black/50 border-white/10 text-white'}`}>
+                        <Trophy className="w-3 h-3 mr-1.5" />
+                        <span>{jam.status}</span>
                     </div>
                 </div>
+            </div>
 
-                <p className="text-white/80 text-sm line-clamp-2 leading-relaxed">
+            <div className="flex flex-col flex-1 px-6 pb-6 pt-0 relative items-center text-center">
+                <div className="w-20 h-20 shrink-0 -mt-10 mb-3 relative z-10 rounded-[1.25rem] bg-slate-100 dark:bg-slate-800 shadow-lg border-4 border-white dark:border-slate-900 overflow-hidden flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+                    {resolvedIcon ? (
+                        <img
+                            src={resolvedIcon}
+                            alt={jam.title}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <Trophy className="w-8 h-8 text-slate-400" />
+                    )}
+                </div>
+
+                <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors line-clamp-1 w-full" title={jam.title}>
+                    {jam.title}
+                </h3>
+
+                <div className="flex items-center justify-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
+                    <span>Hosted by</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-300">{jam.hostName}</span>
+                </div>
+
+                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-6">
                     {jam.description || 'No description provided.'}
                 </p>
 
-                <div className="mt-2 flex items-center justify-between pt-4 border-t border-white/20">
-                    <div className="flex items-center gap-3 text-xs font-bold text-white/90">
-                        <span className="flex items-center bg-white/10 px-2.5 py-1 rounded-lg backdrop-blur-sm shadow-inner border border-white/10" title="Participants">
-                            <Users className="w-3.5 h-3.5 mr-1.5" /> {jam.participantIds?.length || 0}
-                        </span>
+                <div className="mt-auto w-full flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg">
+                        <Users className="w-4 h-4 text-slate-400" /> {jam.participantIds?.length || 0}
                     </div>
-                    <div className="flex items-center text-xs font-bold text-white/90 bg-white/10 px-2.5 py-1 rounded-lg backdrop-blur-sm shadow-inner border border-white/10">
-                        <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg">
+                        <Calendar className="w-4 h-4 text-slate-400" />
                         <span>{formatJamDate()}</span>
                     </div>
                 </div>
