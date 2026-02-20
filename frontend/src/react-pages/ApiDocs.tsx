@@ -1,3 +1,4 @@
+// frontend/react-pages/ApiDocs.tsx
 import React from 'react';
 import {
     Shield,
@@ -75,7 +76,7 @@ const Endpoint = ({
     validation?: string[],
     deprecated?: boolean
 }) => (
-    <div className={`border-b border-slate-100 dark:border-white/5 pb-10 mb-10 last:border-0 last:pb-0 last:mb-0 ${deprecated ? 'opacity-60' : ''}`}>
+    <div className={`border-b border-slate-100 dark:border-white/5 pb-10 mb-10 last:border-0 last:pb-0 last:mb-0 w-full ${deprecated ? 'opacity-60' : ''}`}>
         <div className="flex flex-col md:flex-row md:items-center gap-3 font-mono text-sm mb-3">
             <div className="flex items-center gap-2">
                 <span className={`px-2 py-1 rounded text-xs font-bold text-white shadow-sm min-w-[60px] text-center ${
@@ -123,17 +124,17 @@ const Endpoint = ({
             </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+            <div className="space-y-6 w-full overflow-hidden">
                 {params && (
-                    <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-lg text-xs border border-slate-100 dark:border-white/5 h-fit">
+                    <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-lg text-xs border border-slate-100 dark:border-white/5 h-fit w-full">
                         <h4 className="font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
                             <Layers className="w-3 h-3" /> Parameters <span className="text-[10px] font-normal opacity-50 lowercase">(query / path / multipart)</span>
                         </h4>
-                        <div className="grid grid-cols-1 gap-3">
+                        <div className="grid grid-cols-1 gap-3 w-full">
                             {Object.entries(params).map(([k, v]) => (
-                                <div key={k} className="flex flex-col border-b border-slate-200 dark:border-white/5 last:border-0 pb-2 last:pb-0">
-                                    <span className="font-mono font-bold text-slate-700 dark:text-slate-200 mb-0.5">{k}</span>
+                                <div key={k} className="flex flex-col border-b border-slate-200 dark:border-white/5 last:border-0 pb-2 last:pb-0 w-full overflow-hidden">
+                                    <span className="font-mono font-bold text-slate-700 dark:text-slate-200 mb-0.5 break-all">{k}</span>
                                     <span className="text-slate-500 dark:text-slate-400 break-words leading-relaxed">{v}</span>
                                 </div>
                             ))}
@@ -142,19 +143,19 @@ const Endpoint = ({
                 )}
 
                 {body && (
-                    <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-lg text-xs border border-slate-100 dark:border-white/5 relative group">
+                    <div className="bg-slate-50 dark:bg-black/20 p-4 rounded-lg text-xs border border-slate-100 dark:border-white/5 relative group w-full overflow-hidden">
                         <h4 className="font-bold text-slate-500 uppercase mb-2 select-none flex items-center gap-2">
                             <FileText className="w-3 h-3" /> Request Body <span className="text-[10px] font-normal opacity-50 lowercase">(application/json)</span>
                         </h4>
-                        <pre className="whitespace-pre overflow-x-auto text-slate-600 dark:text-slate-300 font-mono">{body}</pre>
+                        <pre className="whitespace-pre overflow-x-auto text-slate-600 dark:text-slate-300 font-mono max-w-full">{body}</pre>
                     </div>
                 )}
             </div>
 
             {response && (
-                <div className="response-block bg-slate-900 p-4 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto border border-slate-800 relative group h-fit max-h-[500px]">
+                <div className="response-block bg-slate-900 p-4 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto border border-slate-800 relative group h-fit max-h-[500px] w-full">
                     <h4 className="font-bold text-slate-500 uppercase mb-2 select-none sticky top-0 left-0">Response Example</h4>
-                    <pre className="whitespace-pre">{response}</pre>
+                    <pre className="whitespace-pre max-w-full">{response}</pre>
                 </div>
             )}
         </div>
@@ -163,10 +164,10 @@ const Endpoint = ({
 
 export const ApiDocs: React.FC = () => {
     return (
-        <div className="max-w-7xl mx-auto px-4 py-16">
+        <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 mx-auto max-w-[1920px] py-16 overflow-x-hidden">
             <ScrollbarStyles />
 
-            <div className="text-center mb-16">
+            <div className="text-center mb-16 w-full">
                 <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
                     Modtale <span className="text-modtale-accent">API v1</span>
                 </h1>
@@ -174,17 +175,17 @@ export const ApiDocs: React.FC = () => {
                     Complete programmatic access to the Hytale community repository.
                 </p>
 
-                <div className="inline-flex items-center gap-3 px-5 py-3 bg-slate-100 dark:bg-white/5 rounded-full text-sm font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 mb-8 shadow-sm">
-                    <Server className="w-4 h-4 text-modtale-accent" />
+                <div className="inline-flex flex-wrap justify-center items-center gap-3 px-5 py-3 bg-slate-100 dark:bg-white/5 rounded-full text-sm font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 mb-8 shadow-sm max-w-full">
+                    <Server className="w-4 h-4 text-modtale-accent shrink-0" />
                     <span>Base URL:</span>
-                    <span className="font-bold text-slate-900 dark:text-white select-all">https://api.modtale.net</span>
+                    <span className="font-bold text-slate-900 dark:text-white select-all break-all">https://api.modtale.net</span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-center gap-4">
-                    <Link to="/dashboard/developer" className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold hover:opacity-90 transition-transform active:scale-95 shadow-lg flex items-center justify-center gap-2">
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full">
+                    <Link to="/dashboard/developer" className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold hover:opacity-90 transition-transform active:scale-95 shadow-lg flex items-center justify-center gap-2 w-full sm:w-auto">
                         <Shield className="w-4 h-4" /> Get API Key
                     </Link>
-                    <a href="https://github.com/Modtale/modtale-example" target="_blank" rel="noreferrer" className="px-6 py-3 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl font-bold hover:border-modtale-accent hover:text-modtale-accent transition-all active:scale-95 shadow-sm flex items-center justify-center gap-2 group">
+                    <a href="https://github.com/Modtale/modtale-example" target="_blank" rel="noreferrer" className="px-6 py-3 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl font-bold hover:border-modtale-accent hover:text-modtale-accent transition-all active:scale-95 shadow-sm flex items-center justify-center gap-2 group w-full sm:w-auto">
                         <Github className="w-5 h-5 group-hover:text-modtale-accent transition-colors" />
                         <span>View Examples</span>
                         <ExternalLink className="w-3 h-3 opacity-50" />
@@ -192,12 +193,12 @@ export const ApiDocs: React.FC = () => {
                 </div>
             </div>
 
-            <div className="space-y-20">
+            <div className="space-y-12 md:space-y-20 w-full overflow-hidden">
 
-                <section>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                <section className="w-full">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400">
+                            <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 shrink-0">
                                 <Key className="w-6 h-6" />
                             </div>
                             <div>
@@ -211,7 +212,7 @@ export const ApiDocs: React.FC = () => {
 
                         </p>
 
-                        <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 border border-white/10 overflow-x-auto mb-8">
+                        <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 border border-white/10 overflow-x-auto mb-8 max-w-full">
                             <span className="text-purple-400">X-MODTALE-KEY</span>: <span className="text-white">md_12345abcdef...</span>
                         </div>
 
@@ -219,7 +220,7 @@ export const ApiDocs: React.FC = () => {
                             <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (Token Bucket)
                         </h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-2">
                             <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 relative overflow-hidden group hover:border-slate-300 dark:hover:border-white/20 transition-colors">
                                 <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-slate-500"><Globe className="w-24 h-24" /></div>
                                 <div className="flex items-center gap-2 mb-3">
@@ -262,11 +263,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Database className="w-6 h-6 text-slate-400" /> Metadata & Enums
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <Endpoint
                             method="GET"
                             path="/api/v1/tags"
@@ -312,11 +313,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Globe className="w-6 h-6 text-slate-400" /> Project Discovery
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
 
                         <Endpoint
                             method="GET"
@@ -398,11 +399,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <FileText className="w-6 h-6 text-slate-400" /> Project Management
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <div className="mb-8 p-4 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">
                             <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2 text-sm flex items-center gap-2">
                                 <Code className="w-4 h-4"/> Project Lifecycle
@@ -507,11 +508,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Image className="w-6 h-6 text-slate-400" /> Media & Assets
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <Endpoint
                             method="PUT"
                             path="/api/v1/projects/{id}/icon"
@@ -552,11 +553,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Download className="w-6 h-6 text-slate-400" /> Version Management
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800 text-sm">
                             <p className="flex items-start gap-2 text-blue-800 dark:text-blue-200">
                                 <Info className="w-4 h-4 mt-0.5 shrink-0" />
@@ -634,11 +635,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <ArrowRightLeft className="w-6 h-6 text-slate-400" /> Collaboration
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <Endpoint
                             method="POST"
                             path="/api/v1/projects/{id}/invite"
@@ -692,11 +693,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Users className="w-6 h-6 text-slate-400" /> Organizations
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <Endpoint
                             method="POST"
                             path="/api/v1/orgs"
@@ -792,11 +793,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <User className="w-6 h-6 text-slate-400" /> User Profile & Settings
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <Endpoint
                             method="GET"
                             path="/api/v1/users/search"
@@ -914,11 +915,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Bell className="w-6 h-6 text-slate-400" /> Notifications & Analytics
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <Endpoint
                             method="GET"
                             path="/api/v1/notifications"
@@ -963,11 +964,11 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 </section>
 
-                <section>
+                <section className="w-full">
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Activity className="w-6 h-6 text-slate-400" /> Social Actions
                     </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
                         <Endpoint
                             method="POST"
                             path="/api/v1/projects/{id}/favorite"
