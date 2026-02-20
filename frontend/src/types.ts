@@ -24,6 +24,7 @@ export interface User {
     likedModIds: string[];
     followingIds?: string[];
     followerIds?: string[];
+    joinedModjamIds?: string[];
     connectedAccounts?: ConnectedAccount[];
     badges?: string[];
     notificationPreferences?: {
@@ -116,6 +117,7 @@ export interface Mod {
     createdAt?: string;
     modIds?: string[];
     childProjectIds?: string[];
+    modjamIds?: string[];
     sizeBytes?: number;
     comments: Comment[];
     versions: ProjectVersion[];
@@ -157,5 +159,51 @@ export interface Report {
     reason: string;
     description: string;
     status: 'OPEN' | 'RESOLVED' | 'DISMISSED';
+    createdAt: string;
+}
+
+export interface ModjamCategory {
+    id: string;
+    name: string;
+    description: string;
+    maxScore: number;
+}
+
+export interface Modjam {
+    id: string;
+    slug: string;
+    title: string;
+    description: string;
+    bannerUrl?: string;
+    hostId: string;
+    hostName: string;
+    startDate: string;
+    endDate: string;
+    votingEndDate: string;
+    status: 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'VOTING' | 'COMPLETED';
+    participantIds: string[];
+    categories: ModjamCategory[];
+    allowPublicVoting: boolean;
+    createdAt: string;
+}
+
+export interface ModjamVote {
+    id: string;
+    voterId: string;
+    categoryId: string;
+    score: number;
+}
+
+export interface ModjamSubmission {
+    id: string;
+    jamId: string;
+    projectId: string;
+    projectTitle?: string;
+    projectImageUrl?: string;
+    submitterId: string;
+    votes: ModjamVote[];
+    categoryScores?: Record<string, number>;
+    totalScore?: number;
+    rank?: number;
     createdAt: string;
 }
