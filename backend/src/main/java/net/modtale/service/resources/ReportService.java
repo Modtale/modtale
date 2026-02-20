@@ -10,10 +10,12 @@ import net.modtale.model.user.User;
 import net.modtale.repository.resources.ReportRepository;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.user.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,6 +29,7 @@ public class ReportService {
     @Autowired private ReportRepository reportRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private NotificationService notificationService;
 
     @Value("${app.limits.reports-per-day:10}")
     private int reportsPerDay;
@@ -99,5 +102,13 @@ public class ReportService {
         report.setResolutionNote(note);
 
         reportRepository.save(report);
+
+        notificationService.sendNotification(
+                List.of(report.getReporterId()),
+                "Report Resolved",
+                "Your report regarding " + report.getTargetSummary() + " has been resolved.",
+                URI.create("/dashboard"),
+                null
+        );
     }
 }

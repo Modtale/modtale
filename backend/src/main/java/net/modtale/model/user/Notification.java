@@ -3,6 +3,7 @@ package net.modtale.model.user;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,15 +30,15 @@ public class Notification {
 
     public Notification() {}
 
-    public Notification(String userId, String title, String message, String link, String iconUrl) {
+    public Notification(String userId, String title, String message, URI link, String iconUrl) {
         this(userId, title, message, link, iconUrl, "INFO", new HashMap<>());
     }
 
-    public Notification(String userId, String title, String message, String link, String iconUrl, String type, Map<String, String> metadata) {
+    public Notification(String userId, String title, String message, URI link, String iconUrl, String type, Map<String, String> metadata) {
         this.userId = userId;
         this.title = title;
         this.message = message;
-        this.link = link;
+        this.link = link.toString();
         this.iconUrl = iconUrl;
         this.type = type != null ? type : "INFO";
         this.metadata = metadata != null ? metadata : new HashMap<>();

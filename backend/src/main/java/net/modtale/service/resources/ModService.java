@@ -45,6 +45,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -701,7 +702,7 @@ public class ModService {
             analyticsService.logNewProject(saved.getId());
             User author = getAuthorUser(saved);
             if(author != null) {
-                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", getProjectLink(saved), saved.getImageUrl());
+                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", URI.create(getProjectLink(saved)), saved.getImageUrl());
             }
         }
     }
@@ -751,7 +752,7 @@ public class ModService {
                     List.of(author.getId()),
                     "Version Rejected",
                     "Version " + ver.getVersionNumber() + " of " + mod.getTitle() + " was rejected. Reason: " + reason,
-                    "/dashboard/projects",
+                    URI.create("/dashboard/projects"),
                     mod.getImageUrl()
             );
         }
@@ -846,7 +847,7 @@ public class ModService {
                     List.of(author.getId()),
                     "Project Returned",
                     "Your submission '" + mod.getTitle() + "' was returned to drafts. Reason: " + (reason != null ? reason : "Quality Standards"),
-                    "/dashboard/projects",
+                    URI.create("/dashboard/projects"),
                     mod.getImageUrl()
             );
         }
@@ -931,7 +932,7 @@ public class ModService {
                 List.of(target.getId()),
                 "Transfer Request",
                 (authorName != null ? authorName : "Someone") + " wants to transfer '" + mod.getTitle() + "' to you.",
-                "/dashboard/projects",
+                URI.create("/dashboard/projects"),
                 mod.getImageUrl(),
                 "TRANSFER_REQUEST",
                 metadata
@@ -968,7 +969,7 @@ public class ModService {
             evictProjectDetails(mod);
 
             if(oldOwner != null) {
-                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Accepted", mod.getTitle() + " has been transferred to " + newOwner.getUsername(), "/projects/" + mod.getId(), mod.getImageUrl());
+                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Accepted", mod.getTitle() + " has been transferred to " + newOwner.getUsername(), URI.create("/projects/" + mod.getId()), mod.getImageUrl());
             }
         } else {
             mod.setPendingTransferTo(null);
@@ -977,7 +978,7 @@ public class ModService {
 
             User oldOwner = getAuthorUser(mod);
             if(oldOwner != null) {
-                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Declined", "Transfer request for " + mod.getTitle() + " was declined.", "/dashboard/projects", mod.getImageUrl());
+                notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Declined", "Transfer request for " + mod.getTitle() + " was declined.", URI.create("/dashboard/projects"), mod.getImageUrl());
             }
         }
     }
@@ -1327,7 +1328,7 @@ public class ModService {
                     List.of(user.getId()),
                     "Version Submitted",
                     "Your project update is pending approval and will likely be online in under 24 hours.",
-                    "/dashboard/projects",
+                    URI.create("/dashboard/projects"),
                     mod.getImageUrl()
             );
 
@@ -1449,7 +1450,7 @@ public class ModService {
                             List.of(author.getId()),
                             "Version Published",
                             "Your version for " + mod.getTitle() + " has been processed and is now live.",
-                            getProjectLink(mod),
+                            URI.create(getProjectLink(mod)),
                             mod.getImageUrl()
                     );
                 }
@@ -1806,7 +1807,7 @@ public class ModService {
                 String link = "/dashboard";
                 User author = getAuthorUser(mod);
                 if (author != null) {
-                    notificationService.sendNotification(List.of(author.getId()), title, msg, link, mod.getImageUrl());
+                    notificationService.sendNotification(List.of(author.getId()), title, msg, URI.create(link), mod.getImageUrl());
                 }
             }
         }
@@ -1823,7 +1824,7 @@ public class ModService {
                         .map(User::getId).toList();
 
                 if (!usersToNotify.isEmpty()) {
-                    notificationService.sendNotification(usersToNotify, "Update: " + mod.getTitle(), msg, getProjectLink(mod), mod.getImageUrl());
+                    notificationService.sendNotification(usersToNotify, "Update: " + mod.getTitle(), msg, URI.create(getProjectLink(mod)), mod.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send notifications", e); }
         });
@@ -1843,7 +1844,7 @@ public class ModService {
                         .map(User::getId).toList();
 
                 if (!usersToNotify.isEmpty()) {
-                    notificationService.sendNotification(usersToNotify, title, msg, getProjectLink(mod), mod.getImageUrl());
+                    notificationService.sendNotification(usersToNotify, title, msg, URI.create(getProjectLink(mod)), mod.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send new project notifications", e); }
         });
@@ -1857,7 +1858,7 @@ public class ModService {
                 if (author != null && author.getNotificationPreferences().getDependencyUpdates() != User.NotificationLevel.OFF) {
                     String title = "Dependency Update";
                     String msg = updatedMod.getTitle() + " (used in " + dependent.getTitle() + ") has been updated to version " + version + ".";
-                    notificationService.sendNotification(List.of(author.getId()), title, msg, getProjectLink(updatedMod), updatedMod.getImageUrl());
+                    notificationService.sendNotification(List.of(author.getId()), title, msg, URI.create(getProjectLink(updatedMod)), updatedMod.getImageUrl());
                 }
             }
         });
@@ -1884,7 +1885,7 @@ public class ModService {
                         String title = "Your Project is Trending!";
                         String msg = mod.getTitle() + " has hit " + friendlyName + "!";
                         String link = "/dashboard/analytics";
-                        notificationService.sendNotification(List.of(author.getId()), title, msg, link, mod.getImageUrl());
+                        notificationService.sendNotification(List.of(author.getId()), title, msg, URI.create(link), mod.getImageUrl());
                         mod.setLastTrendingNotification(LocalDateTime.now().toString());
                         modRepository.save(mod);
                     }
@@ -1907,7 +1908,7 @@ public class ModService {
         Map<String, String> metadata = new HashMap<>();
         metadata.put("modId", mod.getId());
         metadata.put("action", "CONTRIBUTOR_INVITE");
-        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", "/dashboard/projects", mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
+        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", URI.create("/dashboard/projects"), mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
     }
 
     public void inviteContributor(String modId, String userId, boolean isId) {
@@ -1928,7 +1929,7 @@ public class ModService {
         Map<String, String> metadata = new HashMap<>();
         metadata.put("modId", mod.getId());
         metadata.put("action", "CONTRIBUTOR_INVITE");
-        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", "/dashboard/projects", mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
+        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", URI.create("/dashboard/projects"), mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
     }
 
     public void removeContributor(String modId, String usernameToRemove) {
@@ -1958,7 +1959,7 @@ public class ModService {
                         List.of(owner.getId()),
                         "Invite Accepted",
                         user.getUsername() + " joined the team for " + mod.getTitle(),
-                        getProjectLink(mod) + "/contributors",
+                        URI.create(getProjectLink(mod) + "/contributors"),
                         user.getAvatarUrl()
                 );
             }
@@ -2002,7 +2003,7 @@ public class ModService {
                         List.of(author.getId()),
                         "New Comment",
                         username + " commented on " + mod.getTitle(),
-                        getProjectLink(mod),
+                        URI.create(getProjectLink(mod)),
                         mod.getImageUrl()
                 );
             }
@@ -2080,7 +2081,7 @@ public class ModService {
                         List.of(commenter.getId()),
                         "Developer Reply",
                         mod.getAuthor() + " replied to your comment on " + mod.getTitle(),
-                        getProjectLink(mod),
+                        URI.create(getProjectLink(mod)),
                         mod.getImageUrl()
                 );
             }
