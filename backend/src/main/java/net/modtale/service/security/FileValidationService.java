@@ -7,6 +7,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -31,8 +33,10 @@ public class FileValidationService {
 
     private static final List<String> ARCHIVE_EXTENSIONS = Arrays.asList(".jar", ".zip", ".rar", ".7z", ".tar", ".gz");
 
-    private static final long MAX_UNCOMPRESSED_SIZE = 2L * 1024 * 1024 * 1024;
-    private static final int MAX_FILE_COUNT = 10000;
+    private static final long MAX_UNCOMPRESSED_SIZE = 5L * 1024 * 1024 * 1024;
+    private static final int MAX_FILE_COUNT = 100000;
+    private static final double MAX_COMPRESSION_RATIO = 100.0;
+    private static final long MIN_RATIO_CHECK_SIZE = 100L * 1024 * 1024;
     private static final String PLUGIN_MANIFEST_PATH = "manifest.json";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -75,6 +79,8 @@ public class FileValidationService {
         long totalSize = 0;
         int fileCount = 0;
         boolean manifestFound = false;
+        long compressedSize = file.getSize();
+        byte[] buffer = new byte[8192];
 
         try (ZipInputStream zis = new ZipInputStream(file.getInputStream())) {
             ZipEntry entry;
@@ -84,20 +90,6 @@ public class FileValidationService {
                     throw new IllegalArgumentException("Archive contains too many files (Zip Bomb protection).");
                 }
 
-                if (!entry.isDirectory()) {
-                    long size = entry.getSize();
-                    if (size > MAX_UNCOMPRESSED_SIZE) {
-                        throw new IllegalArgumentException("Single file in archive is too large.");
-                    }
-                    if (size != -1) {
-                        totalSize += size;
-                    }
-                }
-
-                if (totalSize > MAX_UNCOMPRESSED_SIZE) {
-                    throw new IllegalArgumentException("Archive uncompressed size exceeds limit (Zip Bomb protection).");
-                }
-
                 String entryName = entry.getName();
                 String entryNameLower = entryName.toLowerCase();
 
@@ -105,11 +97,42 @@ public class FileValidationService {
                     throw new IllegalArgumentException("Archive contains malicious path traversal: " + entryName);
                 }
 
-                manifestFound = true;
-                /*if ("PLUGIN".equals(classification) && entryName.equals(PLUGIN_MANIFEST_PATH)) {
-                    validatePluginManifest(zis);
+                if ("PLUGIN".equals(classification) && entryName.equals(PLUGIN_MANIFEST_PATH)) {
                     manifestFound = true;
-                }*/
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    int bytesRead;
+                    while ((bytesRead = zis.read(buffer)) != -1) {
+                        baos.write(buffer, 0, bytesRead);
+                        totalSize += bytesRead;
+                        if (totalSize > MAX_UNCOMPRESSED_SIZE) {
+                            throw new IllegalArgumentException("Archive uncompressed size exceeds limit.");
+                        }
+                        if (compressedSize > 0 && totalSize > MIN_RATIO_CHECK_SIZE) {
+                            if ((double) totalSize / compressedSize > MAX_COMPRESSION_RATIO) {
+                                throw new IllegalArgumentException("High compression ratio detected (Zip Bomb protection).");
+                            }
+                        }
+                    }
+                    validatePluginManifest(new ByteArrayInputStream(baos.toByteArray()));
+                } else if (!entry.isDirectory()) {
+                    long claimedSize = entry.getSize();
+                    if (claimedSize > MAX_UNCOMPRESSED_SIZE) {
+                        throw new IllegalArgumentException("Single file in archive is too large.");
+                    }
+
+                    int bytesRead;
+                    while ((bytesRead = zis.read(buffer)) != -1) {
+                        totalSize += bytesRead;
+                        if (totalSize > MAX_UNCOMPRESSED_SIZE) {
+                            throw new IllegalArgumentException("Archive uncompressed size exceeds limit.");
+                        }
+                        if (compressedSize > 0 && totalSize > MIN_RATIO_CHECK_SIZE) {
+                            if ((double) totalSize / compressedSize > MAX_COMPRESSION_RATIO) {
+                                throw new IllegalArgumentException("High compression ratio detected (Zip Bomb protection).");
+                            }
+                        }
+                    }
+                }
 
                 switch (classification) {
                     case "DATA":
