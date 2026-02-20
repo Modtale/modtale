@@ -345,7 +345,7 @@ export const Home: React.FC<HomeProps> = ({
                 <title>{seoContent.title}</title>
                 <meta name="description" content={seoContent.description} />
                 <meta name="keywords" content={seoContent.keywords} />
-                {lcpBannerUrl && <link rel="preload" as="image" href={lcpBannerUrl} fetchpriority="high" />}
+                {lcpBannerUrl && <link rel="preload" as="image" href={lcpBannerUrl} fetchPriority="high" />}
                 {itemListSchema && <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>}
                 {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
             </Helmet>
