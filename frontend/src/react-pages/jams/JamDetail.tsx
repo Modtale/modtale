@@ -5,7 +5,8 @@ import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale } from 'lucide-react';
-import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout';
+import { SidebarSection } from '@/components/resources/ProjectLayout';
+import { JamLayout } from '@/components/jams/JamLayout';
 
 export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
     const { slug } = useParams<{ slug: string }>();
@@ -89,7 +90,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         <>
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
 
-            <ProjectLayout
+            <JamLayout
                 bannerUrl={jam.bannerUrl}
                 iconUrl={jam.bannerUrl || "https://modtale.net/assets/favicon.svg"}
                 onBack={() => navigate('/jams')}
@@ -112,12 +113,6 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                             {jam.description}
                         </p>
                     </>
-                }
-                headerActions={
-                    <div className="flex flex-col items-center justify-center p-3 px-6 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl shadow-inner">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status</span>
-                        <span className="text-xl font-black text-modtale-accent uppercase tracking-wider">{jam.status}</span>
-                    </div>
                 }
                 actionBar={
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6 w-full p-6 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl">
@@ -169,6 +164,11 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 }
                 sidebarContent={
                     <div className="flex flex-col gap-8">
+                        <div className="flex flex-col items-center justify-center p-3 px-6 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl shadow-inner">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status</span>
+                            <span className="text-xl font-black text-modtale-accent uppercase tracking-wider">{jam.status}</span>
+                        </div>
+
                         <SidebarSection title="Timeline" icon={Calendar}>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
