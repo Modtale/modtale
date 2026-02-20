@@ -72,6 +72,13 @@ public class SecurityConfig {
         logger.info("Security Config Initialized. Frontend URL: {}", frontendUrl);
     }
 
+    private String getCleanFrontendUrl() {
+        if (frontendUrl != null && frontendUrl.endsWith("/")) {
+            return frontendUrl.substring(0, frontendUrl.length() - 1);
+        }
+        return frontendUrl;
+    }
+
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -81,9 +88,10 @@ public class SecurityConfig {
     }
 
     private boolean isPreviewEnvironment() {
-        if (frontendUrl == null || frontendUrl.isBlank()) return false;
+        String cleanUrl = getCleanFrontendUrl();
+        if (cleanUrl == null || cleanUrl.isBlank()) return false;
         try {
-            String host = URI.create(frontendUrl).getHost();
+            String host = URI.create(cleanUrl).getHost();
             return (host != null && host.endsWith(".run.app")) || "dev.modtale.net".equalsIgnoreCase(host);
         } catch (Exception e) {
             return false;
@@ -97,15 +105,16 @@ public class SecurityConfig {
         serializer.setCookiePath("/");
 
         boolean isPreview = isPreviewEnvironment();
+        String cleanUrl = getCleanFrontendUrl();
 
         if (isPreview) {
             serializer.setSameSite("None");
         } else {
             serializer.setSameSite("Lax");
 
-            if (frontendUrl != null && !frontendUrl.isBlank()) {
+            if (cleanUrl != null && !cleanUrl.isBlank()) {
                 try {
-                    String host = URI.create(frontendUrl).getHost();
+                    String host = URI.create(cleanUrl).getHost();
                     if (host != null && !host.equalsIgnoreCase("localhost")) {
                         String[] parts = host.split("\\.");
                         if (parts.length >= 2) {
@@ -130,15 +139,16 @@ public class SecurityConfig {
 
         tokenRepository.setCookieCustomizer(cookie -> {
             boolean isPreview = isPreviewEnvironment();
+            String cleanUrl = getCleanFrontendUrl();
 
             if (isPreview) {
                 cookie.sameSite("None");
                 cookie.domain(null);
             } else {
                 cookie.sameSite("Lax");
-                if (frontendUrl != null && !frontendUrl.isBlank()) {
+                if (cleanUrl != null && !cleanUrl.isBlank()) {
                     try {
-                        String host = URI.create(frontendUrl).getHost();
+                        String host = URI.create(cleanUrl).getHost();
                         if (host != null && !host.equalsIgnoreCase("localhost")) {
                             String[] parts = host.split("\\.");
                             if (parts.length >= 2) {
@@ -236,7 +246,8 @@ public class SecurityConfig {
                             HttpServletRequest request = context.getRequest();
                             String origin = request.getHeader("Origin");
                             String referer = request.getHeader("Referer");
-                            String validHost = frontendUrl != null ? URI.create(frontendUrl).getHost() : "localhost";
+                            String cleanUrl = getCleanFrontendUrl();
+                            String validHost = cleanUrl != null ? URI.create(cleanUrl).getHost() : "localhost";
 
                             boolean isValidOrigin = (origin != null && origin.contains(validHost));
                             boolean isValidReferer = (referer != null && referer.contains(validHost));
@@ -300,15 +311,16 @@ public class SecurityConfig {
         List<String> restrictedOrigins = new ArrayList<>();
 
         boolean isPreview = isPreviewEnvironment();
+        String cleanUrl = getCleanFrontendUrl();
 
         if (isPreview) {
             restrictedOrigins.add("https://*.run.app");
-            if (frontendUrl != null && frontendUrl.contains("dev.modtale.net")) {
-                restrictedOrigins.add(frontendUrl);
+            if (cleanUrl != null && cleanUrl.contains("dev.modtale.net")) {
+                restrictedOrigins.add(cleanUrl);
             }
         } else {
-            if (frontendUrl != null && !frontendUrl.isBlank()) {
-                restrictedOrigins.add(frontendUrl);
+            if (cleanUrl != null && !cleanUrl.isBlank()) {
+                restrictedOrigins.add(cleanUrl);
             }
         }
 
@@ -331,8 +343,8 @@ public class SecurityConfig {
         CorsConfiguration publicConfig = new CorsConfiguration();
         List<String> publicOrigins = new ArrayList<>();
         publicOrigins.add("*");
-        if (frontendUrl != null && !frontendUrl.isBlank()) {
-            publicOrigins.add(frontendUrl);
+        if (cleanUrl != null && !cleanUrl.isBlank()) {
+            publicOrigins.add(cleanUrl);
         }
         if (isPreview) {
             publicOrigins.add("https://*.run.app");
@@ -397,11 +409,14 @@ public class SecurityConfig {
                     session.invalidate();
                 }
 
-                response.sendRedirect(frontendUrl + "/mfa?token=" + preAuthToken);
+                String cleanUrl = getCleanFrontendUrl();
+                response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/mfa?token=" + preAuthToken);
             } else {
                 SecurityContextRepository repository = securityContextRepository();
                 repository.saveContext(SecurityContextHolder.getContext(), request, response);
-                response.sendRedirect(frontendUrl + "/dashboard/profile");
+
+                String cleanUrl = getCleanFrontendUrl();
+                response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/dashboard/profile");
             }
         };
     }
@@ -410,7 +425,8 @@ public class SecurityConfig {
     public AuthenticationFailureHandler oauthFailureHandler() {
         return (request, response, exception) -> {
             String errorParam = java.net.URLEncoder.encode(exception.getMessage(), "UTF-8");
-            response.sendRedirect(frontendUrl + "/?oauth_error=" + errorParam);
+            String cleanUrl = getCleanFrontendUrl();
+            response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/?oauth_error=" + errorParam);
         };
     }
 }
