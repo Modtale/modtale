@@ -65,6 +65,8 @@ public class User implements Serializable {
     private List<String> followingIds = new ArrayList<>();
     private List<String> followerIds = new ArrayList<>();
 
+    private List<String> joinedModjamIds = new ArrayList<>();
+
     private List<ConnectedAccount> connectedAccounts = new ArrayList<>();
 
     private List<String> badges = new ArrayList<>();
@@ -235,6 +237,9 @@ public class User implements Serializable {
 
     public List<String> getFollowerIds() { return followerIds; }
     public void setFollowerIds(List<String> followerIds) { this.followerIds = followerIds; }
+
+    public List<String> getJoinedModjamIds() { return joinedModjamIds; }
+    public void setJoinedModjamIds(List<String> joinedModjamIds) { this.joinedModjamIds = joinedModjamIds; }
 
     public List<ConnectedAccount> getConnectedAccounts() { return connectedAccounts; }
     public void setConnectedAccounts(List<ConnectedAccount> connectedAccounts) { this.connectedAccounts = connectedAccounts; }
