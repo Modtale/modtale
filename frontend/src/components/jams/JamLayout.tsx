@@ -13,25 +13,27 @@ interface JamLayoutProps {
     headerContent: React.ReactNode;
     tabs?: React.ReactNode;
     mainContent: React.ReactNode;
+    sidebarContent?: React.ReactNode;
+    actionBar?: React.ReactNode;
     onBack?: () => void;
-    isSaving: boolean;
-    isSaved: boolean;
-    hasUnsavedChanges: boolean;
-    onSave: () => void;
-    onPublish: () => void;
-    publishChecklist: { label: string; met: boolean }[];
+    isSaving?: boolean;
+    isSaved?: boolean;
+    hasUnsavedChanges?: boolean;
+    onSave?: () => void;
+    onPublish?: () => void;
+    publishChecklist?: { label: string; met: boolean }[];
 }
 
 export const JamLayout: React.FC<JamLayoutProps> = ({
                                                         bannerUrl, iconUrl, isEditing, onBannerUpload, onIconUpload,
-                                                        headerContent, tabs, mainContent, onBack,
+                                                        headerContent, tabs, mainContent, sidebarContent, actionBar, onBack,
                                                         isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, publishChecklist
                                                     }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
 
-    const isReadyToPublish = publishChecklist.every(c => c.met) && !hasUnsavedChanges;
+    const isReadyToPublish = publishChecklist?.every(c => c.met) && !hasUnsavedChanges;
 
     const resolveUrl = (url?: string | null) => {
         if (!url) return null;
@@ -149,6 +151,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                     </div>
                                 </div>
                                 {tabs && <div className="mt-8 pt-2">{tabs}</div>}
+                                {actionBar && <div className="mt-6 mb-6">{actionBar}</div>}
                             </div>
                             <div className="p-6 md:p-12 min-h-[500px]">
                                 {mainContent}
@@ -157,53 +160,57 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                     </div>
 
                     <div className="lg:col-span-4 xl:col-span-3 w-full sticky top-28 space-y-6">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8 shadow-xl">
-                            <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-6">Launch Checklist</h3>
-                            <div className="space-y-4 mb-8">
-                                {publishChecklist.map((req, i) => (
-                                    <div key={i} className="flex items-start gap-3">
-                                        <div className={`mt-0.5 shrink-0 ${req.met ? 'text-green-500' : 'text-slate-300 dark:text-slate-700'}`}>
-                                            {req.met ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                        {sidebarContent ? (
+                            sidebarContent
+                        ) : isEditing ? (
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8 shadow-xl">
+                                <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-6">Launch Checklist</h3>
+                                <div className="space-y-4 mb-8">
+                                    {publishChecklist?.map((req, i) => (
+                                        <div key={i} className="flex items-start gap-3">
+                                            <div className={`mt-0.5 shrink-0 ${req.met ? 'text-green-500' : 'text-slate-300 dark:text-slate-700'}`}>
+                                                {req.met ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                                            </div>
+                                            <span className={`text-sm font-bold ${req.met ? 'text-slate-900 dark:text-slate-200' : 'text-slate-400'}`}>{req.label}</span>
                                         </div>
-                                        <span className={`text-sm font-bold ${req.met ? 'text-slate-900 dark:text-slate-200' : 'text-slate-400'}`}>{req.label}</span>
-                                    </div>
-                                ))}
-                                {hasUnsavedChanges && (
-                                    <div className="flex items-start gap-3 pt-4 border-t border-slate-100 dark:border-white/5 mt-4">
-                                        <div className="mt-0.5 shrink-0 text-amber-500">
-                                            <AlertCircle className="w-4 h-4" />
+                                    ))}
+                                    {hasUnsavedChanges && (
+                                        <div className="flex items-start gap-3 pt-4 border-t border-slate-100 dark:border-white/5 mt-4">
+                                            <div className="mt-0.5 shrink-0 text-amber-500">
+                                                <AlertCircle className="w-4 h-4" />
+                                            </div>
+                                            <span className="text-sm font-bold text-amber-500">Unsaved changes</span>
                                         </div>
-                                        <span className="text-sm font-bold text-amber-500">Unsaved changes</span>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                </div>
 
-                            <div className="space-y-3">
-                                <button
-                                    type="button"
-                                    onClick={(e) => { e.preventDefault(); onSave(); }}
-                                    disabled={isSaving || !hasUnsavedChanges}
-                                    className={`w-full h-14 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 border-2 ${
-                                        isSaved ? 'bg-green-500/10 border-green-500 text-green-500' :
-                                            !hasUnsavedChanges ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent cursor-not-allowed' :
-                                                'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent hover:scale-[1.02]'
-                                    }`}
-                                >
-                                    {isSaving ? <Spinner className="w-4 h-4" fullScreen={false} /> : isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                    {isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Draft'}
-                                </button>
+                                <div className="space-y-3">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); onSave?.(); }}
+                                        disabled={isSaving || !hasUnsavedChanges}
+                                        className={`w-full h-14 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 border-2 ${
+                                            isSaved ? 'bg-green-500/10 border-green-500 text-green-500' :
+                                                !hasUnsavedChanges ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent cursor-not-allowed' :
+                                                    'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent hover:scale-[1.02]'
+                                        }`}
+                                    >
+                                        {isSaving ? <Spinner className="w-4 h-4" fullScreen={false} /> : isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                                        {isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Draft'}
+                                    </button>
 
-                                <button
-                                    type="button"
-                                    onClick={(e) => { e.preventDefault(); onPublish(); }}
-                                    disabled={!isReadyToPublish || isSaving}
-                                    className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 enabled:hover:scale-[1.02]"
-                                >
-                                    <Rocket className="w-4 h-4" />
-                                    Publish Jam
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); onPublish?.(); }}
+                                        disabled={!isReadyToPublish || isSaving}
+                                        className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 enabled:hover:scale-[1.02]"
+                                    >
+                                        <Rocket className="w-4 h-4" />
+                                        Publish Jam
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        ) : null}
                     </div>
                 </div>
             </div>
