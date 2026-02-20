@@ -11,9 +11,11 @@ import net.modtale.repository.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +26,7 @@ public class ModjamService {
     @Autowired private ModjamSubmissionRepository submissionRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ModRepository modRepository;
+    @Autowired private StorageService storageService;
 
     public List<Modjam> getAllJams() {
         return modjamRepository.findAll();
@@ -61,6 +64,46 @@ public class ModjamService {
         return modjamRepository.save(jam);
     }
 
+    public Modjam updateJam(String id, Modjam updatedJam) {
+        Modjam jam = modjamRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+
+        jam.setTitle(updatedJam.getTitle());
+        jam.setDescription(updatedJam.getDescription());
+        jam.setStartDate(updatedJam.getStartDate());
+        jam.setEndDate(updatedJam.getEndDate());
+        jam.setVotingEndDate(updatedJam.getVotingEndDate());
+        jam.setAllowPublicVoting(updatedJam.isAllowPublicVoting());
+        jam.setCategories(updatedJam.getCategories());
+        jam.setStatus(updatedJam.getStatus());
+
+        return modjamRepository.save(jam);
+    }
+
+    public void updateIcon(String jamId, MultipartFile file) {
+        try {
+            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            String path = "modjams/" + jamId + "/icon/" + file.getOriginalFilename();
+            String url = storageService.upload(file, path);
+            jam.setImageUrl(url);
+            modjamRepository.save(jam);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to upload icon", e);
+        }
+    }
+
+    public void updateBanner(String jamId, MultipartFile file) {
+        try {
+            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            String path = "modjams/" + jamId + "/banner/" + file.getOriginalFilename();
+            String url = storageService.upload(file, path);
+            jam.setBannerUrl(url);
+            modjamRepository.save(jam);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to upload banner", e);
+        }
+    }
+
     public List<ModjamSubmission> getSubmissions(String jamId) {
         return submissionRepository.findByJamId(jamId);
     }
@@ -71,9 +114,17 @@ public class ModjamService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
+        if (jam.getParticipantIds() == null) {
+            jam.setParticipantIds(new ArrayList<>());
+        }
+
         if (!jam.getParticipantIds().contains(userId)) {
             jam.getParticipantIds().add(userId);
             modjamRepository.save(jam);
+        }
+
+        if (user.getJoinedModjamIds() == null) {
+            user.setJoinedModjamIds(new ArrayList<>());
         }
 
         if (!user.getJoinedModjamIds().contains(jamId)) {
@@ -131,6 +182,10 @@ public class ModjamService {
 
         ModjamSubmission sub = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found"));
+
+        if (sub.getVotes() == null) {
+            sub.setVotes(new ArrayList<>());
+        }
 
         sub.getVotes().removeIf(v -> v.getVoterId().equals(userId) && v.getCategoryId().equals(categoryId));
 

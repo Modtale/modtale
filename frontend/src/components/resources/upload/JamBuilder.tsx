@@ -72,8 +72,14 @@ export const JamBuilder: React.FC<any> = ({
             onBack={onBack}
             bannerUrl={metaData.bannerUrl}
             iconUrl={metaData.imageUrl}
-            onBannerUpload={(f, p) => updateField('bannerUrl', p)}
-            onIconUpload={(f, p) => updateField('imageUrl', p)}
+            onBannerUpload={(f, p) => {
+                markDirty();
+                setMetaData((prev: any) => ({ ...prev, bannerUrl: p, bannerFile: f }));
+            }}
+            onIconUpload={(f, p) => {
+                markDirty();
+                setMetaData((prev: any) => ({ ...prev, imageUrl: p, iconFile: f }));
+            }}
             isEditing={true}
             publishChecklist={publishChecklist}
             tabs={
