@@ -6,7 +6,7 @@ import { ModCard } from '../components/resources/ModCard';
 import { HomeHero } from '../components/home/HomeHero';
 import { HomeFilters } from '../components/home/HomeFilters';
 import { Search, ChevronLeft, ChevronRight, CornerDownLeft, PackageSearch } from 'lucide-react';
-import { api } from '../utils/api';
+import { api, BACKEND_URL } from '../utils/api';
 import { captureError } from '../utils/errorTracking';
 import { PROJECT_TYPES, BROWSE_VIEWS } from '../data/categories';
 import type { Classification } from '../data/categories';
@@ -39,6 +39,11 @@ const getRouteForClassification = (cls: Classification | 'All') => {
         case 'DATA': return '/data';
         default: return '/';
     }
+};
+
+const getResolvedImageUrl = (url?: string) => {
+    if (!url) return null;
+    return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
 };
 
 export const Home: React.FC<HomeProps> = ({
@@ -82,6 +87,13 @@ export const Home: React.FC<HomeProps> = ({
         const crumbs = getBreadcrumbsForClassification(selectedClassification);
         return generateBreadcrumbSchema(crumbs);
     }, [selectedClassification]);
+
+    const lcpBannerUrl = useMemo(() => {
+        if (items.length > 0 && items[0].bannerUrl) {
+            return getResolvedImageUrl(items[0].bannerUrl);
+        }
+        return null;
+    }, [items]);
 
     useEffect(() => {
         if (urlSearchTerm !== searchTerm) {
@@ -210,7 +222,7 @@ export const Home: React.FC<HomeProps> = ({
         fetchData();
     }, [fetchData]);
 
-    const updateParams = (updates: Record<string, string | null>) => {
+    const updateParams = useCallback((updates: Record<string, string | null>) => {
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             Object.entries(updates).forEach(([key, value]) => {
@@ -225,16 +237,16 @@ export const Home: React.FC<HomeProps> = ({
             }
             return next;
         });
-    };
+    }, [setSearchParams]);
 
-    const handleClassificationChange = (cls: Classification | 'All') => {
+    const handleClassificationChange = useCallback((cls: Classification | 'All') => {
         if (cls !== selectedClassification) {
             const route = getRouteForClassification(cls);
             navigate(route);
         }
-    };
+    }, [selectedClassification, navigate]);
 
-    const handleViewChange = (viewId: string) => {
+    const handleViewChange = useCallback((viewId: string) => {
         const updates: Record<string, string | null> = { view: viewId };
 
         if (viewId === 'hidden_gems') updates.sort = 'favorites';
@@ -245,9 +257,9 @@ export const Home: React.FC<HomeProps> = ({
         else if (viewId === 'all') updates.sort = 'relevance';
 
         updateParams(updates);
-    };
+    }, [updateParams]);
 
-    const handleSortChange = (newSort: any) => {
+    const handleSortChange = useCallback((newSort: any) => {
         const sortOption = newSort as SortOption;
         const updates: Record<string, string | null> = { sort: sortOption };
 
@@ -264,9 +276,9 @@ export const Home: React.FC<HomeProps> = ({
             }
         }
         updateParams(updates);
-    };
+    }, [activeViewId, updateParams]);
 
-    const handlePageChange = (p: number) => {
+    const handlePageChange = useCallback((p: number) => {
         if (p >= 0 && p < totalPages) {
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev);
@@ -279,7 +291,7 @@ export const Home: React.FC<HomeProps> = ({
                 behavior: 'smooth'
             });
         }
-    };
+    }, [totalPages, setSearchParams]);
 
     const handleJump = (e: React.FormEvent) => {
         e.preventDefault();
@@ -290,27 +302,27 @@ export const Home: React.FC<HomeProps> = ({
         }
     };
 
-    const handleToggleLocal = (id: string, isModpack: boolean) => {
+    const handleToggleLocal = useCallback((id: string, isModpack: boolean) => {
         if (!isLoggedIn) return;
         onToggleFavoriteMod(id);
         setItems(prev => prev.map(i => i.id === id ? { ...i, favoriteCount: (likedModIds.includes(id) ? Math.max(0, i.favoriteCount - 1) : i.favoriteCount + 1)} : i));
-    };
+    }, [isLoggedIn, onToggleFavoriteMod, likedModIds]);
 
     const getProjectPath = (item: Mod | Modpack | World) => {
         return getProjectUrl(item);
     };
 
-    const getPageTitle = () => {
+    const getPageTitle = useCallback(() => {
         if (selectedTags.length > 0) return `Tagged: ${selectedTags[0]}${selectedTags.length > 1 ? ` (+${selectedTags.length - 1})` : ''}`;
         if (activeViewId === 'all') return selectedClassification === 'All' ? 'All Projects' : `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
         const view = BROWSE_VIEWS.find(v => v.id === activeViewId);
         if (view) return view.label;
         return 'Projects';
-    };
+    }, [selectedTags, activeViewId, selectedClassification]);
 
     const getPageNumbers = () => { const total = totalPages; const current = page + 1; const delta = 2; const range = []; const rangeWithDots: (number | string)[] = []; let l; range.push(1); for (let i = current - delta; i <= current + delta; i++) { if (i < total && i > 1) { range.push(i); } } range.push(total); const uniqueRange = [...new Set(range)].sort((a, b) => a - b); for (const i of uniqueRange) { if (l) { if (i - l === 2) { rangeWithDots.push(l + 1); } else if (i - l !== 1) { rangeWithDots.push('...'); } } rangeWithDots.push(i); l = i; } return rangeWithDots; };
 
-    const resetFilters = () => {
+    const resetFilters = useCallback(() => {
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             next.delete('version');
@@ -322,7 +334,7 @@ export const Home: React.FC<HomeProps> = ({
             return next;
         });
         setIsTopFilterOpen(false);
-    };
+    }, [setSearchParams]);
 
     const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (minFavorites > 0 ? 1 : 0) + (filterDate ? 1 : 0);
     const seoContent = getCategorySEO(selectedClassification);
@@ -333,6 +345,7 @@ export const Home: React.FC<HomeProps> = ({
                 <title>{seoContent.title}</title>
                 <meta name="description" content={seoContent.description} />
                 <meta name="keywords" content={seoContent.keywords} />
+                {lcpBannerUrl && <link rel="preload" as="image" href={lcpBannerUrl} fetchpriority="high" />}
                 {itemListSchema && <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>}
                 {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
             </Helmet>
@@ -378,28 +391,28 @@ export const Home: React.FC<HomeProps> = ({
                                 sortBy={sortBy}
                                 onSortChange={handleSortChange}
                                 selectedTags={selectedTags}
-                                onToggleTag={(tag) => {
+                                onToggleTag={useCallback((tag: string) => {
                                     const newTags = selectedTags.includes(tag)
                                         ? selectedTags.filter(t => t !== tag)
                                         : [...selectedTags, tag];
                                     updateParams({ tags: newTags.length > 0 ? newTags.join(',') : null });
-                                }}
-                                onClearTags={() => updateParams({ tags: null })}
+                                }, [selectedTags, updateParams])}
+                                onClearTags={useCallback(() => updateParams({ tags: null }), [updateParams])}
                                 activeFilterCount={activeFilterCount}
                                 onResetFilters={resetFilters}
                                 isFilterOpen={isTopFilterOpen}
-                                onToggleFilterMenu={() => setIsTopFilterOpen(!isTopFilterOpen)}
+                                onToggleFilterMenu={useCallback(() => setIsTopFilterOpen(prev => !prev), [])}
                                 searchTerm={searchTerm}
                                 onSearchChange={setSearchTerm}
                                 selectedVersion={selectedVersion}
-                                setSelectedVersion={(v) => updateParams({ version: v !== 'Any' ? v : null })}
+                                setSelectedVersion={useCallback((v: string) => updateParams({ version: v !== 'Any' ? v : null }), [updateParams])}
                                 minFavorites={minFavorites}
-                                setMinFavorites={(v) => updateParams({ minFav: v > 0 ? v.toString() : null })}
+                                setMinFavorites={useCallback((v: number) => updateParams({ minFav: v > 0 ? v.toString() : null }), [updateParams])}
                                 minDownloads={minDownloads}
-                                setMinDownloads={(v) => updateParams({ minDl: v > 0 ? v.toString() : null })}
+                                setMinDownloads={useCallback((v: number) => updateParams({ minDl: v > 0 ? v.toString() : null }), [updateParams])}
                                 filterDate={filterDate}
-                                setFilterDate={(v) => updateParams({ date: v })}
-                                setPage={(p) => handlePageChange(p)}
+                                setFilterDate={useCallback((v: string | null) => updateParams({ date: v }), [updateParams])}
+                                setPage={handlePageChange}
                                 showMiniSearch={showMiniSearch}
                                 isMobile={isMobile}
                             />
@@ -430,7 +443,7 @@ export const Home: React.FC<HomeProps> = ({
                                                 mod={item}
                                                 path={getProjectPath(item)}
                                                 isFavorite={likedModIds.includes(item.id)}
-                                                onToggleFavorite={(id) => handleToggleLocal(id, item.classification === 'MODPACK')}
+                                                onToggleFavorite={() => handleToggleLocal(item.id, item.classification === 'MODPACK')}
                                                 isLoggedIn={isLoggedIn}
                                                 onClick={() => { if(item.classification === 'MODPACK') onModpackClick(item as Modpack); else if (item.classification === 'SAVE') onWorldClick(item as World); else onModClick(item as Mod); }}
                                                 priority={isPriority}

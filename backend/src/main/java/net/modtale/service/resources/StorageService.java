@@ -35,6 +35,8 @@ public class StorageService {
 
     private static final String DEFAULT_IMAGE = "default.png";
 
+    private static final String CACHE_CONTROL_HEADER = "public, max-age=31536000, immutable";
+
     private static final Map<String, String> MIME_TYPES = new HashMap<>();
     static {
         MIME_TYPES.put("png", "image/png");
@@ -68,6 +70,7 @@ public class StorageService {
                     .key(storageKey)
                     .contentType(safeContentType)
                     .contentDisposition(contentDisposition)
+                    .cacheControl(CACHE_CONTROL_HEADER)
                     .build();
 
             s3Client.putObject(putOb, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
@@ -96,7 +99,7 @@ public class StorageService {
                 .bucket(bucketName)
                 .key(fileName)
                 .contentType("image/jpeg")
-                .cacheControl("public, max-age=31536000")
+                .cacheControl(CACHE_CONTROL_HEADER)
                 .build();
 
         s3Client.putObject(putOb, RequestBody.fromBytes(resizedBytes));
@@ -109,6 +112,7 @@ public class StorageService {
                 .bucket(bucketName)
                 .key(path)
                 .contentType(contentType)
+                .cacheControl(CACHE_CONTROL_HEADER)
                 .build();
 
         s3Client.putObject(putOb, RequestBody.fromBytes(data));

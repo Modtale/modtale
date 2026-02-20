@@ -52,7 +52,7 @@ const formatTimeAgo = (dateString: string) => {
     return "Just now";
 };
 
-export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false }) => {
+export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, onClick }) => {
     const navigate = useNavigate();
     const title = mod.title || 'Untitled Project';
     const author = mod.author || 'Unknown';
@@ -91,7 +91,11 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
         ) {
             return;
         }
-        navigate(canonicalPath);
+        if (onClick) {
+            onClick();
+        } else {
+            navigate(canonicalPath);
+        }
     };
 
     return (
@@ -207,4 +211,15 @@ export const ModCard: React.FC<ModCardProps> = ({ mod, path, isFavorite, onToggl
             </div>
         </div>
     );
-};
+}, (prevProps, nextProps) => {
+    return (
+        prevProps.mod.id === nextProps.mod.id &&
+        prevProps.mod.updatedAt === nextProps.mod.updatedAt &&
+        prevProps.mod.favoriteCount === nextProps.mod.favoriteCount &&
+        prevProps.isFavorite === nextProps.isFavorite &&
+        prevProps.isLoggedIn === nextProps.isLoggedIn &&
+        prevProps.priority === nextProps.priority
+    );
+});
+
+ModCard.displayName = 'ModCard';

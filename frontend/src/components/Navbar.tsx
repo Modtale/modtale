@@ -86,6 +86,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <img
                                 src={logoSrc}
                                 alt="Modtale"
+                                width="140"
+                                height="36"
                                 className="h-8 md:h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-105 mt-1"
                             />
                         </Link>
