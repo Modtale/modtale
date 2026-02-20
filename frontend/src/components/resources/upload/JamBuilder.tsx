@@ -1,10 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Trophy, Settings, Plus, Trash2, Info, LayoutGrid, List, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+    Settings,
+    Plus,
+    Trash2,
+    LayoutGrid,
+    List,
+    Sparkles,
+    Trophy,
+    ArrowRight,
+    FileText,
+    Scale,
+    ChevronLeft
+} from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamDateInput } from '@/components/jams/JamCalendar';
 import { SidebarSection } from '@/components/resources/ProjectLayout';
-import { api } from '@/utils/api';
-import type { Modjam, User } from '@/types';
 
 export const JamBuilder: React.FC<any> = ({
                                               metaData, setMetaData, handleSave, isLoading, activeTab, setActiveTab, onBack, onPublish
@@ -13,18 +23,20 @@ export const JamBuilder: React.FC<any> = ({
     const [isSaved, setIsSaved] = useState(false);
 
     const publishChecklist = [
-        { label: 'Event Title (min 5 chars)', met: metaData.title?.length >= 5 },
-        { label: 'Description (min 20 chars)', met: metaData.description?.length >= 20 },
-        { label: 'Start Date (Future Only)', met: !!metaData.startDate && new Date(metaData.startDate) > new Date() },
-        { label: 'Submissions Close Date', met: !!metaData.endDate && metaData.endDate > metaData.startDate },
-        { label: 'Voting Period configured', met: !!metaData.votingEndDate && metaData.votingEndDate > metaData.endDate },
-        { label: 'At least one category', met: metaData.categories?.length > 0 }
+        { label: 'Title (min 5 chars)', met: (metaData.title?.trim().length || 0) >= 5 },
+        { label: 'Description (min 20 chars)', met: (metaData.description?.trim().length || 0) >= 20 },
+        { label: 'Start Date set in future', met: !!metaData.startDate && new Date(metaData.startDate) > new Date() },
+        { label: 'Submission & Voting dates', met: !!metaData.endDate && !!metaData.votingEndDate && metaData.votingEndDate > metaData.endDate && metaData.endDate > metaData.startDate },
+        { label: 'Scoring categories set', met: (metaData.categories?.length || 0) > 0 }
     ];
 
-    const markDirty = () => { setIsDirty(true); setIsSaved(false); };
+    const markDirty = () => {
+        setIsDirty(true);
+        setIsSaved(false);
+    };
 
     const performSave = async () => {
-        const success = await handleSave(true);
+        const success = await handleSave();
         if (success) {
             setIsDirty(false);
             setIsSaved(true);
@@ -32,7 +44,10 @@ export const JamBuilder: React.FC<any> = ({
         }
     };
 
-    const updateField = (field: string, val: any) => { markDirty(); setMetaData({ ...metaData, [field]: val }); };
+    const updateField = (field: string, val: any) => {
+        markDirty();
+        setMetaData({ ...metaData, [field]: val });
+    };
 
     return (
         <JamLayout
@@ -44,13 +59,31 @@ export const JamBuilder: React.FC<any> = ({
             onBack={onBack}
             bannerUrl={metaData.bannerUrl}
             publishChecklist={publishChecklist}
+            tabs={
+                <div className="flex items-center gap-1">
+                    {[
+                        {id: 'details', icon: FileText, label: 'Details'},
+                        {id: 'categories', icon: Scale, label: `Judging (${metaData.categories?.length || 0})`},
+                        {id: 'settings', icon: Settings, label: 'Settings'}
+                    ].map(t => (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setActiveTab(t.id as any)}
+                            className={`px-6 py-4 text-sm font-black border-b-4 transition-all flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-slate-900 dark:text-white translate-y-[2px]' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
+                        >
+                            <t.icon className="w-4 h-4"/> {t.label}
+                        </button>
+                    ))}
+                </div>
+            }
             sidebar={
                 <SidebarSection title="Configuration" icon={Settings}>
                     <div className="space-y-4 pt-2">
-                        <label className="flex items-center justify-between p-4 bg-slate-50 dark:bg-black/20 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
+                        <label className="flex items-center justify-between p-4 bg-slate-50 dark:bg-black/20 rounded-2xl cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
                             <div className="flex flex-col">
                                 <span className="text-xs font-bold">Public Voting</span>
-                                <span className="text-[10px] text-slate-500 font-medium">Allow anyone to score</span>
+                                <span className="text-[10px] text-slate-500 font-medium">Community can score</span>
                             </div>
                             <input
                                 type="checkbox"
@@ -69,7 +102,7 @@ export const JamBuilder: React.FC<any> = ({
                         <input
                             value={metaData.title}
                             onChange={e => updateField('title', e.target.value)}
-                            placeholder="A Title to Remember..."
+                            placeholder="Enter a bold title..."
                             className="text-5xl font-black bg-transparent border-none outline-none w-full placeholder:text-slate-100 dark:placeholder:text-slate-800"
                         />
 
@@ -88,7 +121,7 @@ export const JamBuilder: React.FC<any> = ({
                                 onChange={v => updateField('endDate', v)}
                             />
                             <JamDateInput
-                                label="Voting Concludes"
+                                label="Voting Ends"
                                 icon={Trophy}
                                 value={metaData.votingEndDate}
                                 minDate={metaData.endDate}
@@ -100,16 +133,25 @@ export const JamBuilder: React.FC<any> = ({
                     <div className="space-y-4">
                         <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2">
                             <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                                <List className="w-3 h-3" /> Event Briefing
+                                <List className="w-3 h-3" /> Event Summary
                             </h3>
-                            <span className="text-[10px] font-bold text-slate-400">{metaData.description?.length || 0} characters</span>
                         </div>
                         <textarea
                             value={metaData.description}
                             onChange={e => updateField('description', e.target.value)}
                             placeholder="Rules, theme, goals, and glory..."
-                            className="w-full min-h-[400px] bg-transparent border-none outline-none text-lg text-slate-700 dark:text-slate-300 font-medium resize-none leading-relaxed"
+                            className="w-full min-h-[300px] bg-transparent border-none outline-none text-lg text-slate-700 dark:text-slate-300 font-medium resize-none leading-relaxed"
                         />
+                    </div>
+
+                    <div className="pt-10 flex justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('categories')}
+                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all shadow-xl"
+                        >
+                            Next: Setup Judging <ArrowRight className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
             )}
@@ -119,15 +161,19 @@ export const JamBuilder: React.FC<any> = ({
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-3xl font-black">Scoring</h2>
-                            <p className="text-slate-500 font-medium mt-1">Submission criteria for judges and voters.</p>
+                            <p className="text-slate-500 font-medium mt-1">Define criteria for judges and voters.</p>
                         </div>
-                        <button onClick={() => updateField('categories', [...metaData.categories, {name: '', description: '', maxScore: 5}])} className="h-12 px-6 bg-slate-100 dark:bg-white/5 rounded-2xl text-sm font-black flex items-center gap-2 hover:bg-slate-200 transition-all">
+                        <button
+                            type="button"
+                            onClick={() => updateField('categories', [...(metaData.categories || []), {name: '', description: '', maxScore: 5}])}
+                            className="h-12 px-6 bg-slate-100 dark:bg-white/5 rounded-2xl text-sm font-black flex items-center gap-2 hover:bg-slate-200 transition-all"
+                        >
                             <Plus className="w-4 h-4" /> Add Criterion
                         </button>
                     </div>
 
                     <div className="grid gap-4">
-                        {metaData.categories.map((cat: any, i: number) => (
+                        {(metaData.categories || []).map((cat: any, i: number) => (
                             <div key={i} className="flex flex-col sm:flex-row gap-6 p-8 bg-slate-50 dark:bg-black/20 rounded-[2rem] border border-slate-200 dark:border-white/5 group transition-all hover:border-modtale-accent/30">
                                 <div className="flex-1 space-y-4">
                                     <input
@@ -138,7 +184,7 @@ export const JamBuilder: React.FC<any> = ({
                                             updateField('categories', c);
                                         }}
                                         className="w-full bg-white dark:bg-slate-900 border-none rounded-xl px-4 py-3 font-bold shadow-sm"
-                                        placeholder="Name (e.g. Creativity)"
+                                        placeholder="Criterion Name (e.g. Creativity)"
                                     />
                                     <input
                                         value={cat.description}
@@ -166,6 +212,7 @@ export const JamBuilder: React.FC<any> = ({
                                         />
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={() => updateField('categories', metaData.categories.filter((_:any, idx:number) => idx !== i))}
                                         className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all mt-5"
                                     >
@@ -174,6 +221,45 @@ export const JamBuilder: React.FC<any> = ({
                                 </div>
                             </div>
                         ))}
+                        {(!metaData.categories || metaData.categories.length === 0) && (
+                            <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[2rem]">
+                                <Scale className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                                <p className="text-slate-500 font-bold">No scoring criteria added yet.</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-10 flex justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('details')}
+                            className="text-slate-500 font-black flex items-center gap-2 hover:text-slate-900 transition-all"
+                        >
+                            <ChevronLeft className="w-5 h-5" /> Back to Details
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('settings')}
+                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all shadow-xl"
+                        >
+                            Next: Final Settings <ArrowRight className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'settings' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                    <h2 className="text-3xl font-black">Final Configuration</h2>
+                    <div className="p-8 bg-slate-50 dark:bg-black/20 rounded-[2rem] border border-slate-200 dark:border-white/5">
+                        <p className="text-slate-500 font-medium mb-6 text-center italic">Review your details and judging criteria in the sidebar before publishing.</p>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('categories')}
+                            className="text-slate-500 font-black flex items-center gap-2 hover:text-slate-900 transition-all mx-auto"
+                        >
+                            <ChevronLeft className="w-5 h-5" /> Back to Judging
+                        </button>
                     </div>
                 </div>
             )}
