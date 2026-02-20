@@ -218,9 +218,7 @@ public class SecurityConfig {
                         .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
                         .requestMatchers(HttpMethod.GET,
-                                "/api/v1/projects",
                                 "/api/v1/projects/**",
-                                "/api/v1/modjams",
                                 "/api/v1/modjams/**",
                                 "/api/v1/tags",
                                 "/api/v1/files/**",
@@ -285,10 +283,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/change-password",
                                 "/api/v1/auth/credentials"
                         ).authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/projects", "/api/v1/projects/**", "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/projects", "/api/v1/projects/**", "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/projects", "/api/v1/projects/**", "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
