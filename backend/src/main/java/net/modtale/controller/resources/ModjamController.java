@@ -7,9 +7,8 @@ import net.modtale.service.resources.ModjamService;
 import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -21,16 +20,14 @@ public class ModjamController {
     @Autowired private ModjamService modjamService;
     @Autowired private UserService userService;
 
+    private User getAuthenticatedUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) return null;
+        return userService.getPublicProfile(authentication.getName());
+    }
+
     @GetMapping
     public ResponseEntity<List<Modjam>> getAllJams() {
         return ResponseEntity.ok(modjamService.getAllJams());
-    }
-
-    @GetMapping("/user/me")
-    public ResponseEntity<List<Modjam>> getMyJams() {
-        User user = userService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(modjamService.getUserHostedJams(user.getId()));
     }
 
     @GetMapping("/{slug}")
@@ -39,55 +36,10 @@ public class ModjamController {
     }
 
     @PostMapping
-    public ResponseEntity<Modjam> createJam(@RequestBody Modjam jam) {
-        User user = userService.getCurrentUser();
+    public ResponseEntity<Modjam> createJam(@RequestBody Modjam jam, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.createJam(jam, user.getId(), user.getUsername()));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<Modjam> updateJam(@PathVariable String id, @RequestBody Modjam jam) {
-        User user = userService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(modjamService.updateJam(id, jam));
-    }
-
-    @PutMapping("/{id}/icon")
-    public ResponseEntity<?> updateIcon(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = userService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
-        try {
-            modjamService.updateIcon(id, file);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
-    @PutMapping("/{id}/banner")
-    public ResponseEntity<?> updateBanner(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = userService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
-        try {
-            modjamService.updateBanner(id, file);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteJam(@PathVariable String id) {
-        User user = userService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
-        try {
-            modjamService.deleteJam(id, user.getId());
-            return ResponseEntity.ok().build();
-        } catch (ResponseStatusException e) {
-            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
     }
 
     @GetMapping("/{jamId}/submissions")
@@ -96,22 +48,22 @@ public class ModjamController {
     }
 
     @PostMapping("/{jamId}/participate")
-    public ResponseEntity<Modjam> participate(@PathVariable String jamId) {
-        User user = userService.getCurrentUser();
+    public ResponseEntity<Modjam> participate(@PathVariable String jamId, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.participate(jamId, user.getId()));
     }
 
     @PostMapping("/{jamId}/submit")
-    public ResponseEntity<ModjamSubmission> submitProject(@PathVariable String jamId, @RequestBody Map<String, String> body) {
-        User user = userService.getCurrentUser();
+    public ResponseEntity<ModjamSubmission> submitProject(@PathVariable String jamId, @RequestBody Map<String, String> body, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.submitProject(jamId, body.get("projectId"), user.getId()));
     }
 
     @PostMapping("/{jamId}/vote")
-    public ResponseEntity<ModjamSubmission> vote(@PathVariable String jamId, @RequestBody Map<String, Object> body) {
-        User user = userService.getCurrentUser();
+    public ResponseEntity<ModjamSubmission> vote(@PathVariable String jamId, @RequestBody Map<String, Object> body, Authentication auth) {
+        User user = getAuthenticatedUser(auth);
         if (user == null) return ResponseEntity.status(401).build();
 
         String submissionId = (String) body.get("submissionId");
