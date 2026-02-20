@@ -1,12 +1,114 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '@/utils/api';
+import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, User } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
-import { Trophy, Plus, ArrowLeft, CalendarDays } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Trophy, Plus, ArrowLeft, Calendar, Users } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 
+export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
+    const resolveUrl = (url?: string | null) => {
+        if (!url) return '';
+        if (url.startsWith('/api') || url.startsWith('/uploads')) {
+            return `${BACKEND_URL}${url}`;
+        }
+        return url;
+    };
+
+    const resolvedBanner = resolveUrl(jam.bannerUrl);
+    const resolvedIcon = resolveUrl((jam as any).imageUrl || null);
+
+    const formatJamDate = () => {
+        if (!jam.startDate || !jam.endDate) return 'Unknown dates';
+        const now = new Date();
+        const start = new Date(jam.startDate);
+        const end = new Date(jam.endDate);
+
+        if (jam.status === 'UPCOMING' || now < start) {
+            return `Starts ${start.toLocaleDateString()}`;
+        } else if (jam.status === 'ACTIVE' || (now >= start && now <= end)) {
+            return `Ends ${end.toLocaleDateString()}`;
+        } else {
+            return `Ended ${end.toLocaleDateString()}`;
+        }
+    };
+
+    return (
+        <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden">
+            <div className="relative h-24 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-200/50 dark:border-white/5">
+                {resolvedBanner ? (
+                    <img
+                        src={resolvedBanner}
+                        alt=""
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-200 dark:bg-slate-700">
+                        <Trophy className="w-8 h-8 opacity-20 text-slate-500" />
+                    </div>
+                )}
+
+                <div className="absolute top-2 right-2 z-20">
+                    <div className={`text-[10px] font-bold px-2 py-1 rounded flex items-center shadow-sm ${jam.status === 'ACTIVE' ? 'bg-modtale-accent text-white' : 'bg-slate-900/80 text-white'}`}>
+                        <Trophy className="w-3 h-3 mr-1" />
+                        <span>{jam.status}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex px-4 relative flex-1">
+                <div className="flex-shrink-0 -mt-8 mb-2 relative z-10">
+                    <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-slate-800 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative flex items-center justify-center">
+                        {resolvedIcon ? (
+                            <img
+                                src={resolvedIcon}
+                                alt={jam.title}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <Trophy className="w-8 h-8 text-slate-400" />
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
+                    <div className="flex justify-between items-start gap-2 mb-0.5">
+                        <div className="min-w-0 flex-1 relative">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors" title={jam.title}>
+                                {jam.title}
+                            </h3>
+                            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 relative z-20">
+                                <span>Hosted by</span>
+                                <span className="text-slate-700 dark:text-slate-300 font-medium">{jam.hostName}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="px-4 pb-4 mt-2">
+                <p className="text-slate-600 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed h-10">
+                    {jam.description || 'No description provided.'}
+                </p>
+            </div>
+
+            <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-3">
+                    <span className="flex items-center" title="Participants">
+                        <Users className="w-3 h-3 mr-1" /> {jam.participantIds?.length || 0}
+                    </span>
+                </div>
+                <div className="flex items-center">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    <span>{formatJamDate()}</span>
+                </div>
+            </div>
+        </Link>
+    );
+};
+
 export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
+    const navigate = useNavigate();
     const [jams, setJams] = useState<Modjam[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
@@ -51,26 +153,32 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                 return [res.data, ...filtered];
             });
             setIsSavingJam(false);
-            return true;
+            return res.data;
         } catch (e) {
             setIsSavingJam(false);
-            return false;
+            return null;
         }
     };
 
     const handlePublish = async () => {
-        if (!metaData.id) {
-            const saved = await handleSaveJam();
-            if (!saved) return;
+        let currentId = metaData.id;
+        let currentSlug = metaData.slug;
+
+        if (!currentId) {
+            const savedJam = await handleSaveJam();
+            if (!savedJam) return;
+            currentId = savedJam.id;
+            currentSlug = savedJam.slug;
         }
+
         setIsSavingJam(true);
         try {
             const updated = { ...metaData, status: 'PUBLISHED' };
-            await api.put(`/modjams/${metaData.id}`, updated);
-            const res = await api.get('/modjams');
-            setJams(res.data);
+            await api.put(`/modjams/${currentId}`, updated);
+
             setIsCreating(false);
             setStep(0);
+            navigate(`/jam/${currentSlug}`);
         } catch (e) {} finally {
             setIsSavingJam(false);
         }
@@ -143,30 +251,9 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 {jams.map((jam) => (
-                    <Link key={jam.id} to={`/jam/${jam.slug}`} className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl overflow-hidden hover:border-modtale-accent transition-all shadow-sm hover:shadow-xl hover:-translate-y-1 flex flex-col h-full">
-                        <div className="h-48 bg-slate-100 dark:bg-slate-800 relative">
-                            {jam.bannerUrl ? (
-                                <img src={jam.bannerUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                    <Trophy className="w-12 h-12 opacity-20" />
-                                </div>
-                            )}
-                            <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{jam.status}</div>
-                        </div>
-                        <div className="p-6 flex-1 flex flex-col">
-                            <h2 className="text-2xl font-black mb-2 group-hover:text-modtale-accent transition-colors">{jam.title}</h2>
-                            <p className="text-sm text-slate-500 font-medium mb-6 line-clamp-2">{jam.description}</p>
-                            <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
-                                <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
-                                    <CalendarDays className="w-4 h-4" /> {new Date(jam.startDate).toLocaleDateString()}
-                                </div>
-                                <div className="text-modtale-accent font-black text-xs uppercase tracking-widest">View Event</div>
-                            </div>
-                        </div>
-                    </Link>
+                    <JamCard key={jam.id} jam={jam} />
                 ))}
             </div>
         </div>
