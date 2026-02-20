@@ -12,6 +12,7 @@ import net.modtale.service.resources.ModService;
 import net.modtale.service.resources.StorageService;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.repository.AdminLogRepository;
+import net.modtale.repository.resources.ModRepository;
 import org.jetbrains.java.decompiler.main.Fernflower;
 import org.jetbrains.java.decompiler.main.extern.IBytecodeProvider;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
@@ -39,6 +40,7 @@ public class AdminController {
     @Autowired private UserService userService;
     @Autowired private ModService modService;
     @Autowired private UserRepository userRepository;
+    @Autowired private ModRepository modRepository;
     @Autowired private StorageService storageService;
     @Autowired private AdminLogRepository adminLogRepository;
 
@@ -50,6 +52,14 @@ public class AdminController {
 
     private boolean isAdmin(User user) {
         return (user != null && user.getRoles() != null && user.getRoles().contains("ADMIN")) || isSuperAdmin(user);
+    }
+
+    private boolean canManageUser(User currentUser, User targetUser) {
+        if (isSuperAdmin(currentUser)) return true;
+        if (targetUser != null && targetUser.getRoles() != null && targetUser.getRoles().contains("ADMIN")) {
+            return false;
+        }
+        return true;
     }
 
     private User getSafeUser() {
@@ -81,6 +91,12 @@ public class AdminController {
         }
         String email = body.get("email");
         String reason = body.get("reason");
+
+        Optional<User> targetByEmail = userRepository.findByEmail(email);
+        if (targetByEmail.isPresent() && !canManageUser(currentUser, targetByEmail.get())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot ban the email of an administrator.");
+        }
+
         try {
             userService.banEmail(email, reason, currentUser.getId());
             logAction(currentUser.getId(), "BAN_EMAIL", email, "EMAIL", "Reason: " + reason);
@@ -113,15 +129,69 @@ public class AdminController {
         return ResponseEntity.ok(UserDTO.fromEntity(target.get(), true));
     }
 
+    @GetMapping("/users/{username}/raw")
+    public ResponseEntity<?> getRawUser(@PathVariable String username) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        if (target == null) return ResponseEntity.notFound().build();
+
+        target.setGithubAccessToken(null);
+        target.setGitlabAccessToken(null);
+        target.setGitlabRefreshToken(null);
+        target.setGitlabTokenExpiresAt(null);
+
+        return ResponseEntity.ok(target);
+    }
+
+    @PutMapping("/users/{username}/raw")
+    public ResponseEntity<?> updateRawUser(@PathVariable String username, @RequestBody User updatedData) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        User existing = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        if (existing == null) return ResponseEntity.notFound().build();
+
+        if (!canManageUser(currentUser, existing)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can modify other admins.");
+        }
+
+        boolean isGrantingAdmin = updatedData.getRoles() != null && updatedData.getRoles().contains("ADMIN");
+        boolean hadAdmin = existing.getRoles() != null && existing.getRoles().contains("ADMIN");
+        if (isGrantingAdmin && !hadAdmin && !isSuperAdmin(currentUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can grant admin privileges.");
+        }
+
+        updatedData.setId(existing.getId());
+        updatedData.setPassword(existing.getPassword());
+        updatedData.setMfaSecret(existing.getMfaSecret());
+        updatedData.setVerificationToken(existing.getVerificationToken());
+        updatedData.setVerificationTokenExpiry(existing.getVerificationTokenExpiry());
+        updatedData.setPasswordResetToken(existing.getPasswordResetToken());
+        updatedData.setPasswordResetTokenExpiry(existing.getPasswordResetTokenExpiry());
+        updatedData.setGithubAccessToken(existing.getGithubAccessToken());
+        updatedData.setGitlabAccessToken(existing.getGitlabAccessToken());
+        updatedData.setGitlabRefreshToken(existing.getGitlabRefreshToken());
+        updatedData.setGitlabTokenExpiresAt(existing.getGitlabTokenExpiresAt());
+
+        userRepository.save(updatedData);
+        logAction(currentUser.getId(), "RAW_UPDATE_USER", existing.getId(), "USER", "Updated via Raw JSON");
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/users/{username}")
     public ResponseEntity<?> deleteUser(@PathVariable String username) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-
         User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
+
+        if (!canManageUser(currentUser, target)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can delete other admins.");
+        }
 
         try {
             userService.deleteUser(target.getId());
@@ -219,7 +289,7 @@ public class AdminController {
         Mod mod = modService.getRawModById(id);
         if (mod == null) return ResponseEntity.notFound().build();
 
-        User author = userRepository.findByUsername(mod.getAuthor()).orElse(null);
+        User author = userRepository.findByUsernameIgnoreCase(mod.getAuthor()).orElse(null);
         if (author == null) {
             author = userRepository.findById(mod.getAuthor()).orElse(null);
         }
@@ -235,6 +305,32 @@ public class AdminController {
                 "mod", mod,
                 "authorStats", authorStats
         ));
+    }
+
+    @GetMapping("/projects/{id}")
+    public ResponseEntity<?> getProjectById(@PathVariable String id) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        Mod mod = modService.getAdminProjectDetails(id);
+        if (mod == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(mod);
+    }
+
+    @PutMapping("/projects/{id}/raw")
+    public ResponseEntity<?> updateRawProject(@PathVariable String id, @RequestBody Mod updatedMod) {
+        User currentUser = getSafeUser();
+        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        Mod existing = modService.getRawModById(id);
+        if (existing == null) return ResponseEntity.notFound().build();
+
+        updatedMod.setId(existing.getId());
+
+        modRepository.save(updatedMod);
+
+        logAction(currentUser.getId(), "RAW_UPDATE_PROJECT", existing.getId(), "PROJECT", "Updated via Raw JSON");
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/publish")
@@ -374,16 +470,6 @@ public class AdminController {
         } else {
             return ResponseEntity.ok(modService.getMods(null, query, 0, 10, "relevance", null, null, null, null, null, null, null, null).getContent());
         }
-    }
-
-    @GetMapping("/projects/{id}")
-    public ResponseEntity<?> getProjectById(@PathVariable String id) {
-        User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-
-        Mod mod = modService.getAdminProjectDetails(id);
-        if (mod == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(mod);
     }
 
     @GetMapping("/projects/{id}/versions/{version}/structure")

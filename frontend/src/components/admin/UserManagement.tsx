@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail } from 'lucide-react';
+import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, Lock, X, AlertTriangle } from 'lucide-react';
 import { api } from '../../utils/api';
 
 export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setStatus }) => {
@@ -7,6 +7,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUser, setFoundUser] = useState<any>(null);
+    const [currentAdmin, setCurrentAdmin] = useState<any>(null);
 
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [showResults, setShowResults] = useState(false);
@@ -21,8 +22,15 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
     const [banReasonInput, setBanReasonInput] = useState('');
 
     const [showBanConfirm, setShowBanConfirm] = useState(false);
-    const [banConfirmInput, setBanConfirmInput] = useState(''); // To confirm email
+    const [banConfirmInput, setBanConfirmInput] = useState('');
     const [banUserReason, setBanUserReason] = useState('');
+
+    const [showRawModal, setShowRawModal] = useState(false);
+    const [rawJsonStr, setRawJsonStr] = useState('');
+
+    useEffect(() => {
+        api.get('/user/me').then(res => setCurrentAdmin(res.data)).catch(() => {});
+    }, []);
 
     useEffect(() => {
         if (viewMode === 'bans') {
@@ -39,6 +47,10 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const isSuperAdmin = currentAdmin?.id === '692620f7c2f3266e23ac0ded';
+    const isTargetAdmin = foundUser?.roles?.includes('ADMIN');
+    const canManageUser = isSuperAdmin || !isTargetAdmin;
 
     const fetchBannedEmails = async () => {
         setLoading(true);
@@ -210,6 +222,34 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         }
     };
 
+    const openRawEdit = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get(`/admin/users/${foundUser.username}/raw`);
+            setRawJsonStr(JSON.stringify(res.data, null, 2));
+            setShowRawModal(true);
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch raw user data.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const saveRawEdit = async () => {
+        try {
+            setLoading(true);
+            const parsed = JSON.parse(rawJsonStr);
+            await api.put(`/admin/users/${foundUser.username}/raw`, parsed);
+            setStatus({ type: 'success', title: 'Saved', msg: 'Raw user metadata updated successfully.' });
+            setShowRawModal(false);
+            fetchUserProfile(foundUser.username);
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : 'Server error saving raw data.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
             <div className="flex gap-4 mb-8 border-b border-slate-200 dark:border-white/5 pb-4">
@@ -301,6 +341,38 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                         </div>
                     )}
 
+                    {showRawModal && (
+                        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden max-h-[90vh]">
+                                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
+                                    <h3 className="font-bold text-white flex items-center gap-2">
+                                        <Code className="w-5 h-5 text-indigo-500" /> Edit Raw User Metadata
+                                    </h3>
+                                    <button onClick={() => setShowRawModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <div className="p-4 flex-1 overflow-hidden flex flex-col">
+                                    <div className="mb-2 text-amber-400 text-xs font-bold flex items-center gap-2 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                                        <AlertTriangle className="w-4 h-4 shrink-0" /> Note: Secure fields (passwords, MFA secrets, OAuth tokens, and ID) are intercepted by the backend and cannot be overwritten via this editor.
+                                    </div>
+                                    <textarea
+                                        value={rawJsonStr}
+                                        onChange={(e) => setRawJsonStr(e.target.value)}
+                                        className="flex-1 w-full p-4 bg-[#0d1117] text-slate-300 font-mono text-sm rounded-xl border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none whitespace-pre overflow-auto custom-scrollbar"
+                                        spellCheck={false}
+                                    />
+                                </div>
+                                <div className="p-4 border-t border-white/10 bg-black/20 flex justify-end gap-3">
+                                    <button onClick={() => setShowRawModal(false)} className="px-6 py-2 rounded-lg font-bold text-slate-300 hover:bg-white/5 transition-colors">Cancel</button>
+                                    <button onClick={saveRawEdit} disabled={loading} className="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-bold transition-colors disabled:opacity-50">
+                                        {loading ? 'Saving...' : 'Save JSON'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSearch} className="flex gap-4 mb-10 relative z-50">
                         <div className="relative flex-1 group" ref={wrapperRef}>
                             <UserIcon className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
@@ -370,56 +442,82 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <button
-                                    onClick={handleToggleAdmin}
-                                    disabled={loading}
-                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.roles?.includes('ADMIN') ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
+                                    onClick={openRawEdit}
+                                    disabled={loading || !canManageUser}
+                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-indigo-500/20 hover:border-indigo-600 hover:bg-indigo-600/10 shadow-sm hover:shadow-xl'}`}
                                 >
                                     <div className="relative z-10">
                                         <div className="flex justify-between items-start mb-4">
-                                                <span className={`font-black text-xl flex items-center gap-3 ${foundUser.roles?.includes('ADMIN') ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400'}`}>
-                                                    <Shield className="w-6 h-6" /> Admin Privileges
-                                                </span>
-                                            {foundUser.roles?.includes('ADMIN') && <Check className="w-8 h-8 text-red-500 bg-red-100 dark:bg-red-900/30 p-1.5 rounded-full" />}
+                                            <span className={`font-black text-xl flex items-center gap-3 ${!canManageUser ? 'text-slate-900 dark:text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                                                <Code className="w-6 h-6" /> Edit Raw JSON
+                                            </span>
+                                            {!canManageUser && <Lock className="w-5 h-5 text-slate-400" />}
                                         </div>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                                            {foundUser.roles?.includes('ADMIN')
-                                                ? 'User currently has full administrative access. Click to revoke immediately.'
-                                                : 'Granting Admin access will allow this user to approve projects, manage users, and modify content.'}
+                                            Modify the underlying MongoDB document for this user. Advanced use only.
+                                        </p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={handleToggleAdmin}
+                                    disabled={loading || !isSuperAdmin}
+                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : (foundUser.roles?.includes('ADMIN') ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl')}`}
+                                >
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <span className={`font-black text-xl flex items-center gap-3 ${foundUser.roles?.includes('ADMIN') && isSuperAdmin ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400'}`}>
+                                                <Shield className="w-6 h-6" /> Admin Privileges
+                                            </span>
+                                            {!isSuperAdmin && <Lock className="w-5 h-5 text-slate-400" />}
+                                            {isSuperAdmin && foundUser.roles?.includes('ADMIN') && <Check className="w-8 h-8 text-red-500 bg-red-100 dark:bg-red-900/30 p-1.5 rounded-full" />}
+                                        </div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                                            {!isSuperAdmin
+                                                ? 'Only the Super Admin can modify administrative roles.'
+                                                : (foundUser.roles?.includes('ADMIN')
+                                                    ? 'User currently has full administrative access. Click to revoke immediately.'
+                                                    : 'Granting Admin access will allow this user to approve projects, manage users, and modify content.')}
                                         </p>
                                     </div>
                                 </button>
 
                                 <button
                                     onClick={() => handleUpdateTier(foundUser.tier === 'ENTERPRISE' ? 'USER' : 'ENTERPRISE')}
-                                    disabled={loading}
-                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${foundUser.tier === 'ENTERPRISE' ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10' : 'border-slate-200 dark:border-white/5 hover:border-purple-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl'}`}
+                                    disabled={loading || !isSuperAdmin}
+                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : (foundUser.tier === 'ENTERPRISE' ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10' : 'border-slate-200 dark:border-white/5 hover:border-purple-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl')}`}
                                 >
                                     <div className="relative z-10">
                                         <div className="flex justify-between items-start mb-4">
-                                                <span className={`font-black text-xl flex items-center gap-3 ${foundUser.tier === 'ENTERPRISE' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400'}`}>
-                                                    <Zap className="w-6 h-6" /> Enterprise Tier
-                                                </span>
-                                            {foundUser.tier === 'ENTERPRISE' && <Check className="w-8 h-8 text-purple-500 bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-full" />}
+                                            <span className={`font-black text-xl flex items-center gap-3 ${foundUser.tier === 'ENTERPRISE' && isSuperAdmin ? 'text-purple-600 dark:text-purple-400' : 'text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400'}`}>
+                                                <Zap className="w-6 h-6" /> Enterprise Tier
+                                            </span>
+                                            {!isSuperAdmin && <Lock className="w-5 h-5 text-slate-400" />}
+                                            {isSuperAdmin && foundUser.tier === 'ENTERPRISE' && <Check className="w-8 h-8 text-purple-500 bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-full" />}
                                         </div>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                                            {foundUser.tier === 'ENTERPRISE'
-                                                ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.'
-                                                : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.'}
+                                            {!isSuperAdmin
+                                                ? 'Only the Super Admin can grant Enterprise API tiers.'
+                                                : (foundUser.tier === 'ENTERPRISE'
+                                                    ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.'
+                                                    : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.')}
                                         </p>
                                     </div>
                                 </button>
 
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
-                                    className="relative p-8 rounded-3xl border-2 border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-red-500/5 text-left transition-all duration-300 group overflow-hidden"
+                                    disabled={loading || !canManageUser}
+                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-red-500/5'}`}
                                 >
                                     <div className="relative z-10">
                                         <div className="flex justify-between items-start mb-4">
                                             <span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-500">
                                                 <Trash2 className="w-6 h-6" /> Delete Account
                                             </span>
+                                            {!canManageUser && <Lock className="w-5 h-5 text-slate-400" />}
                                         </div>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
                                             Permanently delete this user, their projects, and all associated data. This action cannot be undone.
@@ -430,13 +528,15 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                                 {foundUser.email && (
                                     <button
                                         onClick={() => setShowBanConfirm(true)}
-                                        className="relative p-8 rounded-3xl border-2 border-red-500/20 hover:border-red-600 hover:bg-red-600/10 text-left transition-all duration-300 group overflow-hidden"
+                                        disabled={loading || !canManageUser}
+                                        className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-red-500/20 hover:border-red-600 hover:bg-red-600/10'}`}
                                     >
                                         <div className="relative z-10">
                                             <div className="flex justify-between items-start mb-4">
-                                            <span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-600">
-                                                <Ban className="w-6 h-6" /> Ban Email & Delete
-                                            </span>
+                                                <span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-600">
+                                                    <Ban className="w-6 h-6" /> Ban Email & Delete
+                                                </span>
+                                                {!canManageUser && <Lock className="w-5 h-5 text-slate-400" />}
                                             </div>
                                             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
                                                 Ban <strong>{foundUser.email}</strong> from ever registering again and immediately delete this account.
