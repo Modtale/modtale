@@ -15,6 +15,8 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -134,7 +136,7 @@ public class NotificationService {
     }
 
     @Async
-    public void sendActionableNotification(List<String> targetIds, String title, String message, String link, String iconUrl, String type, Map<String, String> metadata) {
+    public void sendActionableNotification(List<String> targetIds, String title, String message, URI link, String iconUrl, String type, Map<String, String> metadata) {
         if (targetIds.isEmpty()) return;
 
         List<Notification> toSave = new ArrayList<>();
@@ -161,7 +163,7 @@ public class NotificationService {
     }
 
     @Async
-    public void sendNotification(List<String> userIds, String title, String message, String link, String iconUrl) {
+    public void sendNotification(List<String> userIds, String title, String message, URI link, String iconUrl) {
         sendActionableNotification(userIds, title, message, link, iconUrl, "INFO", null);
     }
 }
