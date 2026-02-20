@@ -11,7 +11,6 @@ interface JamLayoutProps {
     onBannerUpload?: (file: File, preview: string) => void;
     onIconUpload?: (file: File, preview: string) => void;
     headerContent: React.ReactNode;
-    headerActions?: React.ReactNode;
     tabs?: React.ReactNode;
     mainContent: React.ReactNode;
     onBack?: () => void;
@@ -25,7 +24,7 @@ interface JamLayoutProps {
 
 export const JamLayout: React.FC<JamLayoutProps> = ({
                                                         bannerUrl, iconUrl, isEditing, onBannerUpload, onIconUpload,
-                                                        headerContent, headerActions, tabs, mainContent, onBack,
+                                                        headerContent, tabs, mainContent, onBack,
                                                         isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, publishChecklist
                                                     }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
@@ -83,7 +82,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                 {onBack && (
                     <div className="absolute top-0 left-0 right-0 z-40 max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 h-full pointer-events-none">
                         <div className="pt-8 pointer-events-auto w-fit">
-                            <button onClick={onBack} className="flex items-center text-white/90 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group">
+                            <button type="button" onClick={onBack} className="flex items-center text-white/90 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group">
                                 <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                                 Back
                             </button>
@@ -146,11 +145,6 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                             <div className="w-full flex-1 min-w-0">
                                                 {headerContent}
                                             </div>
-                                            {headerActions && (
-                                                <div className="flex items-center gap-3 flex-shrink-0 mt-4 xl:mt-0">
-                                                    {headerActions}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -174,26 +168,29 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                         <span className={`text-sm font-bold ${req.met ? 'text-slate-900 dark:text-slate-200' : 'text-slate-400'}`}>{req.label}</span>
                                     </div>
                                 ))}
-                                <div className="flex items-start gap-3 pt-4 border-t border-slate-100 dark:border-white/5 mt-4">
-                                    <div className={`mt-0.5 shrink-0 ${!hasUnsavedChanges ? 'text-green-500' : 'text-amber-500'}`}>
-                                        {!hasUnsavedChanges ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                                {hasUnsavedChanges && (
+                                    <div className="flex items-start gap-3 pt-4 border-t border-slate-100 dark:border-white/5 mt-4">
+                                        <div className="mt-0.5 shrink-0 text-amber-500">
+                                            <AlertCircle className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-sm font-bold text-amber-500">Unsaved changes</span>
                                     </div>
-                                    <span className={`text-sm font-bold ${!hasUnsavedChanges ? 'text-slate-900 dark:text-slate-200' : 'text-amber-500'}`}>All changes saved</span>
-                                </div>
+                                )}
                             </div>
 
                             <div className="space-y-3">
                                 <button
                                     type="button"
                                     onClick={(e) => { e.preventDefault(); onSave(); }}
-                                    disabled={isSaving}
+                                    disabled={isSaving || !hasUnsavedChanges}
                                     className={`w-full h-14 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 border-2 ${
                                         isSaved ? 'bg-green-500/10 border-green-500 text-green-500' :
-                                            'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-white/10'
+                                            !hasUnsavedChanges ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent cursor-not-allowed' :
+                                                'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent hover:scale-[1.02]'
                                     }`}
                                 >
                                     {isSaving ? <Spinner className="w-4 h-4" fullScreen={false} /> : isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                    {isSaved ? 'Changes Saved' : 'Save Draft'}
+                                    {isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Draft'}
                                 </button>
 
                                 <button
