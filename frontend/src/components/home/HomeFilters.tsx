@@ -103,13 +103,13 @@ interface HomeFiltersProps {
     isMobile: boolean;
 }
 
-export const HomeFilters: React.FC<HomeFiltersProps> = ({
-                                                            pageTitle, totalItems, loading, sortBy, onSortChange,
-                                                            selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
-                                                            isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
-                                                            selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage, showMiniSearch,
-                                                            isMobile
-                                                        }) => {
+export const HomeFilters: React.FC<HomeFiltersProps> = React.memo(({
+                                                                       pageTitle, totalItems, loading, sortBy, onSortChange,
+                                                                       selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
+                                                                       isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
+                                                                       selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage, showMiniSearch,
+                                                                       isMobile
+                                                                   }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
@@ -370,4 +370,6 @@ export const HomeFilters: React.FC<HomeFiltersProps> = ({
             )}
         </div>
     );
-};
+});
+
+HomeFilters.displayName = 'HomeFilters';

@@ -24,6 +24,21 @@ export default defineConfig({
         },
         define: {
             'import.meta.env.PUBLIC_API_URL': JSON.stringify(process.env.PUBLIC_API_URL)
+        },
+        build: {
+            target: 'esnext',
+            cssCodeSplit: true,
+            rollupOptions: {
+                output: {
+                    manualChunks: (id) => {
+                        if (id.includes('node_modules')) {
+                            if (id.includes('react')) return 'vendor-react';
+                            if (id.includes('lucide')) return 'vendor-icons';
+                            return 'vendor';
+                        }
+                    }
+                }
+            }
         }
     }
 });

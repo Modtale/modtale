@@ -16,15 +16,19 @@ import java.time.LocalDateTime;
 @Document(collection = "projects")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @CompoundIndexes({
-        @CompoundIndex(name = "class_tags_downloads_idx", def = "{'classification': 1, 'tags': 1, 'downloadCount': -1}"),
-        @CompoundIndex(name = "class_updated_idx", def = "{'classification': 1, 'updatedAt': -1}"),
+        @CompoundIndex(name = "status_class_downloads_idx", def = "{'status': 1, 'classification': 1, 'downloadCount': -1}"),
+        @CompoundIndex(name = "status_class_favorites_idx", def = "{'status': 1, 'classification': 1, 'favoriteCount': -1}"),
+        @CompoundIndex(name = "status_class_updated_idx", def = "{'status': 1, 'classification': 1, 'updatedAt': -1}"),
+        @CompoundIndex(name = "status_class_created_idx", def = "{'status': 1, 'classification': 1, 'createdAt': -1}"),
+
+        @CompoundIndex(name = "status_tags_downloads_idx", def = "{'status': 1, 'tags': 1, 'downloadCount': -1}"),
+
         @CompoundIndex(name = "status_expires_idx", def = "{'status': 1, 'expiresAt': 1}"),
+        @CompoundIndex(name = "deleted_at_idx", def = "{'deletedAt': 1}"),
+
         @CompoundIndex(name = "trend_score_idx", def = "{'trendScore': -1}"),
         @CompoundIndex(name = "relevance_score_idx", def = "{'relevanceScore': -1}"),
-        @CompoundIndex(name = "popular_score_idx", def = "{'popularScore': -1}"),
-        @CompoundIndex(name = "downloads_7d_idx", def = "{'downloads7d': -1}"),
-        @CompoundIndex(name = "downloads_30d_idx", def = "{'downloads30d': -1}"),
-        @CompoundIndex(name = "downloads_90d_idx", def = "{'downloads90d': -1}")
+        @CompoundIndex(name = "popular_score_idx", def = "{'popularScore': -1}")
 })
 public class Mod {
     @Id
