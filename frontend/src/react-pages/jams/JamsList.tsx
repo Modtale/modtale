@@ -137,6 +137,29 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                 res = await api.post('/modjams', metaData);
                 setMetaData(prev => ({ ...prev, id: res.data.id, slug: res.data.slug }));
             }
+
+            const currentId = res.data.id;
+            let filesUploaded = false;
+
+            if ((metaData as any).iconFile) {
+                const fd = new FormData();
+                fd.append('file', (metaData as any).iconFile);
+                await api.put(`/modjams/${currentId}/icon`, fd, { headers: { 'Content-Type': 'multipart/form-data' }});
+                filesUploaded = true;
+            }
+
+            if ((metaData as any).bannerFile) {
+                const fd = new FormData();
+                fd.append('file', (metaData as any).bannerFile);
+                await api.put(`/modjams/${currentId}/banner`, fd, { headers: { 'Content-Type': 'multipart/form-data' }});
+                filesUploaded = true;
+            }
+
+            if (filesUploaded) {
+                const finalRes = await api.get(`/modjams/${res.data.slug}`);
+                res = finalRes;
+            }
+
             setJams(prev => {
                 const filtered = prev.filter(j => j.id !== res.data.id);
                 return [res.data, ...filtered];
