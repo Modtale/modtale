@@ -5,7 +5,6 @@ import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale } from 'lucide-react';
-import { SidebarSection } from '@/components/resources/ProjectLayout';
 import { JamLayout } from '@/components/jams/JamLayout';
 
 export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
@@ -86,6 +85,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const hasSubmitted = submissions.some(s => s.submitterId === currentUser?.id);
     const canVote = jam.status === 'VOTING' && (jam.allowPublicVoting || jam.hostId === currentUser?.id);
 
+    const isPast = (dateString: string) => new Date(dateString) < new Date();
+
     return (
         <>
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
@@ -163,56 +164,74 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                     </div>
                 }
                 sidebarContent={
-                    <div className="flex flex-col gap-8">
-                        <div className="flex flex-col items-center justify-center p-3 px-6 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl shadow-inner">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status</span>
-                            <span className="text-xl font-black text-modtale-accent uppercase tracking-wider">{jam.status}</span>
+                    <div className="flex flex-col gap-6">
+                        <div className="relative overflow-hidden p-6 rounded-[2rem] border border-slate-200 dark:border-white/10 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800/50 dark:to-slate-900/50 shadow-lg">
+                            <div className="relative z-10 flex flex-col items-center justify-center text-center">
+                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Current Status</span>
+                                <span className="text-3xl font-black text-modtale-accent uppercase tracking-widest drop-shadow-sm">{jam.status}</span>
+                            </div>
+                            <Trophy className="absolute -bottom-4 -right-4 w-24 h-24 text-slate-900/5 dark:text-white/5" />
                         </div>
 
-                        <SidebarSection title="Timeline" icon={Calendar}>
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
-                                    <span className="text-xs font-bold text-slate-500">Starts</span>
-                                    <span className="text-sm font-bold text-slate-900 dark:text-white">{new Date(jam.startDate).toLocaleDateString()}</span>
+                        <div className="p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-xl">
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-modtale-accent" /> Timeline
+                            </h3>
+                            <div className="space-y-6 relative before:absolute before:inset-0 before:ml-[11px] before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-slate-200 before:via-slate-200 before:to-transparent dark:before:from-white/10 dark:before:via-white/10">
+                                <div className="relative flex items-center gap-4">
+                                    <div className={`w-6 h-6 rounded-full border-4 border-slate-50 dark:border-slate-950 z-10 shrink-0 ${isPast(jam.startDate) ? 'bg-modtale-accent' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Starts</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">{new Date(jam.startDate).toLocaleDateString()}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
-                                    <span className="text-xs font-bold text-slate-500">Submissions Close</span>
-                                    <span className="text-sm font-bold text-slate-900 dark:text-white">{new Date(jam.endDate).toLocaleDateString()}</span>
+                                <div className="relative flex items-center gap-4">
+                                    <div className={`w-6 h-6 rounded-full border-4 border-slate-50 dark:border-slate-950 z-10 shrink-0 ${isPast(jam.endDate) ? 'bg-modtale-accent' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Submissions Close</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">{new Date(jam.endDate).toLocaleDateString()}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
-                                    <span className="text-xs font-bold text-slate-500">Voting Ends</span>
-                                    <span className="text-sm font-bold text-slate-900 dark:text-white">{new Date(jam.votingEndDate).toLocaleDateString()}</span>
+                                <div className="relative flex items-center gap-4">
+                                    <div className={`w-6 h-6 rounded-full border-4 border-slate-50 dark:border-slate-950 z-10 shrink-0 ${isPast(jam.votingEndDate) ? 'bg-modtale-accent' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Voting Ends</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-white">{new Date(jam.votingEndDate).toLocaleDateString()}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </SidebarSection>
+                        </div>
 
-                        <SidebarSection title="Stats" icon={Users}>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
-                                    <span className="text-3xl font-black text-slate-900 dark:text-white mb-1">{jam.participantIds.length}</span>
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Joined</span>
-                                </div>
-                                <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
-                                    <span className="text-3xl font-black text-slate-900 dark:text-white mb-1">{submissions.length}</span>
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Submissions</span>
-                                </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col items-center justify-center p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-lg">
+                                <Users className="w-6 h-6 text-modtale-accent mb-2" />
+                                <span className="text-3xl font-black text-slate-900 dark:text-white mb-1">{jam.participantIds.length}</span>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Joined</span>
                             </div>
-                        </SidebarSection>
+                            <div className="flex flex-col items-center justify-center p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-lg">
+                                <Upload className="w-6 h-6 text-modtale-accent mb-2" />
+                                <span className="text-3xl font-black text-slate-900 dark:text-white mb-1">{submissions.length}</span>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Submissions</span>
+                            </div>
+                        </div>
 
                         {jam.categories.length > 0 && (
-                            <SidebarSection title="Judging Criteria" icon={Scale}>
-                                <div className="space-y-2">
+                            <div className="p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-xl">
+                                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <Scale className="w-4 h-4 text-modtale-accent" /> Judging Criteria
+                                </h3>
+                                <div className="space-y-3">
                                     {jam.categories.map((cat, idx) => (
-                                        <div key={idx} className="p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5 flex flex-col gap-1">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-bold text-slate-900 dark:text-white">{cat.name}</span>
-                                                <span className="text-[10px] font-black text-modtale-accent uppercase tracking-widest bg-modtale-accent/10 px-2 py-0.5 rounded">Max: {cat.maxScore}</span>
+                                        <div key={idx} className="p-4 bg-white/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 transition-all hover:border-modtale-accent/50 group">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors">{cat.name}</span>
+                                                <span className="text-[10px] font-black text-modtale-accent uppercase tracking-widest bg-modtale-accent/10 px-2.5 py-1 rounded-lg">Max {cat.maxScore}</span>
                                             </div>
                                             {cat.description && <span className="text-xs font-medium text-slate-500">{cat.description}</span>}
                                         </div>
                                     ))}
                                 </div>
-                            </SidebarSection>
+                            </div>
                         )}
                     </div>
                 }
