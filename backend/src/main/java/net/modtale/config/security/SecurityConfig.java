@@ -219,6 +219,7 @@ public class SecurityConfig {
                         .requestMatchers("/client-metadata.json").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/projects/**",
+                                "/api/v1/modjams/**",
                                 "/api/v1/tags",
                                 "/api/v1/files/**",
                                 "/api/v1/user/profile/**",
@@ -282,9 +283,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/change-password",
                                 "/api/v1/auth/credentials"
                         ).authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/projects/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
