@@ -105,6 +105,7 @@ jobs:
             ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
             ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
+            ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
             ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
