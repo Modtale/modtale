@@ -12,12 +12,11 @@ interface JamLayoutProps {
     onBack: () => void;
     publishChecklist: { label: string; met: boolean }[];
     children: React.ReactNode;
-    sidebar: React.ReactNode;
     tabs: React.ReactNode;
 }
 
 export const JamLayout: React.FC<JamLayoutProps> = ({
-                                                        bannerUrl, isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, onBack, publishChecklist, children, sidebar, tabs
+                                                        bannerUrl, isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, onBack, publishChecklist, children, tabs
                                                     }) => {
     const isReadyToPublish = publishChecklist.every(c => c.met) && !hasUnsavedChanges;
 
@@ -32,7 +31,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent" />
 
                 <div className="absolute top-8 left-0 right-0 max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28">
-                    <button onClick={onBack} className="flex items-center gap-2 text-white/80 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group">
+                    <button type="button" onClick={onBack} className="flex items-center gap-2 text-white/80 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group">
                         <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                         Back
                     </button>
@@ -46,7 +45,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                             <div className="px-8 md:px-12 pt-8 md:pt-10 border-b border-slate-100 dark:border-white/5">
                                 {tabs}
                             </div>
-                            <div className="p-8 md:p-12">
+                            <div className="p-8 md:p-12 min-h-[500px]">
                                 {children}
                             </div>
                         </div>
@@ -74,7 +73,8 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
 
                             <div className="space-y-3">
                                 <button
-                                    onClick={onSave}
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); onSave(); }}
                                     disabled={isSaving}
                                     className={`w-full h-14 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 border-2 ${
                                         isSaved ? 'bg-green-500/10 border-green-500 text-green-500' :
@@ -86,7 +86,8 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                 </button>
 
                                 <button
-                                    onClick={onPublish}
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); onPublish(); }}
                                     disabled={!isReadyToPublish || isSaving}
                                     className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 enabled:hover:scale-[1.02]"
                                 >
@@ -95,7 +96,6 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                 </button>
                             </div>
                         </div>
-                        {sidebar}
                     </div>
                 </div>
             </div>
