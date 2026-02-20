@@ -113,6 +113,9 @@ public class ModService {
     @Value("${app.webhook.key}")
     private String webhookKey;
 
+    @Value("${app.discord-webhook.url}")
+    private String discordWebhookUrl;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
@@ -699,6 +702,7 @@ public class ModService {
         if (isNewRelease) {
             notifyNewProject(saved);
             triggerWebhook(saved);
+            triggerDiscordWebhook(saved);
             analyticsService.logNewProject(saved.getId());
             User author = getAuthorUser(saved);
             if(author != null) {
@@ -784,6 +788,53 @@ public class ModService {
                 restTemplate.postForEntity(webhookUrl, request, String.class);
             } catch (Exception e) {
                 logger.error("Failed to trigger webhook", e);
+            }
+        });
+    }
+
+    private void triggerDiscordWebhook(Mod mod) {
+        if (discordWebhookUrl == null || discordWebhookUrl.isEmpty()) {
+            return;
+        }
+
+        taskExecutor.execute(() -> {
+            try {
+                String authorName = mod.getAuthor();
+                if (authorName == null && mod.getAuthorId() != null) {
+                    User u = userRepository.findById(mod.getAuthorId()).orElse(null);
+                    if (u != null) authorName = u.getUsername();
+                }
+
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                Map<String, Object> embed = new HashMap<>();
+                embed.put("title", mod.getTitle());
+                embed.put("url", frontendUrl + getProjectLink(mod));
+                embed.put("description", mod.getDescription());
+                embed.put("color", 3447003);
+
+                if (authorName != null) {
+                    Map<String, String> authorMap = new HashMap<>();
+                    authorMap.put("name", authorName);
+                    embed.put("author", authorMap);
+                }
+
+                if (mod.getImageUrl() != null && !mod.getImageUrl().isEmpty()) {
+                    Map<String, String> thumbnailMap = new HashMap<>();
+                    thumbnailMap.put("url", mod.getImageUrl());
+                    embed.put("thumbnail", thumbnailMap);
+                }
+
+                Map<String, Object> body = new HashMap<>();
+                body.put("content", "A new project has been published!");
+                body.put("embeds", List.of(embed));
+
+                HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+                restTemplate.postForEntity(discordWebhookUrl, request, String.class);
+            } catch (Exception e) {
+                logger.error("Failed to trigger Discord webhook", e);
             }
         });
     }
