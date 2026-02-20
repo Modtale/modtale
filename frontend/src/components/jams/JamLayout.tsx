@@ -13,15 +13,16 @@ interface JamLayoutProps {
     publishChecklist: { label: string; met: boolean }[];
     children: React.ReactNode;
     sidebar: React.ReactNode;
+    tabs: React.ReactNode;
 }
 
 export const JamLayout: React.FC<JamLayoutProps> = ({
-                                                        bannerUrl, isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, onBack, publishChecklist, children, sidebar
+                                                        bannerUrl, isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, onBack, publishChecklist, children, sidebar, tabs
                                                     }) => {
     const isReadyToPublish = publishChecklist.every(c => c.met) && !hasUnsavedChanges;
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col pb-32">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col pb-40">
             <div className="relative h-64 bg-slate-900 overflow-hidden">
                 {bannerUrl ? (
                     <img src={bannerUrl} className="w-full h-full object-cover opacity-40" alt="" />
@@ -33,21 +34,26 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                 <div className="absolute top-8 left-0 right-0 max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28">
                     <button onClick={onBack} className="flex items-center gap-2 text-white/80 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group">
                         <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                        Back to Jams
+                        Back
                     </button>
                 </div>
             </div>
 
             <div className="max-w-[112rem] w-full mx-auto px-4 sm:px-12 md:px-16 lg:px-28 -mt-24 relative z-10 flex-1">
-                <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8">
-                    <div className="lg:col-span-8">
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-2xl p-8 md:p-12">
-                            {children}
+                <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8 items-start">
+                    <div className="lg:col-span-8 w-full space-y-6">
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden">
+                            <div className="px-8 md:px-12 pt-8 md:pt-10 border-b border-slate-100 dark:border-white/5">
+                                {tabs}
+                            </div>
+                            <div className="p-8 md:p-12">
+                                {children}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="lg:col-span-4 space-y-6">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[2rem] p-8 shadow-xl sticky top-28">
+                    <div className="lg:col-span-4 w-full sticky top-28 space-y-6">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[2rem] p-8 shadow-xl">
                             <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-6">Launch Checklist</h3>
                             <div className="space-y-4 mb-8">
                                 {publishChecklist.map((req, i) => (
@@ -58,7 +64,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                         <span className={`text-sm font-bold ${req.met ? 'text-slate-900 dark:text-slate-200' : 'text-slate-400'}`}>{req.label}</span>
                                     </div>
                                 ))}
-                                <div className="flex items-start gap-3">
+                                <div className="flex items-start gap-3 pt-2 border-t border-slate-100 dark:border-white/5 mt-2">
                                     <div className={`mt-0.5 shrink-0 ${!hasUnsavedChanges ? 'text-green-500' : 'text-amber-500'}`}>
                                         {!hasUnsavedChanges ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                                     </div>
@@ -87,10 +93,6 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                     <Rocket className="w-4 h-4" />
                                     Publish Jam
                                 </button>
-
-                                {!isReadyToPublish && hasUnsavedChanges && (
-                                    <p className="text-[10px] font-black text-amber-500 text-center uppercase tracking-widest pt-2">Save changes to enable publishing</p>
-                                )}
                             </div>
                         </div>
                         {sidebar}
