@@ -82,7 +82,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                             disabled={!metaData.title || metaData.title.length < 5}
                             className="w-full h-16 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-lg shadow-xl shadow-modtale-accent/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] active:scale-95"
                         >
-                            Continue to Builder
+                            Draft Event Details
                         </button>
                     </div>
                 </div>
