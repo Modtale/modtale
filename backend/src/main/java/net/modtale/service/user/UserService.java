@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -511,7 +512,7 @@ public class UserService {
                 List.of(target.getId()),
                 "Organization Invite",
                 "You have been invited to join " + org.getUsername() + " as a " + role.toLowerCase() + ".",
-                "/dashboard/orgs",
+                URI.create("/dashboard/orgs"),
                 org.getAvatarUrl(),
                 "ORG_INVITE",
                 metadata
@@ -543,7 +544,7 @@ public class UserService {
                             List.of(admin.getUserId()),
                             "Invite Accepted",
                             msg,
-                            "/dashboard/orgs",
+                            URI.create("/dashboard/orgs"),
                             responder.getAvatarUrl()
                     ));
         } else {
@@ -592,7 +593,7 @@ public class UserService {
                 List.of(targetUserId),
                 "Role Updated",
                 "Your role in " + org.getUsername() + " has been updated to " + roleName + ".",
-                "/dashboard/orgs",
+                URI.create("/dashboard/orgs"),
                 org.getAvatarUrl()
         );
     }
@@ -1061,7 +1062,7 @@ public class UserService {
                         List.of(target.getId()),
                         "New Follower",
                         currentUser.getUsername() + " started following you.",
-                        "/creator/" + currentUser.getUsername(),
+                        URI.create("/creator/" + currentUser.getUsername()),
                         currentUser.getAvatarUrl()
                 );
             }
