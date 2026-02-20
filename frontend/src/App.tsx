@@ -1,30 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
 import { api, BACKEND_URL } from './utils/api';
 
-import { Home } from './react-pages/Home';
-import { Upload } from './react-pages/resources/Upload';
-import { CreatorProfile } from './react-pages/user/CreatorProfile.tsx';
-import { ModDetail } from './react-pages/resources/ModDetail';
-import { EditMod } from './react-pages/resources/EditMod';
-import { TermsOfService } from './react-pages/TermsOfService';
-import { PrivacyPolicy } from './react-pages/PrivacyPolicy';
-import { Dashboard } from './react-pages/user/Dashboard.tsx';
-import { AdminPanel } from './react-pages/AdminPanel.tsx';
-import { ApiDocs } from './react-pages/ApiDocs.tsx';
-import { Status } from './react-pages/Status';
-import { VerifyEmail } from './react-pages/auth/VerifyEmail.tsx';
-import { ResetPassword } from './react-pages/auth/ResetPassword.tsx';
-import { MfaVerify } from './react-pages/auth/MfaVerify';
-import { Analytics } from '@/components/dashboard/analytics/Analytics';
-
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer.tsx';
 import { SEOHead } from './components/SEOHead';
-import NotFound from './components/ui/error/NotFound.tsx';
 import { Spinner } from './components/ui/Spinner';
 import { StatusModal } from './components/ui/StatusModal';
 import { OnboardingModal } from './components/user/OnboardingModal';
@@ -37,6 +20,23 @@ import { ExternalLinkProvider } from './context/ExternalLinkContext';
 import { NotificationProvider } from './context/NotificationsContext.tsx';
 import { ToastProvider } from './components/ui/Toast';
 import { MobileProvider } from './context/MobileContext';
+
+const Home = lazy(() => import('./react-pages/Home').then(module => ({ default: module.Home })));
+const Upload = lazy(() => import('./react-pages/resources/Upload').then(module => ({ default: module.Upload })));
+const CreatorProfile = lazy(() => import('./react-pages/user/CreatorProfile.tsx').then(module => ({ default: module.CreatorProfile })));
+const ModDetail = lazy(() => import('./react-pages/resources/ModDetail').then(module => ({ default: module.ModDetail })));
+const EditMod = lazy(() => import('./react-pages/resources/EditMod').then(module => ({ default: module.EditMod })));
+const TermsOfService = lazy(() => import('./react-pages/TermsOfService').then(module => ({ default: module.TermsOfService })));
+const PrivacyPolicy = lazy(() => import('./react-pages/PrivacyPolicy').then(module => ({ default: module.PrivacyPolicy })));
+const Dashboard = lazy(() => import('./react-pages/user/Dashboard.tsx').then(module => ({ default: module.Dashboard })));
+const AdminPanel = lazy(() => import('./react-pages/AdminPanel.tsx').then(module => ({ default: module.AdminPanel })));
+const ApiDocs = lazy(() => import('./react-pages/ApiDocs.tsx').then(module => ({ default: module.ApiDocs })));
+const Status = lazy(() => import('./react-pages/Status').then(module => ({ default: module.Status })));
+const VerifyEmail = lazy(() => import('./react-pages/auth/VerifyEmail.tsx').then(module => ({ default: module.VerifyEmail })));
+const ResetPassword = lazy(() => import('./react-pages/auth/ResetPassword.tsx').then(module => ({ default: module.ResetPassword })));
+const MfaVerify = lazy(() => import('./react-pages/auth/MfaVerify').then(module => ({ default: module.MfaVerify })));
+const Analytics = lazy(() => import('@/components/dashboard/analytics/Analytics').then(module => ({ default: module.Analytics })));
+const NotFound = lazy(() => import('./components/ui/error/NotFound.tsx'));
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
@@ -180,98 +180,100 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                 />
 
                 <div className="flex-1">
-                    <Routes>
-                        <Route path="/" element={renderHome()} />
-                        <Route path="/mods" element={<Navigate to="/" replace />} />
-                        <Route path="/plugins" element={renderHome('PLUGIN')} />
-                        <Route path="/modpacks" element={renderHome('MODPACK')} />
-                        <Route path="/worlds" element={renderHome('SAVE')} />
-                        <Route path="/art" element={renderHome('ART')} />
-                        <Route path="/data" element={renderHome('DATA')} />
+                    <Suspense fallback={<div className="p-20 flex justify-center"><Spinner /></div>}>
+                        <Routes>
+                            <Route path="/" element={renderHome()} />
+                            <Route path="/mods" element={<Navigate to="/" replace />} />
+                            <Route path="/plugins" element={renderHome('PLUGIN')} />
+                            <Route path="/modpacks" element={renderHome('MODPACK')} />
+                            <Route path="/worlds" element={renderHome('SAVE')} />
+                            <Route path="/art" element={renderHome('ART')} />
+                            <Route path="/data" element={renderHome('DATA')} />
 
-                        <Route path="/upload" element={
-                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                user ? <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} /> :
-                                    <Navigate to="/" />
-                        } />
+                            <Route path="/upload" element={
+                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                    user ? <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} /> :
+                                        <Navigate to="/" />
+                            } />
 
-                        <Route path="/dashboard/*" element={
-                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
-                                    <Navigate to="/" />
-                        } />
+                            <Route path="/dashboard/*" element={
+                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                    user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
+                                        <Navigate to="/" />
+                            } />
 
-                        <Route path="/analytics/project/:id" element={
-                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                user ? <Analytics /> :
-                                    <Navigate to="/" />
-                        } />
+                            <Route path="/analytics/project/:id" element={
+                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                    user ? <Analytics /> :
+                                        <Navigate to="/" />
+                            } />
 
-                        <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
-                        <Route path="/mod/:id/edit" element={
-                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                user ? <EditMod currentUser={user} /> :
-                                    <Navigate to="/" />
-                        } />
+                            <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/mod/:id/edit" element={
+                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                    user ? <EditMod currentUser={user} /> :
+                                        <Navigate to="/" />
+                            } />
 
-                        <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
-                        <Route path="/modpack/:id/edit" element={
-                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                user ? <EditMod currentUser={user} /> :
-                                    <Navigate to="/" />
-                        } />
+                            <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/modpack/:id/edit" element={
+                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                    user ? <EditMod currentUser={user} /> :
+                                        <Navigate to="/" />
+                            } />
 
-                        <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
 
-                        <Route path="/creator/:username" element={
-                            <CreatorProfile
-                                onModClick={handleModClick}
-                                onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
-                                onBack={() => handleNavigate('home')}
-                                likedModIds={user?.likedModIds || []}
-                                onToggleFavorite={handleToggleFavorite}
-                                onToggleFavoriteModpack={handleToggleFavorite}
-                                currentUser={user}
-                                onRefreshUser={fetchUser}
-                            />
-                        } />
+                            <Route path="/creator/:username" element={
+                                <CreatorProfile
+                                    onModClick={handleModClick}
+                                    onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
+                                    onBack={() => handleNavigate('home')}
+                                    likedModIds={user?.likedModIds || []}
+                                    onToggleFavorite={handleToggleFavorite}
+                                    onToggleFavoriteModpack={handleToggleFavorite}
+                                    currentUser={user}
+                                    onRefreshUser={fetchUser}
+                                />
+                            } />
 
-                        <Route path="/verify" element={
-                            <VerifyEmail
-                                user={user}
-                                isDarkMode={isDarkMode}
-                                toggleDarkMode={toggleDarkMode}
-                                onLogout={handleLogout}
-                                onNavigate={handleNavigate}
-                                currentPage={location.pathname.replace('/', '')}
-                                onAuthorClick={handleAuthorClick}
-                            />
-                        } />
+                            <Route path="/verify" element={
+                                <VerifyEmail
+                                    user={user}
+                                    isDarkMode={isDarkMode}
+                                    toggleDarkMode={toggleDarkMode}
+                                    onLogout={handleLogout}
+                                    onNavigate={handleNavigate}
+                                    currentPage={location.pathname.replace('/', '')}
+                                    onAuthorClick={handleAuthorClick}
+                                />
+                            } />
 
-                        <Route path="/reset-password" element={<ResetPassword />} />
+                            <Route path="/reset-password" element={<ResetPassword />} />
 
-                        <Route path="/mfa" element={
-                            <MfaVerify
-                                user={user}
-                                isDarkMode={isDarkMode}
-                                toggleDarkMode={toggleDarkMode}
-                                onLogout={handleLogout}
-                                onNavigate={handleNavigate}
-                                currentPage={location.pathname.replace('/', '')}
-                                onAuthorClick={handleAuthorClick}
-                            />
-                        } />
+                            <Route path="/mfa" element={
+                                <MfaVerify
+                                    user={user}
+                                    isDarkMode={isDarkMode}
+                                    toggleDarkMode={toggleDarkMode}
+                                    onLogout={handleLogout}
+                                    onNavigate={handleNavigate}
+                                    currentPage={location.pathname.replace('/', '')}
+                                    onAuthorClick={handleAuthorClick}
+                                />
+                            } />
 
-                        <Route path="/terms" element={<TermsOfService />} />
-                        <Route path="/privacy" element={<PrivacyPolicy />} />
-                        <Route path="/api-docs" element={<ApiDocs />} />
-                        <Route path="/admin" element={
-                            loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                user ? <AdminPanel currentUser={user} /> :
-                                    <Navigate to="/" />
-                        } />
-                        <Route path="*" element={<NotFound />} />
-                    </Routes>
+                            <Route path="/terms" element={<TermsOfService />} />
+                            <Route path="/privacy" element={<PrivacyPolicy />} />
+                            <Route path="/api-docs" element={<ApiDocs />} />
+                            <Route path="/admin" element={
+                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                    user ? <AdminPanel currentUser={user} /> :
+                                        <Navigate to="/" />
+                            } />
+                            <Route path="*" element={<NotFound />} />
+                        </Routes>
+                    </Suspense>
                 </div>
                 <Footer isDarkMode={isDarkMode} />
             </div>
