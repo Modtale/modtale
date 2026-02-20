@@ -11,8 +11,11 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [step, setStep] = useState(0);
+    const [isSavingJam, setIsSavingJam] = useState(false);
 
     const [metaData, setMetaData] = useState({
+        id: '',
+        slug: '',
         title: '',
         description: '',
         imageUrl: '',
@@ -34,24 +37,43 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     }, []);
 
     const handleSaveJam = async () => {
+        setIsSavingJam(true);
         try {
-            const res = await api.post('/modjams', metaData);
+            let res;
+            if (metaData.id) {
+                res = await api.put(`/modjams/${metaData.id}`, metaData);
+            } else {
+                res = await api.post('/modjams', metaData);
+                setMetaData(prev => ({ ...prev, id: res.data.id, slug: res.data.slug }));
+            }
             setJams(prev => {
                 const filtered = prev.filter(j => j.id !== res.data.id);
                 return [res.data, ...filtered];
             });
+            setIsSavingJam(false);
             return true;
         } catch (e) {
+            setIsSavingJam(false);
             return false;
         }
     };
 
     const handlePublish = async () => {
+        if (!metaData.id) {
+            const saved = await handleSaveJam();
+            if (!saved) return;
+        }
+        setIsSavingJam(true);
         try {
-            await api.post(`/modjams/publish`, metaData);
+            const updated = { ...metaData, status: 'PUBLISHED' };
+            await api.put(`/modjams/${metaData.id}`, updated);
+            const res = await api.get('/modjams');
+            setJams(res.data);
             setIsCreating(false);
             setStep(0);
-        } catch (e) {}
+        } catch (e) {} finally {
+            setIsSavingJam(false);
+        }
     };
 
     if (isCreating) {
@@ -71,7 +93,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Event Title</label>
                             <input
                                 value={metaData.title}
-                                onChange={e => setMetaData({...metaData, title: e.target.value})}
+                                onChange={e => setMetaData(prev => ({...prev, title: e.target.value}))}
                                 className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-2xl px-6 py-5 font-black text-xl shadow-inner outline-none focus:ring-2 focus:ring-modtale-accent transition-all"
                                 placeholder="Summer Hackathon 2026"
                             />
@@ -79,7 +101,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                         <button
                             type="button"
                             onClick={() => setStep(2)}
-                            disabled={!metaData.title || metaData.title.length < 5}
+                            disabled={!metaData.title || metaData.title.trim().length < 5}
                             className="w-full h-16 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-lg shadow-xl shadow-modtale-accent/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] active:scale-95"
                         >
                             Draft Event Details
@@ -95,7 +117,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                 setMetaData={setMetaData}
                 handleSave={handleSaveJam}
                 onPublish={handlePublish}
-                isLoading={loading}
+                isLoading={isSavingJam}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 onBack={() => setStep(1)}
