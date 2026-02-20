@@ -3,13 +3,13 @@ import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-rea
 import { BACKEND_URL } from '../../utils/api.ts';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal.tsx';
 
-export const SidebarSection = ({
-                                   title,
-                                   icon: Icon,
-                                   children,
-                                   defaultOpen = true,
-                                   className = ""
-                               }: {
+export const SidebarSection = React.memo(({
+                                              title,
+                                              icon: Icon,
+                                              children,
+                                              defaultOpen = true,
+                                              className = ""
+                                          }: {
     title: string;
     icon?: React.ElementType;
     children: React.ReactNode;
@@ -26,17 +26,21 @@ export const SidebarSection = ({
 
     return (
         <div className={`border-b border-slate-200 dark:border-white/5 last:border-0 pb-4 mb-4 last:mb-0 last:pb-0 ${visibilityClass} ${className}`}>
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 hover:text-slate-900 dark:hover:text-white transition-colors"
-            >
-                <span className="flex items-center gap-2">{Icon && <Icon className="w-3 h-3" />} {title}</span>
-                {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
+            <h3 className="w-full m-0 p-0">
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    aria-expanded={isOpen}
+                    className="w-full flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-3 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                    <span className="flex items-center gap-2">{Icon && <Icon className="w-3 h-3" aria-hidden="true" />} {title}</span>
+                    {isOpen ? <ChevronUp className="w-3 h-3" aria-hidden="true" /> : <ChevronDown className="w-3 h-3" aria-hidden="true" />}
+                </button>
+            </h3>
             {isOpen && <div className="animate-in fade-in slide-in-from-top-1 duration-200">{children}</div>}
         </div>
     );
-};
+});
+SidebarSection.displayName = 'SidebarSection';
 
 interface ProjectLayoutProps {
     bannerUrl?: string | null;
@@ -54,20 +58,20 @@ interface ProjectLayoutProps {
     onBack?: () => void;
 }
 
-export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
-                                                                bannerUrl,
-                                                                iconUrl,
-                                                                isEditing,
-                                                                onBannerUpload,
-                                                                onIconUpload,
-                                                                headerContent,
-                                                                headerActions,
-                                                                actionBar,
-                                                                tabs,
-                                                                mainContent,
-                                                                sidebarContent,
-                                                                onBack
-                                                            }) => {
+export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
+                                                                           bannerUrl,
+                                                                           iconUrl,
+                                                                           isEditing,
+                                                                           onBannerUpload,
+                                                                           onIconUpload,
+                                                                           headerContent,
+                                                                           headerActions,
+                                                                           actionBar,
+                                                                           tabs,
+                                                                           mainContent,
+                                                                           sidebarContent,
+                                                                           onBack
+                                                                       }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
@@ -97,10 +101,6 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
         setTempImage(null);
     };
 
-    const bgStyle = finalBanner
-        ? { backgroundImage: `url(${finalBanner})` }
-        : { backgroundImage: 'linear-gradient(to bottom right, #1e293b, #0f172a)' };
-
     const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
     return (
@@ -115,14 +115,27 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
             )}
 
             <div className="relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group z-10">
-                <div className={`w-full h-full bg-cover bg-center transition-opacity duration-300 ${finalBanner ? 'opacity-100' : 'opacity-0'}`} style={bgStyle}></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-950/90 to-transparent" />
+                <div className="absolute inset-0 z-0">
+                    {finalBanner ? (
+                        <img
+                            src={finalBanner}
+                            alt=""
+                            fetchPriority="high"
+                            loading="eager"
+                            decoding="sync"
+                            className="w-full h-full object-cover transition-opacity duration-300 opacity-100"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900" />
+                    )}
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-950/90 to-transparent z-10" />
 
                 {onBack && (
                     <div className={`absolute top-0 left-0 right-0 z-40 mx-auto ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
                         <div className="pt-6 pointer-events-auto w-fit">
-                            <button onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back">
-                                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" /> <span className="hidden md:inline">Back</span>
+                            <button aria-label="Go back" onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back">
+                                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">Back</span>
                             </button>
                         </div>
                     </div>
@@ -159,10 +172,10 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                                 <label className={`block w-32 h-32 rounded-2xl bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-4 border-slate-950 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
-                                        <img src={finalIcon} alt="Icon" className="w-full h-full object-cover" />
+                                        <img src={finalIcon} alt="Icon" width={128} height={128} className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
-                                            <ImageIcon className="w-8 h-8 opacity-50" />
+                                            <ImageIcon className="w-8 h-8 opacity-50" aria-hidden="true" />
                                         </div>
                                     )}
                                 </label>
@@ -177,16 +190,16 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
                                 <label className={`block w-56 h-56 rounded-[2.5rem] bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-[8px] border-white dark:border-slate-800 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
-                                        <img src={finalIcon} alt="Icon" className="w-full h-full object-cover" />
+                                        <img src={finalIcon} alt="Icon" width={224} height={224} className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
-                                            <ImageIcon className="w-10 h-10 opacity-50" />
+                                            <ImageIcon className="w-10 h-10 opacity-50" aria-hidden="true" />
                                             <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">512x512</span>
                                         </div>
                                     )}
                                     {isEditing && (
                                         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px]">
-                                            <ImageIcon className="w-8 h-8 text-white mb-2" />
+                                            <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
                                             <span className="text-xs font-bold text-white">Change Icon</span>
                                             <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
                                         </div>
@@ -231,4 +244,5 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = ({
             </div>
         </div>
     );
-};
+});
+ProjectLayout.displayName = 'ProjectLayout';
