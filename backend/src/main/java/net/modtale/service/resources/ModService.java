@@ -26,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -139,6 +140,10 @@ public class ModService {
 
     private final Map<String, Bucket> modpackGenBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> rescanBuckets = new ConcurrentHashMap<>();
+
+    // Batch metrics handling
+    private final ConcurrentHashMap<String, Integer> pendingDownloadIncrements = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> pendingFavoriteIncrements = new ConcurrentHashMap<>();
 
     private boolean isAdmin(User user) {
         return user != null && user.getRoles() != null && user.getRoles().contains("ADMIN");
@@ -1846,20 +1851,100 @@ public class ModService {
     }
 
     public void incrementDownloadCount(String modId) {
-        Mod mod = getRawModById(modId);
-        if (mod != null) {
-            mod.setDownloadCount(mod.getDownloadCount() + 1);
-            modRepository.save(mod);
+        pendingDownloadIncrements.merge(modId, 1, Integer::sum);
+    }
 
-            int count = mod.getDownloadCount();
-            if (count == 10000 || count == 100000 || count == 1000000 || count == 10000000) {
-                String title = "Download Milestone Reached!";
-                String msg = mod.getTitle() + " has hit " + String.format("%,d", count) + " downloads!";
-                String link = "/dashboard";
-                User author = getAuthorUser(mod);
-                if (author != null) {
-                    notificationService.sendNotification(List.of(author.getId()), title, msg, URI.create(link), mod.getImageUrl());
+    public void incrementDownloadCountByFileUrl(String fileUrl) {
+        Optional<Mod> modOpt = modRepository.findByVersionsFileUrl(fileUrl);
+        if (modOpt.isEmpty() && fileUrl.contains("/")) {
+            String filename = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            Query query = new Query(Criteria.where("versions.fileUrl").regex(filename + "$"));
+            Mod found = mongoTemplate.findOne(query, Mod.class);
+            modOpt = Optional.ofNullable(found);
+        }
+        if (modOpt.isPresent()) {
+            Mod mod = modOpt.get();
+            incrementDownloadCount(mod.getId());
+            analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false, "internal");
+        }
+    }
+
+    public void toggleFavorite(String modId, String username) {
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user != null) {
+            List<String> likes = user.getLikedModIds();
+            if (likes == null) { likes = new ArrayList<>(); user.setLikedModIds(likes); }
+
+            boolean adding = true;
+            if (likes.contains(modId)) {
+                likes.remove(modId);
+                adding = false;
+            } else {
+                likes.add(modId);
+            }
+
+            userRepository.save(user);
+
+            int delta = adding ? 1 : -1;
+            pendingFavoriteIncrements.merge(modId, delta, Integer::sum);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${app.metrics.flush-rate:60000}") // Runs every minute
+    public void flushMetricsToDatabase() {
+        if (pendingDownloadIncrements.isEmpty() && pendingFavoriteIncrements.isEmpty()) {
+            return;
+        }
+
+        Map<String, Integer> downloadsToFlush = new HashMap<>();
+        Iterator<Map.Entry<String, Integer>> dlIterator = pendingDownloadIncrements.entrySet().iterator();
+        while (dlIterator.hasNext()) {
+            Map.Entry<String, Integer> entry = dlIterator.next();
+            downloadsToFlush.put(entry.getKey(), entry.getValue());
+            dlIterator.remove();
+        }
+
+        Map<String, Integer> favoritesToFlush = new HashMap<>();
+        Iterator<Map.Entry<String, Integer>> favIterator = pendingFavoriteIncrements.entrySet().iterator();
+        while (favIterator.hasNext()) {
+            Map.Entry<String, Integer> entry = favIterator.next();
+            favoritesToFlush.put(entry.getKey(), entry.getValue());
+            favIterator.remove();
+        }
+
+        if (!downloadsToFlush.isEmpty() || !favoritesToFlush.isEmpty()) {
+            BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
+            Set<String> allIdsToEvict = new HashSet<>();
+
+            Set<String> allKeys = new HashSet<>();
+            allKeys.addAll(downloadsToFlush.keySet());
+            allKeys.addAll(favoritesToFlush.keySet());
+
+            for (String modId : allKeys) {
+                Update update = new Update();
+                if (downloadsToFlush.containsKey(modId)) {
+                    update.inc("downloadCount", downloadsToFlush.get(modId));
                 }
+                if (favoritesToFlush.containsKey(modId)) {
+                    update.inc("favoriteCount", favoritesToFlush.get(modId));
+                }
+
+                Query query = new Query(Criteria.where("_id").is(modId));
+                bulkOps.updateOne(query, update);
+                allIdsToEvict.add(modId);
+            }
+
+            try {
+                bulkOps.execute();
+
+                Cache cache = cacheManager.getCache("projectDetails");
+                if (cache != null) {
+                    allIdsToEvict.forEach(cache::evict);
+                }
+            } catch (Exception e) {
+                logger.error("Failed to bulk flush metrics to database", e);
+                downloadsToFlush.forEach((k, v) -> pendingDownloadIncrements.merge(k, v, Integer::sum));
+                favoritesToFlush.forEach((k, v) -> pendingFavoriteIncrements.merge(k, v, Integer::sum));
             }
         }
     }
@@ -2139,25 +2224,6 @@ public class ModService {
         }
     }
 
-    public void toggleFavorite(String modId, String username) {
-        User user = userRepository.findByUsername(username).orElse(null);
-        Mod mod = getRawModById(modId);
-        if (user != null && mod != null) {
-            List<String> likes = user.getLikedModIds();
-            if (likes == null) { likes = new ArrayList<>(); user.setLikedModIds(likes); }
-            if (likes.contains(modId)) {
-                likes.remove(modId);
-                mod.setFavoriteCount(Math.max(0, mod.getFavoriteCount() - 1));
-            } else {
-                likes.add(modId);
-                mod.setFavoriteCount(mod.getFavoriteCount() + 1);
-            }
-            userRepository.save(user);
-            modRepository.save(mod);
-            evictProjectDetails(mod);
-        }
-    }
-
     public void addGalleryImage(String id, String imageUrl) {
         Mod mod = getRawModById(id);
         if (mod != null) {
@@ -2217,23 +2283,6 @@ public class ModService {
             return mongoTemplate.exists(suffixQuery, Mod.class);
         }
         return false;
-    }
-
-    public void incrementDownloadCountByFileUrl(String fileUrl) {
-        Optional<Mod> modOpt = modRepository.findByVersionsFileUrl(fileUrl);
-        if (modOpt.isEmpty() && fileUrl.contains("/")) {
-            String filename = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            Query query = new Query(Criteria.where("versions.fileUrl").regex(filename + "$"));
-            Mod found = mongoTemplate.findOne(query, Mod.class);
-            modOpt = Optional.ofNullable(found);
-        }
-        if (modOpt.isPresent()) {
-            Mod mod = modOpt.get();
-            mod.setDownloadCount(mod.getDownloadCount() + 1);
-            modRepository.save(mod);
-            evictProjectDetails(mod);
-            analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false, "internal");
-        }
     }
 
     private String getLinkSlug(Mod mod) {

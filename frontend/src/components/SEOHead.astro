@@ -1,0 +1,109 @@
+---
+import '../index.css';
+import { DEFAULT_SEO } from '../data/seo-constants';
+
+interface Props {
+    title?: string;
+    description?: string;
+    keywords?: string;
+    image?: string;
+    jsonLd?: object;
+    initialData?: any;
+}
+
+const {
+    title = DEFAULT_SEO.title,
+    description = DEFAULT_SEO.description,
+    keywords = DEFAULT_SEO.keywords,
+    image: propImage,
+    jsonLd,
+    initialData
+} = Astro.props;
+
+const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
+
+const defaultImage = "https://modtale.net/assets/og-default.png";
+let image = propImage || defaultImage;
+
+if (initialData && initialData.id && initialData.classification) {
+    image = `api.modale.net/api/v1/og/project/${initialData.id}.png`;
+}
+
+const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
+const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
+
+const rawApiUrl = import.meta.env.PUBLIC_API_URL || "https://modtale-backend-dev-ptpi2wdeva-uc.a.run.app";
+let apiOrigin = rawApiUrl;
+try {
+    apiOrigin = new URL(rawApiUrl).origin;
+} catch (e) {}
+
+const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    `img-src 'self' data: https://cdn.modtale.net ${apiOrigin} https://cdn.discordapp.com https://avatars.githubusercontent.com https://secure.gravatar.com https://gitlab.com https://ui-avatars.com https://lh3.googleusercontent.com`,
+    "font-src 'self' https://fonts.gstatic.com",
+    `connect-src 'self' ${apiOrigin} https://cloudflareinsights.com`,
+    "frame-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'"
+].join('; ');
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark bg-slate-50 dark:bg-modtale-dark text-slate-900 dark:text-slate-400">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>{title}</title>
+
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+
+    <meta http-equiv="Content-Security-Policy" content={csp} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={title} />
+
+    <meta property="og:image" content={image} />
+    <meta property="og:site_name" content="Modtale" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:image" content={image} />
+
+    <meta name="keywords" content={keywords} />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <meta name="theme-color" content="#3b82f6" />
+
+    <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" />
+    </noscript>
+
+    {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
+
+    <script is:inline set:html={`window.INITIAL_DATA = ${initialDataString};`}></script>
+
+    <script is:inline>
+        (function() {
+            try {
+                const localTheme = localStorage.getItem('theme');
+                if (localTheme === 'light') {
+                    document.documentElement.classList.remove('dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body>
+<slot />
+</body>
+</html>

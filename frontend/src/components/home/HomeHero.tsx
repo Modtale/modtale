@@ -12,15 +12,15 @@ interface HomeHeroProps {
     seoH1?: string | null;
 }
 
-export const HomeHero: React.FC<HomeHeroProps> = ({
-                                                      selectedClassification,
-                                                      onClassificationChange,
-                                                      searchTerm,
-                                                      onSearchChange,
-                                                      currentTypeLabel,
-                                                      showMiniSearch,
-                                                      seoH1
-                                                  }) => {
+export const HomeHero: React.FC<HomeHeroProps> = React.memo(({
+                                                                 selectedClassification,
+                                                                 onClassificationChange,
+                                                                 searchTerm,
+                                                                 onSearchChange,
+                                                                 currentTypeLabel,
+                                                                 showMiniSearch,
+                                                                 seoH1
+                                                             }) => {
     const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
     const navContainerRef = useRef<HTMLDivElement>(null);
     const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
@@ -136,4 +136,6 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             </div>
         </div>
     );
-};
+});
+
+HomeHero.displayName = 'HomeHero';
