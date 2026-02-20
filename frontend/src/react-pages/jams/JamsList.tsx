@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import type { Modjam, User } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
-import {Trophy, Plus, ArrowLeft, Sparkles, Wand2, CalendarDays, ArrowRight} from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Trophy, Plus, ArrowLeft, CalendarDays } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 
 export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
@@ -15,6 +15,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const [metaData, setMetaData] = useState({
         title: '',
         description: '',
+        imageUrl: '',
         bannerUrl: '',
         startDate: '',
         endDate: '',
@@ -35,7 +36,10 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const handleSaveJam = async () => {
         try {
             const res = await api.post('/modjams', metaData);
-            setJams([res.data, ...jams.filter(j => j.id !== res.data.id)]);
+            setJams(prev => {
+                const filtered = prev.filter(j => j.id !== res.data.id);
+                return [res.data, ...filtered];
+            });
             return true;
         } catch (e) {
             return false;
@@ -54,42 +58,31 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         if (step === 1) {
             return (
                 <div className="max-w-xl mx-auto pt-24 px-6 animate-in fade-in zoom-in-95 pb-32">
-                    <button onClick={() => setIsCreating(false)} className="text-slate-500 font-bold mb-10 flex items-center gap-2 hover:text-slate-900 transition-colors">
+                    <button type="button" onClick={() => setIsCreating(false)} className="text-slate-500 font-bold mb-10 flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" /> Cancel
                     </button>
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-[1.25rem] bg-modtale-accent/10 text-modtale-accent flex items-center justify-center">
-                            <Wand2 className="w-6 h-6" />
-                        </div>
-                        <h1 className="text-4xl font-black tracking-tight">Let's build a jam.</h1>
+                    <div className="mb-10">
+                        <h1 className="text-4xl font-black tracking-tight mb-2">Host a Jam</h1>
+                        <p className="text-slate-500 font-medium text-lg">Set the stage for your community event.</p>
                     </div>
-                    <p className="text-slate-500 font-medium mb-10 text-lg">Define your theme and mission before we set the dates.</p>
 
-                    <div className="space-y-8 bg-white dark:bg-modtale-card p-10 rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl">
+                    <div className="space-y-6 bg-white dark:bg-modtale-card p-10 rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl">
                         <div className="space-y-3">
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Event Title</label>
                             <input
                                 value={metaData.title}
                                 onChange={e => setMetaData({...metaData, title: e.target.value})}
                                 className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-2xl px-6 py-5 font-black text-xl shadow-inner outline-none focus:ring-2 focus:ring-modtale-accent transition-all"
-                                placeholder="The Big Mod Hackathon 2026"
-                            />
-                        </div>
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Short Briefing</label>
-                            <textarea
-                                value={metaData.description}
-                                onChange={e => setMetaData({...metaData, description: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-2xl px-6 py-5 text-slate-600 dark:text-slate-300 font-medium min-h-[120px] shadow-inner outline-none focus:ring-2 focus:ring-modtale-accent transition-all"
-                                placeholder="Create something beautiful in just 48 hours..."
+                                placeholder="Summer Hackathon 2026"
                             />
                         </div>
                         <button
+                            type="button"
                             onClick={() => setStep(2)}
-                            disabled={!metaData.title || !metaData.description}
+                            disabled={!metaData.title || metaData.title.length < 5}
                             className="w-full h-16 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-lg shadow-xl shadow-modtale-accent/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] active:scale-95"
                         >
-                            Open Builder <Sparkles className="w-5 h-5" />
+                            Continue to Builder
                         </button>
                     </div>
                 </div>
@@ -110,6 +103,10 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         );
     }
 
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center"><Spinner className="w-8 h-8" fullScreen={false} /></div>;
+    }
+
     return (
         <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-16 pb-32">
             <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-16">
@@ -118,7 +115,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                     <p className="text-xl text-slate-500 font-medium max-w-2xl leading-relaxed">The heartbeat of the community. Create, compete, and celebrate the best modding has to offer.</p>
                 </div>
                 {currentUser && (
-                    <button onClick={() => { setIsCreating(true); setStep(1); }} className="h-16 px-10 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-[1.25rem] font-black text-lg shadow-xl shadow-modtale-accent/20 transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <button type="button" onClick={() => { setIsCreating(true); setStep(1); }} className="h-16 px-10 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-[1.25rem] font-black text-lg shadow-xl shadow-modtale-accent/20 transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
                         <Plus className="w-6 h-6" /> Host a Jam
                     </button>
                 )}
@@ -144,7 +141,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                                 <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
                                     <CalendarDays className="w-4 h-4" /> {new Date(jam.startDate).toLocaleDateString()}
                                 </div>
-                                <div className="text-modtale-accent font-black text-xs uppercase tracking-widest flex items-center gap-2">View Event <ArrowRight className="w-3 h-3" /></div>
+                                <div className="text-modtale-accent font-black text-xs uppercase tracking-widest">View Event</div>
                             </div>
                         </div>
                     </Link>
