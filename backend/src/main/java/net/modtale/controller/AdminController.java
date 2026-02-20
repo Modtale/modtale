@@ -132,7 +132,7 @@ public class AdminController {
     @GetMapping("/users/{username}/raw")
     public ResponseEntity<?> getRawUser(@PathVariable String username) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
@@ -148,20 +148,10 @@ public class AdminController {
     @PutMapping("/users/{username}/raw")
     public ResponseEntity<?> updateRawUser(@PathVariable String username, @RequestBody User updatedData) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         User existing = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
-
-        if (!canManageUser(currentUser, existing)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can modify other admins.");
-        }
-
-        boolean isGrantingAdmin = updatedData.getRoles() != null && updatedData.getRoles().contains("ADMIN");
-        boolean hadAdmin = existing.getRoles() != null && existing.getRoles().contains("ADMIN");
-        if (isGrantingAdmin && !hadAdmin && !isSuperAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can grant admin privileges.");
-        }
 
         updatedData.setId(existing.getId());
         updatedData.setPassword(existing.getPassword());
@@ -320,7 +310,7 @@ public class AdminController {
     @PutMapping("/projects/{id}/raw")
     public ResponseEntity<?> updateRawProject(@PathVariable String id, @RequestBody Mod updatedMod) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         Mod existing = modService.getRawModById(id);
         if (existing == null) return ResponseEntity.notFound().build();

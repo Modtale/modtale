@@ -503,18 +503,18 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <button
                                     onClick={openRawEdit}
-                                    disabled={loading || !canManageUser}
-                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-indigo-500/20 hover:border-indigo-600 hover:bg-indigo-600/10 shadow-sm hover:shadow-xl'}`}
+                                    disabled={loading || !isSuperAdmin}
+                                    className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-indigo-500/20 hover:border-indigo-600 hover:bg-indigo-600/10 shadow-sm hover:shadow-xl'}`}
                                 >
                                     <div className="relative z-10">
                                         <div className="flex justify-between items-start mb-4">
-                                            <span className={`font-black text-xl flex items-center gap-3 ${!canManageUser ? 'text-slate-900 dark:text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                                            <span className={`font-black text-xl flex items-center gap-3 ${!isSuperAdmin ? 'text-slate-900 dark:text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>
                                                 <Code className="w-6 h-6" /> Edit Raw JSON
                                             </span>
-                                            {!canManageUser && <Lock className="w-5 h-5 text-slate-400" />}
+                                            {!isSuperAdmin && <Lock className="w-5 h-5 text-slate-400" />}
                                         </div>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                                            Modify the underlying MongoDB document for this user. Advanced use only.
+                                            {!isSuperAdmin ? 'Only the Super Admin can edit raw user metadata.' : 'Modify the underlying MongoDB document for this user. Advanced use only.'}
                                         </p>
                                     </div>
                                 </button>
