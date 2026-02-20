@@ -286,6 +286,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/modjams/**").authenticated()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
@@ -335,6 +336,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/user/api-keys/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/analytics", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
+        source.registerCorsConfiguration("/api/v1/modjams/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
