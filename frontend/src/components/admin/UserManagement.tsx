@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, Lock, X, AlertTriangle } from 'lucide-react';
+import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, Lock, X, AlertTriangle, FileJson } from 'lucide-react';
 import { api } from '../../utils/api';
 
 export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setStatus }) => {
@@ -13,6 +13,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
     const [showResults, setShowResults] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmUsername, setDeleteConfirmUsername] = useState('');
@@ -27,6 +28,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
 
     const [showRawModal, setShowRawModal] = useState(false);
     const [rawJsonStr, setRawJsonStr] = useState('');
+    const [jsonError, setJsonError] = useState<string | null>(null);
 
     useEffect(() => {
         api.get('/user/me').then(res => setCurrentAdmin(res.data)).catch(() => {});
@@ -227,11 +229,50 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         try {
             const res = await api.get(`/admin/users/${foundUser.username}/raw`);
             setRawJsonStr(JSON.stringify(res.data, null, 2));
+            setJsonError(null);
             setShowRawModal(true);
         } catch (e) {
             setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch raw user data.' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setRawJsonStr(val);
+        try {
+            JSON.parse(val);
+            setJsonError(null);
+        } catch (err: any) {
+            setJsonError(err.message);
+        }
+    };
+
+    const handleJsonKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const target = e.currentTarget;
+            const start = target.selectionStart;
+            const end = target.selectionEnd;
+            const val = target.value;
+
+            setRawJsonStr(val.substring(0, start) + '  ' + val.substring(end));
+
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
+                }
+            }, 0);
+        }
+    };
+
+    const formatJson = () => {
+        try {
+            const parsed = JSON.parse(rawJsonStr);
+            setRawJsonStr(JSON.stringify(parsed, null, 2));
+            setJsonError(null);
+        } catch (e) {
         }
     };
 
@@ -244,7 +285,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
             setShowRawModal(false);
             fetchUserProfile(foundUser.username);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : 'Server error saving raw data.' });
+            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : (e.response?.data || 'Server error saving raw data.') });
         } finally {
             setLoading(false);
         }
@@ -342,31 +383,48 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                     )}
 
                     {showRawModal && (
-                        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                            <div className="bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden max-h-[90vh]">
-                                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
-                                    <h3 className="font-bold text-white flex items-center gap-2">
-                                        <Code className="w-5 h-5 text-indigo-500" /> Edit Raw User Metadata
-                                    </h3>
+                        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden h-[85vh]">
+                                <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-black/40">
+                                    <div>
+                                        <h3 className="font-bold text-white flex items-center gap-2 text-lg">
+                                            <FileJson className="w-5 h-5 text-indigo-400" /> JSON Editor
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1 font-mono">Editing user: {foundUser.username}</p>
+                                    </div>
                                     <button onClick={() => setShowRawModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
-                                        <X className="w-4 h-4" />
+                                        <X className="w-5 h-5" />
                                     </button>
                                 </div>
-                                <div className="p-4 flex-1 overflow-hidden flex flex-col">
-                                    <div className="mb-2 text-amber-400 text-xs font-bold flex items-center gap-2 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
-                                        <AlertTriangle className="w-4 h-4 shrink-0" /> Note: Secure fields (passwords, MFA secrets, OAuth tokens, and ID) are intercepted by the backend and cannot be overwritten via this editor.
+                                <div className="flex-1 p-6 overflow-hidden flex flex-col bg-[#0d1117]">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2 text-xs font-bold bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-lg border border-amber-500/20">
+                                            <AlertTriangle className="w-4 h-4 shrink-0" /> Secure fields (passwords, MFA secrets) are intercepted and cannot be overwritten.
+                                        </div>
+                                        <button onClick={formatJson} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold rounded-lg border border-white/10 transition-colors">
+                                            Format JSON
+                                        </button>
                                     </div>
-                                    <textarea
-                                        value={rawJsonStr}
-                                        onChange={(e) => setRawJsonStr(e.target.value)}
-                                        className="flex-1 w-full p-4 bg-[#0d1117] text-slate-300 font-mono text-sm rounded-xl border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none whitespace-pre overflow-auto custom-scrollbar"
-                                        spellCheck={false}
-                                    />
+                                    <div className="relative flex-1 rounded-xl border border-white/10 overflow-hidden bg-black/20 flex flex-col">
+                                        <textarea
+                                            ref={textareaRef}
+                                            value={rawJsonStr}
+                                            onChange={handleJsonChange}
+                                            onKeyDown={handleJsonKeyDown}
+                                            className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto custom-scrollbar transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`}
+                                            spellCheck={false}
+                                        />
+                                        {jsonError && (
+                                            <div className="absolute bottom-0 left-0 right-0 bg-red-500/90 text-white text-xs font-bold px-4 py-2 truncate shadow-lg backdrop-blur-sm">
+                                                Parse Error: {jsonError}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="p-4 border-t border-white/10 bg-black/20 flex justify-end gap-3">
-                                    <button onClick={() => setShowRawModal(false)} className="px-6 py-2 rounded-lg font-bold text-slate-300 hover:bg-white/5 transition-colors">Cancel</button>
-                                    <button onClick={saveRawEdit} disabled={loading} className="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-bold transition-colors disabled:opacity-50">
-                                        {loading ? 'Saving...' : 'Save JSON'}
+                                <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end gap-3 px-6">
+                                    <button onClick={() => setShowRawModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-300 hover:bg-white/5 transition-colors">Cancel</button>
+                                    <button onClick={saveRawEdit} disabled={loading || !!jsonError} className="px-8 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex items-center gap-2">
+                                        {loading ? 'Saving...' : 'Save Changes'}
                                     </button>
                                 </div>
                             </div>

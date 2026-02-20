@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X } from 'lucide-react';
+import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson } from 'lucide-react';
 import { api, API_BASE_URL } from '../../utils/api';
 import type { Mod, ScanIssue } from '../../types';
 
@@ -15,6 +15,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const [showResults, setShowResults] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const [confirmAction, setConfirmAction] = useState<'DELETE' | 'UNLIST' | 'DELETE_VER' | 'RESTORE' | 'HARD_DELETE' | null>(null);
     const [restoreTargetStatus, setRestoreTargetStatus] = useState<string>('PUBLISHED');
@@ -26,6 +27,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
 
     const [showRawModal, setShowRawModal] = useState(false);
     const [rawJsonStr, setRawJsonStr] = useState('');
+    const [jsonError, setJsonError] = useState<string | null>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -96,7 +98,46 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
 
     const openRawEdit = () => {
         setRawJsonStr(JSON.stringify(foundProject, null, 2));
+        setJsonError(null);
         setShowRawModal(true);
+    };
+
+    const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setRawJsonStr(val);
+        try {
+            JSON.parse(val);
+            setJsonError(null);
+        } catch (err: any) {
+            setJsonError(err.message);
+        }
+    };
+
+    const handleJsonKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const target = e.currentTarget;
+            const start = target.selectionStart;
+            const end = target.selectionEnd;
+            const val = target.value;
+
+            setRawJsonStr(val.substring(0, start) + '  ' + val.substring(end));
+
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
+                }
+            }, 0);
+        }
+    };
+
+    const formatJson = () => {
+        try {
+            const parsed = JSON.parse(rawJsonStr);
+            setRawJsonStr(JSON.stringify(parsed, null, 2));
+            setJsonError(null);
+        } catch (e) {
+        }
     };
 
     const saveRawEdit = async () => {
@@ -361,31 +402,48 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                     )}
 
                     {showRawModal && (
-                        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                            <div className="bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden max-h-[90vh]">
-                                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
-                                    <h3 className="font-bold text-white flex items-center gap-2">
-                                        <Code className="w-5 h-5 text-indigo-500" /> Edit Raw Project Metadata
-                                    </h3>
+                        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden h-[85vh]">
+                                <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-black/40">
+                                    <div>
+                                        <h3 className="font-bold text-white flex items-center gap-2 text-lg">
+                                            <FileJson className="w-5 h-5 text-indigo-400" /> JSON Editor
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1 font-mono">Editing project: {foundProject.id}</p>
+                                    </div>
                                     <button onClick={() => setShowRawModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
-                                        <X className="w-4 h-4" />
+                                        <X className="w-5 h-5" />
                                     </button>
                                 </div>
-                                <div className="p-4 flex-1 overflow-hidden flex flex-col">
-                                    <div className="mb-2 text-amber-400 text-xs font-bold flex items-center gap-2 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
-                                        <AlertTriangle className="w-4 h-4" /> Warning: Directly modifying raw JSON bypasses standard validation rules. Malformed data will break the project.
+                                <div className="flex-1 p-6 overflow-hidden flex flex-col bg-[#0d1117]">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2 text-xs font-bold bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-lg border border-amber-500/20">
+                                            <AlertTriangle className="w-4 h-4" /> Bypasses standard validation.
+                                        </div>
+                                        <button onClick={formatJson} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold rounded-lg border border-white/10 transition-colors">
+                                            Format JSON
+                                        </button>
                                     </div>
-                                    <textarea
-                                        value={rawJsonStr}
-                                        onChange={(e) => setRawJsonStr(e.target.value)}
-                                        className="flex-1 w-full p-4 bg-[#0d1117] text-slate-300 font-mono text-sm rounded-xl border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none whitespace-pre overflow-auto custom-scrollbar"
-                                        spellCheck={false}
-                                    />
+                                    <div className="relative flex-1 rounded-xl border border-white/10 overflow-hidden bg-black/20 flex flex-col">
+                                        <textarea
+                                            ref={textareaRef}
+                                            value={rawJsonStr}
+                                            onChange={handleJsonChange}
+                                            onKeyDown={handleJsonKeyDown}
+                                            className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto custom-scrollbar transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`}
+                                            spellCheck={false}
+                                        />
+                                        {jsonError && (
+                                            <div className="absolute bottom-0 left-0 right-0 bg-red-500/90 text-white text-xs font-bold px-4 py-2 truncate shadow-lg backdrop-blur-sm">
+                                                Parse Error: {jsonError}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="p-4 border-t border-white/10 bg-black/20 flex justify-end gap-3">
-                                    <button onClick={() => setShowRawModal(false)} className="px-6 py-2 rounded-lg font-bold text-slate-300 hover:bg-white/5 transition-colors">Cancel</button>
-                                    <button onClick={saveRawEdit} disabled={loading} className="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-bold transition-colors disabled:opacity-50">
-                                        {loading ? 'Saving...' : 'Save JSON'}
+                                <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end gap-3 px-6">
+                                    <button onClick={() => setShowRawModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-300 hover:bg-white/5 transition-colors">Cancel</button>
+                                    <button onClick={saveRawEdit} disabled={loading || !!jsonError} className="px-8 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex items-center gap-2">
+                                        {loading ? 'Saving...' : 'Save Changes'}
                                     </button>
                                 </div>
                             </div>
