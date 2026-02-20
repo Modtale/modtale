@@ -1,0 +1,987 @@
+openapi: 3.1.0
+info:
+  title: Modtale API
+  version: v1
+  description: Complete programmatic access to the Hytale community repository.
+servers:
+  - url: https://api.modtale.net
+    description: Production Server
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-MODTALE-KEY
+      description: Include your API key to identify your client and get higher limits.
+  schemas:
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        classification:
+          type: string
+          enum: [PLUGIN, DATA, ART, SAVE, MODPACK]
+        description:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+security:
+  - ApiKeyAuth: []
+paths:
+  /api/v1/tags:
+    get:
+      summary: Retrieve allowed project tags
+      description: Retrieve the strictly enforced list of allowed project tags.
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              example: ["Adventure", "RPG", "Sci-Fi", "Fantasy"]
+  /api/v1/meta/classifications:
+    get:
+      summary: Get allowed project types
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              example: ["PLUGIN", "DATA", "ART", "SAVE", "MODPACK"]
+  /api/v1/meta/game-versions:
+    get:
+      summary: Get supported game target versions
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              example: ["2026.01.13-dcad8778f", "2026.01.17-4b0f30090"]
+  /api/v1/status:
+    get:
+      summary: Get system health and latency statistics
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              example:
+                overall: "operational"
+                services:
+                  - id: "api"
+                    status: "operational"
+                    latency: 12
+                timestamp: 1740000000000
+  /api/v1/projects:
+    get:
+      summary: Search projects
+      description: Search projects with advanced filtering. Authentication is required only for specific 'category' filters like Favorites.
+      security:
+        - ApiKeyAuth: []
+        - {}
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, downloads, updated, newest, rating, favorites]
+        - name: classification
+          in: query
+          schema:
+            type: string
+            enum: [PLUGIN, DATA, ART, SAVE, MODPACK]
+        - name: tags
+          in: query
+          schema:
+            type: string
+        - name: gameVersion
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: author
+          in: query
+          schema:
+            type: string
+        - name: creator
+          in: query
+          schema:
+            type: string
+        - name: dateRange
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, 1y, all]
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Initialize a new project Draft
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, classification, description]
+              properties:
+                title:
+                  type: string
+                classification:
+                  type: string
+                description:
+                  type: string
+                owner:
+                  type: string
+                slug:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}:
+    get:
+      summary: Get full project details
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    put:
+      summary: Update project metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Delete a project
+      description: If the project is a dependency for other active projects, it will be 'Soft Deleted' to prevent breaking modpacks.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/user/contributed:
+    get:
+      summary: Get user contributed projects
+      responses:
+        "200":
+          description: OK
+  /api/v1/creators/{username}/projects:
+    get:
+      summary: Get creator projects
+      security: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/publish:
+    post:
+      summary: Submit a draft for publishing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/submit:
+    post:
+      summary: Submit a project for admin review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/archive:
+    post:
+      summary: Archive a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/unlist:
+    post:
+      summary: Unlist a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/icon:
+    put:
+      summary: Upload project icon
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/banner:
+    put:
+      summary: Upload project banner
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/gallery:
+    post:
+      summary: Add an image to the gallery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Remove an image from the gallery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: imageUrl
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/versions:
+    post:
+      summary: Upload a new version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                versionNumber:
+                  type: string
+                gameVersions:
+                  type: array
+                  items:
+                    type: string
+                changelog:
+                  type: string
+                channel:
+                  type: string
+                  enum: [RELEASE, BETA, ALPHA]
+                file:
+                  type: string
+                  format: binary
+                modIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/versions/{versionId}:
+    put:
+      summary: Update version metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Delete a version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/versions/{version}/download-url:
+    get:
+      summary: Generate a temporary signed download link
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/version/{hash}:
+    get:
+      summary: Lookup version details by file hash
+      security: []
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/invite:
+    post:
+      summary: Invite a contributor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/invite/accept:
+    post:
+      summary: Accept a contribution invite
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/invite/decline:
+    post:
+      summary: Decline a contribution invite
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/contributors/{username}:
+    delete:
+      summary: Remove a contributor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/transfer:
+    post:
+      summary: Initiate ownership transfer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/transfer/resolve:
+    post:
+      summary: Accept or decline a transfer request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accept:
+                  type: boolean
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs:
+    post:
+      summary: Create a new Organization
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/orgs:
+    get:
+      summary: List organizations you belong to
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{username}/members:
+    get:
+      summary: Get public members of an organization
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{id}/members:
+    post:
+      summary: Invite a user to the organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                role:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{id}/members/{userId}:
+    put:
+      summary: Update member role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Remove member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{id}:
+    put:
+      summary: Update organization profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Delete organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{id}/avatar:
+    post:
+      summary: Upload organization avatar
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{id}/banner:
+    post:
+      summary: Upload organization banner
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+  /api/v1/users/search:
+    get:
+      summary: Public user search
+      security: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/users/batch:
+    post:
+      summary: Batch retrieve user profiles
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usernames:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/me:
+    get:
+      summary: Get authenticated user details
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Permanently delete user account
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/profile:
+    put:
+      summary: Update profile settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/profile/avatar:
+    post:
+      summary: Upload user avatar
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/profile/banner:
+    post:
+      summary: Upload user banner
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+  /api/v1/users/{username}/following:
+    get:
+      summary: Get list of users this user follows
+      security: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/users/{username}/followers:
+    get:
+      summary: Get list of users following this user
+      security: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/settings/notifications:
+    put:
+      summary: Update notification preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/follow/{targetUsername}:
+    post:
+      summary: Follow a user
+      parameters:
+        - name: targetUsername
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/unfollow/{targetUsername}:
+    post:
+      summary: Unfollow a user
+      parameters:
+        - name: targetUsername
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/notifications:
+    get:
+      summary: Retrieve user notifications
+      responses:
+        "200":
+          description: OK
+  /api/v1/notifications/{id}/read:
+    post:
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/notifications/read-all:
+    post:
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/analytics:
+    get:
+      summary: Get public stats for a project
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: range
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/favorite:
+    post:
+      summary: Toggle favorite status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/comments:
+    post:
+      summary: Post a comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/comments/{commentId}:
+    put:
+      summary: Edit your comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/comments/{commentId}/reply:
+    post:
+      summary: Developer reply to a comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reply:
+                  type: string
+      responses:
+        "200":
+          description: OK
