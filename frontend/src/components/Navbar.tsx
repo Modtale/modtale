@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, FileText, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
+import { Menu, X, Upload, Home, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, FileText, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationMenu } from './user/NotificationMenu';
 import { FollowingModal } from './user/FollowingModal';
 import { SignInModal } from './user/SignInModal';
 import { AnimatedThemeToggler } from './ui/AnimatedThemeToggler';
 import { useMobile } from '../context/MobileContext';
-import type { User } from "@/types.ts";
+import type { User } from "@/types";
 
 interface NavbarProps {
     user: User | null;
@@ -60,8 +60,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         }
     }, [isMobile]);
 
-    const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
-    const detailPrefixes = ['mod/', 'world/', 'modpack/'];
+    const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data', 'jams'];
+    const detailPrefixes = ['mod/', 'world/', 'modpack/', 'jam/'];
     const isHomeLayout = homeLikePages.includes(currentPage) || detailPrefixes.some(prefix => currentPage.startsWith(prefix) && currentPage.split('/').length < 2);
 
     const widthClass = isHomeLayout
@@ -100,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     <button
                                         onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
                                         className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                            isHomeLayout
+                                            isHomeLayout && currentPage !== 'jams'
                                                 ? 'text-modtale-accent bg-modtale-accent/10'
                                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                         }`}
@@ -166,16 +166,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 </div>
 
                                 <Link
-                                    to="/api-docs"
+                                    to="/jams"
                                     className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                        currentPage === 'api-docs'
+                                        currentPage === 'jams'
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                     }`}
                                 >
-                                    <Code2 className="w-4 h-4 mr-2" />
-                                    API
+                                    <Trophy className="w-4 h-4 mr-2" />
+                                    Jams
                                 </Link>
+
                                 {user && (
                                     <>
                                         <Link
@@ -295,7 +296,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
 
-                    <Link to="/api-docs" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> API</Link>
+                    <Link to="/jams" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Trophy className="w-4 h-4 mr-3" /> Modjams</Link>
+
                     {user && (
                         <>
                             <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
