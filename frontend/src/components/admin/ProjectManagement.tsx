@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw } from 'lucide-react';
+import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X } from 'lucide-react';
 import { api, API_BASE_URL } from '../../utils/api';
 import type { Mod, ScanIssue } from '../../types';
-import { SourceInspector } from "@/components/admin/SourceInspector.tsx";
 
 export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setStatus }) => {
     const [query, setQuery] = useState('');
@@ -24,6 +23,9 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
 
     const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
+
+    const [showRawModal, setShowRawModal] = useState(false);
+    const [rawJsonStr, setRawJsonStr] = useState('');
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -90,6 +92,27 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
         setIdQuery(mod.id);
         setShowResults(false);
         setConfirmAction(null);
+    };
+
+    const openRawEdit = () => {
+        setRawJsonStr(JSON.stringify(foundProject, null, 2));
+        setShowRawModal(true);
+    };
+
+    const saveRawEdit = async () => {
+        if (!foundProject) return;
+        setLoading(true);
+        try {
+            const parsed = JSON.parse(rawJsonStr);
+            await api.put(`/admin/projects/${foundProject.id}/raw`, parsed);
+            setStatus({ type: 'success', title: 'Saved', msg: 'Raw project metadata updated successfully.' });
+            setShowRawModal(false);
+            setFoundProject(parsed);
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : (e.response?.data || 'Server error saving raw data.') });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleAction = async () => {
@@ -245,6 +268,13 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                         </div>
 
                         <div className="flex flex-wrap gap-4">
+                            <button
+                                onClick={openRawEdit}
+                                className="flex-1 py-3 border-2 border-indigo-500/20 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px]"
+                            >
+                                <Code className="w-4 h-4" /> Edit Raw JSON
+                            </button>
+
                             {foundProject.status === 'DELETED' ? (
                                 <>
                                     <button
@@ -327,6 +357,38 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {showRawModal && (
+                        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden max-h-[90vh]">
+                                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
+                                    <h3 className="font-bold text-white flex items-center gap-2">
+                                        <Code className="w-5 h-5 text-indigo-500" /> Edit Raw Project Metadata
+                                    </h3>
+                                    <button onClick={() => setShowRawModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <div className="p-4 flex-1 overflow-hidden flex flex-col">
+                                    <div className="mb-2 text-amber-400 text-xs font-bold flex items-center gap-2 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                                        <AlertTriangle className="w-4 h-4" /> Warning: Directly modifying raw JSON bypasses standard validation rules. Malformed data will break the project.
+                                    </div>
+                                    <textarea
+                                        value={rawJsonStr}
+                                        onChange={(e) => setRawJsonStr(e.target.value)}
+                                        className="flex-1 w-full p-4 bg-[#0d1117] text-slate-300 font-mono text-sm rounded-xl border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none whitespace-pre overflow-auto custom-scrollbar"
+                                        spellCheck={false}
+                                    />
+                                </div>
+                                <div className="p-4 border-t border-white/10 bg-black/20 flex justify-end gap-3">
+                                    <button onClick={() => setShowRawModal(false)} className="px-6 py-2 rounded-lg font-bold text-slate-300 hover:bg-white/5 transition-colors">Cancel</button>
+                                    <button onClick={saveRawEdit} disabled={loading} className="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-bold transition-colors disabled:opacity-50">
+                                        {loading ? 'Saving...' : 'Save JSON'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
