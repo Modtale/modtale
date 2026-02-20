@@ -174,6 +174,7 @@ export interface Modjam {
     slug: string;
     title: string;
     description: string;
+    imageUrl?: string;
     bannerUrl?: string;
     hostId: string;
     hostName: string;
