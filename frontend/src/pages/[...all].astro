@@ -104,12 +104,14 @@ if (isBot) {
         try {
             let classification = null;
             let isHome = false;
+            let isJams = false;
 
             if (cleanPath === '/plugins') classification = 'PLUGIN';
             else if (cleanPath === '/modpacks') classification = 'MODPACK';
             else if (cleanPath === '/worlds') classification = 'SAVE';
             else if (cleanPath === '/art') classification = 'ART';
             else if (cleanPath === '/data') classification = 'DATA';
+            else if (cleanPath === '/jams') isJams = true;
             else if (cleanPath === '' || cleanPath === '/') {
                 classification = 'ALL';
                 isHome = true;
@@ -136,6 +138,13 @@ if (isBot) {
                     if (breadcrumbSchema) schemas.push(breadcrumbSchema);
 
                     if (schemas.length > 0) jsonLd = schemas;
+                }
+            } else if (isJams) {
+                const res = await fetch(`${API_URL}/modjams`);
+                if (res.ok) {
+                    const jams = await res.json();
+                    const listSchema = generateItemListSchema(jams.map((j: any) => ({...j, classification: 'JAM'})));
+                    if (listSchema) jsonLd = [websiteSchema, listSchema];
                 }
             }
         } catch (e) {
