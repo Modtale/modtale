@@ -27,16 +27,20 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
                 const subRes = await api.get(`/modjams/${res.data.id}/submissions`);
                 setSubmissions(subRes.data);
-
-                if (currentUser) {
-                    const projRes = await api.get(`/user/repos`);
-                    setMyProjects(projRes.data.content || []);
-                }
             } catch (err) {
                 console.error(err);
                 setStatusModal({ type: 'error', title: 'Not Found', msg: 'Failed to load jam details.' });
             } finally {
                 setLoading(false);
+            }
+
+            if (currentUser) {
+                try {
+                    const projRes = await api.get(`/user/repos`);
+                    setMyProjects(projRes.data.content || []);
+                } catch (e) {
+                    console.error("Failed to fetch user projects for jam submission", e);
+                }
             }
         };
         fetchJamData();
@@ -47,7 +51,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         try {
             await api.post(`/modjams/${jam.id}/participate`, {});
             setStatusModal({ type: 'success', title: 'Joined!', msg: 'Successfully joined the jam.' });
-            setJam({ ...jam, participantIds: [...jam.participantIds, currentUser.id] });
+            setJam({ ...jam, participantIds: [...(jam.participantIds || []), currentUser.id] });
         } catch (err) {
             setStatusModal({ type: 'error', title: 'Error', msg: 'Failed to join the jam.' });
         }
@@ -81,7 +85,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!jam) return <div className="p-20 text-center font-bold text-slate-500">Jam not found.</div>;
 
-    const isParticipating = currentUser?.id && jam.participantIds.includes(currentUser.id);
+    const isParticipating = currentUser?.id && (jam.participantIds || []).includes(currentUser.id);
     const hasSubmitted = submissions.some(s => s.submitterId === currentUser?.id);
     const canVote = jam.status === 'VOTING' && (jam.allowPublicVoting || jam.hostId === currentUser?.id);
 
@@ -93,7 +97,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
             <JamLayout
                 bannerUrl={jam.bannerUrl}
-                iconUrl={jam.bannerUrl || "https://modtale.net/assets/favicon.svg"}
+                iconUrl={(jam as any).imageUrl || "https://modtale.net/assets/favicon.svg"}
                 onBack={() => navigate('/jams')}
                 headerContent={
                     <>
@@ -170,7 +174,6 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Current Status</span>
                                 <span className="text-3xl font-black text-modtale-accent uppercase tracking-widest drop-shadow-sm">{jam.status}</span>
                             </div>
-                            <Trophy className="absolute -bottom-4 -right-4 w-24 h-24 text-slate-900/5 dark:text-white/5" />
                         </div>
 
                         <div className="p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-xl">
@@ -205,7 +208,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="flex flex-col items-center justify-center p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-lg">
                                 <Users className="w-6 h-6 text-modtale-accent mb-2" />
-                                <span className="text-3xl font-black text-slate-900 dark:text-white mb-1">{jam.participantIds.length}</span>
+                                <span className="text-3xl font-black text-slate-900 dark:text-white mb-1">{(jam.participantIds || []).length}</span>
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Joined</span>
                             </div>
                             <div className="flex flex-col items-center justify-center p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-lg">
@@ -215,7 +218,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                             </div>
                         </div>
 
-                        {jam.categories.length > 0 && (
+                        {(jam.categories || []).length > 0 && (
                             <div className="p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-xl">
                                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 flex items-center gap-2">
                                     <Scale className="w-4 h-4 text-modtale-accent" /> Judging Criteria
@@ -259,10 +262,10 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                     </div>
 
                                     <div className="p-5 flex-1 flex flex-col bg-slate-50 dark:bg-transparent">
-                                        {canVote && jam.categories.length > 0 ? (
+                                        {canVote && (jam.categories || []).length > 0 ? (
                                             <div className="mt-auto space-y-3 pt-2">
                                                 {jam.categories.map(cat => {
-                                                    const myVote = sub.votes.find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
+                                                    const myVote = (sub.votes || []).find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
                                                     return (
                                                         <div key={cat.id} className="flex flex-col gap-2 p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
                                                             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{cat.name}</span>

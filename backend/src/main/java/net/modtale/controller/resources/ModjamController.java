@@ -8,6 +8,7 @@ import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,37 @@ public class ModjamController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.createJam(jam, user.getId(), user.getUsername()));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Modjam> updateJam(@PathVariable String id, @RequestBody Modjam jam) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.updateJam(id, jam));
+    }
+
+    @PutMapping("/{id}/icon")
+    public ResponseEntity<?> updateIcon(@PathVariable String id, @RequestParam("file") MultipartFile file) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            modjamService.updateIcon(id, file);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/banner")
+    public ResponseEntity<?> updateBanner(@PathVariable String id, @RequestParam("file") MultipartFile file) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            modjamService.updateBanner(id, file);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/{jamId}/submissions")
