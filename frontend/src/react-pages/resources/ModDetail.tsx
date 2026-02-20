@@ -1,5 +1,4 @@
-// frontend/react-pages/resources/ModDetail.tsx
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -39,7 +38,7 @@ const ProjectSidebar: React.FC<{
     contributors: User[];
     orgMembers: User[];
     author: User | null;
-}> = ({ mod, dependencies, depMeta, navigate, contributors, orgMembers, author }) => {
+}> = React.memo(({ mod, dependencies, depMeta, navigate, contributors, orgMembers, author }) => {
     const [copiedId, setCopiedId] = useState(false);
 
     const gameVersions = useMemo(() => {
@@ -55,11 +54,11 @@ const ProjectSidebar: React.FC<{
         return mod.license ? getLicenseInfo(mod.license) : null;
     }, [mod.license, mod.links]);
 
-    const handleCopyId = () => {
+    const handleCopyId = useCallback(() => {
         navigator.clipboard.writeText(mod.id);
         setCopiedId(true);
         setTimeout(() => setCopiedId(false), 2000);
-    };
+    }, [mod.id]);
 
     const isModpack = mod.classification === 'MODPACK';
     const getIconUrl = (path?: string) => path ? (path.startsWith('http') ? path : `${BACKEND_URL}${path}`) : null;
@@ -69,8 +68,8 @@ const ProjectSidebar: React.FC<{
             <div className="grid grid-cols-2 gap-2 py-2">
                 <div className="flex flex-col items-center justify-start">
                     <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.favoriteCount.toLocaleString()}</div>
-                    <div className="flex items-center justify-center mt-1 h-5 w-full gap-1.5 text-slate-400">
-                        <Heart className="w-3.5 h-3.5" />
+                    <div className="flex items-center justify-center mt-1 h-5 w-full gap-1.5 text-slate-500 dark:text-slate-400">
+                        <Heart className="w-3.5 h-3.5" aria-hidden="true" />
                         <span className="text-[10px] font-bold uppercase tracking-widest pt-0.5">Favorites</span>
                     </div>
                 </div>
@@ -78,8 +77,8 @@ const ProjectSidebar: React.FC<{
                 <div className="flex flex-col items-center justify-start border-l border-slate-200 dark:border-white/5">
                     <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.downloadCount.toLocaleString()}</div>
                     <div className="flex items-center gap-1.5 mt-1 h-5">
-                        <Download className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-0.5">Downloads</span>
+                        <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pt-0.5">Downloads</span>
                     </div>
                 </div>
             </div>
@@ -88,7 +87,7 @@ const ProjectSidebar: React.FC<{
                 <SidebarSection title="Supported Versions" icon={Gamepad2}>
                     <div className="flex flex-wrap gap-2">
                         {gameVersions.map(v => (
-                            <span key={v} className="px-2.5 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-md text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                            <span key={v} className="px-2.5 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-md text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                                 {v}
                             </span>
                         ))}
@@ -99,7 +98,7 @@ const ProjectSidebar: React.FC<{
             <SidebarSection title="Tags" icon={Tag}>
                 <div className="flex flex-wrap gap-2">
                     {mod.tags?.map((tag) => (
-                        <span key={tag} className="px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-modtale-accent hover:border-modtale-accent transition-all cursor-default">
+                        <span key={tag} className="px-3 py-1.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-modtale-accent hover:border-modtale-accent transition-all cursor-default">
                             {tag}
                         </span>
                     ))}
@@ -118,14 +117,14 @@ const ProjectSidebar: React.FC<{
                             >
                                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
                                     {member.avatarUrl ? (
-                                        <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                        <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
                                     ) : (
-                                        <span className="font-bold text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
+                                        <span className="font-bold text-slate-500 dark:text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
                                     )}
                                 </div>
                                 <div>
-                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-modtale-accent">{member.username}</div>
-                                    <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{member.username}</div>
+                                    <div className="text-[10px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">
                                         {author.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
                                     </div>
                                 </div>
@@ -146,12 +145,12 @@ const ProjectSidebar: React.FC<{
                             >
                                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
                                     {contributor.avatarUrl ? (
-                                        <img src={contributor.avatarUrl} alt={contributor.username} className="w-full h-full object-cover" />
+                                        <img src={contributor.avatarUrl} alt="" className="w-full h-full object-cover" />
                                     ) : (
-                                        <span className="font-bold text-slate-400 text-xs">{contributor.username.charAt(0).toUpperCase()}</span>
+                                        <span className="font-bold text-slate-500 dark:text-slate-400 text-xs">{contributor.username.charAt(0).toUpperCase()}</span>
                                     )}
                                 </div>
-                                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-modtale-accent">{contributor.username}</div>
+                                <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{contributor.username}</div>
                             </a>
                         ))}
                     </div>
@@ -175,12 +174,12 @@ const ProjectSidebar: React.FC<{
                                     className="w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left"
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden">
-                                        {iconUrl ? <img src={iconUrl} alt="" className="w-full h-full object-cover" /> : <Box className="w-4 h-4" />}
+                                        {iconUrl ? <img src={iconUrl} alt="" className="w-full h-full object-cover" /> : <Box className="w-4 h-4" aria-hidden="true" />}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-modtale-accent truncate">{title}</div>
-                                        <div className="text-[10px] text-slate-500 flex items-center gap-2">
-                                            {!isModpack && <span className={dep.isOptional ? '' : 'text-amber-500 font-bold'}>{dep.isOptional ? 'Optional' : 'Required'}</span>}
+                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{title}</div>
+                                        <div className="text-[10px] text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                                            {!isModpack && <span className={dep.isOptional ? '' : 'text-amber-600 dark:text-amber-500 font-bold'}>{dep.isOptional ? 'Optional' : 'Required'}</span>}
                                             <span className="font-mono opacity-75">v{dep.versionNumber}</span>
                                         </div>
                                     </div>
@@ -195,11 +194,11 @@ const ProjectSidebar: React.FC<{
                 <SidebarSection title="License" icon={Scale}>
                     <div className="text-xs font-bold">
                         {licenseInfo.url ? (
-                            <a href={licenseInfo.url} target="_blank" rel="noopener noreferrer" className="block text-center p-2 rounded-lg bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:text-modtale-accent hover:border-modtale-accent transition-all truncate">
+                            <a href={licenseInfo.url} target="_blank" rel="noopener noreferrer" className="block text-center p-2 rounded-lg bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 text-slate-700 dark:text-slate-300 hover:text-modtale-accent hover:border-modtale-accent transition-all truncate">
                                 {licenseInfo.name}
                             </a>
                         ) : (
-                            <div className="text-center p-2 rounded-lg bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 truncate">
+                            <div className="text-center p-2 rounded-lg bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 text-slate-700 dark:text-slate-300 truncate">
                                 {licenseInfo.name}
                             </div>
                         )}
@@ -209,15 +208,16 @@ const ProjectSidebar: React.FC<{
 
             <SidebarSection title="Project ID" icon={Hash}>
                 <div className="flex items-center justify-between group bg-white dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">
-                    <code className="text-xs font-mono text-slate-600 dark:text-slate-300">{mod.id}</code>
-                    <button onClick={handleCopyId} className="text-slate-400 hover:text-modtale-accent transition-colors">
-                        {copiedId ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                    <code className="text-xs font-mono text-slate-700 dark:text-slate-300">{mod.id}</code>
+                    <button onClick={handleCopyId} aria-label="Copy Project ID" className="text-slate-500 hover:text-modtale-accent transition-colors">
+                        {copiedId ? <Check className="w-4 h-4 text-green-600 dark:text-green-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                 </div>
             </SidebarSection>
         </div>
     );
-};
+});
+ProjectSidebar.displayName = 'ProjectSidebar';
 
 interface CommentSectionProps {
     modId: string;
@@ -232,23 +232,23 @@ interface CommentSectionProps {
     onReport: (commentId: string) => void;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, currentUser, isCreator, onCommentSubmitted, onError, onSuccess, innerRef, commentsDisabled, onReport }) => {
+const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comments, currentUser, isCreator, onCommentSubmitted, onError, onSuccess, innerRef, commentsDisabled, onReport }) => {
     const [text, setText] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
 
-    const startEditing = (comment: Comment) => {
+    const startEditing = useCallback((comment: Comment) => {
         setText(comment.content);
         setEditingCommentId(comment.id);
         if(innerRef?.current) innerRef.current.scrollIntoView({behavior:'smooth'});
-    };
+    }, [innerRef]);
 
-    const cancelEdit = () => {
+    const cancelEdit = useCallback(() => {
         setEditingCommentId(null);
         setText('');
-    };
+    }, []);
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -298,36 +298,36 @@ const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, curren
     return (
         <div ref={innerRef} className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-                <MessageSquare className="w-6 h-6 text-modtale-accent" /> Comments <span className="text-sm font-medium text-slate-400">({comments.length})</span>
+                <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> Comments <span className="text-sm font-medium text-slate-500 dark:text-slate-400">({comments.length})</span>
             </h2>
 
             {commentsDisabled && (
-                <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 text-orange-500 rounded-xl flex items-center gap-2 text-sm font-bold">
-                    <Flag className="w-4 h-4"/> Comments are currently disabled. Only you can see them.
+                <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-500 rounded-xl flex items-center gap-2 text-sm font-bold">
+                    <Flag className="w-4 h-4" aria-hidden="true"/> Comments are currently disabled. Only you can see them.
                 </div>
             )}
 
             {currentUser ? (
                 <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
                     <div className="flex justify-between mb-4">
-                        <h3 className="font-bold text-slate-900 dark:text-white">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
-                        {editingCommentId && <button type="button" onClick={cancelEdit} className="text-xs text-slate-500 hover:text-red-500 font-bold">Cancel</button>}
+                        <h3 className="font-bold text-slate-900 dark:text-white m-0 text-base">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
+                        {editingCommentId && <button type="button" onClick={cancelEdit} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-500 font-bold">Cancel</button>}
                     </div>
-                    <textarea value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[100px]" placeholder="Ask a question or share your thoughts..." required />
-                    <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50">
-                        <Send className="w-4 h-4" /> {editingCommentId ? 'Update Comment' : 'Post Comment'}
+                    <textarea aria-label="Comment content" value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[100px]" placeholder="Ask a question or share your thoughts..." required />
+                    <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 transition-colors">
+                        <Send className="w-4 h-4" aria-hidden="true" /> {editingCommentId ? 'Update Comment' : 'Post Comment'}
                     </button>
                 </form>
-            ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/5">Log in to post a comment.</div>}
+            ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-600 dark:text-slate-400 font-bold border border-slate-200 dark:border-white/5">Log in to post a comment.</div>}
 
             <div className="space-y-4">
                 {comments?.length > 0 ? comments.map((comment) => (
                     <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-500 flex items-center justify-center font-black overflow-hidden shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden shrink-0">
                                     {comment.userAvatarUrl ? (
-                                        <img src={comment.userAvatarUrl} alt={comment.user} className="w-full h-full object-cover" />
+                                        <img src={comment.userAvatarUrl} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         comment.user.charAt(0)
                                     )}
@@ -335,27 +335,27 @@ const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, curren
                                 <div><span className="font-bold text-slate-900 dark:text-white block">{comment.user}</span></div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                     {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                 </div>
-                                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
                                     {currentUser && (
-                                        <button onClick={() => onReport(comment.id)} className="text-xs text-slate-500 hover:text-red-500 font-bold flex items-center gap-1">
-                                            <Flag className="w-3 h-3"/> Report
+                                        <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
+                                            <Flag className="w-3 h-3" aria-hidden="true"/> Report
                                         </button>
                                     )}
                                     {(currentUser && currentUser.username === comment.user) && (
-                                        <button onClick={() => startEditing(comment)} className="text-xs text-slate-500 hover:text-modtale-accent font-bold flex items-center gap-1">
-                                            <Edit className="w-3 h-3"/> Edit
+                                        <button aria-label="Edit comment" onClick={() => startEditing(comment)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-modtale-accent font-bold flex items-center gap-1">
+                                            <Edit className="w-3 h-3" aria-hidden="true"/> Edit
                                         </button>
                                     )}
                                     {(isCreator || (currentUser && currentUser.username === comment.user)) && (
-                                        <button onClick={() => deleteComment(comment.id)} className="text-xs text-slate-500 hover:text-red-500 font-bold flex items-center gap-1">
-                                            <Trash className="w-3 h-3"/> Delete
+                                        <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
+                                            <Trash className="w-3 h-3" aria-hidden="true"/> Delete
                                         </button>
                                     )}
                                     {isCreator && (
-                                        <button onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs text-modtale-accent font-bold hover:underline">
+                                        <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs text-modtale-accent font-bold hover:underline">
                                             {comment.developerReply ? 'Edit Reply' : 'Reply'}
                                         </button>
                                     )}
@@ -367,16 +367,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, curren
                         {replyingCommentId === comment.id ? (
                             <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
                                 <textarea
+                                    aria-label="Developer reply content"
                                     value={replyText}
                                     onChange={e => setReplyText(e.target.value)}
-                                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-2 text-sm mb-2 focus:outline-none focus:border-modtale-accent"
+                                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-2 text-sm mb-2 focus:outline-none focus:border-modtale-accent text-slate-900 dark:text-white"
                                     placeholder="Write a reply..."
                                     rows={3}
                                 />
                                 <div className="flex justify-end gap-2">
-                                    <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white">Cancel</button>
-                                    <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1">
-                                        <CornerDownRight className="w-3 h-3"/> Post Reply
+                                    <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Cancel</button>
+                                    <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-modtale-accentHover transition-colors">
+                                        <CornerDownRight className="w-3 h-3" aria-hidden="true"/> Post Reply
                                     </button>
                                 </div>
                             </form>
@@ -390,29 +391,30 @@ const CommentSection: React.FC<CommentSectionProps> = ({ modId, comments, curren
                                                 {comment.developerReply.userAvatarUrl ? (
                                                     <img src={comment.developerReply.userAvatarUrl} alt="" className="w-full h-full object-cover"/>
                                                 ) : (
-                                                    <Crown className="w-3 h-3" />
+                                                    <Crown className="w-3 h-3" aria-hidden="true" />
                                                 )}
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                                                    {comment.developerReply.user} <Crown className="w-3 h-3 text-modtale-accent" />
+                                                    {comment.developerReply.user} <Crown className="w-3 h-3 text-modtale-accent" aria-hidden="true" />
                                                 </span>
-                                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                                                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
                                                     Developer Response • {new Date(comment.developerReply.date).toLocaleDateString()}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{comment.developerReply.content}</p>
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{comment.developerReply.content}</p>
                                 </div>
                             </div>
                         )}
                     </div>
-                )) : <div className="text-center py-12 text-slate-500 italic">No comments yet.</div>}
+                )) : <div className="text-center py-12 text-slate-600 dark:text-slate-400 italic">No comments yet.</div>}
             </div>
         </div>
     );
-};
+});
+CommentSection.displayName = 'CommentSection';
 
 export const ModDetail: React.FC<{
     onToggleFavorite: (id: string) => void;
@@ -632,14 +634,14 @@ export const ModDetail: React.FC<{
         try { await api.post(oldState ? `/user/unfollow/${mod.author}` : `/user/follow/${mod.author}`); } catch (e) { setIsFollowing(oldState); }
     };
 
-    const initiateDownload = (url: string, ver?: string, deps?: any[]) => {
+    const initiateDownload = useCallback((url: string, ver?: string, deps?: any[]) => {
         if (mod?.classification !== 'MODPACK' && deps && deps.length > 0) {
             setPendingDownloadVer({ url, ver: ver || '', deps });
             setShowDownloadModal(false);
         } else {
             executeDownload(url, ver);
         }
-    };
+    }, [mod?.classification]);
 
     const executeDownload = async (fileUrl: string, ver?: string) => {
         try {
@@ -726,6 +728,7 @@ export const ModDetail: React.FC<{
     if (!mod) return null;
 
     const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
+    const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
 
     const links = [
         mod.repositoryUrl && { type: 'SOURCE', url: mod.repositoryUrl, icon: Github, label: 'Source Code' },
@@ -737,10 +740,10 @@ export const ModDetail: React.FC<{
 
     const getLinkColor = (type: string) => {
         if (type === 'DISCORD') return 'text-[#5865F2] hover:bg-[#5865F2]/20 border-[#5865F2]/20';
-        if (type === 'WEBSITE') return 'text-blue-400 hover:bg-blue-500/20 border-blue-500/20';
-        if (type === 'ISSUE') return 'text-red-400 hover:bg-red-500/20 border-red-500/20';
-        if (type === 'SOURCE') return 'text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 border-slate-200 dark:border-white/10';
-        return 'text-amber-500 hover:bg-amber-500/10 border-amber-500/20';
+        if (type === 'WEBSITE') return 'text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20';
+        if (type === 'ISSUE') return 'text-red-500 dark:text-red-400 hover:bg-red-500/20 border-red-500/20';
+        if (type === 'SOURCE') return 'text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 border-slate-200 dark:border-white/10';
+        return 'text-amber-600 dark:text-amber-500 hover:bg-amber-500/10 border-amber-500/20';
     };
 
     const displayClassification = toTitleCase(mod.classification || 'PLUGIN');
@@ -753,6 +756,8 @@ export const ModDetail: React.FC<{
                     <meta name="description" content={projectMeta.description} />
                     {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
                     {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
+
+                    {resolvedBannerUrl && <link rel="preload" as="image" href={resolvedBannerUrl} fetchPriority="high" />}
 
                     <meta property="og:title" content={mod.title} />
                     <meta property="og:site_name" content="Modtale" />
@@ -811,23 +816,25 @@ export const ModDetail: React.FC<{
 
                         <div className="p-4 flex justify-between items-center bg-black/20 border-b border-white/10 z-10 shrink-0">
                             <span className="text-sm font-bold text-white/70">Image {galleryIndex + 1} of {mod.galleryImages.length}</span>
-                            <button onClick={() => setGalleryIndex(null)} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"><X className="w-5 h-5" /></button>
+                            <button aria-label="Close gallery" onClick={() => setGalleryIndex(null)} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
                         </div>
 
                         <div className="flex-1 relative flex items-center justify-center bg-black/40 overflow-hidden group">
                             {mod.galleryImages.length > 1 && (
                                 <>
                                     <button
+                                        aria-label="Previous image"
                                         onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex - 1 + mod.galleryImages!.length) % mod.galleryImages!.length)}}
                                         className="absolute left-4 p-3 bg-black/50 hover:bg-modtale-accent text-white rounded-full transition-all z-20 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0"
                                     >
-                                        <ChevronLeft className="w-6 h-6" />
+                                        <ChevronLeft className="w-6 h-6" aria-hidden="true" />
                                     </button>
                                     <button
+                                        aria-label="Next image"
                                         onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex + 1) % mod.galleryImages!.length)}}
                                         className="absolute right-4 p-3 bg-black/50 hover:bg-modtale-accent text-white rounded-full transition-all z-20 opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0"
                                     >
-                                        <ChevronRight className="w-6 h-6" />
+                                        <ChevronRight className="w-6 h-6" aria-hidden="true" />
                                     </button>
                                 </>
                             )}
@@ -849,18 +856,18 @@ export const ModDetail: React.FC<{
                 }}
                 headerActions={
                     <>
-                        <button disabled={!currentUser} onClick={() => onToggleFavorite(mod.id)} className={`p-3 rounded-xl border transition-all ${isLiked(mod.id) ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`} title="Favorite">
-                            <Heart className={`w-5 h-5 ${isLiked(mod.id) ? 'fill-current' : ''}`} />
+                        <button disabled={!currentUser} aria-label="Favorite" onClick={() => onToggleFavorite(mod.id)} className={`p-3 rounded-xl border transition-all ${isLiked(mod.id) ? 'bg-red-500/10 text-red-600 dark:text-red-500 border-red-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`} title="Favorite">
+                            <Heart className={`w-5 h-5 ${isLiked(mod.id) ? 'fill-current' : ''}`} aria-hidden="true" />
                         </button>
-                        <button onClick={handleShare} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-blue-400 hover:border-blue-400/30 transition-all" title="Share">
-                            <Share2 className="w-5 h-5" />
+                        <button onClick={handleShare} aria-label="Share" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-blue-500 hover:border-blue-500/30 transition-all" title="Share">
+                            <Share2 className="w-5 h-5" aria-hidden="true" />
                         </button>
-                        <button onClick={() => setReportTarget({id: mod.id, type: 'PROJECT', title: mod.title})} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
-                            <Flag className="w-5 h-5" />
+                        <button onClick={() => setReportTarget({id: mod.id, type: 'PROJECT', title: mod.title})} aria-label="Report Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
+                            <Flag className="w-5 h-5" aria-hidden="true" />
                         </button>
                         {Boolean(canEdit) && (
-                            <button onClick={() => navigate(`${getProjectUrl(mod)}/edit`)} className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" title="Edit Project">
-                                <Edit className="w-5 h-5" />
+                            <button onClick={() => navigate(`${getProjectUrl(mod)}/edit`)} aria-label="Edit Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" title="Edit Project">
+                                <Edit className="w-5 h-5" aria-hidden="true" />
                             </button>
                         )}
                     </>
@@ -869,31 +876,31 @@ export const ModDetail: React.FC<{
                     <>
                         <div className="flex flex-wrap items-center gap-3 mb-3">
                             <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-sm leading-tight break-words">{mod.title}</h1>
-                            <span className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 py-1 rounded-full text-xs font-bold text-modtale-accent tracking-widest uppercase flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                            <span className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-3 py-1 rounded-full text-xs font-bold text-blue-700 dark:text-modtale-accent tracking-widest uppercase flex items-center gap-1.5 shadow-sm whitespace-nowrap">
                                 {getClassificationIcon(mod.classification || 'PLUGIN', "w-3.5 h-3.5")}{displayClassification}
                             </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-500 dark:text-slate-400 mb-4">
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
-                                <span>by <button onClick={() => navigate(`/creator/${mod.author}`)} className="font-bold text-slate-700 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</button></span>
+                                <span>by <button onClick={() => navigate(`/creator/${mod.author}`)} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</button></span>
                                 {currentUser && currentUser.username !== mod.author && (
                                     <button
                                         onClick={handleFollowToggle}
-                                        className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-400' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
+                                        className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
                                     >
                                         {isFollowing ? 'Unfollow' : 'Follow'}
                                     </button>
                                 )}
                             </div>
-                            <span className="hidden md:inline text-slate-300 dark:text-slate-600">•</span>
+                            <span className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
                             <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
-                                <Calendar className="w-3 h-3" /> Updated {formatTimeAgo(mod.updatedAt)}
+                                <Calendar className="w-3 h-3" aria-hidden="true" /> Updated {formatTimeAgo(mod.updatedAt)}
                             </span>
                         </div>
 
                         {mod.description && (
-                            <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed max-w-4xl font-medium border-l-2 border-modtale-accent pl-4">
+                            <p className="text-slate-700 dark:text-slate-300 text-base leading-relaxed max-w-4xl font-medium border-l-2 border-modtale-accent pl-4">
                                 {mod.description}
                             </p>
                         )}
@@ -906,7 +913,7 @@ export const ModDetail: React.FC<{
                                 onClick={() => setShowDownloadModal(true)}
                                 className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
                             >
-                                <Download className="w-5 h-5 group-hover:animate-bounce" />
+                                <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
                                 Download
                             </button>
 
@@ -914,10 +921,10 @@ export const ModDetail: React.FC<{
 
                             <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto">
                                 {mod.galleryImages && mod.galleryImages.length > 0 && (
-                                    <button onClick={() => {if(mod.galleryImages?.length) setGalleryIndex(0)}} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" /> Gallery</button>
+                                    <button onClick={() => {if(mod.galleryImages?.length) setGalleryIndex(0)}} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</button>
                                 )}
-                                <button onClick={() => setShowAllVersionsModal(true)} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" /> Changelog</button>
-                                <button onClick={() => commentsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" /> Comments</button>
+                                <button onClick={() => setShowAllVersionsModal(true)} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</button>
+                                <button onClick={() => commentsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments</button>
                             </div>
                         </div>
 
@@ -926,9 +933,9 @@ export const ModDetail: React.FC<{
                                 <div className="relative w-full" ref={depsDropdownRef}>
                                     <button
                                         onClick={() => { setShowMobileDeps(!showMobileDeps); setShowMobileLinks(false); }}
-                                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-bold text-slate-600 dark:text-slate-300"
+                                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-bold text-slate-700 dark:text-slate-300"
                                     >
-                                        <Box className="w-4 h-4" /> Included Mods <ChevronDown className={`w-4 h-4 transition-transform ${showMobileDeps ? 'rotate-180' : ''}`} />
+                                        <Box className="w-4 h-4" aria-hidden="true" /> Included Mods <ChevronDown className={`w-4 h-4 transition-transform ${showMobileDeps ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileDeps && (
                                         <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
@@ -943,13 +950,13 @@ export const ModDetail: React.FC<{
                                                         className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white text-left"
                                                     >
                                                         <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center border border-white/5 shrink-0 overflow-hidden">
-                                                            {meta?.icon ? <img src={resolveUrl(meta.icon)} className="w-full h-full object-cover" alt="" /> : <Box className="w-4 h-4 text-slate-600" />}
+                                                            {meta?.icon ? <img src={resolveUrl(meta.icon)} className="w-full h-full object-cover" alt="" /> : <Box className="w-4 h-4 text-slate-500" aria-hidden="true" />}
                                                         </div>
                                                         <div className="min-w-0 flex-1">
                                                             <div className="text-sm font-bold truncate">{title}</div>
-                                                            <div className="text-[10px] text-slate-500 font-mono">v{dep.versionNumber}</div>
+                                                            <div className="text-[10px] text-slate-400 font-mono">v{dep.versionNumber}</div>
                                                         </div>
-                                                        <ExternalLink className="w-3 h-3 opacity-50 shrink-0" />
+                                                        <ExternalLink className="w-3 h-3 opacity-50 shrink-0" aria-hidden="true" />
                                                     </button>
                                                 );
                                             })}
@@ -967,8 +974,9 @@ export const ModDetail: React.FC<{
                                         rel="noreferrer"
                                         className={`p-2.5 rounded-xl border transition-all ${getLinkColor(link.type)}`}
                                         title={link.label}
+                                        aria-label={link.label}
                                     >
-                                        <link.icon className="w-5 h-5" />
+                                        <link.icon className="w-5 h-5" aria-hidden="true" />
                                     </a>
                                 ))}
                             </div>
@@ -977,9 +985,9 @@ export const ModDetail: React.FC<{
                                 <div className="md:hidden relative w-full" ref={dropdownRef}>
                                     <button
                                         onClick={() => { setShowMobileLinks(!showMobileLinks); setShowMobileDeps(false); }}
-                                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-bold text-slate-600 dark:text-slate-300"
+                                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-bold text-slate-700 dark:text-slate-300"
                                     >
-                                        <LinkIcon className="w-4 h-4" /> External Links <ChevronDown className={`w-4 h-4 transition-transform ${showMobileLinks ? 'rotate-180' : ''}`} />
+                                        <LinkIcon className="w-4 h-4" aria-hidden="true" /> External Links <ChevronDown className={`w-4 h-4 transition-transform ${showMobileLinks ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileLinks && (
                                         <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
@@ -992,10 +1000,10 @@ export const ModDetail: React.FC<{
                                                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white"
                                                 >
                                                     <div className={`p-1.5 rounded-lg border bg-slate-950 ${getLinkColor(link.type)}`}>
-                                                        <link.icon className="w-4 h-4" />
+                                                        <link.icon className="w-4 h-4" aria-hidden="true" />
                                                     </div>
                                                     <span className="text-sm font-bold">{link.label}</span>
-                                                    <ExternalLink className="w-3 h-3 ml-auto opacity-50" />
+                                                    <ExternalLink className="w-3 h-3 ml-auto opacity-50" aria-hidden="true" />
                                                 </a>
                                             ))}
                                         </div>
@@ -1028,11 +1036,11 @@ export const ModDetail: React.FC<{
                             currentUser={currentUser}
                             isCreator={Boolean(canEdit)}
                             commentsDisabled={mod.allowComments === false}
-                            onCommentSubmitted={(c) => { setMod(prev => prev ? {...prev, comments: c} : null); if(onRefresh) onRefresh(); }}
-                            onError={(m) => setStatusModal({type:'error', title:'Error', msg:m})}
-                            onSuccess={(m) => setStatusModal({type:'success', title:'Success', msg:m})}
+                            onCommentSubmitted={useCallback((c) => { setMod(prev => prev ? {...prev, comments: c} : null); if(onRefresh) onRefresh(); }, [onRefresh])}
+                            onError={useCallback((m) => setStatusModal({type:'error', title:'Error', msg:m}), [])}
+                            onSuccess={useCallback((m) => setStatusModal({type:'success', title:'Success', msg:m}), [])}
                             innerRef={commentsRef}
-                            onReport={(commentId) => setReportTarget({id: commentId, type: 'COMMENT'})}
+                            onReport={useCallback((commentId) => setReportTarget({id: commentId, type: 'COMMENT'}), [])}
                         />
                     </>
                 }
