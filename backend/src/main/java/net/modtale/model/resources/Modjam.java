@@ -48,6 +48,7 @@ public class Modjam {
     private boolean allowPublicVoting = true;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
     public static class Category {
         private String id;
@@ -107,4 +108,6 @@ public class Modjam {
     public void setAllowPublicVoting(boolean allowPublicVoting) { this.allowPublicVoting = allowPublicVoting; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
