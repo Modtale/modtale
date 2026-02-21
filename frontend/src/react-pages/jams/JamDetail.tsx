@@ -59,7 +59,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
             if (currentUser) {
                 try {
-                    const projRes = await api.get(`/user/repos`);
+                    const projRes = await api.get(`/creators/${currentUser.username}/projects?size=100`);
                     const allProjects: Mod[] = projRes.data.content || [];
                     setMyProjects(allProjects.filter(p => p.status === 'PUBLISHED'));
                 } catch (e) {
