@@ -26,6 +26,13 @@ public class ModjamController {
         return ResponseEntity.ok(modjamService.getAllJams());
     }
 
+    @GetMapping("/user/me")
+    public ResponseEntity<List<Modjam>> getMyJams() {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.getUserHostedJams(user.getId()));
+    }
+
     @GetMapping("/{slug}")
     public ResponseEntity<Modjam> getJamBySlug(@PathVariable String slug) {
         return ResponseEntity.ok(modjamService.getJamBySlug(slug));
