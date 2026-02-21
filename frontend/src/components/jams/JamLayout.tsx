@@ -8,6 +8,7 @@ interface JamLayoutProps {
     bannerUrl?: string | null;
     iconUrl?: string | null;
     isEditing?: boolean;
+    isPublished?: boolean;
     onBannerUpload?: (file: File, preview: string) => void;
     onIconUpload?: (file: File, preview: string) => void;
     headerContent: React.ReactNode;
@@ -25,7 +26,7 @@ interface JamLayoutProps {
 }
 
 export const JamLayout: React.FC<JamLayoutProps> = ({
-                                                        bannerUrl, iconUrl, isEditing, onBannerUpload, onIconUpload,
+                                                        bannerUrl, iconUrl, isEditing, isPublished, onBannerUpload, onIconUpload,
                                                         headerContent, tabs, mainContent, sidebarContent, actionBar, onBack,
                                                         isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, publishChecklist
                                                     }) => {
@@ -196,7 +197,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                         }`}
                                     >
                                         {isSaving ? <Spinner className="w-4 h-4" fullScreen={false} /> : isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                        {isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Draft'}
+                                        {isSaving ? 'Saving...' : isSaved ? 'Saved!' : (isPublished ? 'Save Changes' : 'Save Draft')}
                                     </button>
 
                                     <button
@@ -206,7 +207,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                                         className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 enabled:hover:scale-[1.02]"
                                     >
                                         <Rocket className="w-4 h-4" />
-                                        Publish Jam
+                                        {isPublished ? 'Save & Close' : 'Publish Jam'}
                                     </button>
                                 </div>
                             </div>
