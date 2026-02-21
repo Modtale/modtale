@@ -185,7 +185,10 @@ export interface Modjam {
     participantIds: string[];
     categories: ModjamCategory[];
     allowPublicVoting: boolean;
+    allowConcurrentVoting: boolean;
+    showResultsBeforeVotingEnds: boolean;
     createdAt: string;
+    updatedAt?: string;
 }
 
 export interface ModjamVote {
@@ -201,6 +204,9 @@ export interface ModjamSubmission {
     projectId: string;
     projectTitle?: string;
     projectImageUrl?: string;
+    projectBannerUrl?: string;
+    projectAuthor?: string;
+    projectDescription?: string;
     submitterId: string;
     votes: ModjamVote[];
     categoryScores?: Record<string, number>;
