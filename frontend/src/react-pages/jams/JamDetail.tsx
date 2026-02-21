@@ -375,50 +375,74 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
                             {submissions.map(sub => {
                                 const resolvedProjectImage = resolveUrl(sub.projectImageUrl);
+                                const resolvedProjectBanner = resolveUrl(sub.projectBannerUrl);
                                 const isMySubmission = sub.submitterId === currentUser?.id;
 
                                 return (
-                                    <div key={sub.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col group shadow-sm transition-all hover:border-modtale-accent dark:hover:border-modtale-accent">
-                                        <Link to={`/mod/${sub.projectId}`} className="flex px-4 pt-4 pb-2 relative flex-1 cursor-pointer">
-                                            <div className="flex-shrink-0 relative z-10">
+                                    <div key={sub.id} className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden">
+                                        <Link to={`/mod/${sub.projectId}`} className="relative h-24 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-200/50 dark:border-white/5 block block">
+                                            {resolvedProjectBanner ? (
+                                                <img src={resolvedProjectBanner} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                            ) : (
+                                                <div className="w-full h-full bg-slate-200 dark:bg-slate-700" />
+                                            )}
+                                        </Link>
+
+                                        <div className="flex px-4 relative flex-1 cursor-pointer" onClick={() => navigate(`/mod/${sub.projectId}`)}>
+                                            <div className="flex-shrink-0 -mt-8 mb-2 relative z-10">
                                                 <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative">
                                                     {resolvedProjectImage ? (
                                                         <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                        <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-200 dark:bg-slate-700">
                                                             <LayoutGrid className="w-8 h-8 opacity-20" />
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
-
                                             <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
-                                                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors" title={sub.projectTitle}>
-                                                    {sub.projectTitle}
-                                                </h3>
+                                                <div className="flex justify-between items-start gap-2 mb-0.5">
+                                                    <div className="min-w-0 flex-1 relative">
+                                                        <Link to={`/mod/${sub.projectId}`} className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors block" title={sub.projectTitle}>
+                                                            {sub.projectTitle}
+                                                        </Link>
+                                                        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 relative z-20">
+                                                            <span>by</span>
+                                                            <Link to={`/creator/${sub.projectAuthor}`} onClick={(e) => e.stopPropagation()} className="text-slate-700 dark:text-slate-300 font-medium hover:text-modtale-accent hover:underline focus:outline-none p-0.5 -m-0.5 rounded">
+                                                                {sub.projectAuthor || 'Unknown'}
+                                                            </Link>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </Link>
+                                        </div>
 
-                                        <div className="px-4 pb-4 bg-slate-50 dark:bg-transparent mt-auto border-t border-slate-100 dark:border-white/5">
+                                        <div className="px-4 pb-4 mt-2 cursor-pointer" onClick={() => navigate(`/mod/${sub.projectId}`)}>
+                                            <p className="text-slate-600 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed h-10">
+                                                {sub.projectDescription || 'No description provided.'}
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 border-t border-slate-100 dark:border-white/5">
                                             {canVote && (jam.categories || []).length > 0 ? (
                                                 isMySubmission ? (
-                                                    <div className="flex-1 flex flex-col items-center justify-center py-4 text-center text-slate-500">
-                                                        <CheckCircle2 className="w-6 h-6 text-green-500 opacity-50 mb-1" />
+                                                    <div className="flex flex-col items-center justify-center py-2 text-center text-slate-500">
+                                                        <CheckCircle2 className="w-5 h-5 text-green-500 opacity-50 mb-1" />
                                                         <span className="text-xs font-bold">This is your submission</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="mt-2 space-y-2">
+                                                    <div className="space-y-2">
                                                         {jam.categories.map(cat => {
                                                             const myVote = (sub.votes || []).find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
                                                             return (
-                                                                <div key={cat.id} className="flex flex-col gap-1.5 p-2 bg-white dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-white/5">
+                                                                <div key={cat.id} className="flex flex-col gap-1.5">
                                                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{cat.name}</span>
                                                                     <div className="flex flex-wrap items-center gap-1">
                                                                         {[...Array(cat.maxScore)].map((_, i) => (
                                                                             <button
                                                                                 key={i}
                                                                                 onClick={() => handleVote(sub.id, cat.id, i + 1)}
-                                                                                className={`flex-1 h-6 rounded flex items-center justify-center font-bold text-xs transition-all ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white shadow-sm' : 'bg-slate-100 dark:bg-white/5 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
+                                                                                className={`flex-1 h-6 rounded flex items-center justify-center font-bold text-xs transition-all ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white shadow-sm' : 'bg-slate-200 dark:bg-white/5 text-slate-400 hover:bg-slate-300 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
                                                                             >
                                                                                 {i + 1}
                                                                             </button>
@@ -430,8 +454,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                                     </div>
                                                 )
                                             ) : (
-                                                <div className="flex-1 flex flex-col items-center justify-center py-4 text-center text-slate-500">
-                                                    <AlertCircle className="w-6 h-6 opacity-20 mb-1" />
+                                                <div className="flex flex-col items-center justify-center py-2 text-center text-slate-500">
+                                                    <AlertCircle className="w-5 h-5 opacity-20 mb-1" />
                                                     <span className="text-xs font-bold">Voting not available</span>
                                                 </div>
                                             )}
