@@ -16,9 +16,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ModjamService {
@@ -81,6 +80,11 @@ public class ModjamService {
         jam.setVotingEndDate(updatedJam.getVotingEndDate());
         jam.setAllowPublicVoting(updatedJam.isAllowPublicVoting());
         jam.setCategories(updatedJam.getCategories());
+
+        if (jam.getStatus().equals("ACTIVE") && updatedJam.getStatus().equals("COMPLETED")) {
+            calculateScores(jam.getId());
+        }
+
         jam.setStatus(updatedJam.getStatus());
         jam.setUpdatedAt(LocalDateTime.now());
 
@@ -163,11 +167,20 @@ public class ModjamService {
     public ModjamSubmission submitProject(String jamId, String projectId, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+
+        if (!"ACTIVE".equals(jam.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Submissions are closed for this jam.");
+        }
+
         Mod project = modRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
 
         if (!project.getAuthorId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this project");
+        }
+
+        if (!"PUBLISHED".equals(project.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only published projects can be submitted to a jam.");
         }
 
         List<ModjamSubmission> existing = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
@@ -185,6 +198,9 @@ public class ModjamService {
 
         submissionRepository.save(sub);
 
+        if (project.getModjamIds() == null) {
+            project.setModjamIds(new ArrayList<>());
+        }
         if (!project.getModjamIds().contains(jamId)) {
             project.getModjamIds().add(jamId);
             modRepository.save(project);
@@ -197,8 +213,8 @@ public class ModjamService {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
 
-        if (jam.getStatus().equals("COMPLETED")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voting has concluded for this jam.");
+        if (!"VOTING".equals(jam.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voting is not currently active for this jam.");
         }
 
         if (!jam.isAllowPublicVoting() && !jam.getHostId().equals(userId)) {
@@ -207,6 +223,10 @@ public class ModjamService {
 
         ModjamSubmission sub = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found"));
+
+        if (sub.getSubmitterId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot vote on your own submission.");
+        }
 
         if (sub.getVotes() == null) {
             sub.setVotes(new ArrayList<>());
@@ -224,7 +244,44 @@ public class ModjamService {
         return submissionRepository.save(sub);
     }
 
-    @Scheduled(cron = "0 0 * * * *")
+    private void calculateScores(String jamId) {
+        List<ModjamSubmission> submissions = submissionRepository.findByJamId(jamId);
+        if (submissions == null || submissions.isEmpty()) return;
+
+        for (ModjamSubmission sub : submissions) {
+            Map<String, List<Integer>> categoryScoresMap = new HashMap<>();
+
+            if (sub.getVotes() != null) {
+                for (ModjamSubmission.Vote vote : sub.getVotes()) {
+                    categoryScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
+                }
+            }
+
+            Map<String, Double> averagedCategoryScores = new HashMap<>();
+            double totalScoreSum = 0;
+            int categoryCount = 0;
+
+            for (Map.Entry<String, List<Integer>> entry : categoryScoresMap.entrySet()) {
+                double avg = entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
+                averagedCategoryScores.put(entry.getKey(), avg);
+                totalScoreSum += avg;
+                categoryCount++;
+            }
+
+            sub.setCategoryScores(averagedCategoryScores);
+            sub.setTotalScore(categoryCount > 0 ? totalScoreSum / categoryCount : 0.0);
+        }
+
+        submissions.sort((s1, s2) -> Double.compare(s2.getTotalScore(), s1.getTotalScore()));
+
+        int rank = 1;
+        for (ModjamSubmission sub : submissions) {
+            sub.setRank(rank++);
+            submissionRepository.save(sub);
+        }
+    }
+
+    @Scheduled(cron = "0 0 0 * * *")
     public void cleanupStaleDrafts() {
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         List<Modjam> staleDrafts = modjamRepository.findByStatusAndUpdatedAtBefore("DRAFT", thirtyDaysAgo);

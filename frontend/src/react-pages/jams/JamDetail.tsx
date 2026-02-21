@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '@/utils/api';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale, Settings } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
+import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
 
 export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
     const { slug } = useParams<{ slug: string }>();
@@ -16,20 +17,30 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [submissions, setSubmissions] = useState<ModjamSubmission[]>([]);
     const [loading, setLoading] = useState(true);
     const [myProjects, setMyProjects] = useState<Mod[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+
+    const [isSubmittingModalOpen, setIsSubmittingModalOpen] = useState(false);
+
     const [statusModal, setStatusModal] = useState<{
         type: 'success' | 'error' | 'warning',
         title: string,
         msg: string,
-        onConfirm?: () => void,
-        confirmText?: string
+        onAction?: () => void,
+        actionLabel?: string,
+        secondaryLabel?: string
     } | null>(null);
-    const [submitting, setSubmitting] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
     const [metaData, setMetaData] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<'details' | 'categories' | 'settings'>('details');
     const [isSavingJam, setIsSavingJam] = useState(false);
+
+    const resolveUrl = (url?: string | null) => {
+        if (!url) return '';
+        if (url.startsWith('/api') || url.startsWith('/uploads')) {
+            return `${BACKEND_URL}${url}`;
+        }
+        return url;
+    };
 
     useEffect(() => {
         const fetchJamData = async () => {
@@ -49,7 +60,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             if (currentUser) {
                 try {
                     const projRes = await api.get(`/user/repos`);
-                    setMyProjects(projRes.data.content || []);
+                    const allProjects: Mod[] = projRes.data.content || [];
+                    setMyProjects(allProjects.filter(p => p.status === 'PUBLISHED'));
                 } catch (e) {
                     console.error("Failed to fetch user projects for jam submission", e);
                 }
@@ -66,21 +78,6 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             setJam({ ...jam, participantIds: [...(jam.participantIds || []), currentUser.id] });
         } catch (err) {
             setStatusModal({ type: 'error', title: 'Error', msg: 'Failed to join the jam.' });
-        }
-    };
-
-    const handleSubmit = async () => {
-        if (!jam || !selectedProjectId) return;
-        setSubmitting(true);
-        try {
-            const res = await api.post(`/modjams/${jam.id}/submit`, { projectId: selectedProjectId });
-            setStatusModal({ type: 'success', title: 'Submitted!', msg: 'Project submitted successfully.' });
-            setSubmissions([...submissions, res.data]);
-            setSelectedProjectId('');
-        } catch (err: any) {
-            setStatusModal({ type: 'error', title: 'Submission Failed', msg: err.response?.data?.message || 'Failed to submit project.' });
-        } finally {
-            setSubmitting(false);
         }
     };
 
@@ -153,8 +150,9 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             type: 'warning',
             title: 'Delete Event?',
             msg: 'Are you sure you want to delete this jam? This action cannot be undone and will permanently delete all submissions.',
-            confirmText: 'Delete Jam',
-            onConfirm: async () => {
+            actionLabel: 'Delete Jam',
+            secondaryLabel: 'Cancel',
+            onAction: async () => {
                 try {
                     await api.delete(`/modjams/${jam.id}`);
                     navigate('/jams');
@@ -198,8 +196,23 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                     title={statusModal.title}
                     message={statusModal.msg}
                     onClose={() => setStatusModal(null)}
-                    onConfirm={statusModal.onConfirm}
-                    confirmText={statusModal.confirmText}
+                    onAction={statusModal.onAction}
+                    actionLabel={statusModal.actionLabel}
+                    secondaryLabel={statusModal.secondaryLabel}
+                />
+            )}
+
+            {isSubmittingModalOpen && jam && (
+                <JamSubmissionWizard
+                    jam={jam}
+                    myProjects={myProjects}
+                    onSuccess={(sub) => {
+                        setSubmissions([...submissions, sub]);
+                        setIsSubmittingModalOpen(false);
+                        setStatusModal({ type: 'success', title: 'Submitted!', msg: 'Project submitted successfully.' });
+                    }}
+                    onCancel={() => setIsSubmittingModalOpen(false)}
+                    onError={(msg) => setStatusModal({ type: 'error', title: 'Submission Failed', msg })}
                 />
             )}
 
@@ -246,22 +259,11 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
                                 {jam.status === 'ACTIVE' && !hasSubmitted && (
                                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-                                        <select
-                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:ring-2 focus:ring-modtale-accent shadow-sm min-w-[200px]"
-                                            value={selectedProjectId}
-                                            onChange={(e) => setSelectedProjectId(e.target.value)}
-                                        >
-                                            <option value="">Select a project to submit...</option>
-                                            {myProjects.map(p => (
-                                                <option key={p.id} value={p.id}>{p.title}</option>
-                                            ))}
-                                        </select>
                                         <button
-                                            onClick={handleSubmit}
-                                            disabled={!selectedProjectId || submitting}
-                                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-xl font-black disabled:opacity-50 flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md"
+                                            onClick={() => setIsSubmittingModalOpen(true)}
+                                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md"
                                         >
-                                            {submitting ? <Spinner className="w-4 h-4" fullScreen={false} /> : <Upload className="w-4 h-4" />} Submit
+                                            <Upload className="w-4 h-4" /> Submit a Project
                                         </button>
                                     </div>
                                 )}
@@ -367,68 +369,81 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                         </h2>
 
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                            {submissions.map(sub => (
-                                <div key={sub.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 rounded-3xl overflow-hidden flex flex-col group hover:border-modtale-accent transition-colors shadow-sm">
-                                    <div className="h-48 bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
-                                        {sub.projectImageUrl ? (
-                                            <img src={sub.projectImageUrl} alt={sub.projectTitle} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                                <LayoutGrid className="w-12 h-12 opacity-20" />
+                            {submissions.map(sub => {
+                                const resolvedProjectImage = resolveUrl(sub.projectImageUrl);
+                                const isMySubmission = sub.submitterId === currentUser?.id;
+
+                                return (
+                                    <div key={sub.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 rounded-3xl overflow-hidden flex flex-col group shadow-sm transition-all hover:shadow-lg">
+                                        <Link to={`/project/${sub.projectId}`} className="h-48 bg-slate-100 dark:bg-slate-800 relative overflow-hidden block">
+                                            {resolvedProjectImage ? (
+                                                <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                    <LayoutGrid className="w-12 h-12 opacity-20" />
+                                                </div>
+                                            )}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90" />
+                                            <div className="absolute bottom-4 left-5 right-5 flex items-center justify-between">
+                                                <h3 className="text-xl font-black text-white truncate drop-shadow-md group-hover:text-modtale-accent transition-colors">{sub.projectTitle}</h3>
                                             </div>
-                                        )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90" />
-                                        <div className="absolute bottom-4 left-5 right-5">
-                                            <h3 className="text-xl font-black text-white truncate drop-shadow-md">{sub.projectTitle}</h3>
+                                        </Link>
+
+                                        <div className="p-5 flex-1 flex flex-col bg-slate-50 dark:bg-transparent border-t border-slate-200 dark:border-white/5">
+                                            {canVote && (jam.categories || []).length > 0 ? (
+                                                isMySubmission ? (
+                                                    <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                                                        <CheckCircle2 className="w-8 h-8 text-green-500 opacity-50 mb-2" />
+                                                        <span className="text-sm font-bold">This is your submission</span>
+                                                        <span className="text-xs font-medium mt-1">You cannot vote on your own project.</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-auto space-y-3 pt-2">
+                                                        {jam.categories.map(cat => {
+                                                            const myVote = (sub.votes || []).find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
+                                                            return (
+                                                                <div key={cat.id} className="flex flex-col gap-2 p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
+                                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{cat.name}</span>
+                                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                                        {[...Array(cat.maxScore)].map((_, i) => (
+                                                                            <button
+                                                                                key={i}
+                                                                                onClick={() => handleVote(sub.id, cat.id, i + 1)}
+                                                                                className={`flex-1 h-8 rounded-lg flex items-center justify-center font-black text-xs transition-all ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-white/5 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
+                                                                            >
+                                                                                {i + 1}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                                                    <AlertCircle className="w-8 h-8 opacity-20 mb-2" />
+                                                    <span className="text-sm font-bold">Voting not available</span>
+                                                </div>
+                                            )}
+
+                                            {jam.status === 'COMPLETED' && sub.totalScore !== undefined && (
+                                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Final Score</span>
+                                                        <span className="text-lg font-black text-slate-900 dark:text-white">{sub.totalScore.toFixed(2)}</span>
+                                                    </div>
+                                                    {sub.rank && (
+                                                        <div className="flex items-center gap-2 bg-modtale-accent/10 text-modtale-accent px-4 py-2 rounded-xl font-black text-lg">
+                                                            <Trophy className="w-5 h-5"/> #{sub.rank}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-
-                                    <div className="p-5 flex-1 flex flex-col bg-slate-50 dark:bg-transparent">
-                                        {canVote && (jam.categories || []).length > 0 ? (
-                                            <div className="mt-auto space-y-3 pt-2">
-                                                {jam.categories.map(cat => {
-                                                    const myVote = (sub.votes || []).find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
-                                                    return (
-                                                        <div key={cat.id} className="flex flex-col gap-2 p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
-                                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{cat.name}</span>
-                                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                                {[...Array(cat.maxScore)].map((_, i) => (
-                                                                    <button
-                                                                        key={i}
-                                                                        onClick={() => handleVote(sub.id, cat.id, i + 1)}
-                                                                        className={`flex-1 h-8 rounded-lg flex items-center justify-center font-black text-xs transition-all ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-white/5 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
-                                                                    >
-                                                                        {i + 1}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-500">
-                                                <AlertCircle className="w-8 h-8 opacity-20 mb-2" />
-                                                <span className="text-sm font-bold">Voting not available</span>
-                                            </div>
-                                        )}
-
-                                        {jam.status === 'COMPLETED' && sub.totalScore !== undefined && (
-                                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Final Score</span>
-                                                    <span className="text-lg font-black text-slate-900 dark:text-white">{sub.totalScore.toFixed(2)}</span>
-                                                </div>
-                                                {sub.rank && (
-                                                    <div className="flex items-center gap-2 bg-modtale-accent/10 text-modtale-accent px-4 py-2 rounded-xl font-black text-lg">
-                                                        <Trophy className="w-5 h-5"/> #{sub.rank}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {submissions.length === 0 && (
