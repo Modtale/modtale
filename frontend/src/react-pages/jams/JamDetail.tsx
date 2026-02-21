@@ -4,7 +4,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale, Settings, Star } from 'lucide-react';
+import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale, Settings, Star, Clock } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -20,6 +20,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
     const [isSubmittingModalOpen, setIsSubmittingModalOpen] = useState(false);
     const [votingSubmissionId, setVotingSubmissionId] = useState<string | null>(null);
+    const [timeLeft, setTimeLeft] = useState<{ label: string, time: string } | null>(null);
 
     const [statusModal, setStatusModal] = useState<{
         type: 'success' | 'error' | 'warning',
@@ -70,6 +71,55 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         };
         fetchJamData();
     }, [slug, currentUser]);
+
+    useEffect(() => {
+        if (!jam) return;
+
+        const calculateTimeLeft = () => {
+            const now = new Date().getTime();
+            const start = new Date(jam.startDate).getTime();
+            const end = new Date(jam.endDate).getTime();
+            const voteEnd = new Date(jam.votingEndDate).getTime();
+
+            let target = 0;
+            let label = '';
+
+            if (now < start) {
+                target = start;
+                label = 'Starts In';
+            } else if (now < end) {
+                target = end;
+                label = 'Submissions Close In';
+            } else if (now < voteEnd) {
+                target = voteEnd;
+                label = 'Voting Ends In';
+            } else {
+                return null;
+            }
+
+            const difference = target - now;
+            if (difference <= 0) return null;
+
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const timeStr = days > 0
+                ? `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`
+                : `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+
+            return { label, time: timeStr };
+        };
+
+        setTimeLeft(calculateTimeLeft());
+        const interval = setInterval(() => {
+            setTimeLeft(calculateTimeLeft());
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [jam]);
 
     const handleJoin = async () => {
         if (!jam || !currentUser) return;
@@ -353,6 +403,16 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                             <div className="relative z-10 flex flex-col items-center justify-center text-center">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Current Status</span>
                                 <span className="text-3xl font-black text-modtale-accent uppercase tracking-widest drop-shadow-sm">{jam.status}</span>
+                                {timeLeft && (
+                                    <div className="mt-5 flex flex-col items-center animate-in fade-in zoom-in-95">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                                            <Clock className="w-3.5 h-3.5" /> {timeLeft.label}
+                                        </div>
+                                        <span className="text-lg font-mono font-bold text-slate-700 dark:text-slate-300 bg-white/60 dark:bg-black/20 px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/5 shadow-inner">
+                                            {timeLeft.time}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
