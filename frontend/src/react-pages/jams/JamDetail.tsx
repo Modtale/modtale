@@ -399,7 +399,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                             </div>
                         )}
 
-                        <div className="relative overflow-hidden p-6 rounded-[2rem] border border-slate-200 dark:border-white/10 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800/50 dark:to-slate-900/50 shadow-lg">
+                        <div className="relative overflow-hidden p-6 rounded-[2rem] border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-900 shadow-lg">
                             <div className="relative z-10 flex flex-col items-center justify-center text-center">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Current Status</span>
                                 <span className="text-3xl font-black text-modtale-accent uppercase tracking-widest drop-shadow-sm">{jam.status}</span>
