@@ -6,15 +6,15 @@ import { Trophy, Plus, ArrowLeft, Calendar, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 
-export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
-    const resolveUrl = (url?: string | null) => {
-        if (!url) return '';
-        if (url.startsWith('/api') || url.startsWith('/uploads')) {
-            return `${BACKEND_URL}${url}`;
-        }
-        return url;
-    };
+const resolveUrl = (url?: string | null) => {
+    if (!url) return '';
+    if (url.startsWith('/api') || url.startsWith('/uploads')) {
+        return `${BACKEND_URL}${url}`;
+    }
+    return url;
+};
 
+export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
     const resolvedBanner = resolveUrl(jam.bannerUrl);
     const resolvedIcon = resolveUrl((jam as any).imageUrl || null);
 
@@ -132,13 +132,12 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const TRACK_HEIGHT = 44;
     const TRACK_GAP = 12;
 
-    const gradients = [
-        'bg-gradient-to-r from-indigo-500/90 to-purple-600/90',
-        'bg-gradient-to-r from-emerald-500/90 to-teal-600/90',
-        'bg-gradient-to-r from-rose-500/90 to-pink-600/90',
-        'bg-gradient-to-r from-blue-500/90 to-cyan-600/90',
-        'bg-gradient-to-r from-amber-500/90 to-orange-600/90',
-        'bg-gradient-to-r from-fuchsia-500/90 to-rose-600/90'
+    const trackStyles = [
+        'border-modtale-accent',
+        'border-blue-500',
+        'border-indigo-500',
+        'border-violet-500',
+        'border-slate-500'
     ];
 
     useEffect(() => {
@@ -150,7 +149,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
     const { startDate, endDate, totalDays, days } = useMemo(() => {
         const start = new Date();
-        start.setDate(start.getDate() - 10);
+        start.setDate(start.getDate() - 1);
         start.setHours(0, 0, 0, 0);
         const total = 60;
         const end = new Date(start);
@@ -352,19 +351,30 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
                 <div className="overflow-x-auto custom-scrollbar pb-8 pl-8 pt-8">
                     <div style={{ width: `${totalDays * DAY_WIDTH}px`, minHeight: `${Math.max(tracks.length * (TRACK_HEIGHT + TRACK_GAP) + 60, 300)}px` }} className="relative">
-                        <div className="flex absolute top-0 left-0 right-0 h-10 border-b border-slate-200 dark:border-white/10">
-                            {days.map(day => (
-                                <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className="shrink-0 flex items-center text-[11px] font-black uppercase tracking-widest text-slate-400 border-l border-slate-200/50 dark:border-white/5 pl-2.5">
-                                    {formatDay(day)}
-                                </div>
-                            ))}
+                        <div className="flex absolute top-0 left-0 right-0 h-12 border-b border-slate-200 dark:border-white/10">
+                            {days.map((day, i) => {
+                                const isFirstDayOfMonth = day.getDate() === 1;
+                                return (
+                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 flex flex-col justify-center text-left border-l border-slate-200/50 dark:border-white/5 pl-2.5 ${isFirstDayOfMonth ? 'bg-slate-100/50 dark:bg-white/5' : ''}`}>
+                                        {isFirstDayOfMonth || i === 0 ? (
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-modtale-accent leading-none mb-0.5">
+                                                {day.toLocaleString('default', { month: 'short' })}
+                                            </span>
+                                        ) : null}
+                                        <span className="text-[11px] font-bold text-slate-500 leading-none">
+                                            {formatDay(day)}
+                                        </span>
+                                    </div>
+                                );
+                            })}
                         </div>
 
-                        <div className="absolute top-10 left-0 right-0 bottom-0 flex pointer-events-none">
+                        <div className="absolute top-12 left-0 right-0 bottom-0 flex pointer-events-none">
                             {days.map(day => {
                                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                                const isFirstDayOfMonth = day.getDate() === 1;
                                 return (
-                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 border-l border-slate-200/30 dark:border-white/[0.03] ${isWeekend ? 'bg-slate-50/50 dark:bg-white/[0.01]' : ''}`} />
+                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 border-l border-slate-200/30 dark:border-white/[0.03] ${isWeekend ? 'bg-slate-50/50 dark:bg-white/[0.01]' : ''} ${isFirstDayOfMonth ? 'bg-slate-50/80 dark:bg-white/[0.02]' : ''}`} />
                                 );
                             })}
                         </div>
@@ -375,7 +385,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                             </div>
                         )}
 
-                        <div className="absolute top-16 left-0 right-0">
+                        <div className="absolute top-16 left-0 right-0 mt-2">
                             {sortedJams.map(jam => {
                                 const startMs = new Date(jam.startDate).getTime();
                                 const endMs = new Date(jam.endDate).getTime();
@@ -390,24 +400,31 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                                 const trackIdx = jamTracks[jam.id] || 0;
                                 const topPx = trackIdx * (TRACK_HEIGHT + TRACK_GAP);
 
-                                const colorIdx = jam.id.charCodeAt(0) % gradients.length;
-                                const gradient = gradients[colorIdx];
+                                const colorStyle = trackStyles[jam.id.charCodeAt(0) % trackStyles.length];
+                                const jamIcon = resolveUrl((jam as any).imageUrl || null);
 
                                 return (
                                     <Link
                                         key={jam.id}
                                         to={`/jam/${jam.slug}`}
-                                        className={`absolute flex items-center px-4 rounded-[1.25rem] shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-95 transition-all cursor-pointer backdrop-blur-md border border-white/20 group z-10 ${gradient}`}
+                                        className={`absolute flex items-center px-3 py-1.5 rounded-[1rem] shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer backdrop-blur-xl border border-slate-200 dark:border-white/10 border-l-4 group z-10 bg-white/80 dark:bg-slate-800/80 text-slate-900 dark:text-white ${colorStyle}`}
                                         style={{
                                             left: `${leftPx}px`,
-                                            width: `${Math.max(widthPx, 140)}px`,
+                                            width: `${Math.max(widthPx, 160)}px`,
                                             top: `${topPx}px`,
                                             height: `${TRACK_HEIGHT}px`
                                         }}
                                         title={`${jam.title} (${jam.participantIds?.length || 0} joined)`}
                                     >
-                                        <span className="text-white font-black text-sm truncate drop-shadow-md relative z-10">{jam.title}</span>
-                                        <span className="ml-2 bg-black/20 text-white/90 px-2 py-0.5 rounded-md font-bold text-[10px] whitespace-nowrap relative z-10 group-hover:bg-black/30 group-hover:text-white transition-colors">
+                                        {jamIcon ? (
+                                            <img src={jamIcon} className="w-6 h-6 rounded-md object-cover mr-2 shrink-0 border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900" alt="" />
+                                        ) : (
+                                            <div className="w-6 h-6 rounded-md bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-2 shrink-0 border border-slate-200 dark:border-white/10">
+                                                <Trophy className="w-3 h-3 text-slate-400" />
+                                            </div>
+                                        )}
+                                        <span className="font-black text-sm truncate drop-shadow-sm flex-1">{jam.title}</span>
+                                        <span className="ml-2 bg-slate-100 dark:bg-black/20 text-slate-500 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold text-[10px] whitespace-nowrap group-hover:bg-slate-200 dark:group-hover:bg-black/40 transition-colors">
                                             {jam.participantIds?.length || 0} joined
                                         </span>
                                     </Link>
