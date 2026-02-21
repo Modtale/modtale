@@ -4,8 +4,9 @@ import { api } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale } from 'lucide-react';
+import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale, Settings } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
+import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 
 export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
     const { slug } = useParams<{ slug: string }>();
@@ -18,6 +19,11 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');
     const [statusModal, setStatusModal] = useState<{type: 'success' | 'error' | 'warning', title: string, msg: string} | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [metaData, setMetaData] = useState<any>(null);
+    const [activeTab, setActiveTab] = useState<'details' | 'categories' | 'settings'>('details');
+    const [isSavingJam, setIsSavingJam] = useState(false);
 
     useEffect(() => {
         const fetchJamData = async () => {
@@ -82,12 +88,92 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         }
     };
 
+    const startEditing = () => {
+        if (!jam) return;
+        setMetaData({
+            id: jam.id,
+            slug: jam.slug,
+            title: jam.title,
+            description: jam.description,
+            imageUrl: (jam as any).imageUrl,
+            bannerUrl: jam.bannerUrl,
+            startDate: jam.startDate,
+            endDate: jam.endDate,
+            votingEndDate: jam.votingEndDate,
+            allowPublicVoting: jam.allowPublicVoting,
+            categories: jam.categories,
+            status: jam.status
+        });
+        setIsEditing(true);
+    };
+
+    const handleSaveJam = async () => {
+        setIsSavingJam(true);
+        try {
+            let res = await api.put(`/modjams/${metaData.id}`, metaData);
+            let filesUploaded = false;
+
+            if (metaData.iconFile) {
+                const fd = new FormData();
+                fd.append('file', metaData.iconFile);
+                await api.put(`/modjams/${metaData.id}/icon`, fd, { headers: { 'Content-Type': 'multipart/form-data' }});
+                filesUploaded = true;
+            }
+
+            if (metaData.bannerFile) {
+                const fd = new FormData();
+                fd.append('file', metaData.bannerFile);
+                await api.put(`/modjams/${metaData.id}/banner`, fd, { headers: { 'Content-Type': 'multipart/form-data' }});
+                filesUploaded = true;
+            }
+
+            if (filesUploaded) {
+                res = await api.get(`/modjams/${metaData.slug}`);
+            }
+
+            setJam(res.data);
+            setIsSavingJam(false);
+            return true;
+        } catch (e) {
+            setIsSavingJam(false);
+            return false;
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!jam) return;
+        if (!window.confirm("Are you sure you want to delete this jam? This action cannot be undone and will delete all submissions.")) return;
+
+        try {
+            await api.delete(`/modjams/${jam.id}`);
+            navigate('/jams');
+        } catch (err: any) {
+            setStatusModal({ type: 'error', title: 'Error', msg: 'Failed to delete jam.' });
+        }
+    };
+
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!jam) return <div className="p-20 text-center font-bold text-slate-500">Jam not found.</div>;
 
+    if (isEditing && metaData) {
+        return (
+            <JamBuilder
+                metaData={metaData}
+                setMetaData={setMetaData}
+                handleSave={handleSaveJam}
+                onPublish={async () => { await handleSaveJam(); setIsEditing(false); }}
+                isLoading={isSavingJam}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                onBack={() => setIsEditing(false)}
+            />
+        );
+    }
+
+    const isHost = currentUser?.id === jam.hostId;
     const isParticipating = currentUser?.id && (jam.participantIds || []).includes(currentUser.id);
     const hasSubmitted = submissions.some(s => s.submitterId === currentUser?.id);
-    const canVote = jam.status === 'VOTING' && (jam.allowPublicVoting || jam.hostId === currentUser?.id);
+    const canVote = jam.status === 'VOTING' && (jam.allowPublicVoting || isHost);
 
     const isPast = (dateString: string) => new Date(dateString) < new Date();
 
@@ -169,6 +255,20 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 }
                 sidebarContent={
                     <div className="flex flex-col gap-6">
+                        {isHost && (
+                            <div className="flex flex-col gap-3 p-6 bg-modtale-accent/5 dark:bg-modtale-accent/10 rounded-[2rem] border border-modtale-accent/20">
+                                <h3 className="text-sm font-black text-modtale-accent uppercase tracking-widest flex items-center gap-2 mb-2">
+                                    <Settings className="w-4 h-4" /> Host Controls
+                                </h3>
+                                <button onClick={startEditing} className="w-full py-3 bg-white dark:bg-slate-900 rounded-xl font-bold text-sm hover:text-modtale-accent transition-colors shadow-sm">
+                                    Edit Event Details
+                                </button>
+                                <button onClick={handleDelete} className="w-full py-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl font-bold text-sm hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors shadow-sm">
+                                    Delete Event
+                                </button>
+                            </div>
+                        )}
+
                         <div className="relative overflow-hidden p-6 rounded-[2rem] border border-slate-200 dark:border-white/10 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800/50 dark:to-slate-900/50 shadow-lg">
                             <div className="relative z-10 flex flex-col items-center justify-center text-center">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Current Status</span>
