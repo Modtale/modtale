@@ -104,6 +104,22 @@ public class ModjamService {
         }
     }
 
+    public void deleteJam(String jamId, String userId) {
+        Modjam jam = modjamRepository.findById(jamId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+
+        if (!jam.getHostId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can delete this jam");
+        }
+
+        List<ModjamSubmission> submissions = submissionRepository.findByJamId(jamId);
+        if (submissions != null && !submissions.isEmpty()) {
+            submissionRepository.deleteAll(submissions);
+        }
+
+        modjamRepository.delete(jam);
+    }
+
     public List<ModjamSubmission> getSubmissions(String jamId) {
         return submissionRepository.findByJamId(jamId);
     }
