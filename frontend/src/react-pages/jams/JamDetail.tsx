@@ -4,7 +4,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale, Settings } from 'lucide-react';
+import { Trophy, Calendar, Users, Upload, CheckCircle2, LayoutGrid, AlertCircle, Scale, Settings, Star } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -19,6 +19,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [myProjects, setMyProjects] = useState<Mod[]>([]);
 
     const [isSubmittingModalOpen, setIsSubmittingModalOpen] = useState(false);
+    const [votingSubmissionId, setVotingSubmissionId] = useState<string | null>(null);
 
     const [statusModal, setStatusModal] = useState<{
         type: 'success' | 'error' | 'warning',
@@ -192,6 +193,10 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
     const isPast = (dateString: string) => new Date(dateString) < new Date();
 
+    const sortedSubmissions = [...submissions].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+
+    const activeVotingSub = submissions.find(s => s.id === votingSubmissionId);
+
     return (
         <>
             {statusModal && (
@@ -218,6 +223,53 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                     onCancel={() => setIsSubmittingModalOpen(false)}
                     onError={(msg) => setStatusModal({ type: 'error', title: 'Submission Failed', message: msg })}
                 />
+            )}
+
+            {activeVotingSub && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col">
+                        <div className="p-8 border-b border-slate-200 dark:border-white/10 text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 shadow-sm overflow-hidden mx-auto mb-4 border-2 border-white dark:border-slate-700">
+                                {activeVotingSub.projectImageUrl ? (
+                                    <img src={resolveUrl(activeVotingSub.projectImageUrl)} className="w-full h-full object-cover" alt="" />
+                                ) : (
+                                    <LayoutGrid className="w-8 h-8 m-auto mt-3.5 text-slate-400 opacity-20" />
+                                )}
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-900 dark:text-white">Cast Your Vote</h3>
+                            <p className="text-sm font-medium text-slate-500 mt-1">Voting on <span className="text-modtale-accent font-bold">{activeVotingSub.projectTitle}</span></p>
+                        </div>
+                        <div className="p-8 overflow-y-auto max-h-[50vh] space-y-6 custom-scrollbar">
+                            {jam.categories.map(cat => {
+                                const myVote = activeVotingSub.votes?.find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
+                                return (
+                                    <div key={cat.id} className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-black text-slate-900 dark:text-white">{cat.name}</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Max {cat.maxScore}</span>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {[...Array(cat.maxScore)].map((_, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => handleVote(activeVotingSub.id, cat.id, i + 1)}
+                                                    className={`flex-1 h-12 rounded-xl flex items-center justify-center font-black text-sm transition-all shadow-sm ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white scale-105 ring-4 ring-modtale-accent/30' : 'bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/5'}`}
+                                                >
+                                                    {i + 1}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20">
+                            <button onClick={() => setVotingSubmissionId(null)} className="w-full h-14 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
+                                Done Voting
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <JamLayout
@@ -372,107 +424,66 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                             <LayoutGrid className="w-6 h-6 text-modtale-accent" /> Submissions
                         </h2>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
-                            {submissions.map(sub => {
+                        <div className="flex flex-col gap-4">
+                            {sortedSubmissions.map(sub => {
                                 const resolvedProjectImage = resolveUrl(sub.projectImageUrl);
-                                const resolvedProjectBanner = resolveUrl(sub.projectBannerUrl);
                                 const isMySubmission = sub.submitterId === currentUser?.id;
 
                                 return (
-                                    <div key={sub.id} className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden">
-                                        <Link to={`/mod/${sub.projectId}`} className="relative h-24 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-200/50 dark:border-white/5 block block">
-                                            {resolvedProjectBanner ? (
-                                                <img src={resolvedProjectBanner} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                    <div key={sub.id} className="bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden flex flex-col sm:flex-row items-center p-3 gap-4 group shadow-sm transition-all hover:shadow-lg hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50">
+                                        <Link to={`/mod/${sub.projectId}`} className="w-full sm:w-20 h-32 sm:h-20 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 relative overflow-hidden shadow-sm block">
+                                            {resolvedProjectImage ? (
+                                                <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                             ) : (
-                                                <div className="w-full h-full bg-slate-200 dark:bg-slate-700" />
+                                                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                    <LayoutGrid className="w-6 h-6 opacity-20" />
+                                                </div>
                                             )}
                                         </Link>
 
-                                        <div className="flex px-4 relative flex-1 cursor-pointer" onClick={() => navigate(`/mod/${sub.projectId}`)}>
-                                            <div className="flex-shrink-0 -mt-8 mb-2 relative z-10">
-                                                <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative">
-                                                    {resolvedProjectImage ? (
-                                                        <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-200 dark:bg-slate-700">
-                                                            <LayoutGrid className="w-8 h-8 opacity-20" />
-                                                        </div>
-                                                    )}
-                                                </div>
+                                        <div className="flex-1 min-w-0 flex flex-col justify-center w-full text-center sm:text-left py-2 sm:py-0">
+                                            <Link to={`/mod/${sub.projectId}`} className="text-xl sm:text-lg font-black text-slate-900 dark:text-white truncate group-hover:text-modtale-accent transition-colors block">
+                                                {sub.projectTitle}
+                                            </Link>
+                                            <div className="flex items-center justify-center sm:justify-start gap-1 text-xs text-slate-500 font-medium truncate mt-0.5">
+                                                <span>by</span>
+                                                <Link to={`/creator/${sub.projectAuthor}`} onClick={(e) => e.stopPropagation()} className="text-slate-700 dark:text-slate-300 font-bold hover:text-modtale-accent transition-colors">
+                                                    {sub.projectAuthor || 'Unknown'}
+                                                </Link>
                                             </div>
-                                            <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
-                                                <div className="flex justify-between items-start gap-2 mb-0.5">
-                                                    <div className="min-w-0 flex-1 relative">
-                                                        <Link to={`/mod/${sub.projectId}`} className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors block" title={sub.projectTitle}>
-                                                            {sub.projectTitle}
-                                                        </Link>
-                                                        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 relative z-20">
-                                                            <span>by</span>
-                                                            <Link to={`/creator/${sub.projectAuthor}`} onClick={(e) => e.stopPropagation()} className="text-slate-700 dark:text-slate-300 font-medium hover:text-modtale-accent hover:underline focus:outline-none p-0.5 -m-0.5 rounded">
-                                                                {sub.projectAuthor || 'Unknown'}
-                                                            </Link>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            {sub.projectDescription && (
+                                                <p className="text-xs text-slate-500 line-clamp-1 mt-1.5 opacity-80">{sub.projectDescription}</p>
+                                            )}
                                         </div>
 
-                                        <div className="px-4 pb-4 mt-2 cursor-pointer" onClick={() => navigate(`/mod/${sub.projectId}`)}>
-                                            <p className="text-slate-600 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed h-10">
-                                                {sub.projectDescription || 'No description provided.'}
-                                            </p>
-                                        </div>
-
-                                        <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 border-t border-slate-100 dark:border-white/5">
-                                            {canVote && (jam.categories || []).length > 0 ? (
-                                                isMySubmission ? (
-                                                    <div className="flex flex-col items-center justify-center py-2 text-center text-slate-500">
-                                                        <CheckCircle2 className="w-5 h-5 text-green-500 opacity-50 mb-1" />
-                                                        <span className="text-xs font-bold">This is your submission</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        {jam.categories.map(cat => {
-                                                            const myVote = (sub.votes || []).find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
-                                                            return (
-                                                                <div key={cat.id} className="flex flex-col gap-1.5">
-                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{cat.name}</span>
-                                                                    <div className="flex flex-wrap items-center gap-1">
-                                                                        {[...Array(cat.maxScore)].map((_, i) => (
-                                                                            <button
-                                                                                key={i}
-                                                                                onClick={() => handleVote(sub.id, cat.id, i + 1)}
-                                                                                className={`flex-1 h-6 rounded flex items-center justify-center font-bold text-xs transition-all ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white shadow-sm' : 'bg-slate-200 dark:bg-white/5 text-slate-400 hover:bg-slate-300 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
-                                                                            >
-                                                                                {i + 1}
-                                                                            </button>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                )
+                                        <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-4 sm:gap-2 shrink-0 w-full sm:w-auto px-4 sm:px-2 pt-4 sm:pt-0 border-t sm:border-t-0 sm:border-l border-slate-200/50 dark:border-white/5">
+                                            {canSeeResults && sub.totalScore !== undefined ? (
+                                                <div className="flex flex-col items-start sm:items-end">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{jam.status === 'COMPLETED' ? 'Final Score' : 'Score'}</span>
+                                                    <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-none mt-0.5">{sub.totalScore.toFixed(2)}</span>
+                                                </div>
                                             ) : (
-                                                <div className="flex flex-col items-center justify-center py-2 text-center text-slate-500">
-                                                    <AlertCircle className="w-5 h-5 opacity-20 mb-1" />
-                                                    <span className="text-xs font-bold">Voting not available</span>
+                                                <div className="flex flex-col items-start sm:items-end opacity-50">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Score</span>
+                                                    <span className="text-lg font-black text-slate-500 leading-none mt-0.5">---</span>
                                                 </div>
                                             )}
 
-                                            {canSeeResults && sub.totalScore !== undefined && (
-                                                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Final Score</span>
-                                                        <span className="text-sm font-black text-slate-900 dark:text-white">{sub.totalScore.toFixed(2)}</span>
+                                            <div className="flex flex-col items-end">
+                                                {canVote && !isMySubmission && (
+                                                    <button
+                                                        onClick={(e) => { e.preventDefault(); setVotingSubmissionId(sub.id); }}
+                                                        className="px-6 sm:px-4 py-2 sm:py-1.5 bg-modtale-accent hover:bg-modtale-accentHover text-white text-sm sm:text-xs font-black rounded-xl sm:rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+                                                    >
+                                                        <Star className="w-3.5 h-3.5" /> Vote
+                                                    </button>
+                                                )}
+                                                {isMySubmission && (
+                                                    <div className="px-3 py-1 bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1">
+                                                        <CheckCircle2 className="w-3 h-3" /> Yours
                                                     </div>
-                                                    {sub.rank && (
-                                                        <div className="flex items-center gap-1.5 bg-modtale-accent/10 text-modtale-accent px-2 py-1 rounded font-black text-sm">
-                                                            <Trophy className="w-3.5 h-3.5"/> #{sub.rank}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );

@@ -34,9 +34,9 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
     };
 
     return (
-        <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-full bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-white/5 hover:border-modtale-accent dark:hover:border-modtale-accent transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden">
+        <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-full bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 hover:border-modtale-accent dark:hover:border-modtale-accent transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 overflow-hidden shadow-lg">
 
-            <div className="relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 border-b border-slate-200/50 dark:border-white/5">
+            <div className="relative w-full aspect-[3/1] bg-slate-200/50 dark:bg-slate-800/50 overflow-hidden shrink-0 border-b border-slate-200/50 dark:border-white/5">
                 {resolvedBanner ? (
                     <img
                         src={resolvedBanner}
@@ -44,7 +44,7 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-slate-200 dark:bg-slate-800">
+                    <div className="w-full h-full flex items-center justify-center bg-slate-300/30 dark:bg-slate-700/30">
                         <Trophy className="w-8 h-8 opacity-20 text-slate-500" />
                     </div>
                 )}
@@ -57,7 +57,7 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
             </div>
 
             <div className="flex flex-col flex-1 px-6 pb-6 pt-0 relative items-center text-center">
-                <div className="w-20 h-20 shrink-0 -mt-10 mb-3 relative z-10 rounded-[1.25rem] bg-slate-100 dark:bg-slate-800 shadow-lg border-4 border-white dark:border-slate-900 overflow-hidden flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+                <div className="w-20 h-20 shrink-0 -mt-10 mb-3 relative z-10 rounded-[1.25rem] bg-white/80 dark:bg-slate-800/80 backdrop-blur-md shadow-lg border-4 border-white dark:border-slate-900 overflow-hidden flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
                     {resolvedIcon ? (
                         <img
                             src={resolvedIcon}
@@ -82,12 +82,12 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
                     {jam.description || 'No description provided.'}
                 </p>
 
-                <div className="mt-auto w-full flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg">
-                        <Users className="w-4 h-4 text-slate-400" /> {jam.participantIds?.length || 0}
+                <div className="mt-auto w-full flex items-center justify-between pt-4 border-t border-slate-200/50 dark:border-white/5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-white/5">
+                        <Users className="w-4 h-4 text-modtale-accent" /> {jam.participantIds?.length || 0}
                     </div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg">
-                        <Calendar className="w-4 h-4 text-slate-400" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-white/5">
+                        <Calendar className="w-4 h-4 text-modtale-accent" />
                         <span>{formatJamDate()}</span>
                     </div>
                 </div>
@@ -116,7 +116,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         votingEndDate: '',
         allowPublicVoting: true,
         allowConcurrentVoting: false,
-        showResultsBeforeVotingEnds: false,
+        showResultsBeforeVotingEnds: true,
         categories: []
     });
 
