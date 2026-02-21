@@ -10,6 +10,7 @@ import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,6 +33,10 @@ public class ModjamService {
         return modjamRepository.findAll();
     }
 
+    public List<Modjam> getUserHostedJams(String hostId) {
+        return modjamRepository.findByHostId(hostId);
+    }
+
     public Modjam getJamBySlug(String slug) {
         return modjamRepository.findBySlug(slug)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
@@ -47,11 +52,12 @@ public class ModjamService {
 
         if (jam.getStartDate() != null && jam.getStartDate().isAfter(LocalDateTime.now())) {
             jam.setStatus("UPCOMING");
-        } else {
+        } else if (!"DRAFT".equals(jam.getStatus())) {
             jam.setStatus("ACTIVE");
         }
 
         jam.setCreatedAt(LocalDateTime.now());
+        jam.setUpdatedAt(LocalDateTime.now());
 
         if (jam.getCategories() != null) {
             for (Modjam.Category cat : jam.getCategories()) {
@@ -76,6 +82,7 @@ public class ModjamService {
         jam.setAllowPublicVoting(updatedJam.isAllowPublicVoting());
         jam.setCategories(updatedJam.getCategories());
         jam.setStatus(updatedJam.getStatus());
+        jam.setUpdatedAt(LocalDateTime.now());
 
         return modjamRepository.save(jam);
     }
@@ -86,6 +93,7 @@ public class ModjamService {
             String path = "modjams/" + jamId + "/icon/" + file.getOriginalFilename();
             String url = storageService.upload(file, path);
             jam.setImageUrl(url);
+            jam.setUpdatedAt(LocalDateTime.now());
             modjamRepository.save(jam);
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload icon", e);
@@ -98,6 +106,7 @@ public class ModjamService {
             String path = "modjams/" + jamId + "/banner/" + file.getOriginalFilename();
             String url = storageService.upload(file, path);
             jam.setBannerUrl(url);
+            jam.setUpdatedAt(LocalDateTime.now());
             modjamRepository.save(jam);
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload banner", e);
@@ -213,5 +222,19 @@ public class ModjamService {
         sub.getVotes().add(vote);
 
         return submissionRepository.save(sub);
+    }
+
+    @Scheduled(cron = "0 0 * * * *")
+    public void cleanupStaleDrafts() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<Modjam> staleDrafts = modjamRepository.findByStatusAndUpdatedAtBefore("DRAFT", thirtyDaysAgo);
+
+        for (Modjam jam : staleDrafts) {
+            List<ModjamSubmission> submissions = submissionRepository.findByJamId(jam.getId());
+            if (submissions != null && !submissions.isEmpty()) {
+                submissionRepository.deleteAll(submissions);
+            }
+            modjamRepository.delete(jam);
+        }
     }
 }
