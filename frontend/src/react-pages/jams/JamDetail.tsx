@@ -17,7 +17,13 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [loading, setLoading] = useState(true);
     const [myProjects, setMyProjects] = useState<Mod[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-    const [statusModal, setStatusModal] = useState<{type: 'success' | 'error' | 'warning', title: string, msg: string} | null>(null);
+    const [statusModal, setStatusModal] = useState<{
+        type: 'success' | 'error' | 'warning',
+        title: string,
+        msg: string,
+        onConfirm?: () => void,
+        confirmText?: string
+    } | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -140,16 +146,23 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         }
     };
 
-    const handleDelete = async () => {
+    const handleDelete = () => {
         if (!jam) return;
-        if (!window.confirm("Are you sure you want to delete this jam? This action cannot be undone and will delete all submissions.")) return;
 
-        try {
-            await api.delete(`/modjams/${jam.id}`);
-            navigate('/jams');
-        } catch (err: any) {
-            setStatusModal({ type: 'error', title: 'Error', msg: 'Failed to delete jam.' });
-        }
+        setStatusModal({
+            type: 'warning',
+            title: 'Delete Event?',
+            msg: 'Are you sure you want to delete this jam? This action cannot be undone and will permanently delete all submissions.',
+            confirmText: 'Delete Jam',
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/modjams/${jam.id}`);
+                    navigate('/jams');
+                } catch (err: any) {
+                    setStatusModal({ type: 'error', title: 'Error', msg: 'Failed to delete jam.' });
+                }
+            }
+        });
     };
 
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
@@ -179,7 +192,16 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
     return (
         <>
-            {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
+            {statusModal && (
+                <StatusModal
+                    type={statusModal.type}
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                    onConfirm={statusModal.onConfirm}
+                    confirmText={statusModal.confirmText}
+                />
+            )}
 
             <JamLayout
                 bannerUrl={jam.bannerUrl}
