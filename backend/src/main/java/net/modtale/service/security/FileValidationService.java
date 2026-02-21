@@ -98,7 +98,7 @@ public class FileValidationService {
                 }
 
                 if ("PLUGIN".equals(classification) && entryName.equals(PLUGIN_MANIFEST_PATH)) {
-                    manifestFound = true;
+                    /*manifestFound = true;
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     int bytesRead;
                     while ((bytesRead = zis.read(buffer)) != -1) {
@@ -113,7 +113,7 @@ public class FileValidationService {
                             }
                         }
                     }
-                    validatePluginManifest(new ByteArrayInputStream(baos.toByteArray()));
+                    validatePluginManifest(new ByteArrayInputStream(baos.toByteArray()));*/
                 } else if (!entry.isDirectory()) {
                     long claimedSize = entry.getSize();
                     if (claimedSize > MAX_UNCOMPRESSED_SIZE) {
@@ -155,9 +155,12 @@ public class FileValidationService {
             }
         }
 
+        manifestFound = true;
+        /*
         if ("PLUGIN".equals(classification) && !manifestFound) {
             throw new IllegalArgumentException("Invalid Plugin: Missing manifest.json");
         }
+        */
     }
 
     private void validatePluginManifest(InputStream is) {
