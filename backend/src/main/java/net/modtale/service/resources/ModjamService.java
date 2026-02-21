@@ -60,10 +60,12 @@ public class ModjamService {
 
         if (jam.getCategories() != null) {
             for (Modjam.Category cat : jam.getCategories()) {
-                if (cat.getId() == null || cat.getId().isEmpty()) {
+                if (cat.getId() == null || cat.getId().trim().isEmpty()) {
                     cat.setId(UUID.randomUUID().toString());
                 }
             }
+        } else {
+            jam.setCategories(new ArrayList<>());
         }
 
         return modjamRepository.save(jam);
@@ -81,7 +83,17 @@ public class ModjamService {
         jam.setAllowPublicVoting(updatedJam.isAllowPublicVoting());
         jam.setAllowConcurrentVoting(updatedJam.isAllowConcurrentVoting());
         jam.setShowResultsBeforeVotingEnds(updatedJam.isShowResultsBeforeVotingEnds());
-        jam.setCategories(updatedJam.getCategories());
+
+        if (updatedJam.getCategories() != null) {
+            for (Modjam.Category cat : updatedJam.getCategories()) {
+                if (cat.getId() == null || cat.getId().trim().isEmpty()) {
+                    cat.setId(UUID.randomUUID().toString());
+                }
+            }
+            jam.setCategories(updatedJam.getCategories());
+        } else {
+            jam.setCategories(new ArrayList<>());
+        }
 
         if (!"COMPLETED".equals(jam.getStatus()) && "COMPLETED".equals(updatedJam.getStatus())) {
             calculateScores(jam.getId());
@@ -215,8 +227,17 @@ public class ModjamService {
     }
 
     public ModjamSubmission vote(String jamId, String submissionId, String categoryId, int score, String userId) {
+        if (categoryId == null || categoryId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category ID is required to vote.");
+        }
+
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+
+        boolean validCategory = jam.getCategories() != null && jam.getCategories().stream().anyMatch(c -> categoryId.equals(c.getId()));
+        if (!validCategory) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid category ID provided.");
+        }
 
         boolean canVote = "VOTING".equals(jam.getStatus()) ||
                 ("ACTIVE".equals(jam.getStatus()) && jam.isAllowConcurrentVoting());
@@ -264,7 +285,9 @@ public class ModjamService {
 
             if (sub.getVotes() != null) {
                 for (ModjamSubmission.Vote vote : sub.getVotes()) {
-                    categoryScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
+                    if (vote.getCategoryId() != null) {
+                        categoryScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
+                    }
                 }
             }
 
@@ -273,17 +296,19 @@ public class ModjamService {
             int categoryCount = 0;
 
             for (Map.Entry<String, List<Integer>> entry : categoryScoresMap.entrySet()) {
-                double avg = entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
-                averagedCategoryScores.put(entry.getKey(), avg);
-                totalScoreSum += avg;
-                categoryCount++;
+                if (entry.getKey() != null) {
+                    double avg = entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
+                    averagedCategoryScores.put(entry.getKey(), avg);
+                    totalScoreSum += avg;
+                    categoryCount++;
+                }
             }
 
             sub.setCategoryScores(averagedCategoryScores);
             sub.setTotalScore(categoryCount > 0 ? totalScoreSum / categoryCount : 0.0);
         }
 
-        submissions.sort((s1, s2) -> Double.compare(s2.getTotalScore(), s1.getTotalScore()));
+        submissions.sort((s1, s2) -> Double.compare(s2.getTotalScore() != null ? s2.getTotalScore() : 0.0, s1.getTotalScore() != null ? s1.getTotalScore() : 0.0));
 
         int rank = 1;
         for (ModjamSubmission sub : submissions) {
