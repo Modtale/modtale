@@ -140,6 +140,7 @@ public class DataSeeder implements CommandLineRunner {
         user.setId(SUPER_ADMIN_ID);
         user.setUsername("super_admin");
         user.setEmail("admin@modtale.net");
+        user.setEmailVerified(true);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRoles(List.of("USER", "ADMIN"));
         user.setBio("I am the Super Admin for this preview environment.");
@@ -154,6 +155,7 @@ public class DataSeeder implements CommandLineRunner {
         User user = new User();
         user.setUsername("user");
         user.setEmail("user@modtale.net");
+        user.setEmailVerified(true);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRoles(List.of("USER"));
         user.setBio("I am a standard user.");
@@ -202,6 +204,7 @@ public class DataSeeder implements CommandLineRunner {
 
             user.put("password", defaultPasswordHash);
             user.put("email", "scrubbed_" + id + "@modtale.local");
+            user.put("emailVerified", true);
             user.put("githubAccessToken", null);
             user.put("gitlabAccessToken", null);
             safeToInsert.add(user);
