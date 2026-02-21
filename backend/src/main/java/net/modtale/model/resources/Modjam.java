@@ -47,7 +47,7 @@ public class Modjam {
 
     private boolean allowPublicVoting = true;
     private boolean allowConcurrentVoting = false;
-    private boolean showResultsBeforeVotingEnds = false;
+    private boolean showResultsBeforeVotingEnds = true;
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt = LocalDateTime.now();
