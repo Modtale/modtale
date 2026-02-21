@@ -46,6 +46,8 @@ public class Modjam {
     private List<Category> categories = new ArrayList<>();
 
     private boolean allowPublicVoting = true;
+    private boolean allowConcurrentVoting = false;
+    private boolean showResultsBeforeVotingEnds = false;
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt = LocalDateTime.now();
@@ -106,6 +108,10 @@ public class Modjam {
     public void setCategories(List<Category> categories) { this.categories = categories; }
     public boolean isAllowPublicVoting() { return allowPublicVoting; }
     public void setAllowPublicVoting(boolean allowPublicVoting) { this.allowPublicVoting = allowPublicVoting; }
+    public boolean isAllowConcurrentVoting() { return allowConcurrentVoting; }
+    public void setAllowConcurrentVoting(boolean allowConcurrentVoting) { this.allowConcurrentVoting = allowConcurrentVoting; }
+    public boolean isShowResultsBeforeVotingEnds() { return showResultsBeforeVotingEnds; }
+    public void setShowResultsBeforeVotingEnds(boolean showResultsBeforeVotingEnds) { this.showResultsBeforeVotingEnds = showResultsBeforeVotingEnds; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
