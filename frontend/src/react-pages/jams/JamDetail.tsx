@@ -492,7 +492,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
                                 return (
                                     <div key={sub.id} className="bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden flex flex-col group shadow-sm transition-all hover:shadow-lg hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 relative">
-                                        <Link to={`/mod/${sub.projectId}`} className="block relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 border-b border-slate-200/50 dark:border-white/5">
+                                        <Link to={`/mod/${sub.projectId}`} className="block relative w-full h-20 bg-slate-100 dark:bg-slate-800 border-b border-slate-200/50 dark:border-white/5">
                                             {resolvedProjectBanner ? (
                                                 <img src={resolvedProjectBanner} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                             ) : (
@@ -501,7 +501,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                         </Link>
 
                                         <div className="flex px-4 relative">
-                                            <div className="flex-shrink-0 -mt-6 mb-2 relative z-10">
+                                            <div className="flex-shrink-0 -mt-8 mb-2 relative z-20">
                                                 <Link to={`/mod/${sub.projectId}`} className="block w-16 h-16 rounded-xl bg-white dark:bg-slate-800 shadow-md border-[3px] border-white dark:border-slate-900 overflow-hidden relative group-hover:scale-105 transition-transform">
                                                     {resolvedProjectImage ? (
                                                         <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
@@ -512,14 +512,14 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                                     )}
                                                 </Link>
                                             </div>
-                                            <div className="flex-1 min-w-0 pt-2 pl-3 flex justify-between items-start gap-2">
+                                            <div className="flex-1 min-w-0 pt-2 pl-3 flex justify-between items-start gap-2 relative z-10">
                                                 <div className="min-w-0 flex-1">
                                                     <Link to={`/mod/${sub.projectId}`} className="text-lg font-black text-slate-900 dark:text-white truncate group-hover:text-modtale-accent transition-colors block">
                                                         {sub.projectTitle}
                                                     </Link>
-                                                    <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                                                    <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium truncate mt-0.5 relative z-20">
                                                         <span>by</span>
-                                                        <Link to={`/creator/${sub.projectAuthor}`} onClick={(e) => e.stopPropagation()} className="text-slate-700 dark:text-slate-300 font-bold hover:text-modtale-accent transition-colors">
+                                                        <Link to={`/creator/${sub.projectAuthor}`} onClick={(e) => e.stopPropagation()} className="text-slate-700 dark:text-slate-300 font-bold hover:text-modtale-accent hover:underline transition-colors p-0.5 -m-0.5 rounded relative z-20">
                                                             {sub.projectAuthor || 'Unknown'}
                                                         </Link>
                                                     </div>
@@ -527,15 +527,15 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                             </div>
                                         </div>
 
-                                        <div className="px-4 pb-4 flex-1 flex flex-col">
+                                        <Link to={`/mod/${sub.projectId}`} className="px-4 pb-4 flex-1 flex flex-col relative z-10 block">
                                             {sub.projectDescription && (
                                                 <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mt-1">
                                                     {sub.projectDescription}
                                                 </p>
                                             )}
-                                        </div>
+                                        </Link>
 
-                                        <div className="mt-auto px-4 py-3 bg-slate-50/50 dark:bg-white/[0.02] border-t border-slate-200/50 dark:border-white/5 flex items-center justify-between">
+                                        <div className="mt-auto px-4 py-3 bg-slate-50/50 dark:bg-white/[0.02] border-t border-slate-200/50 dark:border-white/5 flex items-center justify-between relative z-10">
                                             <div className="flex items-center gap-2">
                                                 {canSeeResults && sub.totalScore !== undefined ? (
                                                     <div className="flex flex-col">
@@ -553,8 +553,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                             <div className="flex items-center">
                                                 {canVote && !isMySubmission && (
                                                     <button
-                                                        onClick={(e) => { e.preventDefault(); setVotingSubmissionId(sub.id); }}
-                                                        className="px-4 py-1.5 bg-modtale-accent hover:bg-modtale-accentHover text-white text-xs font-black rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVotingSubmissionId(sub.id); }}
+                                                        className="px-4 py-1.5 bg-modtale-accent hover:bg-modtale-accentHover text-white text-xs font-black rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-1.5 relative z-20"
                                                     >
                                                         <Star className="w-3 h-3" /> Vote
                                                     </button>
