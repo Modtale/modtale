@@ -43,6 +43,8 @@ export const JamBuilder: React.FC<any> = ({
         setMetaData((prev: any) => ({ ...prev, [field]: val }));
     };
 
+    const isPublished = metaData.status && metaData.status !== 'DRAFT';
+
     const MarkdownComponents = {
         code({node, inline, className, children, ...props}: any) {
             const match = /language-(\w+)/.exec(className || '');
@@ -70,6 +72,7 @@ export const JamBuilder: React.FC<any> = ({
             onSave={performSave}
             onPublish={onPublish}
             onBack={onBack}
+            isPublished={isPublished}
             bannerUrl={metaData.bannerUrl}
             iconUrl={metaData.imageUrl}
             onBannerUpload={(f, p) => {
