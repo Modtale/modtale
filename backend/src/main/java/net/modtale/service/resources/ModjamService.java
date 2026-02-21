@@ -196,6 +196,9 @@ public class ModjamService {
         sub.setProjectId(projectId);
         sub.setProjectTitle(project.getTitle());
         sub.setProjectImageUrl(project.getImageUrl());
+        sub.setProjectBannerUrl(project.getBannerUrl());
+        sub.setProjectAuthor(project.getAuthor());
+        sub.setProjectDescription(project.getDescription());
         sub.setSubmitterId(userId);
 
         submissionRepository.save(sub);

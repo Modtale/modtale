@@ -30,6 +30,9 @@ public class ModjamSubmission {
 
     private String projectTitle;
     private String projectImageUrl;
+    private String projectBannerUrl;
+    private String projectAuthor;
+    private String projectDescription;
 
     @Indexed
     private String submitterId;
@@ -80,6 +83,12 @@ public class ModjamSubmission {
     public void setProjectTitle(String projectTitle) { this.projectTitle = projectTitle; }
     public String getProjectImageUrl() { return projectImageUrl; }
     public void setProjectImageUrl(String projectImageUrl) { this.projectImageUrl = projectImageUrl; }
+    public String getProjectBannerUrl() { return projectBannerUrl; }
+    public void setProjectBannerUrl(String projectBannerUrl) { this.projectBannerUrl = projectBannerUrl; }
+    public String getProjectAuthor() { return projectAuthor; }
+    public void setProjectAuthor(String projectAuthor) { this.projectAuthor = projectAuthor; }
+    public String getProjectDescription() { return projectDescription; }
+    public void setProjectDescription(String projectDescription) { this.projectDescription = projectDescription; }
     public String getSubmitterId() { return submitterId; }
     public void setSubmitterId(String submitterId) { this.submitterId = submitterId; }
     public List<Vote> getVotes() { return votes; }
