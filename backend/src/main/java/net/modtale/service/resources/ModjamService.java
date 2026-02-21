@@ -79,9 +79,11 @@ public class ModjamService {
         jam.setEndDate(updatedJam.getEndDate());
         jam.setVotingEndDate(updatedJam.getVotingEndDate());
         jam.setAllowPublicVoting(updatedJam.isAllowPublicVoting());
+        jam.setAllowConcurrentVoting(updatedJam.isAllowConcurrentVoting());
+        jam.setShowResultsBeforeVotingEnds(updatedJam.isShowResultsBeforeVotingEnds());
         jam.setCategories(updatedJam.getCategories());
 
-        if (jam.getStatus().equals("ACTIVE") && updatedJam.getStatus().equals("COMPLETED")) {
+        if (!"COMPLETED".equals(jam.getStatus()) && "COMPLETED".equals(updatedJam.getStatus())) {
             calculateScores(jam.getId());
         }
 
@@ -213,7 +215,10 @@ public class ModjamService {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
 
-        if (!"VOTING".equals(jam.getStatus())) {
+        boolean canVote = "VOTING".equals(jam.getStatus()) ||
+                ("ACTIVE".equals(jam.getStatus()) && jam.isAllowConcurrentVoting());
+
+        if (!canVote) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voting is not currently active for this jam.");
         }
 
@@ -241,7 +246,10 @@ public class ModjamService {
         vote.setScore(score);
         sub.getVotes().add(vote);
 
-        return submissionRepository.save(sub);
+        submissionRepository.save(sub);
+        calculateScores(jamId);
+
+        return submissionRepository.findById(submissionId).orElse(sub);
     }
 
     private void calculateScores(String jamId) {

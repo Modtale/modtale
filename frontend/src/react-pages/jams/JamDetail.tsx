@@ -23,7 +23,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [statusModal, setStatusModal] = useState<{
         type: 'success' | 'error' | 'warning',
         title: string,
-        msg: string,
+        message: string,
         onAction?: () => void,
         actionLabel?: string,
         secondaryLabel?: string
@@ -52,7 +52,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 setSubmissions(subRes.data);
             } catch (err) {
                 console.error(err);
-                setStatusModal({ type: 'error', title: 'Not Found', msg: 'Failed to load jam details.' });
+                setStatusModal({ type: 'error', title: 'Not Found', message: 'Failed to load jam details.' });
             } finally {
                 setLoading(false);
             }
@@ -74,10 +74,10 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         if (!jam || !currentUser) return;
         try {
             await api.post(`/modjams/${jam.id}/participate`, {});
-            setStatusModal({ type: 'success', title: 'Joined!', msg: 'Successfully joined the jam.' });
+            setStatusModal({ type: 'success', title: 'Joined!', message: 'Successfully joined the jam.' });
             setJam({ ...jam, participantIds: [...(jam.participantIds || []), currentUser.id] });
         } catch (err) {
-            setStatusModal({ type: 'error', title: 'Error', msg: 'Failed to join the jam.' });
+            setStatusModal({ type: 'error', title: 'Error', message: 'Failed to join the jam.' });
         }
     };
 
@@ -87,7 +87,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             const res = await api.post(`/modjams/${jam.id}/vote`, { submissionId, categoryId, score });
             setSubmissions(submissions.map(s => s.id === submissionId ? res.data : s));
         } catch (err: any) {
-            setStatusModal({ type: 'error', title: 'Vote Failed', msg: err.response?.data?.message || 'Failed to record vote.' });
+            setStatusModal({ type: 'error', title: 'Vote Failed', message: err.response?.data?.message || 'Failed to record vote.' });
         }
     };
 
@@ -104,6 +104,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             endDate: jam.endDate,
             votingEndDate: jam.votingEndDate,
             allowPublicVoting: jam.allowPublicVoting,
+            allowConcurrentVoting: jam.allowConcurrentVoting,
+            showResultsBeforeVotingEnds: jam.showResultsBeforeVotingEnds,
             categories: jam.categories,
             status: jam.status
         });
@@ -149,7 +151,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         setStatusModal({
             type: 'warning',
             title: 'Delete Event?',
-            msg: 'Are you sure you want to delete this jam? This action cannot be undone and will permanently delete all submissions.',
+            message: 'Are you sure you want to delete this jam? This action cannot be undone and will permanently delete all submissions.',
             actionLabel: 'Delete Jam',
             secondaryLabel: 'Cancel',
             onAction: async () => {
@@ -157,7 +159,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                     await api.delete(`/modjams/${jam.id}`);
                     navigate('/jams');
                 } catch (err: any) {
-                    setStatusModal({ type: 'error', title: 'Error', msg: 'Failed to delete jam.' });
+                    setStatusModal({ type: 'error', title: 'Error', message: 'Failed to delete jam.' });
                 }
             }
         });
@@ -184,7 +186,9 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const isHost = currentUser?.id === jam.hostId;
     const isParticipating = currentUser?.id && (jam.participantIds || []).includes(currentUser.id);
     const hasSubmitted = submissions.some(s => s.submitterId === currentUser?.id);
-    const canVote = jam.status === 'VOTING' && (jam.allowPublicVoting || isHost);
+
+    const canVote = (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || isHost);
+    const canSeeResults = jam.status === 'COMPLETED' || jam.showResultsBeforeVotingEnds || isHost;
 
     const isPast = (dateString: string) => new Date(dateString) < new Date();
 
@@ -194,7 +198,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 <StatusModal
                     type={statusModal.type}
                     title={statusModal.title}
-                    message={statusModal.msg}
+                    message={statusModal.message}
                     onClose={() => setStatusModal(null)}
                     onAction={statusModal.onAction}
                     actionLabel={statusModal.actionLabel}
@@ -209,10 +213,10 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                     onSuccess={(sub) => {
                         setSubmissions([...submissions, sub]);
                         setIsSubmittingModalOpen(false);
-                        setStatusModal({ type: 'success', title: 'Submitted!', msg: 'Project submitted successfully.' });
+                        setStatusModal({ type: 'success', title: 'Submitted!', message: 'Project submitted successfully.' });
                     }}
                     onCancel={() => setIsSubmittingModalOpen(false)}
-                    onError={(msg) => setStatusModal({ type: 'error', title: 'Submission Failed', msg })}
+                    onError={(msg) => setStatusModal({ type: 'error', title: 'Submission Failed', message: msg })}
                 />
             )}
 
@@ -368,48 +372,53 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                             <LayoutGrid className="w-6 h-6 text-modtale-accent" /> Submissions
                         </h2>
 
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
                             {submissions.map(sub => {
                                 const resolvedProjectImage = resolveUrl(sub.projectImageUrl);
                                 const isMySubmission = sub.submitterId === currentUser?.id;
 
                                 return (
-                                    <div key={sub.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 rounded-3xl overflow-hidden flex flex-col group shadow-sm transition-all hover:shadow-lg">
-                                        <Link to={`/project/${sub.projectId}`} className="h-48 bg-slate-100 dark:bg-slate-800 relative overflow-hidden block">
-                                            {resolvedProjectImage ? (
-                                                <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                                    <LayoutGrid className="w-12 h-12 opacity-20" />
+                                    <div key={sub.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col group shadow-sm transition-all hover:border-modtale-accent dark:hover:border-modtale-accent">
+                                        <Link to={`/mod/${sub.projectId}`} className="flex px-4 pt-4 pb-2 relative flex-1 cursor-pointer">
+                                            <div className="flex-shrink-0 relative z-10">
+                                                <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative">
+                                                    {resolvedProjectImage ? (
+                                                        <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                            <LayoutGrid className="w-8 h-8 opacity-20" />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90" />
-                                            <div className="absolute bottom-4 left-5 right-5 flex items-center justify-between">
-                                                <h3 className="text-xl font-black text-white truncate drop-shadow-md group-hover:text-modtale-accent transition-colors">{sub.projectTitle}</h3>
+                                            </div>
+
+                                            <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
+                                                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors" title={sub.projectTitle}>
+                                                    {sub.projectTitle}
+                                                </h3>
                                             </div>
                                         </Link>
 
-                                        <div className="p-5 flex-1 flex flex-col bg-slate-50 dark:bg-transparent border-t border-slate-200 dark:border-white/5">
+                                        <div className="px-4 pb-4 bg-slate-50 dark:bg-transparent mt-auto border-t border-slate-100 dark:border-white/5">
                                             {canVote && (jam.categories || []).length > 0 ? (
                                                 isMySubmission ? (
-                                                    <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-500">
-                                                        <CheckCircle2 className="w-8 h-8 text-green-500 opacity-50 mb-2" />
-                                                        <span className="text-sm font-bold">This is your submission</span>
-                                                        <span className="text-xs font-medium mt-1">You cannot vote on your own project.</span>
+                                                    <div className="flex-1 flex flex-col items-center justify-center py-4 text-center text-slate-500">
+                                                        <CheckCircle2 className="w-6 h-6 text-green-500 opacity-50 mb-1" />
+                                                        <span className="text-xs font-bold">This is your submission</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="mt-auto space-y-3 pt-2">
+                                                    <div className="mt-2 space-y-2">
                                                         {jam.categories.map(cat => {
                                                             const myVote = (sub.votes || []).find(v => v.voterId === currentUser?.id && v.categoryId === cat.id);
                                                             return (
-                                                                <div key={cat.id} className="flex flex-col gap-2 p-3 bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-white/5">
-                                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{cat.name}</span>
-                                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                                <div key={cat.id} className="flex flex-col gap-1.5 p-2 bg-white dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-white/5">
+                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{cat.name}</span>
+                                                                    <div className="flex flex-wrap items-center gap-1">
                                                                         {[...Array(cat.maxScore)].map((_, i) => (
                                                                             <button
                                                                                 key={i}
                                                                                 onClick={() => handleVote(sub.id, cat.id, i + 1)}
-                                                                                className={`flex-1 h-8 rounded-lg flex items-center justify-center font-black text-xs transition-all ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-white/5 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
+                                                                                className={`flex-1 h-6 rounded flex items-center justify-center font-bold text-xs transition-all ${myVote?.score === i + 1 ? 'bg-modtale-accent text-white shadow-sm' : 'bg-slate-100 dark:bg-white/5 text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
                                                                             >
                                                                                 {i + 1}
                                                                             </button>
@@ -421,21 +430,21 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                                                     </div>
                                                 )
                                             ) : (
-                                                <div className="flex-1 flex flex-col items-center justify-center py-6 text-center text-slate-500">
-                                                    <AlertCircle className="w-8 h-8 opacity-20 mb-2" />
-                                                    <span className="text-sm font-bold">Voting not available</span>
+                                                <div className="flex-1 flex flex-col items-center justify-center py-4 text-center text-slate-500">
+                                                    <AlertCircle className="w-6 h-6 opacity-20 mb-1" />
+                                                    <span className="text-xs font-bold">Voting not available</span>
                                                 </div>
                                             )}
 
-                                            {jam.status === 'COMPLETED' && sub.totalScore !== undefined && (
-                                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
+                                            {canSeeResults && sub.totalScore !== undefined && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
                                                     <div className="flex flex-col">
                                                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Final Score</span>
-                                                        <span className="text-lg font-black text-slate-900 dark:text-white">{sub.totalScore.toFixed(2)}</span>
+                                                        <span className="text-sm font-black text-slate-900 dark:text-white">{sub.totalScore.toFixed(2)}</span>
                                                     </div>
                                                     {sub.rank && (
-                                                        <div className="flex items-center gap-2 bg-modtale-accent/10 text-modtale-accent px-4 py-2 rounded-xl font-black text-lg">
-                                                            <Trophy className="w-5 h-5"/> #{sub.rank}
+                                                        <div className="flex items-center gap-1.5 bg-modtale-accent/10 text-modtale-accent px-2 py-1 rounded font-black text-sm">
+                                                            <Trophy className="w-3.5 h-3.5"/> #{sub.rank}
                                                         </div>
                                                     )}
                                                 </div>

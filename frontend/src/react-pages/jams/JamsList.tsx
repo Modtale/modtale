@@ -115,6 +115,8 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         endDate: '',
         votingEndDate: '',
         allowPublicVoting: true,
+        allowConcurrentVoting: false,
+        showResultsBeforeVotingEnds: false,
         categories: []
     });
 

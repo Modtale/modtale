@@ -256,14 +256,37 @@ export const JamBuilder: React.FC<any> = ({
                                     </div>
                                     <input
                                         type="checkbox"
-                                        checked={metaData.allowPublicVoting}
+                                        checked={metaData.allowPublicVoting !== false}
                                         onChange={e => updateField('allowPublicVoting', e.target.checked)}
                                         className="w-6 h-6 rounded-lg border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
                                     />
                                 </label>
-                                <p className="text-xs text-slate-500 font-medium leading-relaxed px-2">
-                                    If public voting is disabled, only the host and designated judges will be able to score submissions.
-                                </p>
+
+                                <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-2xl cursor-pointer hover:border-modtale-accent border border-transparent transition-all shadow-sm">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold">Concurrent Voting</span>
+                                        <span className="text-xs text-slate-500 font-medium">Allow users to vote while submissions are still open</span>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={metaData.allowConcurrentVoting || false}
+                                        onChange={e => updateField('allowConcurrentVoting', e.target.checked)}
+                                        className="w-6 h-6 rounded-lg border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                    />
+                                </label>
+
+                                <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-2xl cursor-pointer hover:border-modtale-accent border border-transparent transition-all shadow-sm">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold">Public Results</span>
+                                        <span className="text-xs text-slate-500 font-medium">Show live scores and rankings before the jam finishes</span>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={metaData.showResultsBeforeVotingEnds || false}
+                                        onChange={e => updateField('showResultsBeforeVotingEnds', e.target.checked)}
+                                        className="w-6 h-6 rounded-lg border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                    />
+                                </label>
                             </div>
                         </div>
                     )}
