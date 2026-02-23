@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, User } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
-import { Trophy, Plus, ArrowLeft, Calendar, Users } from 'lucide-react';
+import { Trophy, Plus, ArrowLeft, Calendar, Users, LayoutGrid } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 
@@ -34,8 +34,7 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
     };
 
     return (
-        <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-full bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-slate-200 dark:border-white/10 hover:border-modtale-accent dark:hover:border-modtale-accent transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 overflow-hidden shadow-lg">
-
+        <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-full bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-white/10 hover:border-modtale-accent dark:hover:border-modtale-accent transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden shadow-md">
             <div className="relative w-full aspect-[3/1] bg-slate-200/50 dark:bg-slate-800/50 overflow-hidden shrink-0 border-b border-slate-200/50 dark:border-white/5">
                 {resolvedBanner ? (
                     <img
@@ -49,15 +48,15 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
                     </div>
                 )}
                 <div className="absolute top-3 right-3 z-20">
-                    <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center shadow-sm backdrop-blur-md border ${jam.status === 'ACTIVE' ? 'bg-modtale-accent/90 border-modtale-accent text-white' : 'bg-black/50 border-white/10 text-white'}`}>
+                    <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md flex items-center shadow-sm backdrop-blur-md border ${jam.status === 'ACTIVE' ? 'bg-modtale-accent/90 border-modtale-accent text-white' : 'bg-black/50 border-white/10 text-white'}`}>
                         <Trophy className="w-3 h-3 mr-1.5" />
                         <span>{jam.status}</span>
                     </div>
                 </div>
             </div>
 
-            <div className="flex flex-col flex-1 px-6 pb-6 pt-0 relative items-center text-center">
-                <div className="w-20 h-20 shrink-0 -mt-10 mb-3 relative z-10 rounded-[1.25rem] bg-white/80 dark:bg-slate-800/80 backdrop-blur-md shadow-lg border-4 border-white dark:border-slate-900 overflow-hidden flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+            <div className="flex flex-col flex-1 px-5 pb-5 pt-0 relative items-center text-center">
+                <div className="w-16 h-16 shrink-0 -mt-8 mb-3 relative z-10 rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-md shadow-lg border-2 border-white dark:border-slate-900 overflow-hidden flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
                     {resolvedIcon ? (
                         <img
                             src={resolvedIcon}
@@ -65,28 +64,28 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
                             className="w-full h-full object-cover"
                         />
                     ) : (
-                        <Trophy className="w-8 h-8 text-slate-400" />
+                        <Trophy className="w-6 h-6 text-slate-400" />
                     )}
                 </div>
 
-                <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors line-clamp-1 w-full" title={jam.title}>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors line-clamp-1 w-full" title={jam.title}>
                     {jam.title}
                 </h3>
 
-                <div className="flex items-center justify-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
+                <div className="flex items-center justify-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-1 mb-3">
                     <span>Hosted by</span>
                     <span className="font-bold text-slate-700 dark:text-slate-300">{jam.hostName}</span>
                 </div>
 
-                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-6">
+                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-5">
                     {jam.description || 'No description provided.'}
                 </p>
 
                 <div className="mt-auto w-full flex items-center justify-between pt-4 border-t border-slate-200/50 dark:border-white/5">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-white/5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-white/5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-white/5">
                         <Users className="w-4 h-4 text-modtale-accent" /> {jam.participantIds?.length || 0}
                     </div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-white/5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-white/5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white/50 dark:bg-white/5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-white/5">
                         <Calendar className="w-4 h-4 text-modtale-accent" />
                         <span>{formatJamDate()}</span>
                     </div>
@@ -128,17 +127,9 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
     const [activeTab, setActiveTab] = useState<'details' | 'categories' | 'settings'>('details');
 
-    const DAY_WIDTH = 76;
-    const TRACK_HEIGHT = 44;
+    const DAY_WIDTH = 80;
+    const TRACK_HEIGHT = 60;
     const TRACK_GAP = 12;
-
-    const trackStyles = [
-        'border-modtale-accent',
-        'border-blue-500',
-        'border-indigo-500',
-        'border-violet-500',
-        'border-slate-500'
-    ];
 
     useEffect(() => {
         api.get('/modjams').then(res => {
@@ -149,9 +140,9 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
     const { startDate, endDate, totalDays, days } = useMemo(() => {
         const start = new Date();
-        start.setDate(start.getDate() - 1);
+        start.setDate(start.getDate() - 3);
         start.setHours(0, 0, 0, 0);
-        const total = 60;
+        const total = 90;
         const end = new Date(start);
         end.setDate(end.getDate() + total);
 
@@ -169,8 +160,8 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         const jt: Record<string, number> = {};
 
         const sj = [...jams]
-            .filter(jam => jam.startDate && jam.endDate)
-            .filter(jam => new Date(jam.endDate).getTime() >= startDate.getTime() && new Date(jam.startDate).getTime() <= endDate.getTime())
+            .filter(jam => jam.startDate && (jam.votingEndDate || jam.endDate))
+            .filter(jam => new Date(jam.votingEndDate || jam.endDate).getTime() >= startDate.getTime() && new Date(jam.startDate).getTime() <= endDate.getTime())
             .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
         sj.forEach(jam => {
@@ -178,7 +169,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
             for (let i = 0; i < t.length; i++) {
                 const track = t[i];
                 const lastJam = track[track.length - 1];
-                if (new Date(lastJam.endDate).getTime() < new Date(jam.startDate).getTime()) {
+                if (new Date(lastJam.votingEndDate || lastJam.endDate).getTime() + (1000 * 60 * 60 * 24 * 1) < new Date(jam.startDate).getTime()) {
                     track.push(jam);
                     jt[jam.id] = i;
                     placed = true;
@@ -275,13 +266,13 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                         <p className="text-slate-500 font-medium text-lg">Set the stage for your community event.</p>
                     </div>
 
-                    <div className="space-y-6 bg-white dark:bg-modtale-card p-10 rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl">
+                    <div className="space-y-6 bg-white dark:bg-modtale-card p-10 rounded-2xl border border-slate-200 dark:border-white/5 shadow-2xl">
                         <div className="space-y-3">
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Event Title</label>
                             <input
                                 value={metaData.title}
                                 onChange={e => setMetaData(prev => ({...prev, title: e.target.value}))}
-                                className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-2xl px-6 py-5 font-black text-xl shadow-inner outline-none focus:ring-2 focus:ring-modtale-accent transition-all"
+                                className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-xl px-6 py-5 font-black text-xl shadow-inner outline-none focus:ring-2 focus:ring-modtale-accent transition-all"
                                 placeholder="Summer Hackathon 2026"
                             />
                         </div>
@@ -289,7 +280,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                             type="button"
                             onClick={() => setStep(2)}
                             disabled={!metaData.title || metaData.title.trim().length < 5}
-                            className="w-full h-16 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-lg shadow-xl shadow-modtale-accent/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] active:scale-95"
+                            className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-lg shadow-md shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 hover:scale-[1.02] active:scale-95"
                         >
                             Draft Event Details
                         </button>
@@ -324,44 +315,41 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const isNowInWindow = now >= startDate.getTime() && now <= endDate.getTime();
     const nowLeftPx = ((now - startDate.getTime()) / (1000 * 60 * 60 * 24)) * DAY_WIDTH;
 
+    const pastJams = jams.filter(jam => ['VOTING', 'COMPLETED'].includes(jam.status));
+
     return (
-        <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-16 pb-32">
-            <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-12">
-                <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                    <h1 className="text-6xl font-black tracking-tighter mb-4">Modjams</h1>
-                    <p className="text-xl text-slate-500 font-medium max-w-2xl leading-relaxed">The heartbeat of the community. Create, compete, and celebrate the best modding has to offer.</p>
-                </div>
-                {currentUser && (
-                    <button type="button" onClick={() => { setIsCreating(true); setStep(1); }} className="h-16 px-10 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-[1.25rem] font-black text-lg shadow-xl shadow-modtale-accent/20 transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500 shrink-0">
-                        <Plus className="w-6 h-6" /> Host a Jam
-                    </button>
-                )}
-            </div>
-
-            <div className="bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="p-6 md:p-8 border-b border-slate-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-black/20">
-                    <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900 dark:text-white">
-                        <Calendar className="w-6 h-6 text-modtale-accent" />
-                        Event Calendar
-                    </h2>
-                    <div className="text-sm font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-5 py-2.5 rounded-xl shadow-sm border border-slate-200 dark:border-white/5">
-                        {monthLabel}
+        <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-8 md:pt-16 pb-32">
+            <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-8 border-b border-slate-200 dark:border-white/10 pb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            <Calendar className="w-8 h-8 text-modtale-accent" />
+                            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">Event Calendar</h1>
+                        </div>
+                        <div className="text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-md border border-slate-200 dark:border-white/5 sm:ml-2">
+                            {monthLabel}
+                        </div>
                     </div>
+                    {currentUser && (
+                        <button type="button" onClick={() => { setIsCreating(true); setStep(1); }} className="h-12 px-6 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-lg font-bold text-sm shadow-md shadow-modtale-accent/20 transition-all hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 shrink-0">
+                            <Plus className="w-5 h-5" /> Host a Jam
+                        </button>
+                    )}
                 </div>
 
-                <div className="overflow-x-auto custom-scrollbar pb-8 pl-8 pt-8">
-                    <div style={{ width: `${totalDays * DAY_WIDTH}px`, minHeight: `${Math.max(tracks.length * (TRACK_HEIGHT + TRACK_GAP) + 60, 300)}px` }} className="relative">
-                        <div className="flex absolute top-0 left-0 right-0 h-12 border-b border-slate-200 dark:border-white/10">
+                <div className="overflow-x-auto custom-scrollbar pb-12 pt-2 relative w-full">
+                    <div style={{ width: `${totalDays * DAY_WIDTH}px`, minHeight: `${Math.max(tracks.length * (TRACK_HEIGHT + TRACK_GAP) + 60, 240)}px` }} className="relative">
+                        <div className="flex absolute top-0 left-0 right-0 h-10 border-b border-slate-200 dark:border-white/10 z-0">
                             {days.map((day, i) => {
                                 const isFirstDayOfMonth = day.getDate() === 1;
                                 return (
-                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 flex flex-col justify-center text-left border-l border-slate-200/50 dark:border-white/5 pl-2.5 ${isFirstDayOfMonth ? 'bg-slate-100/50 dark:bg-white/5' : ''}`}>
+                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 flex flex-col justify-end pb-1 text-left border-l border-slate-200/40 dark:border-white/5 pl-2 ${isFirstDayOfMonth ? 'border-dashed border-slate-400 dark:border-white/20 bg-slate-100/30 dark:bg-white/[0.02]' : ''}`}>
                                         {isFirstDayOfMonth || i === 0 ? (
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-modtale-accent leading-none mb-0.5">
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-modtale-accent leading-none mb-0.5">
                                                 {day.toLocaleString('default', { month: 'short' })}
                                             </span>
                                         ) : null}
-                                        <span className="text-[11px] font-bold text-slate-500 leading-none">
+                                        <span className="text-[10px] font-bold text-slate-500 leading-none">
                                             {formatDay(day)}
                                         </span>
                                     </div>
@@ -369,26 +357,25 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                             })}
                         </div>
 
-                        <div className="absolute top-12 left-0 right-0 bottom-0 flex pointer-events-none">
+                        <div className="absolute top-10 left-0 right-0 bottom-0 flex pointer-events-none z-0">
                             {days.map(day => {
-                                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                                 const isFirstDayOfMonth = day.getDate() === 1;
                                 return (
-                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 border-l border-slate-200/30 dark:border-white/[0.03] ${isWeekend ? 'bg-slate-50/50 dark:bg-white/[0.01]' : ''} ${isFirstDayOfMonth ? 'bg-slate-50/80 dark:bg-white/[0.02]' : ''}`} />
+                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 border-l border-slate-200/40 dark:border-white/5 ${isFirstDayOfMonth ? 'border-dashed border-slate-400 dark:border-white/20 bg-slate-100/30 dark:bg-white/[0.01]' : ''}`} />
                                 );
                             })}
                         </div>
 
                         {isNowInWindow && (
-                            <div className="absolute top-0 bottom-0 w-0.5 bg-modtale-accent z-20 shadow-[0_0_12px_rgba(var(--color-modtale-accent),0.8)]" style={{ left: `${nowLeftPx}px` }}>
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-modtale-accent text-white text-[9px] font-black uppercase tracking-widest rounded-b-md">Today</div>
+                            <div className="absolute top-0 bottom-0 w-px bg-modtale-accent z-20" style={{ left: `${nowLeftPx}px` }}>
+                                <div className="absolute top-1 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-modtale-accent text-white text-[8px] font-black uppercase tracking-widest rounded shadow-sm">Now</div>
                             </div>
                         )}
 
-                        <div className="absolute top-16 left-0 right-0 mt-2">
+                        <div className="absolute top-14 left-0 right-0 z-10">
                             {sortedJams.map(jam => {
                                 const startMs = new Date(jam.startDate).getTime();
-                                const endMs = new Date(jam.endDate).getTime();
+                                const endMs = new Date(jam.votingEndDate || jam.endDate).getTime();
                                 const windowStartMs = startDate.getTime();
 
                                 const renderStart = Math.max(startMs, windowStartMs);
@@ -400,39 +387,71 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                                 const trackIdx = jamTracks[jam.id] || 0;
                                 const topPx = trackIdx * (TRACK_HEIGHT + TRACK_GAP);
 
-                                const colorStyle = trackStyles[jam.id.charCodeAt(0) % trackStyles.length];
                                 const jamIcon = resolveUrl((jam as any).imageUrl || null);
 
                                 return (
                                     <Link
                                         key={jam.id}
                                         to={`/jam/${jam.slug}`}
-                                        className={`absolute flex items-center px-3 py-1.5 rounded-[1rem] shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer backdrop-blur-xl border border-slate-200 dark:border-white/10 border-l-4 group z-10 bg-white/80 dark:bg-slate-800/80 text-slate-900 dark:text-white ${colorStyle}`}
+                                        className="absolute flex flex-col justify-center px-3 py-2 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer backdrop-blur-md border border-modtale-accent/20 hover:border-modtale-accent/40 group overflow-hidden bg-modtale-accent/5 dark:bg-modtale-accent/10"
                                         style={{
                                             left: `${leftPx}px`,
-                                            width: `${Math.max(widthPx, 160)}px`,
+                                            width: `${Math.max(widthPx, 220)}px`,
                                             top: `${topPx}px`,
                                             height: `${TRACK_HEIGHT}px`
                                         }}
                                         title={`${jam.title} (${jam.participantIds?.length || 0} joined)`}
                                     >
-                                        {jamIcon ? (
-                                            <img src={jamIcon} className="w-6 h-6 rounded-md object-cover mr-2 shrink-0 border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900" alt="" />
-                                        ) : (
-                                            <div className="w-6 h-6 rounded-md bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-2 shrink-0 border border-slate-200 dark:border-white/10">
-                                                <Trophy className="w-3 h-3 text-slate-400" />
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-modtale-accent" />
+
+                                        <div className="relative z-10 flex items-center w-full min-w-0 px-1">
+                                            <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center mr-3 shrink-0 shadow-sm overflow-hidden border border-slate-200 dark:border-white/10">
+                                                {jamIcon ? <img src={jamIcon} className="w-full h-full object-cover" alt="" /> : <Trophy className="w-5 h-5 opacity-40 text-slate-500" />}
                                             </div>
-                                        )}
-                                        <span className="font-black text-sm truncate drop-shadow-sm flex-1">{jam.title}</span>
-                                        <span className="ml-2 bg-slate-100 dark:bg-black/20 text-slate-500 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold text-[10px] whitespace-nowrap group-hover:bg-slate-200 dark:group-hover:bg-black/40 transition-colors">
-                                            {jam.participantIds?.length || 0} joined
-                                        </span>
+
+                                            <div className="flex flex-col flex-1 min-w-0 pr-1">
+                                                <span className="font-bold text-sm text-slate-900 dark:text-white truncate drop-shadow-sm leading-tight mb-0.5 group-hover:text-modtale-accent transition-colors">{jam.title}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 truncate">
+                                                        {jam.participantIds?.length || 0} entries
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </Link>
                                 );
                             })}
+
+                            {sortedJams.length === 0 && (
+                                <div className="absolute top-4 left-10 right-10 text-center text-slate-500 py-16">
+                                    <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                                    <p className="text-base font-bold text-slate-500 dark:text-slate-400">No active jams scheduled.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="mt-16 space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                <section>
+                    <div className="flex items-center gap-4 mb-8 border-b border-slate-200 dark:border-white/10 pb-4">
+                        <LayoutGrid className="w-6 h-6 text-modtale-accent" />
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Past Events</h2>
+                    </div>
+
+                    {pastJams.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {pastJams.map(jam => (
+                                <JamCard key={jam.id} jam={jam} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="py-24 text-center text-slate-500 border border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
+                            <p className="text-sm font-bold">No past events yet.</p>
+                        </div>
+                    )}
+                </section>
             </div>
         </div>
     );
