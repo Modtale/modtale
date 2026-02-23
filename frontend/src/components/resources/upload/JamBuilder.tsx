@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -45,10 +45,12 @@ export const JamBuilder: React.FC<any> = ({
         { label: 'Description (min 10 chars)', met: (metaData.description || '').trim().length >= 10 },
         { label: 'Start Date set', met: !!metaData.startDate },
         { label: 'Timeline follows order', met: !!metaData.endDate && !!metaData.votingEndDate && new Date(metaData.votingEndDate) > new Date(metaData.endDate) && new Date(metaData.endDate) > new Date(metaData.startDate) },
-        { label: 'Scoring criteria set', met: (metaData.categories?.length || 0) > 0 }
+        { label: 'Scoring criteria set', met: (metaData.categories?.length || 0) > 0 },
+        { label: 'All changes saved', met: !isDirty }
     ];
 
     const isReadyToPublish = publishChecklist.every(c => c.met);
+    const metCount = publishChecklist.filter(r => r.met).length;
     const isPublished = metaData.status && metaData.status !== 'DRAFT';
 
     const markDirty = () => {
@@ -137,14 +139,36 @@ export const JamBuilder: React.FC<any> = ({
                     </button>
 
                     {!isPublished && (
-                        <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); onPublish(); }}
-                            disabled={!isReadyToPublish || isLoading}
-                            className="h-12 md:h-14 px-6 md:px-8 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-[1rem] md:rounded-[1.25rem] font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-modtale-accent/20 enabled:active:scale-95"
-                        >
-                            <span className="hidden sm:inline">Publish Jam</span>
-                        </button>
+                        <div className="relative group">
+                            <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-50">
+                                <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-white/5 pb-3">
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Requirements</span>
+                                    <span className={`text-xs font-black ${isReadyToPublish ? 'text-green-500' : 'text-slate-400'}`}>
+                                        {metCount}/{publishChecklist.length}
+                                    </span>
+                                </div>
+                                <div className="space-y-3">
+                                    {publishChecklist.map((req, i) => (
+                                        <div key={i} className="flex items-center gap-3">
+                                            <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${req.met ? 'bg-green-500 text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-400'}`}>
+                                                {req.met ? <Check className="w-2.5 h-2.5" strokeWidth={4} /> : <X className="w-2.5 h-2.5" strokeWidth={4} />}
+                                            </div>
+                                            <span className={`text-[11px] font-bold ${req.met ? 'text-slate-900 dark:text-slate-200' : 'text-slate-400 dark:text-slate-600'}`}>{req.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="absolute top-full right-10 -mt-1.5 border-8 border-transparent border-t-white dark:border-t-slate-900" />
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); onPublish(); }}
+                                disabled={!isReadyToPublish || isLoading}
+                                className="h-12 md:h-14 px-6 md:px-8 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-[1rem] md:rounded-[1.25rem] font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-modtale-accent/20 enabled:active:scale-95"
+                            >
+                                <span className="hidden sm:inline">Publish Jam</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             }
@@ -282,65 +306,49 @@ export const JamBuilder: React.FC<any> = ({
                     )}
 
                     {activeTab === 'settings' && (
-                        <div className="space-y-8">
-                            <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
-                                <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest mb-6">Launch Checklist</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {publishChecklist.map((req, i) => (
-                                        <div key={i} className="flex items-start gap-3 bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-white/50 dark:border-white/5">
-                                            <div className={`mt-0.5 shrink-0 transition-colors ${req.met ? 'text-green-500' : 'text-slate-400 dark:text-slate-600'}`}>
-                                                {req.met ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                                            </div>
-                                            <span className={`text-sm font-bold transition-colors ${req.met ? 'text-slate-900 dark:text-slate-200' : 'text-slate-500'}`}>{req.label}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-200/50 dark:border-white/5 pb-4 flex items-center gap-2">
+                                <Settings className="w-4 h-4" /> Configuration
+                            </h3>
+                            <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 space-y-4 shadow-sm">
+                                <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">Public Participation</span>
+                                        <span className="text-xs text-slate-500 font-medium">Allow anyone to score entries</span>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={metaData.allowPublicVoting !== false}
+                                        onChange={e => updateField('allowPublicVoting', e.target.checked)}
+                                        className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                    />
+                                </label>
 
-                            <div className="space-y-6">
-                                <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-200/50 dark:border-white/5 pb-4 flex items-center gap-2">
-                                    <Settings className="w-4 h-4" /> Configuration
-                                </h3>
-                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 space-y-4 shadow-sm">
-                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Public Participation</span>
-                                            <span className="text-xs text-slate-500 font-medium">Allow anyone to score entries</span>
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={metaData.allowPublicVoting !== false}
-                                            onChange={e => updateField('allowPublicVoting', e.target.checked)}
-                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
-                                        />
-                                    </label>
+                                <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">Concurrent Voting</span>
+                                        <span className="text-xs text-slate-500 font-medium">Allow users to vote while submissions are still open</span>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={metaData.allowConcurrentVoting || false}
+                                        onChange={e => updateField('allowConcurrentVoting', e.target.checked)}
+                                        className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                    />
+                                </label>
 
-                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Concurrent Voting</span>
-                                            <span className="text-xs text-slate-500 font-medium">Allow users to vote while submissions are still open</span>
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={metaData.allowConcurrentVoting || false}
-                                            onChange={e => updateField('allowConcurrentVoting', e.target.checked)}
-                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
-                                        />
-                                    </label>
-
-                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Public Results</span>
-                                            <span className="text-xs text-slate-500 font-medium">Show live scores and rankings before the jam finishes</span>
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={metaData.showResultsBeforeVotingEnds !== false}
-                                            onChange={e => updateField('showResultsBeforeVotingEnds', e.target.checked)}
-                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
-                                        />
-                                    </label>
-                                </div>
+                                <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">Public Results</span>
+                                        <span className="text-xs text-slate-500 font-medium">Show live scores and rankings before the jam finishes</span>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={metaData.showResultsBeforeVotingEnds !== false}
+                                        onChange={e => updateField('showResultsBeforeVotingEnds', e.target.checked)}
+                                        className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                    />
+                                </label>
                             </div>
                         </div>
                     )}
