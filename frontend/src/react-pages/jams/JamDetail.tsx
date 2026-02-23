@@ -200,12 +200,38 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     };
 
     const handleVote = async (submissionId: string, categoryId: string, score: number) => {
-        if (!jam) return;
+        if (!jam || !currentUser) return;
+
+        const previousSubmissions = [...submissions];
+
+        const optimisticSubmissions = submissions.map(s => {
+            if (s.id === submissionId) {
+                const votes = [...(s.votes || [])];
+                const existingVoteIdx = votes.findIndex(v => v.voterId === currentUser.id && v.categoryId === categoryId);
+
+                if (existingVoteIdx > -1) {
+                    votes[existingVoteIdx] = { ...votes[existingVoteIdx], score };
+                } else {
+                    votes.push({ id: 'temp-id', voterId: currentUser.id, categoryId, score });
+                }
+                return { ...s, votes };
+            }
+            return s;
+        });
+
+        setSubmissions(optimisticSubmissions);
+
         try {
             const res = await api.post(`/modjams/${jam.id}/vote`, { submissionId, categoryId, score });
-            setSubmissions(submissions.map(s => s.id === submissionId ? res.data : s));
+
+            setSubmissions(prev => prev.map(s => s.id === submissionId ? res.data : s));
         } catch (err: any) {
-            setStatusModal({ type: 'error', title: 'Vote Failed', message: err.response?.data?.message || 'Failed to record vote.' });
+            setSubmissions(previousSubmissions);
+            setStatusModal({
+                type: 'error',
+                title: 'Vote Failed',
+                message: err.response?.data?.message || 'Failed to record vote.'
+            });
         }
     };
 
