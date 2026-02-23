@@ -114,7 +114,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 </div>
             </div>
 
-            <div className="flex px-4 relative flex-1">
+            <div className="flex px-4 flex-1">
                 <div className="flex-shrink-0 -mt-8 mb-2 relative z-10">
                     <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative">
                         <img
@@ -138,12 +138,12 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
 
                 <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
                     <div className="flex justify-between items-start gap-2 mb-0.5">
-                        <div className="min-w-0 flex-1 relative">
+                        <div className="min-w-0 flex-1">
                             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors" title={title}>
                                 <Link
                                     to={canonicalPath}
                                     onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
-                                    className="before:absolute before:inset-0 before:z-10 focus:outline-none"
+                                    className="before:content-[''] before:absolute before:inset-0 before:z-10 focus:outline-none"
                                 >
                                     {title}
                                 </Link>
@@ -169,7 +169,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 </p>
             </div>
 
-            <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/5 relative z-20">
+            <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/5">
                 <div className="flex items-center gap-3">
                     <span className="flex items-center"><Download className="w-3 h-3 mr-1" /> {downloads}</span>
 
