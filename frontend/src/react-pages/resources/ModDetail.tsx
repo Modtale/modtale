@@ -474,16 +474,78 @@ export const ModDetail: React.FC<{
     const depsDropdownRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
 
-    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
+    const memoizedDescription = useMemo(() => {
+        if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
 
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                    ...defaultSchema,
+                    attributes: {
+                        ...defaultSchema.attributes,
+                        code: ['className']
+                    }
+                }]]}
+                components={{
+                    code({node, inline, className, children, ...props}: any) {
+                        const match = /language-(\w+)/.exec(className || '')
+                        return !inline && match ? (
+                            <SyntaxHighlighter
+                                {...props}
+                                style={vscDarkPlus}
+                                language={match[1]}
+                                PreTag="div"
+                                className="rounded-lg text-sm"
+                            >
+                                {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                        ) : (
+                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                                {children}
+                            </code>
+                        )
+                    },
+                    p({node, children, ...props}: any) {
+                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
+                    },
+                    li({node, children, ...props}: any) {
+                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
+                    },
+                    ul({node, children, ...props}: any) {
+                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
+                    },
+                    ol({node, children, ...props}: any) {
+                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
+                    }
+                }}
+            >
+                {mod.about}
+            </ReactMarkdown>
+        );
+    }, [mod?.about]);
+
+    const handleCommentSubmitted = useCallback((c: Comment[]) => {
+        setMod(prev => prev ? {...prev, comments: c} : null);
+        if(onRefresh) onRefresh();
+    }, [onRefresh]);
+
+    const handleError = useCallback((m: string) => setStatusModal({type:'error', title:'Error', msg:m}), []);
+    const handleSuccess = useCallback((m: string) => setStatusModal({type:'success', title:'Success', msg:m}), []);
+    const handleReport = useCallback((commentId: string) => setReportTarget({id: commentId, type: 'COMMENT'}), []);
+
+    if (isNotFound) return <NotFound />;
+    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
+    if (!mod) return null;
+
+    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
 
-    const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
-    const breadcrumbSchema = useMemo(() => mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null, [mod]);
-    const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
-
-    const ogImageUrl = useMemo(() => mod ? `${API_BASE_URL}/og/project/${mod.id}.png` : '', [mod]);
+    const projectMeta = mod ? generateProjectMeta(mod) : null;
+    const breadcrumbSchema = mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null;
+    const canonicalUrl = mod ? `https://modtale.net${getProjectUrl(mod)}` : null;
+    const ogImageUrl = mod ? `${API_BASE_URL}/og/project/${mod.id}.png` : '';
 
     useEffect(() => {
         if (mod && mod.id && !analyticsFired.current) {
@@ -566,7 +628,7 @@ export const ModDetail: React.FC<{
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
-    const allVersions = useMemo(() => mod?.versions || [], [mod]);
+    const allVersions = mod?.versions || [];
 
     const sortedHistory = useMemo(() => {
         const displayedVersions = allVersions.filter(v => showExperimental ? true : (!v.channel || v.channel === 'RELEASE'));
@@ -671,61 +733,6 @@ export const ModDetail: React.FC<{
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
     };
-
-    const memoizedDescription = useMemo(() => {
-        if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
-
-        return (
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                    ...defaultSchema,
-                    attributes: {
-                        ...defaultSchema.attributes,
-                        code: ['className']
-                    }
-                }]]}
-                components={{
-                    code({node, inline, className, children, ...props}: any) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        return !inline && match ? (
-                            <SyntaxHighlighter
-                                {...props}
-                                style={vscDarkPlus}
-                                language={match[1]}
-                                PreTag="div"
-                                className="rounded-lg text-sm"
-                            >
-                                {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                        ) : (
-                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                                {children}
-                            </code>
-                        )
-                    },
-                    p({node, children, ...props}: any) {
-                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
-                    },
-                    li({node, children, ...props}: any) {
-                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
-                    },
-                    ul({node, children, ...props}: any) {
-                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
-                    },
-                    ol({node, children, ...props}: any) {
-                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
-                    }
-                }}
-            >
-                {mod.about}
-            </ReactMarkdown>
-        );
-    }, [mod?.about]);
-
-    if (isNotFound) return <NotFound />;
-    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
-    if (!mod) return null;
 
     const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
@@ -1036,11 +1043,11 @@ export const ModDetail: React.FC<{
                             currentUser={currentUser}
                             isCreator={Boolean(canEdit)}
                             commentsDisabled={mod.allowComments === false}
-                            onCommentSubmitted={useCallback((c) => { setMod(prev => prev ? {...prev, comments: c} : null); if(onRefresh) onRefresh(); }, [onRefresh])}
-                            onError={useCallback((m) => setStatusModal({type:'error', title:'Error', msg:m}), [])}
-                            onSuccess={useCallback((m) => setStatusModal({type:'success', title:'Success', msg:m}), [])}
+                            onCommentSubmitted={handleCommentSubmitted}
+                            onError={handleError}
+                            onSuccess={handleSuccess}
                             innerRef={commentsRef}
-                            onReport={useCallback((commentId) => setReportTarget({id: commentId, type: 'COMMENT'}), [])}
+                            onReport={handleReport}
                         />
                     </>
                 }
