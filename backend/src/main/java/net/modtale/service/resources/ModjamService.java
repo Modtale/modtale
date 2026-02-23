@@ -17,7 +17,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class ModjamService {
@@ -108,9 +107,10 @@ public class ModjamService {
     public void updateIcon(String jamId, MultipartFile file) {
         try {
             Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            String path = "modjams/" + jamId + "/icon/" + file.getOriginalFilename();
-            String url = storageService.upload(file, path);
-            jam.setImageUrl(url);
+            String pathPrefix = "modjams/" + jamId + "/icon";
+            String storageKey = storageService.upload(file, pathPrefix);
+            String publicUrl = storageService.getPublicUrl(storageKey);
+            jam.setImageUrl(publicUrl);
             jam.setUpdatedAt(LocalDateTime.now());
             modjamRepository.save(jam);
         } catch (Exception e) {
@@ -121,9 +121,10 @@ public class ModjamService {
     public void updateBanner(String jamId, MultipartFile file) {
         try {
             Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            String path = "modjams/" + jamId + "/banner/" + file.getOriginalFilename();
-            String url = storageService.upload(file, path);
-            jam.setBannerUrl(url);
+            String pathPrefix = "modjams/" + jamId + "/banner";
+            String storageKey = storageService.upload(file, pathPrefix);
+            String publicUrl = storageService.getPublicUrl(storageKey);
+            jam.setBannerUrl(publicUrl);
             jam.setUpdatedAt(LocalDateTime.now());
             modjamRepository.save(jam);
         } catch (Exception e) {
