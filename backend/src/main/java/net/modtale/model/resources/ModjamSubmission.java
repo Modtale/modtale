@@ -2,6 +2,7 @@ package net.modtale.model.resources;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -28,24 +29,25 @@ public class ModjamSubmission {
     @Indexed
     private String projectId;
 
-    private String projectTitle;
-    private String projectImageUrl;
-    private String projectBannerUrl;
-    private String projectAuthor;
-    private String projectDescription;
-
     @Indexed
     private String submitterId;
 
     private List<Vote> votes = new ArrayList<>();
-
     private Map<String, Double> categoryScores = new HashMap<>();
-
     private Double totalScore;
-
     private Integer rank;
-
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Transient
+    private String projectTitle;
+    @Transient
+    private String projectImageUrl;
+    @Transient
+    private String projectBannerUrl;
+    @Transient
+    private String projectAuthor;
+    @Transient
+    private String projectDescription;
 
     public static class Vote {
         private String id;
@@ -79,16 +81,6 @@ public class ModjamSubmission {
     public void setJamId(String jamId) { this.jamId = jamId; }
     public String getProjectId() { return projectId; }
     public void setProjectId(String projectId) { this.projectId = projectId; }
-    public String getProjectTitle() { return projectTitle; }
-    public void setProjectTitle(String projectTitle) { this.projectTitle = projectTitle; }
-    public String getProjectImageUrl() { return projectImageUrl; }
-    public void setProjectImageUrl(String projectImageUrl) { this.projectImageUrl = projectImageUrl; }
-    public String getProjectBannerUrl() { return projectBannerUrl; }
-    public void setProjectBannerUrl(String projectBannerUrl) { this.projectBannerUrl = projectBannerUrl; }
-    public String getProjectAuthor() { return projectAuthor; }
-    public void setProjectAuthor(String projectAuthor) { this.projectAuthor = projectAuthor; }
-    public String getProjectDescription() { return projectDescription; }
-    public void setProjectDescription(String projectDescription) { this.projectDescription = projectDescription; }
     public String getSubmitterId() { return submitterId; }
     public void setSubmitterId(String submitterId) { this.submitterId = submitterId; }
     public List<Vote> getVotes() { return votes; }
@@ -101,4 +93,15 @@ public class ModjamSubmission {
     public void setRank(Integer rank) { this.rank = rank; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getProjectTitle() { return projectTitle; }
+    public void setProjectTitle(String projectTitle) { this.projectTitle = projectTitle; }
+    public String getProjectImageUrl() { return projectImageUrl; }
+    public void setProjectImageUrl(String projectImageUrl) { this.projectImageUrl = projectImageUrl; }
+    public String getProjectBannerUrl() { return projectBannerUrl; }
+    public void setProjectBannerUrl(String projectBannerUrl) { this.projectBannerUrl = projectBannerUrl; }
+    public String getProjectAuthor() { return projectAuthor; }
+    public void setProjectAuthor(String projectAuthor) { this.projectAuthor = projectAuthor; }
+    public String getProjectDescription() { return projectDescription; }
+    public void setProjectDescription(String projectDescription) { this.projectDescription = projectDescription; }
 }

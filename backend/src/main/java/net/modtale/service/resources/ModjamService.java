@@ -27,6 +27,16 @@ public class ModjamService {
     @Autowired private ModRepository modRepository;
     @Autowired private StorageService storageService;
 
+    private void enrichSubmission(ModjamSubmission sub) {
+        modRepository.findById(sub.getProjectId()).ifPresent(project -> {
+            sub.setProjectTitle(project.getTitle());
+            sub.setProjectImageUrl(project.getImageUrl());
+            sub.setProjectBannerUrl(project.getBannerUrl());
+            sub.setProjectAuthor(project.getAuthor());
+            sub.setProjectDescription(project.getDescription());
+        });
+    }
+
     public List<Modjam> getAllJams() {
         return modjamRepository.findAll();
     }
@@ -149,7 +159,9 @@ public class ModjamService {
     }
 
     public List<ModjamSubmission> getSubmissions(String jamId) {
-        return submissionRepository.findByJamId(jamId);
+        List<ModjamSubmission> subs = submissionRepository.findByJamId(jamId);
+        subs.forEach(this::enrichSubmission);
+        return subs;
     }
 
     public Modjam participate(String jamId, String userId) {
@@ -184,97 +196,59 @@ public class ModjamService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
 
         if (!"ACTIVE".equals(jam.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Submissions are closed for this jam.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Submissions are closed.");
         }
 
         Mod project = modRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
 
         if (!project.getAuthorId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this project");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your project");
         }
 
         if (!"PUBLISHED".equals(project.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only published projects can be submitted to a jam.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must be published.");
         }
 
         List<ModjamSubmission> existing = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
-        boolean alreadySubmitted = existing.stream().anyMatch(s -> s.getProjectId().equals(projectId));
-        if (alreadySubmitted) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project already submitted to this jam");
+        if (existing.stream().anyMatch(s -> s.getProjectId().equals(projectId))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already submitted.");
         }
 
         ModjamSubmission sub = new ModjamSubmission();
         sub.setJamId(jamId);
         sub.setProjectId(projectId);
-        sub.setProjectTitle(project.getTitle());
-        sub.setProjectImageUrl(project.getImageUrl());
-        sub.setProjectBannerUrl(project.getBannerUrl());
-        sub.setProjectAuthor(project.getAuthor());
-        sub.setProjectDescription(project.getDescription());
         sub.setSubmitterId(userId);
 
         submissionRepository.save(sub);
 
-        if (project.getModjamIds() == null) {
-            project.setModjamIds(new ArrayList<>());
-        }
+        if (project.getModjamIds() == null) project.setModjamIds(new ArrayList<>());
         if (!project.getModjamIds().contains(jamId)) {
             project.getModjamIds().add(jamId);
             modRepository.save(project);
         }
 
+        enrichSubmission(sub);
         return sub;
     }
 
     public ModjamSubmission vote(String jamId, String submissionId, String categoryId, int score, String userId) {
-        if (categoryId == null || categoryId.trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category ID is required to vote.");
-        }
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        ModjamSubmission sub = submissionRepository.findById(submissionId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        Modjam jam = modjamRepository.findById(jamId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
-
-        boolean validCategory = jam.getCategories() != null && jam.getCategories().stream().anyMatch(c -> categoryId.equals(c.getId()));
-        if (!validCategory) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid category ID provided.");
-        }
-
-        boolean canVote = "VOTING".equals(jam.getStatus()) ||
-                ("ACTIVE".equals(jam.getStatus()) && jam.isAllowConcurrentVoting());
-
-        if (!canVote) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voting is not currently active for this jam.");
-        }
-
-        if (!jam.isAllowPublicVoting() && !jam.getHostId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only judges are permitted to vote on this jam.");
-        }
-
-        ModjamSubmission sub = submissionRepository.findById(submissionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found"));
-
-        if (sub.getSubmitterId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot vote on your own submission.");
-        }
-
-        if (sub.getVotes() == null) {
-            sub.setVotes(new ArrayList<>());
-        }
+        if (sub.getSubmitterId().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot vote on self");
 
         sub.getVotes().removeIf(v -> v.getVoterId().equals(userId) && v.getCategoryId().equals(categoryId));
 
-        ModjamSubmission.Vote vote = new ModjamSubmission.Vote();
-        vote.setId(UUID.randomUUID().toString());
-        vote.setVoterId(userId);
-        vote.setCategoryId(categoryId);
-        vote.setScore(score);
+        ModjamSubmission.Vote vote = new ModjamSubmission.Vote(UUID.randomUUID().toString(), userId, categoryId, score);
         sub.getVotes().add(vote);
 
         submissionRepository.save(sub);
         calculateScores(jamId);
 
-        return submissionRepository.findById(submissionId).orElse(sub);
+        ModjamSubmission updated = submissionRepository.findById(submissionId).orElse(sub);
+        enrichSubmission(updated);
+        return updated;
     }
 
     private void calculateScores(String jamId) {
@@ -283,12 +257,9 @@ public class ModjamService {
 
         for (ModjamSubmission sub : submissions) {
             Map<String, List<Integer>> categoryScoresMap = new HashMap<>();
-
             if (sub.getVotes() != null) {
                 for (ModjamSubmission.Vote vote : sub.getVotes()) {
-                    if (vote.getCategoryId() != null) {
-                        categoryScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
-                    }
+                    categoryScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
                 }
             }
 
@@ -297,12 +268,10 @@ public class ModjamService {
             int categoryCount = 0;
 
             for (Map.Entry<String, List<Integer>> entry : categoryScoresMap.entrySet()) {
-                if (entry.getKey() != null) {
-                    double avg = entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
-                    averagedCategoryScores.put(entry.getKey(), avg);
-                    totalScoreSum += avg;
-                    categoryCount++;
-                }
+                double avg = entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
+                averagedCategoryScores.put(entry.getKey(), avg);
+                totalScoreSum += avg;
+                categoryCount++;
             }
 
             sub.setCategoryScores(averagedCategoryScores);
@@ -322,12 +291,8 @@ public class ModjamService {
     public void cleanupStaleDrafts() {
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         List<Modjam> staleDrafts = modjamRepository.findByStatusAndUpdatedAtBefore("DRAFT", thirtyDaysAgo);
-
         for (Modjam jam : staleDrafts) {
-            List<ModjamSubmission> submissions = submissionRepository.findByJamId(jam.getId());
-            if (submissions != null && !submissions.isEmpty()) {
-                submissionRepository.deleteAll(submissions);
-            }
+            submissionRepository.deleteAll(submissionRepository.findByJamId(jam.getId()));
             modjamRepository.delete(jam);
         }
     }
