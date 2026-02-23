@@ -1,4 +1,4 @@
-package net.modtale.config.security.auth;
+package net.modtale.config.auth;
 
 import net.modtale.model.user.User;
 import net.modtale.service.user.UserService;

@@ -1,8 +1,9 @@
 package net.modtale.config.security;
 
-import net.modtale.config.security.auth.CustomOAuth2UserService;
-import net.modtale.config.security.auth.CustomOidcUserService;
-import net.modtale.service.security.CustomUserDetailsService;
+import net.modtale.config.auth.ApiKeyAuthFilter;
+import net.modtale.config.auth.CustomOAuth2UserService;
+import net.modtale.config.auth.CustomOidcUserService;
+import net.modtale.service.auth.CustomUserDetailsService;
 import net.modtale.service.user.UserService;
 import net.modtale.model.user.User;
 import org.slf4j.Logger;

@@ -1,4 +1,4 @@
-package net.modtale.config.security;
+package net.modtale.config.auth;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -6,7 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.security.ApiKeyService;
+import net.modtale.service.auth.ApiKeyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;

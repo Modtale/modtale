@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../utils/api';
-import type {Mod, User} from '../../types';
+import { api } from '../../../utils/api.ts';
+import type {Mod, User} from '../../../types.ts';
 import { Building2, Plus, Users, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { StatusModal } from '../ui/StatusModal';
+import { StatusModal } from '../../ui/StatusModal.tsx';
 import { ProjectListItem } from '@/components/dashboard/manage-projects/ProjectListItem.tsx';
 import { TransferProjectModal } from '@/components/dashboard/manage-projects/TransferProjectModal.tsx';
 

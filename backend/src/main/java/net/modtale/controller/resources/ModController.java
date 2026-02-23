@@ -5,7 +5,7 @@ import net.modtale.model.user.User;
 import net.modtale.model.resources.*;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.AnalyticsService;
-import net.modtale.service.DownloadTokenService;
+import net.modtale.service.resources.DownloadTokenService;
 import net.modtale.service.user.UserService;
 import net.modtale.service.resources.ModService;
 import net.modtale.service.resources.StorageService;

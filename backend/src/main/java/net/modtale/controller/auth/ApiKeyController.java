@@ -3,7 +3,7 @@ package net.modtale.controller.auth;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.service.user.UserService;
-import net.modtale.service.security.ApiKeyService;
+import net.modtale.service.auth.ApiKeyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
