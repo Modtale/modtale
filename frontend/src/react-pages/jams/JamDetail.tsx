@@ -10,7 +10,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock } from 'lucide-react';
+import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2 } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -271,7 +271,6 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             title: 'Delete Event?',
             message: 'Are you sure you want to delete this jam? This action cannot be undone and will permanently delete all submissions.',
             actionLabel: 'Delete Jam',
-
             secondaryLabel: 'Cancel',
             onAction: async () => {
                 try {
@@ -565,14 +564,15 @@ const JamDetailView: React.FC<{
                                 {sortedSubmissions.map(sub => {
                                     const resolvedProjectImage = resolveUrl(sub.projectImageUrl);
                                     const resolvedProjectBanner = sub.projectBannerUrl ? resolveUrl(sub.projectBannerUrl) : null;
+                                    const isMySubmission = sub.submitterId === currentUser?.id;
 
                                     return (
                                         <div
                                             key={sub.id}
                                             onClick={() => navigate(`/mod/${sub.projectId}`)}
-                                            className="bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col group shadow-xl hover:-translate-y-1.5 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 relative cursor-pointer"
+                                            className="group bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col shadow-xl hover:-translate-y-1.5 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 relative cursor-pointer"
                                         >
-                                            <div className="block relative w-full h-36 bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden">
+                                            <div className="block relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden border-b border-slate-200/50 dark:border-white/5">
                                                 {resolvedProjectBanner ? (
                                                     <img
                                                         src={resolvedProjectBanner}
@@ -580,7 +580,7 @@ const JamDetailView: React.FC<{
                                                         fetchPriority="high"
                                                         loading="eager"
                                                         decoding="sync"
-                                                        className="w-full h-full object-cover transition-opacity duration-300 opacity-100"
+                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                                     />
                                                 ) : null}
                                             </div>
@@ -619,25 +619,23 @@ const JamDetailView: React.FC<{
                                                 <div className="flex items-center gap-2">
                                                     {canSeeResults && sub.totalScore !== undefined ? (
                                                         <div className="flex flex-col text-left">
-                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{jam.status === 'COMPLETED' ? 'Final Score' : 'Score'}</span>
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{jam.status === 'COMPLETED' ? 'Final Score' : 'Score'}</span>
                                                             <span className="text-xl font-black text-slate-900 dark:text-white leading-none mt-1 drop-shadow-sm">{sub.totalScore.toFixed(2)}</span>
                                                         </div>
                                                     ) : (
                                                         <div className="flex flex-col text-left opacity-50">
-                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Score</span>
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Score</span>
                                                             <span className="text-xl font-black text-slate-500 leading-none mt-1">---</span>
                                                         </div>
                                                     )}
                                                 </div>
 
                                                 <div className="flex items-center gap-3">
-                                                    {canSeeResults && sub.rank && (
-                                                        <div className="flex items-center gap-1.5 text-modtale-accent font-black text-xl drop-shadow-sm">
-                                                            <Trophy className="w-5 h-5"/> #{sub.rank}
+                                                    {isMySubmission ? (
+                                                        <div className="px-4 py-2 bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 border border-green-500/20 shadow-sm relative z-20">
+                                                            <CheckCircle2 className="w-4 h-4" /> Your Entry
                                                         </div>
-                                                    )}
-
-                                                    {canVote && sub.submitterId !== currentUser?.id && (
+                                                    ) : canVote && (
                                                         <button
                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVotingSubmissionId(sub.id); }}
                                                             className="px-5 py-2.5 bg-modtale-accent hover:bg-modtale-accentHover text-white text-sm font-black rounded-xl shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 flex items-center gap-2 ml-2 relative z-20"
