@@ -434,10 +434,10 @@ export const ModDetail: React.FC<{
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
-    const realId = extractId(id);
+    const realId = id ? extractId(id) : '';
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
-    const initialMod = (initialData && extractId(initialData.id) === realId) ? initialData : null;
+    const initialMod = (initialData?.id && extractId(initialData.id) === realId) ? (initialData as Mod) : null;
 
     const [mod, setMod] = useState<Mod | null>(initialMod);
     const [loading, setLoading] = useState(!initialMod);
@@ -534,9 +534,48 @@ export const ModDetail: React.FC<{
     const handleSuccess = useCallback((m: string) => setStatusModal({type:'success', title:'Success', msg:m}), []);
     const handleReport = useCallback((commentId: string) => setReportTarget({id: commentId, type: 'COMMENT'}), []);
 
-    if (isNotFound) return <NotFound />;
-    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
-    if (!mod) return null;
+    useEffect(() => {
+        if (mod && extractId(mod.id) === realId) {
+            setLoading(false);
+            return;
+        }
+
+        if (!realId) {
+            setIsNotFound(true);
+            setLoading(false);
+            return;
+        }
+
+        let isMounted = true;
+        setLoading(true);
+
+        api.get(`/projects/${realId}`)
+            .then(res => {
+                if (isMounted) {
+                    setMod(res.data);
+                    const vers = res.data.versions || [];
+                    if (vers.length > 0 && !vers.some((v: any) => !v.channel || v.channel === 'RELEASE')) {
+                        setShowExperimental(true);
+                    }
+                }
+            })
+            .catch(() => {
+                if (isMounted) setIsNotFound(true);
+            })
+            .finally(() => {
+                if (isMounted) setLoading(false);
+            });
+
+        return () => { isMounted = false; };
+    }, [realId]);
+
+    useEffect(() => {
+        if (currentUser?.followingIds && mod?.author) {
+            setIsFollowing(currentUser.followingIds.includes(mod.author));
+        } else {
+            setIsFollowing(false);
+        }
+    }, [currentUser, mod?.author]);
 
     const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
     const analyticsFired = useRef(false);
@@ -553,28 +592,6 @@ export const ModDetail: React.FC<{
             api.post(`/analytics/view/${mod.id}`).catch(() => {});
         }
     }, [mod?.id]);
-
-    useEffect(() => {
-        if (mod && extractId(mod.id) === realId) {
-            setLoading(false);
-            if(currentUser?.followingIds) setIsFollowing(currentUser.followingIds.includes(mod.author));
-            return;
-        }
-
-        if (realId) {
-            setLoading(true);
-            api.get(`/projects/${realId}`).then(res => {
-                setMod(res.data);
-                if (currentUser?.followingIds?.includes(res.data.author)) setIsFollowing(true);
-
-                const vers = res.data.versions || [];
-                if (vers.length > 0 && !vers.some((v: any) => !v.channel || v.channel === 'RELEASE')) {
-                    setShowExperimental(true);
-                }
-
-            }).catch(() => setIsNotFound(true)).finally(() => setLoading(false));
-        }
-    }, [realId, currentUser]);
 
     useEffect(() => {
         const fetchTeam = async () => {
@@ -613,7 +630,7 @@ export const ModDetail: React.FC<{
                 navigate(canonicalPath, { replace: true });
             }
         }
-    }, [mod, loading, location, navigate]);
+    }, [mod, loading, location.pathname, navigate]);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
@@ -733,6 +750,10 @@ export const ModDetail: React.FC<{
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
     };
+
+    if (isNotFound) return <NotFound />;
+    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
+    if (!mod) return null;
 
     const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
