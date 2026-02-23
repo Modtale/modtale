@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -10,7 +10,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, Calendar } from 'lucide-react';
+import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -271,6 +271,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             title: 'Delete Event?',
             message: 'Are you sure you want to delete this jam? This action cannot be undone and will permanently delete all submissions.',
             actionLabel: 'Delete Jam',
+
             secondaryLabel: 'Cancel',
             onAction: async () => {
                 try {
@@ -563,13 +564,13 @@ const JamDetailView: React.FC<{
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
                                 {sortedSubmissions.map(sub => {
                                     const resolvedProjectImage = resolveUrl(sub.projectImageUrl);
-                                    const resolvedProjectBanner = resolveUrl(sub.projectBannerUrl);
+                                    const resolvedProjectBanner = sub.projectBannerUrl ? resolveUrl(sub.projectBannerUrl) : null;
 
                                     return (
                                         <div
                                             key={sub.id}
                                             onClick={() => navigate(`/mod/${sub.projectId}`)}
-                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col group shadow-xl hover:-translate-y-1.5 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 relative cursor-pointer"
+                                            className="bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col group shadow-xl hover:-translate-y-1.5 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 relative cursor-pointer"
                                         >
                                             <div className="block relative w-full h-36 bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden">
                                                 {resolvedProjectBanner ? (
@@ -683,8 +684,8 @@ const VotingModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl w-full max-w-md rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl w-full max-w-md rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
                 <div className="p-10 border-b border-slate-200/50 dark:border-white/5 text-center">
                     <div className="w-24 h-24 rounded-xl bg-white dark:bg-slate-800 shadow-lg overflow-hidden mx-auto mb-6 border-[3px] border-white dark:border-slate-700">
                         {submission.projectImageUrl ? (
@@ -721,7 +722,7 @@ const VotingModal: React.FC<{
                     })}
                 </div>
                 <div className="p-8 border-t border-slate-200/50 dark:border-white/5 bg-slate-50/50 dark:bg-black/20">
-                    <button onClick={onClose} className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-lg transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
+                    <button onClick={onClose} className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-lg transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
                         Done Voting
                     </button>
                 </div>
