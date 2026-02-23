@@ -1,40 +1,30 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ImageIcon, Plus, Save, AlertCircle, CheckCircle2, Rocket } from 'lucide-react';
+import { ChevronLeft, ImageIcon, Plus } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
-import { Spinner } from '@/components/ui/Spinner';
 
 interface JamLayoutProps {
     bannerUrl?: string | null;
     iconUrl?: string | null;
     isEditing?: boolean;
-    isPublished?: boolean;
     onBannerUpload?: (file: File, preview: string) => void;
     onIconUpload?: (file: File, preview: string) => void;
-    headerContent: React.ReactNode;
-    tabs?: React.ReactNode;
+    titleContent: React.ReactNode;
+    hostContent?: React.ReactNode;
+    actionContent?: React.ReactNode;
+    statsContent?: React.ReactNode;
+    tabsAndTimers?: React.ReactNode;
     mainContent: React.ReactNode;
-    sidebarContent?: React.ReactNode;
-    actionBar?: React.ReactNode;
     onBack?: () => void;
-    isSaving?: boolean;
-    isSaved?: boolean;
-    hasUnsavedChanges?: boolean;
-    onSave?: () => void;
-    onPublish?: () => void;
-    publishChecklist?: { label: string; met: boolean }[];
 }
 
 export const JamLayout: React.FC<JamLayoutProps> = ({
-                                                        bannerUrl, iconUrl, isEditing, isPublished, onBannerUpload, onIconUpload,
-                                                        headerContent, tabs, mainContent, sidebarContent, actionBar, onBack,
-                                                        isSaving, isSaved, hasUnsavedChanges, onSave, onPublish, publishChecklist
+                                                        bannerUrl, iconUrl, isEditing, onBannerUpload, onIconUpload,
+                                                        titleContent, hostContent, actionContent, statsContent, tabsAndTimers, mainContent, onBack
                                                     }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
-
-    const isReadyToPublish = publishChecklist?.every(c => c.met) && !hasUnsavedChanges;
 
     const resolveUrl = (url?: string | null) => {
         if (!url) return null;
@@ -62,7 +52,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col pb-32 overflow-x-hidden">
+        <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-32">
             {cropperOpen && tempImage && (
                 <ImageCropperModal
                     imageSrc={tempImage}
@@ -72,19 +62,19 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                 />
             )}
 
-            <div className="relative w-full aspect-[3/1] bg-slate-900 group z-10 border-b border-slate-200 dark:border-white/10">
-                <div className="absolute inset-0 z-0">
+            <div className="relative w-full aspect-[2/1] md:aspect-[3/1] bg-slate-900 overflow-hidden shrink-0 shadow-sm">
+                <div className="absolute inset-0 z-0 pointer-events-none">
                     {finalBanner ? (
-                        <img src={finalBanner} alt="" className="w-full h-full object-cover opacity-70" />
+                        <img src={finalBanner} alt="" className="w-full h-full object-cover opacity-80" />
                     ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-slate-900 opacity-60" />
+                        <div className="w-full h-full bg-gradient-to-br from-indigo-900/80 to-slate-900/80" />
                     )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-modtale-dark via-slate-50/20 dark:via-modtale-dark/20 to-transparent" />
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10" />
 
                 {onBack && (
                     <div className="absolute top-0 left-0 right-0 z-40 max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 h-full pointer-events-none">
-                        <div className="pt-8 pointer-events-auto w-fit">
+                        <div className="pt-6 md:pt-8 pointer-events-auto w-fit">
                             <button type="button" onClick={onBack} className="flex items-center text-white/90 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group">
                                 <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                                 Back
@@ -94,125 +84,71 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                 )}
 
                 {isEditing && (
-                    <label className={`cursor-pointer transition-all duration-300 ${
-                        finalBanner
-                            ? "absolute top-8 right-8 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
-                            : "absolute inset-0 z-30 flex flex-col items-center justify-center m-8 rounded-3xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
-                    }`}>
-                        <input type="file" accept="image/*" onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
-                        {finalBanner ? (
-                            <div className="flex flex-col items-end">
-                                <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Change Banner</div>
-                                <span className="text-[10px] font-medium text-white/50">Rec: 1920x640</span>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center">
-                                <Plus className="w-8 h-8 text-white/50 mb-2" />
-                                <span className="text-lg font-bold text-white/80">Upload Jam Banner</span>
-                                <span className="text-xs font-medium text-white/40 mt-1">Recommended: 1920x640</span>
-                            </div>
-                        )}
-                    </label>
-                )}
-            </div>
-
-            <div className="max-w-[112rem] w-full mx-auto px-4 sm:px-12 md:px-16 lg:px-28 relative z-50 -mt-20 md:-mt-24">
-                <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8 items-start">
-                    <div className="lg:col-span-8 xl:col-span-9 w-full">
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col">
-                            <div className="relative p-6 md:p-12 pb-0 border-b border-slate-100 dark:border-white/5">
-                                <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
-                                    <div className="flex-shrink-0 relative z-50 -mt-16 md:-mt-28 ml-2">
-                                        <label className={`block w-32 h-32 md:w-48 md:h-48 rounded-[2rem] bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-[6px] border-white dark:border-slate-900 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
-                                            <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
-                                            {finalIcon ? (
-                                                <img src={finalIcon} alt="Icon" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
-                                                    <ImageIcon className="w-8 h-8 md:w-10 md:h-10 opacity-50" />
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">512x512</span>
-                                                </div>
-                                            )}
-                                            {isEditing && (
-                                                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px]">
-                                                    <ImageIcon className="w-6 h-6 md:w-8 md:h-8 text-white mb-2" />
-                                                    <span className="text-xs font-bold text-white">Change Icon</span>
-                                                    <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
-                                                </div>
-                                            )}
-                                        </label>
-                                    </div>
-
-                                    <div className="flex-1 min-w-0 flex flex-col justify-end pt-2 w-full">
-                                        <div className="flex flex-col xl:flex-row items-start justify-between gap-6">
-                                            <div className="w-full flex-1 min-w-0">
-                                                {headerContent}
-                                            </div>
-                                        </div>
-                                    </div>
+                    <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center p-8">
+                        <label className={`pointer-events-auto cursor-pointer transition-all duration-300 ${
+                            finalBanner
+                                ? "absolute top-6 md:top-8 right-6 md:right-8 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
+                                : "w-full h-full rounded-[2.5rem] border-2 border-dashed border-white/20 hover:border-white/40 bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center group/banner"
+                        }`}>
+                            <input type="file" accept="image/*" onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
+                            {finalBanner ? (
+                                <div className="flex flex-col items-end">
+                                    <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Change Banner</div>
+                                    <span className="text-[10px] font-medium text-white/50">Rec: 1920x640</span>
                                 </div>
-                                {tabs && <div className="mt-8 pt-2">{tabs}</div>}
-                                {actionBar && <div className="mt-6 mb-6">{actionBar}</div>}
+                            ) : (
+                                <div className="flex flex-col items-center">
+                                    <Plus className="w-8 h-8 text-white/50 mb-2" />
+                                    <span className="text-lg font-bold text-white/90">Upload Jam Banner</span>
+                                    <span className="text-xs font-medium text-white/50 mt-1">Recommended: 1920x640</span>
+                                </div>
+                            )}
+                        </label>
+                    </div>
+                )}
+
+                <div className="absolute inset-0 flex flex-col justify-end pb-0 max-w-[112rem] w-full mx-auto px-4 sm:px-12 md:px-16 lg:px-28 z-30 pointer-events-none">
+                    <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 pointer-events-auto pb-0">
+                        <div className="relative shrink-0 z-40">
+                            <label className={`block w-36 h-36 md:w-48 md:h-48 rounded-[1.5rem] md:rounded-[2.5rem] bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl shadow-2xl border-[4px] border-white/50 dark:border-white/10 overflow-hidden relative ${isEditing ? 'cursor-pointer group' : ''}`}>
+                                <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
+                                {finalIcon ? (
+                                    <img src={finalIcon} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                                        <ImageIcon className="w-8 h-8 md:w-10 md:h-10 opacity-40" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40">512x512</span>
+                                    </div>
+                                )}
+                                {isEditing && (
+                                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px]">
+                                        <ImageIcon className="w-6 h-6 md:w-8 md:h-8 text-white mb-2" />
+                                        <span className="text-xs font-bold text-white">Change Icon</span>
+                                    </div>
+                                )}
+                            </label>
+                        </div>
+
+                        <div className="flex flex-col xl:flex-row xl:items-end justify-between flex-1 min-w-0 gap-3 mb-0 xl:mb-2">
+                            <div className="flex-1 min-w-0 relative z-30">
+                                {titleContent}
+                                {hostContent && <div className="mt-2 md:mt-3">{hostContent}</div>}
                             </div>
-                            <div className="p-6 md:p-12 min-h-[500px]">
-                                {mainContent}
+
+                            <div className="flex flex-wrap items-center gap-2 md:gap-3 shrink-0 relative z-30">
+                                {statsContent}
+                                {actionContent}
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div className="lg:col-span-4 xl:col-span-3 w-full sticky top-28 space-y-6">
-                        {sidebarContent ? (
-                            sidebarContent
-                        ) : isEditing ? (
-                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8 shadow-xl">
-                                <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-6">Launch Checklist</h3>
-                                <div className="space-y-4 mb-8">
-                                    {publishChecklist?.map((req, i) => (
-                                        <div key={i} className="flex items-start gap-3">
-                                            <div className={`mt-0.5 shrink-0 ${req.met ? 'text-green-500' : 'text-slate-300 dark:text-slate-700'}`}>
-                                                {req.met ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                                            </div>
-                                            <span className={`text-sm font-bold ${req.met ? 'text-slate-900 dark:text-slate-200' : 'text-slate-400'}`}>{req.label}</span>
-                                        </div>
-                                    ))}
-                                    {hasUnsavedChanges && (
-                                        <div className="flex items-start gap-3 pt-4 border-t border-slate-100 dark:border-white/5 mt-4">
-                                            <div className="mt-0.5 shrink-0 text-amber-500">
-                                                <AlertCircle className="w-4 h-4" />
-                                            </div>
-                                            <span className="text-sm font-bold text-amber-500">Unsaved changes</span>
-                                        </div>
-                                    )}
-                                </div>
+            <div className="max-w-[112rem] w-full mx-auto px-4 sm:px-12 md:px-16 lg:px-28 relative z-40 pt-1.5 md:pt-3 mt-4 md:mt-8">
+                {tabsAndTimers && <div className="mb-2 md:mb-4">{tabsAndTimers}</div>}
 
-                                <div className="space-y-3">
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.preventDefault(); onSave?.(); }}
-                                        disabled={isSaving || !hasUnsavedChanges}
-                                        className={`w-full h-14 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 border-2 ${
-                                            isSaved ? 'bg-green-500/10 border-green-500 text-green-500' :
-                                                !hasUnsavedChanges ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent cursor-not-allowed' :
-                                                    'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent hover:scale-[1.02]'
-                                        }`}
-                                    >
-                                        {isSaving ? <Spinner className="w-4 h-4" fullScreen={false} /> : isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                        {isSaving ? 'Saving...' : isSaved ? 'Saved!' : (isPublished ? 'Save Changes' : 'Save Draft')}
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.preventDefault(); onPublish?.(); }}
-                                        disabled={!isReadyToPublish || isSaving}
-                                        className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 enabled:hover:scale-[1.02]"
-                                    >
-                                        <Rocket className="w-4 h-4" />
-                                        {isPublished ? 'Save & Close' : 'Publish Jam'}
-                                    </button>
-                                </div>
-                            </div>
-                        ) : null}
-                    </div>
+                <div className="w-full">
+                    {mainContent}
                 </div>
             </div>
         </div>
