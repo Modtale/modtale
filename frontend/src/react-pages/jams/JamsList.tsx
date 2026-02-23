@@ -4,7 +4,7 @@ import type { Modjam, User } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { Trophy, Plus, ArrowLeft, Calendar, Users, LayoutGrid } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { JamBuilder } from '@/components/resources/upload/JamBuilder';
+import { JamBuilder } from '@/components/jams/JamBuilder.tsx';
 
 const resolveUrl = (url?: string | null) => {
     if (!url) return '';

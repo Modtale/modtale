@@ -1,9 +1,9 @@
-package net.modtale.controller.resources;
+package net.modtale.controller;
 
-import net.modtale.model.resources.Modjam;
-import net.modtale.model.resources.ModjamSubmission;
+import net.modtale.model.jam.Modjam;
+import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.user.User;
-import net.modtale.service.resources.ModjamService;
+import net.modtale.service.ModjamService;
 import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

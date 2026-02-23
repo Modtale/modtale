@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2 } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
-import { JamBuilder } from '@/components/resources/upload/JamBuilder';
+import { JamBuilder } from '@/components/jams/JamBuilder.tsx';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
 
 const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => {

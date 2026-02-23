@@ -1,4 +1,4 @@
-package net.modtale.config.security.auth;
+package net.modtale.config.auth;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

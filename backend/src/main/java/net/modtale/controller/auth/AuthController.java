@@ -4,7 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import net.modtale.model.user.User;
 import net.modtale.service.user.UserService;
-import net.modtale.service.security.TwoFactorService;
+import net.modtale.service.auth.TwoFactorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;

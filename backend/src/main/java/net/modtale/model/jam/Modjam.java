@@ -1,4 +1,4 @@
-package net.modtale.model.resources;
+package net.modtale.model.jam;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.data.annotation.Id;

@@ -1,6 +1,6 @@
-package net.modtale.controller.resources;
+package net.modtale.controller.user;
 
-import net.modtale.model.resources.Report;
+import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
 import net.modtale.service.resources.ReportService;
 import net.modtale.service.user.UserService;

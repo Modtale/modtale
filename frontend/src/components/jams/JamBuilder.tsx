@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X } from 'lucide-react';
-import { JamLayout } from '@/components/jams/JamLayout';
+import { JamLayout } from '@/components/jams/JamLayout.tsx';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/Spinner.tsx';
 
 const DateInput: React.FC<{ label: string, icon: any, value: string, minDate?: string, onChange: (v: string) => void }> = ({ label, icon: Icon, value, minDate, onChange }) => (
     <div className="flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] px-5 py-3 md:py-3.5 shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden group focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all min-w-[200px]">
