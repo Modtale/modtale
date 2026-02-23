@@ -1,5 +1,6 @@
 import React, { useRef, useState, useLayoutEffect, useCallback } from 'react';
 import { Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PROJECT_TYPES, type Classification } from '../../data/categories';
 
 interface HomeHeroProps {
@@ -12,6 +13,17 @@ interface HomeHeroProps {
     seoH1?: string | null;
 }
 
+const getRouteForClassification = (cls: string) => {
+    switch(cls) {
+        case 'PLUGIN': return '/plugins';
+        case 'MODPACK': return '/modpacks';
+        case 'SAVE': return '/worlds';
+        case 'ART': return '/art';
+        case 'DATA': return '/data';
+        default: return '/';
+    }
+};
+
 export const HomeHero: React.FC<HomeHeroProps> = React.memo(({
                                                                  selectedClassification,
                                                                  onClassificationChange,
@@ -21,7 +33,7 @@ export const HomeHero: React.FC<HomeHeroProps> = React.memo(({
                                                                  showMiniSearch,
                                                                  seoH1
                                                              }) => {
-    const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
+    const tabsRef = useRef<(HTMLElement | null)[]>([]);
     const navContainerRef = useRef<HTMLDivElement>(null);
     const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
     const [showLeftFade, setShowLeftFade] = useState(false);
@@ -119,15 +131,16 @@ export const HomeHero: React.FC<HomeHeroProps> = React.memo(({
                                 const Icon = type.icon;
                                 const isSelected = selectedClassification === type.id;
                                 return (
-                                    <button
+                                    <Link
                                         key={type.id}
-                                        ref={el => tabsRef.current[index] = el}
+                                        to={getRouteForClassification(type.id)}
                                         onClick={() => onClassificationChange(type.id as any)}
+                                        ref={el => tabsRef.current[index] = el}
                                         className={`px-4 md:px-5 py-2 rounded-lg text-xs md:text-sm font-bold flex items-center justify-center gap-2 transition-colors duration-200 whitespace-nowrap snap-center ${isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                     >
                                         <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isSelected ? 'text-modtale-accent dark:text-white' : ''}`} />
                                         <span className="inline">{type.label.replace(' Assets', '').replace('Server ', '')}</span>
-                                    </button>
+                                    </Link>
                                 );
                             })}
                         </div>
