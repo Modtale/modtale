@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Trash2, List, Sparkles, Trophy, FileText, Scale, Save, CheckCircle2, Rocket, AlertCircle, LayoutGrid, Edit3 } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -48,7 +48,8 @@ export const JamBuilder: React.FC<any> = ({
         { label: 'Scoring criteria set', met: (metaData.categories?.length || 0) > 0 }
     ];
 
-    const isReadyToPublish = publishChecklist.every(c => c.met) && !isDirty;
+    const isReadyToPublish = publishChecklist.every(c => c.met);
+    const isPublished = metaData.status && metaData.status !== 'DRAFT';
 
     const markDirty = () => {
         setIsDirty(true);
@@ -68,8 +69,6 @@ export const JamBuilder: React.FC<any> = ({
         markDirty();
         setMetaData((prev: any) => ({ ...prev, [field]: val }));
     };
-
-    const isPublished = metaData.status && metaData.status !== 'DRAFT';
 
     const MarkdownComponents = {
         code({node, inline, className, children, ...props}: any) {
@@ -118,7 +117,7 @@ export const JamBuilder: React.FC<any> = ({
             }
             hostContent={
                 <div className="text-slate-600 dark:text-slate-300 font-bold flex items-center gap-2 bg-white/50 dark:bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 dark:border-white/10 shadow-sm w-fit text-sm">
-                    <span className="w-2.5 h-2.5 rounded-full bg-modtale-accent animate-pulse" /> Editing Draft
+                    <span className="w-2.5 h-2.5 rounded-full bg-modtale-accent animate-pulse" /> {isPublished ? 'Live Event' : 'Editing Draft'}
                 </div>
             }
             actionContent={
@@ -137,15 +136,16 @@ export const JamBuilder: React.FC<any> = ({
                         <span className="hidden sm:inline">{isLoading ? 'Saving...' : isSaved ? 'Saved!' : (isPublished ? 'Save Changes' : 'Save Draft')}</span>
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); onPublish(); }}
-                        disabled={!isReadyToPublish || isLoading}
-                        className="h-12 md:h-14 px-6 md:px-8 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-[1rem] md:rounded-[1.25rem] font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-modtale-accent/20 enabled:active:scale-95"
-                    >
-                        <Rocket className="w-4 h-4" />
-                        <span className="hidden sm:inline">{isPublished ? 'Save & Close' : 'Publish Jam'}</span>
-                    </button>
+                    {!isPublished && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); onPublish(); }}
+                            disabled={!isReadyToPublish || isLoading}
+                            className="h-12 md:h-14 px-6 md:px-8 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-[1rem] md:rounded-[1.25rem] font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-modtale-accent/20 enabled:active:scale-95"
+                        >
+                            <span className="hidden sm:inline">Publish Jam</span>
+                        </button>
+                    )}
                 </div>
             }
             tabsAndTimers={
@@ -167,7 +167,7 @@ export const JamBuilder: React.FC<any> = ({
                         ))}
                     </div>
                     <div className="flex flex-wrap items-center gap-3 pb-3 xl:pb-2">
-                        <DateInput label="Starts" icon={Sparkles} value={metaData.startDate} onChange={v => updateField('startDate', v)} />
+                        <DateInput label="Starts" icon={Clock} value={metaData.startDate} onChange={v => updateField('startDate', v)} />
                         <DateInput label="Submissions Close" icon={LayoutGrid} value={metaData.endDate} minDate={metaData.startDate} onChange={v => updateField('endDate', v)} />
                         <DateInput label="Voting Ends" icon={Trophy} value={metaData.votingEndDate} minDate={metaData.endDate} onChange={v => updateField('votingEndDate', v)} />
                     </div>
@@ -295,12 +295,6 @@ export const JamBuilder: React.FC<any> = ({
                                         </div>
                                     ))}
                                 </div>
-                                {isDirty && (
-                                    <div className="flex items-center gap-3 mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-                                        <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
-                                        <span className="text-sm font-bold text-amber-600 dark:text-amber-400">You have unsaved changes. Save before publishing.</span>
-                                    </div>
-                                )}
                             </div>
 
                             <div className="space-y-6">

@@ -39,9 +39,6 @@ export const JamSubmissionWizard: React.FC<{
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
             <div className="bg-white dark:bg-modtale-card w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95">
                 <div className="p-10 text-center flex flex-col max-h-[90vh]">
-                    <div className="w-20 h-20 rounded-[2rem] bg-modtale-accent/10 text-modtale-accent flex items-center justify-center mx-auto mb-6 shrink-0">
-                        <Rocket className="w-10 h-10" />
-                    </div>
                     <h2 className="text-3xl font-black mb-2 shrink-0">Submit to {jam.title}</h2>
                     <p className="text-slate-500 font-medium mb-8 px-8 shrink-0">Select one of your existing projects to enter into the jam. All your project's details, screenshots, and files will be automatically linked.</p>
 
