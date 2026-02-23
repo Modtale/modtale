@@ -1,10 +1,16 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, ChevronRight, Edit3, Trash2, Clock } from 'lucide-react';
+import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, Calendar } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/resources/upload/JamBuilder';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -277,6 +283,57 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         });
     };
 
+    const memoizedDescription = useMemo(() => {
+        if (!jam?.description) return <p className="text-slate-500 italic">No description provided.</p>;
+
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                    ...defaultSchema,
+                    attributes: {
+                        ...defaultSchema.attributes,
+                        code: ['className']
+                    }
+                }]]}
+                components={{
+                    code({node, inline, className, children, ...props}: any) {
+                        const match = /language-(\w+)/.exec(className || '')
+                        return !inline && match ? (
+                            <SyntaxHighlighter
+                                {...props}
+                                style={vscDarkPlus}
+                                language={match[1]}
+                                PreTag="div"
+                                className="rounded-lg text-sm"
+                            >
+                                {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                        ) : (
+                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                                {children}
+                            </code>
+                        )
+                    },
+                    p({node, children, ...props}: any) {
+                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
+                    },
+                    li({node, children, ...props}: any) {
+                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
+                    },
+                    ul({node, children, ...props}: any) {
+                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
+                    },
+                    ol({node, children, ...props}: any) {
+                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
+                    }
+                }}
+            >
+                {jam.description}
+            </ReactMarkdown>
+        );
+    }, [jam?.description]);
+
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!jam) return <div className="p-20 text-center font-bold text-slate-500">Jam not found.</div>;
 
@@ -357,6 +414,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 canSeeResults={canSeeResults}
                 canVote={canVote}
                 setVotingSubmissionId={setVotingSubmissionId}
+                memoizedDescription={memoizedDescription}
             />
         </>
     );
@@ -379,11 +437,12 @@ const JamDetailView: React.FC<{
     now: number,
     canSeeResults: boolean,
     canVote: boolean,
-    setVotingSubmissionId: (id: string | null) => void
+    setVotingSubmissionId: (id: string | null) => void,
+    memoizedDescription: React.ReactNode
 }> = ({
           jam, submissions, currentUser, isFollowing, handleFollowToggle, startEditing, handleDelete,
           isParticipating, hasSubmitted, handleJoin, setIsSubmittingModalOpen, activeTab, setActiveTab,
-          now, canSeeResults, canVote, setVotingSubmissionId
+          now, canSeeResults, canVote, setVotingSubmissionId, memoizedDescription
       }) => {
     const navigate = useNavigate();
     const sortedSubmissions = useMemo(() => [...submissions].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)), [submissions]);
@@ -471,11 +530,11 @@ const JamDetailView: React.FC<{
                 </div>
             }
             mainContent={
-                <div className="animate-in fade-in slide-in-from-bottom-2 mt-8 md:mt-10">
+                <div className="animate-in fade-in slide-in-from-bottom-2 mt-10">
                     {activeTab === 'overview' ? (
                         <div className="space-y-10">
                             <div className="prose dark:prose-invert prose-lg max-w-none bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 md:p-10 shadow-sm">
-                                <p className="whitespace-pre-wrap leading-relaxed">{jam.description || "No description provided."}</p>
+                                {memoizedDescription}
                             </div>
 
                             {jam.categories.length > 0 && (
@@ -510,7 +569,7 @@ const JamDetailView: React.FC<{
                                         <div
                                             key={sub.id}
                                             onClick={() => navigate(`/mod/${sub.projectId}`)}
-                                            className="bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col group shadow-xl hover:-translate-y-1.5 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 relative cursor-pointer"
+                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col group shadow-xl hover:-translate-y-1.5 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 relative cursor-pointer"
                                         >
                                             <div className="block relative w-full h-36 bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden">
                                                 {resolvedProjectBanner ? (
@@ -555,16 +614,16 @@ const JamDetailView: React.FC<{
                                                 </p>
                                             </div>
 
-                                            <div className="mt-auto px-6 py-5 bg-white/40 dark:bg-black/20 border-t border-slate-200/50 dark:border-white/5 flex items-center justify-between relative z-10">
+                                            <div className="mt-auto px-6 py-5 bg-white/40 dark:bg-black/20 border-t border-slate-200/50 dark:border-white/5 flex items-center justify-between relative z-10 backdrop-blur-md">
                                                 <div className="flex items-center gap-2">
                                                     {canSeeResults && sub.totalScore !== undefined ? (
                                                         <div className="flex flex-col text-left">
-                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{jam.status === 'COMPLETED' ? 'Final Score' : 'Score'}</span>
+                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{jam.status === 'COMPLETED' ? 'Final Score' : 'Score'}</span>
                                                             <span className="text-xl font-black text-slate-900 dark:text-white leading-none mt-1 drop-shadow-sm">{sub.totalScore.toFixed(2)}</span>
                                                         </div>
                                                     ) : (
                                                         <div className="flex flex-col text-left opacity-50">
-                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Score</span>
+                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Score</span>
                                                             <span className="text-xl font-black text-slate-500 leading-none mt-1">---</span>
                                                         </div>
                                                     )}
@@ -662,7 +721,7 @@ const VotingModal: React.FC<{
                     })}
                 </div>
                 <div className="p-8 border-t border-slate-200/50 dark:border-white/5 bg-slate-50/50 dark:bg-black/20">
-                    <button onClick={onClose} className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-lg transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
+                    <button onClick={onClose} className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-lg transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
                         Done Voting
                     </button>
                 </div>
