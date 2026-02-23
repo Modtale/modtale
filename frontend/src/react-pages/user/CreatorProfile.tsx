@@ -1,6 +1,5 @@
-// frontend/react-pages/user/CreatorProfile.tsx
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { Mod, Modpack, User } from '../../types.ts';
 import { ModCard } from '../../components/resources/ModCard.tsx';
 import { api } from '../../utils/api.ts';
@@ -86,14 +85,12 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                         const membersRes = await api.get(`/orgs/${username}/members`);
                         setOrgMembers(membersRes.data);
                     } catch (e) {
-                        console.warn("Could not fetch org members", e);
                     }
                 } else {
                     try {
                         const orgsRes = await api.get(`/users/${username}/organizations`);
                         setMemberOrgs(orgsRes.data);
                     } catch (e) {
-                        console.warn("Could not fetch user organizations", e);
                     }
                 }
             } catch (error: any) {
@@ -243,9 +240,9 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                             </h2>
                             <div className="flex flex-wrap gap-4">
                                 {orgMembers.map(member => (
-                                    <a
+                                    <Link
                                         key={member.id}
-                                        href={`/creator/${member.username}`}
+                                        to={`/creator/${member.username}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -261,7 +258,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                                 {creator.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
                                             </div>
                                         </div>
-                                    </a>
+                                    </Link>
                                 ))}
                             </div>
                         </div>
@@ -275,9 +272,9 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                             </h2>
                             <div className="flex flex-wrap gap-4">
                                 {memberOrgs.map(org => (
-                                    <a
+                                    <Link
                                         key={org.id}
-                                        href={`/creator/${org.username}`}
+                                        to={`/creator/${org.username}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -293,7 +290,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                                 Organization
                                             </div>
                                         </div>
-                                    </a>
+                                    </Link>
                                 ))}
                             </div>
                         </div>

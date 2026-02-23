@@ -2,7 +2,7 @@ import React from 'react';
 import type { Mod } from '../../types';
 import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe } from 'lucide-react';
 import { BACKEND_URL } from '../../utils/api';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { getProjectUrl } from '../../utils/slug';
 import { prefetchProject } from '../../utils/prefetch';
 
@@ -53,7 +53,6 @@ const formatTimeAgo = (dateString: string) => {
 };
 
 export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, onClick }) => {
-    const navigate = useNavigate();
     const title = mod.title || 'Untitled Project';
     const author = mod.author || 'Unknown';
 
@@ -84,25 +83,10 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         prefetchProject(mod.id);
     };
 
-    const handleClick = (e: React.MouseEvent) => {
-        if (
-            (e.target as HTMLElement).closest('button') ||
-            (e.target as HTMLElement).closest('a')
-        ) {
-            return;
-        }
-        if (onClick) {
-            onClick();
-        } else {
-            navigate(canonicalPath);
-        }
-    };
-
     return (
         <div
-            onClick={handleClick}
             onMouseEnter={handleMouseEnter}
-            className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden cursor-pointer"
+            className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden"
             role="article"
             aria-label={`Project: ${title} by ${author}`}
         >
@@ -130,7 +114,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 </div>
             </div>
 
-            <div className="flex px-4 relative flex-1">
+            <div className="flex px-4 flex-1">
                 <div className="flex-shrink-0 -mt-8 mb-2 relative z-10">
                     <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative">
                         <img
@@ -154,9 +138,15 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
 
                 <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
                     <div className="flex justify-between items-start gap-2 mb-0.5">
-                        <div className="min-w-0 flex-1 relative">
+                        <div className="min-w-0 flex-1">
                             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors" title={title}>
-                                {title}
+                                <Link
+                                    to={canonicalPath}
+                                    onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
+                                    className="before:content-[''] before:absolute before:inset-0 before:z-10 focus:outline-none"
+                                >
+                                    {title}
+                                </Link>
                             </h3>
                             <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 relative z-20">
                                 <span>by</span>
