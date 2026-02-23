@@ -2,7 +2,7 @@ package net.modtale.controller.user;
 
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
-import net.modtale.service.resources.ReportService;
+import net.modtale.service.user.ReportService;
 import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
