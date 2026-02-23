@@ -1,6 +1,6 @@
-package net.modtale.repository.user;
+package net.modtale.repository.admin;
 
-import net.modtale.model.user.BannedEmail;
+import net.modtale.model.admin.BannedEmail;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import java.util.Optional;
 

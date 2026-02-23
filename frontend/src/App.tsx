@@ -35,7 +35,7 @@ const Status = lazy(() => import('./react-pages/Status').then(module => ({ defau
 const VerifyEmail = lazy(() => import('./react-pages/auth/VerifyEmail.tsx').then(module => ({ default: module.VerifyEmail })));
 const ResetPassword = lazy(() => import('./react-pages/auth/ResetPassword.tsx').then(module => ({ default: module.ResetPassword })));
 const MfaVerify = lazy(() => import('./react-pages/auth/MfaVerify').then(module => ({ default: module.MfaVerify })));
-const Analytics = lazy(() => import('@/components/dashboard/analytics/Analytics').then(module => ({ default: module.Analytics })));
+const Analytics = lazy(() => import('@/components/dashboard/Analytics.tsx').then(module => ({ default: module.Analytics })));
 const NotFound = lazy(() => import('./components/ui/error/NotFound.tsx'));
 
 const ScrollToTop = () => {

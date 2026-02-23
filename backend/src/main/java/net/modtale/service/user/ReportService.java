@@ -1,16 +1,15 @@
-package net.modtale.service.resources;
+package net.modtale.service.user;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
 import net.modtale.model.resources.Mod;
-import net.modtale.model.resources.Report;
+import net.modtale.model.user.Report;
 import net.modtale.model.resources.Comment;
 import net.modtale.model.user.User;
-import net.modtale.repository.resources.ReportRepository;
+import net.modtale.repository.user.ReportRepository;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.user.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
