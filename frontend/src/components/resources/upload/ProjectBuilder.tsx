@@ -116,7 +116,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const markDirty = () => !readOnly && !isDirty && setIsDirty(true);
     const checkRepoUrl = useCallback((url: string) => {
         if (!url) { setRepoValid(true); return true; }
-        const isValid = /^https:\/\/(github\.com|gitlab\.com)\/[\w.-]+\/[\w.-]+$/.test(url);
+        const isValid = /^https:\/\/(github\.com|gitlab\.com|codeberg\.org)\/[\w.-]+\/[\w.-]+$/.test(url);
         setRepoValid(isValid);
         return isValid;
     }, []);

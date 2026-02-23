@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -67,7 +67,7 @@ const ProjectSidebar: React.FC<{
         <div className="flex flex-col gap-8">
             <div className="grid grid-cols-2 gap-2 py-2">
                 <div className="flex flex-col items-center justify-start">
-                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.favoriteCount.toLocaleString()}</div>
+                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.favoriteCount.toLocaleString()}</div>
                     <div className="flex items-center justify-center mt-1 h-5 w-full gap-1.5 text-slate-500 dark:text-slate-400">
                         <Heart className="w-3.5 h-3.5" aria-hidden="true" />
                         <span className="text-[10px] font-bold uppercase tracking-widest pt-0.5">Favorites</span>
@@ -75,7 +75,7 @@ const ProjectSidebar: React.FC<{
                 </div>
 
                 <div className="flex flex-col items-center justify-start border-l border-slate-200 dark:border-white/5">
-                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.downloadCount.toLocaleString()}</div>
+                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{mod.downloadCount.toLocaleString()}</div>
                     <div className="flex items-center gap-1.5 mt-1 h-5">
                         <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pt-0.5">Downloads</span>
@@ -110,9 +110,9 @@ const ProjectSidebar: React.FC<{
                 <SidebarSection title="Team Members" icon={Users}>
                     <div className="flex flex-col gap-2">
                         {orgMembers.map(member => (
-                            <a
+                            <Link
                                 key={member.id}
-                                href={`/creator/${member.username}`}
+                                to={`/creator/${member.username}`}
                                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                             >
                                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -128,7 +128,7 @@ const ProjectSidebar: React.FC<{
                                         {author.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
                                     </div>
                                 </div>
-                            </a>
+                            </Link>
                         ))}
                     </div>
                 </SidebarSection>
@@ -138,9 +138,9 @@ const ProjectSidebar: React.FC<{
                 <SidebarSection title="Contributors" icon={Users}>
                     <div className="flex flex-col gap-2">
                         {contributors.map(contributor => (
-                            <a
+                            <Link
                                 key={contributor.id}
-                                href={`/creator/${contributor.username}`}
+                                to={`/creator/${contributor.username}`}
                                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                             >
                                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -151,7 +151,7 @@ const ProjectSidebar: React.FC<{
                                     )}
                                 </div>
                                 <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{contributor.username}</div>
-                            </a>
+                            </Link>
                         ))}
                     </div>
                 </SidebarSection>
@@ -332,10 +332,10 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                         comment.user.charAt(0)
                                     )}
                                 </div>
-                                <div><span className="font-bold text-slate-900 dark:text-white block">{comment.user}</span></div>
+                                <div><Link to={`/creator/${comment.user}`} className="font-bold text-slate-900 dark:text-white block hover:text-modtale-accent transition-colors">{comment.user}</Link></div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                <div suppressHydrationWarning className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                     {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                 </div>
                                 <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
@@ -396,9 +396,9 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                                                    {comment.developerReply.user} <Crown className="w-3 h-3 text-modtale-accent" aria-hidden="true" />
+                                                    <Link to={`/creator/${comment.developerReply.user}`} className="hover:text-modtale-accent transition-colors">{comment.developerReply.user}</Link> <Crown className="w-3 h-3 text-modtale-accent" aria-hidden="true" />
                                                 </span>
-                                                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
+                                                <span suppressHydrationWarning className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
                                                     Developer Response • {new Date(comment.developerReply.date).toLocaleDateString()}
                                                 </span>
                                             </div>
@@ -434,10 +434,10 @@ export const ModDetail: React.FC<{
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
-    const realId = extractId(id);
+    const realId = id ? extractId(id) : '';
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
-    const initialMod = (initialData && extractId(initialData.id) === realId) ? initialData : null;
+    const initialMod = (initialData?.id && extractId(initialData.id) === realId) ? (initialData as Mod) : null;
 
     const [mod, setMod] = useState<Mod | null>(initialMod);
     const [loading, setLoading] = useState(!initialMod);
@@ -474,16 +474,117 @@ export const ModDetail: React.FC<{
     const depsDropdownRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
 
-    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
+    const memoizedDescription = useMemo(() => {
+        if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
 
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                    ...defaultSchema,
+                    attributes: {
+                        ...defaultSchema.attributes,
+                        code: ['className']
+                    }
+                }]]}
+                components={{
+                    code({node, inline, className, children, ...props}: any) {
+                        const match = /language-(\w+)/.exec(className || '')
+                        return !inline && match ? (
+                            <SyntaxHighlighter
+                                {...props}
+                                style={vscDarkPlus}
+                                language={match[1]}
+                                PreTag="div"
+                                className="rounded-lg text-sm"
+                            >
+                                {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                        ) : (
+                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                                {children}
+                            </code>
+                        )
+                    },
+                    p({node, children, ...props}: any) {
+                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
+                    },
+                    li({node, children, ...props}: any) {
+                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
+                    },
+                    ul({node, children, ...props}: any) {
+                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
+                    },
+                    ol({node, children, ...props}: any) {
+                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
+                    }
+                }}
+            >
+                {mod.about}
+            </ReactMarkdown>
+        );
+    }, [mod?.about]);
+
+    const handleCommentSubmitted = useCallback((c: Comment[]) => {
+        setMod(prev => prev ? {...prev, comments: c} : null);
+        if(onRefresh) onRefresh();
+    }, [onRefresh]);
+
+    const handleError = useCallback((m: string) => setStatusModal({type:'error', title:'Error', msg:m}), []);
+    const handleSuccess = useCallback((m: string) => setStatusModal({type:'success', title:'Success', msg:m}), []);
+    const handleReport = useCallback((commentId: string) => setReportTarget({id: commentId, type: 'COMMENT'}), []);
+
+    useEffect(() => {
+        if (mod && extractId(mod.id) === realId) {
+            setLoading(false);
+            return;
+        }
+
+        if (!realId) {
+            setIsNotFound(true);
+            setLoading(false);
+            return;
+        }
+
+        let isMounted = true;
+        setLoading(true);
+
+        api.get(`/projects/${realId}`)
+            .then(res => {
+                if (isMounted) {
+                    setMod(res.data);
+                    const vers = res.data.versions || [];
+                    if (vers.length > 0 && !vers.some((v: any) => !v.channel || v.channel === 'RELEASE')) {
+                        setShowExperimental(true);
+                    }
+                }
+            })
+            .catch(() => {
+                if (isMounted) setIsNotFound(true);
+            })
+            .finally(() => {
+                if (isMounted) setLoading(false);
+            });
+
+        return () => { isMounted = false; };
+    }, [realId]);
+
+    useEffect(() => {
+        if (currentUser?.followingIds && mod?.author) {
+            setIsFollowing(currentUser.followingIds.includes(mod.author));
+        } else {
+            setIsFollowing(false);
+        }
+    }, [currentUser, mod?.author]);
+
+    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
 
-    const projectMeta = useMemo(() => mod ? generateProjectMeta(mod) : null, [mod]);
-    const breadcrumbSchema = useMemo(() => mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null, [mod]);
-    const canonicalUrl = useMemo(() => mod ? `https://modtale.net${getProjectUrl(mod)}` : null, [mod]);
-
-    const ogImageUrl = useMemo(() => mod ? `${API_BASE_URL}/og/project/${mod.id}.png` : '', [mod]);
+    const projectMeta = mod ? generateProjectMeta(mod) : null;
+    const breadcrumbSchema = mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null;
+    const canonicalUrl = mod ? `https://modtale.net${getProjectUrl(mod)}` : null;
+    const ogImageUrl = mod ? `${API_BASE_URL}/og/project/${mod.id}.png` : '';
 
     useEffect(() => {
         if (mod && mod.id && !analyticsFired.current) {
@@ -491,28 +592,6 @@ export const ModDetail: React.FC<{
             api.post(`/analytics/view/${mod.id}`).catch(() => {});
         }
     }, [mod?.id]);
-
-    useEffect(() => {
-        if (mod && extractId(mod.id) === realId) {
-            setLoading(false);
-            if(currentUser?.followingIds) setIsFollowing(currentUser.followingIds.includes(mod.author));
-            return;
-        }
-
-        if (realId) {
-            setLoading(true);
-            api.get(`/projects/${realId}`).then(res => {
-                setMod(res.data);
-                if (currentUser?.followingIds?.includes(res.data.author)) setIsFollowing(true);
-
-                const vers = res.data.versions || [];
-                if (vers.length > 0 && !vers.some((v: any) => !v.channel || v.channel === 'RELEASE')) {
-                    setShowExperimental(true);
-                }
-
-            }).catch(() => setIsNotFound(true)).finally(() => setLoading(false));
-        }
-    }, [realId, currentUser]);
 
     useEffect(() => {
         const fetchTeam = async () => {
@@ -551,7 +630,7 @@ export const ModDetail: React.FC<{
                 navigate(canonicalPath, { replace: true });
             }
         }
-    }, [mod, loading, location, navigate]);
+    }, [mod, loading, location.pathname, navigate]);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
@@ -566,7 +645,7 @@ export const ModDetail: React.FC<{
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
-    const allVersions = useMemo(() => mod?.versions || [], [mod]);
+    const allVersions = mod?.versions || [];
 
     const sortedHistory = useMemo(() => {
         const displayedVersions = allVersions.filter(v => showExperimental ? true : (!v.channel || v.channel === 'RELEASE'));
@@ -671,57 +750,6 @@ export const ModDetail: React.FC<{
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
     };
-
-    const memoizedDescription = useMemo(() => {
-        if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
-
-        return (
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                    ...defaultSchema,
-                    attributes: {
-                        ...defaultSchema.attributes,
-                        code: ['className']
-                    }
-                }]]}
-                components={{
-                    code({node, inline, className, children, ...props}: any) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        return !inline && match ? (
-                            <SyntaxHighlighter
-                                {...props}
-                                style={vscDarkPlus}
-                                language={match[1]}
-                                PreTag="div"
-                                className="rounded-lg text-sm"
-                            >
-                                {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                        ) : (
-                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                                {children}
-                            </code>
-                        )
-                    },
-                    p({node, children, ...props}: any) {
-                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
-                    },
-                    li({node, children, ...props}: any) {
-                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
-                    },
-                    ul({node, children, ...props}: any) {
-                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
-                    },
-                    ol({node, children, ...props}: any) {
-                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
-                    }
-                }}
-            >
-                {mod.about}
-            </ReactMarkdown>
-        );
-    }, [mod?.about]);
 
     if (isNotFound) return <NotFound />;
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
@@ -883,7 +911,7 @@ export const ModDetail: React.FC<{
 
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
-                                <span>by <button onClick={() => navigate(`/creator/${mod.author}`)} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</button></span>
+                                <span>by <Link to={`/creator/${mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
                                 {currentUser && currentUser.username !== mod.author && (
                                     <button
                                         onClick={handleFollowToggle}
@@ -893,9 +921,9 @@ export const ModDetail: React.FC<{
                                     </button>
                                 )}
                             </div>
-                            <span className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
-                            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
-                                <Calendar className="w-3 h-3" aria-hidden="true" /> Updated {formatTimeAgo(mod.updatedAt)}
+                            <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
+                            <span suppressHydrationWarning className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
+                                <Calendar className="w-3 h-3" aria-hidden="true" /> Updated <span suppressHydrationWarning>{formatTimeAgo(mod.updatedAt)}</span>
                             </span>
                         </div>
 
@@ -1036,11 +1064,11 @@ export const ModDetail: React.FC<{
                             currentUser={currentUser}
                             isCreator={Boolean(canEdit)}
                             commentsDisabled={mod.allowComments === false}
-                            onCommentSubmitted={useCallback((c) => { setMod(prev => prev ? {...prev, comments: c} : null); if(onRefresh) onRefresh(); }, [onRefresh])}
-                            onError={useCallback((m) => setStatusModal({type:'error', title:'Error', msg:m}), [])}
-                            onSuccess={useCallback((m) => setStatusModal({type:'success', title:'Success', msg:m}), [])}
+                            onCommentSubmitted={handleCommentSubmitted}
+                            onError={handleError}
+                            onSuccess={handleSuccess}
                             innerRef={commentsRef}
-                            onReport={useCallback((commentId) => setReportTarget({id: commentId, type: 'COMMENT'}), [])}
+                            onReport={handleReport}
                         />
                     </>
                 }

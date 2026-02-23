@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import type { Mod, Modpack, World } from '../types';
 import { ModCard } from '../components/resources/ModCard';
 import { HomeHero } from '../components/home/HomeHero';
@@ -246,19 +246,6 @@ export const Home: React.FC<HomeProps> = ({
         }
     }, [selectedClassification, navigate]);
 
-    const handleViewChange = useCallback((viewId: string) => {
-        const updates: Record<string, string | null> = { view: viewId };
-
-        if (viewId === 'hidden_gems') updates.sort = 'favorites';
-        else if (viewId === 'popular') updates.sort = 'popular';
-        else if (viewId === 'trending') updates.sort = 'trending';
-        else if (viewId === 'new') updates.sort = 'newest';
-        else if (viewId === 'updated') updates.sort = 'updated';
-        else if (viewId === 'all') updates.sort = 'relevance';
-
-        updateParams(updates);
-    }, [updateParams]);
-
     const handleSortChange = useCallback((newSort: any) => {
         const sortOption = newSort as SortOption;
         const updates: Record<string, string | null> = { sort: sortOption };
@@ -278,6 +265,13 @@ export const Home: React.FC<HomeProps> = ({
         updateParams(updates);
     }, [activeViewId, updateParams]);
 
+    const handleScrollTop = useCallback(() => {
+        window.scrollTo({
+            top: cardsSectionRef.current?.offsetTop ? cardsSectionRef.current.offsetTop - 120 : 0,
+            behavior: 'smooth'
+        });
+    }, []);
+
     const handlePageChange = useCallback((p: number) => {
         if (p >= 0 && p < totalPages) {
             setSearchParams(prev => {
@@ -285,13 +279,9 @@ export const Home: React.FC<HomeProps> = ({
                 next.set('page', p.toString());
                 return next;
             });
-
-            window.scrollTo({
-                top: cardsSectionRef.current?.offsetTop ? cardsSectionRef.current.offsetTop - 120 : 0,
-                behavior: 'smooth'
-            });
+            handleScrollTop();
         }
-    }, [totalPages, setSearchParams]);
+    }, [totalPages, setSearchParams, handleScrollTop]);
 
     const handleJump = (e: React.FormEvent) => {
         e.preventDefault();
@@ -336,6 +326,25 @@ export const Home: React.FC<HomeProps> = ({
         setIsTopFilterOpen(false);
     }, [setSearchParams]);
 
+    const createViewUrl = (viewId: string) => {
+        const search = new URLSearchParams(searchParams);
+        search.set('view', viewId);
+        if (viewId === 'hidden_gems') search.set('sort', 'favorites');
+        else if (viewId === 'popular') search.set('sort', 'popular');
+        else if (viewId === 'trending') search.set('sort', 'trending');
+        else if (viewId === 'new') search.set('sort', 'newest');
+        else if (viewId === 'updated') search.set('sort', 'updated');
+        else search.set('sort', 'relevance');
+        search.delete('page');
+        return `?${search.toString()}`;
+    };
+
+    const createPageUrl = (p: number) => {
+        const search = new URLSearchParams(searchParams);
+        search.set('page', p.toString());
+        return `?${search.toString()}`;
+    };
+
     const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (minFavorites > 0 ? 1 : 0) + (filterDate ? 1 : 0);
     const seoContent = getCategorySEO(selectedClassification);
 
@@ -370,13 +379,13 @@ export const Home: React.FC<HomeProps> = ({
                             <h2 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest px-2">Browse</h2>
                             <div className="space-y-1">
                                 {BROWSE_VIEWS.map(v => (
-                                    <button
+                                    <Link
                                         key={v.id}
-                                        onClick={() => handleViewChange(v.id)}
-                                        className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all ${activeViewId === v.id ? 'bg-modtale-accent text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                                        to={createViewUrl(v.id)}
+                                        className={`block w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all ${activeViewId === v.id ? 'bg-modtale-accent text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}
                                     >
                                         {v.label}
-                                    </button>
+                                    </Link>
                                 ))}
                             </div>
                         </div>
@@ -465,9 +474,27 @@ export const Home: React.FC<HomeProps> = ({
                         {totalPages > 1 && (
                             <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => handlePageChange(page - 1)} disabled={page === 0} aria-label="Previous page" className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-                                    <div className="hidden sm:flex gap-2">{getPageNumbers().map((p, idx) => (typeof p === 'number' ? ( <button key={p} onClick={() => handlePageChange(p - 1)} aria-label={`Page ${p}`} className={`w-10 h-10 rounded-lg text-sm font-bold border transition-colors ${page === p - 1 ? 'bg-modtale-accent text-white border-modtale-accent' : 'text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}>{p}</button> ) : ( <span key={`dots-${idx}`} className="w-10 h-10 flex items-center justify-center text-slate-400">...</span> )))}</div>
-                                    <button onClick={() => handlePageChange(page + 1)} disabled={page === totalPages - 1} aria-label="Next page" className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                                    {page === 0 ? (
+                                        <button disabled aria-label="Previous page" className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 opacity-50 cursor-not-allowed transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                                    ) : (
+                                        <Link to={createPageUrl(page - 1)} onClick={handleScrollTop} aria-label="Previous page" className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"><ChevronLeft className="w-5 h-5" /></Link>
+                                    )}
+
+                                    <div className="hidden sm:flex gap-2">
+                                        {getPageNumbers().map((p, idx) => (
+                                            typeof p === 'number' ? (
+                                                <Link key={p} to={createPageUrl(p - 1)} onClick={handleScrollTop} aria-label={`Page ${p}`} className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-bold border transition-colors ${page === p - 1 ? 'bg-modtale-accent text-white border-modtale-accent' : 'text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}>{p}</Link>
+                                            ) : (
+                                                <span key={`dots-${idx}`} className="w-10 h-10 flex items-center justify-center text-slate-400">...</span>
+                                            )
+                                        ))}
+                                    </div>
+
+                                    {page === totalPages - 1 ? (
+                                        <button disabled aria-label="Next page" className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 opacity-50 cursor-not-allowed transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                                    ) : (
+                                        <Link to={createPageUrl(page + 1)} onClick={handleScrollTop} aria-label="Next page" className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"><ChevronRight className="w-5 h-5" /></Link>
+                                    )}
                                 </div>
                                 <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-white/10"></div>
                                 <form onSubmit={handleJump} className="flex items-center gap-2">

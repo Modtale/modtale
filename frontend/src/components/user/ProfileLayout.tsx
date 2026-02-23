@@ -199,7 +199,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         <>
             <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter truncate leading-tight">{displayTitle}</h1>
+                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight pb-1 truncate min-h-[1.2em]">{displayTitle}</h1>
                     <div className="flex gap-1.5 flex-wrap items-center">
                         {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
                         {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
@@ -283,7 +283,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                 <div className="w-full flex-1 min-w-0">
                                     {headerInput ? headerInput : <HeaderInfo />}
                                 </div>
-                                <div className="hidden md:flex items-center gap-2">
+                                <div className="hidden md:flex items-center gap-2 mt-1">
                                     {actionInput ? actionInput : (
                                         <>
                                             {isSelf ? (
