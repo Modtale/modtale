@@ -1,4 +1,4 @@
-package net.modtale.model.user;
+package net.modtale.model.admin;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;

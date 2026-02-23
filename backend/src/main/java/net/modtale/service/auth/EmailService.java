@@ -1,4 +1,4 @@
-package net.modtale.service.security;
+package net.modtale.service.auth;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;

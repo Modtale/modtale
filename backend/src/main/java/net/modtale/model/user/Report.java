@@ -1,4 +1,4 @@
-package net.modtale.model.resources;
+package net.modtale.model.user;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;

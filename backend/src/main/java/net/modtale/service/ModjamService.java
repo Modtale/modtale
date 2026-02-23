@@ -1,13 +1,14 @@
-package net.modtale.service.resources;
+package net.modtale.service;
 
-import net.modtale.model.resources.Modjam;
-import net.modtale.model.resources.ModjamSubmission;
+import net.modtale.model.jam.Modjam;
+import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.user.User;
-import net.modtale.repository.resources.ModjamRepository;
-import net.modtale.repository.resources.ModjamSubmissionRepository;
+import net.modtale.repository.jam.ModjamRepository;
+import net.modtale.repository.jam.ModjamSubmissionRepository;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.resources.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;

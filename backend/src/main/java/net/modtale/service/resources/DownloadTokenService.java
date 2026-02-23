@@ -1,4 +1,4 @@
-package net.modtale.service;
+package net.modtale.service.resources;
 
 import org.springframework.stereotype.Service;
 

@@ -1,4 +1,4 @@
-package net.modtale.service.security;
+package net.modtale.service.auth;
 
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
@@ -9,7 +9,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.stream.Collectors;
 
 @Service

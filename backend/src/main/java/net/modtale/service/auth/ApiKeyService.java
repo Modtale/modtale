@@ -1,4 +1,4 @@
-package net.modtale.service.security;
+package net.modtale.service.auth;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;

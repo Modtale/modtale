@@ -1,6 +1,6 @@
-package net.modtale.repository.resources;
+package net.modtale.repository.user;
 
-import net.modtale.model.resources.Report;
+import net.modtale.model.user.Report;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import java.util.List;
