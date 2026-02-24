@@ -12,7 +12,7 @@ import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    CornerDownRight, Crown, Trash, Users, Flag
+    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -776,6 +776,9 @@ export const ModDetail: React.FC<{
 
     const displayClassification = toTitleCase(mod.classification || 'PLUGIN');
 
+    const isUnlisted = mod.status === 'UNLISTED';
+    const isArchived = mod.status === 'ARCHIVED';
+
     return (
         <>
             {projectMeta && (
@@ -797,6 +800,8 @@ export const ModDetail: React.FC<{
                     <meta name="twitter:card" content="summary_large_image" />
                     <meta name="twitter:title" content={mod.title} />
                     <meta name="twitter:image" content={ogImageUrl} />
+
+                    {(isUnlisted || isArchived) && <meta name="robots" content="noindex, nofollow" />}
                 </Helmet>
             )}
 
@@ -869,6 +874,20 @@ export const ModDetail: React.FC<{
                             <img src={resolveUrl(mod.galleryImages[galleryIndex])} className="max-w-full max-h-full object-contain shadow-lg" alt="" />
                         </div>
                     </div>
+                </div>
+            )}
+
+            {isUnlisted && (
+                <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-500 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold">
+                    <AlertTriangle className="w-4 h-4" />
+                    This project is unlisted. Only people with the link can view it.
+                </div>
+            )}
+
+            {isArchived && (
+                <div className="bg-slate-500/10 border-b border-slate-500/20 text-slate-700 dark:text-slate-400 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold">
+                    <Archive className="w-4 h-4" />
+                    This project is archived. It is read-only and no longer actively maintained.
                 </div>
             )}
 
