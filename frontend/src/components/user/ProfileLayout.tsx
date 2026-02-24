@@ -152,6 +152,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[105] md:hidden" onClick={() => setActivePopup(null)} />
 
                         <div ref={popupRef} className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-xs md:absolute md:bottom-full md:top-auto md:translate-y-0 md:mb-3 md:w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-[110] animate-in zoom-in-95 duration-200 text-left cursor-default ${popupPositionClasses}`}>
+                            <div className="absolute top-full left-0 w-full h-6 bg-transparent hidden md:block"></div>
+
                             <div className="flex justify-between items-start mb-3">
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label} Identity</h4>
                                 <button onClick={() => setActivePopup(null)}><X className="w-3 h-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" /></button>
@@ -163,7 +165,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     <p className="text-[10px] text-slate-500">Connected Account</p>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-2 relative z-10">
                                 <button onClick={() => copyHandle(account.username, account.provider)} className="flex items-center justify-center gap-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 py-2 rounded-lg text-xs font-bold transition-colors text-slate-700 dark:text-slate-200">
                                     {popupCopied === account.provider ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />} {popupCopied === account.provider ? 'Copied' : 'Copy'}
                                 </button>
@@ -205,7 +207,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         <>
             <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words">{displayTitle}</h1>
+                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
                     <div className="flex gap-1.5 flex-wrap items-center">
                         {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
                         {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
@@ -289,7 +291,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                 <div className="w-full flex-1 min-w-0">
                                     {headerInput ? headerInput : <HeaderInfo />}
                                 </div>
-                                <div className="hidden md:flex items-center gap-2">
+                                <div className="hidden md:flex items-center gap-2 mt-1 relative z-20">
                                     {actionInput ? actionInput : (
                                         <>
                                             {isSelf ? (
@@ -332,7 +334,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             </div>
                         )}
 
-                        <div className="md:hidden flex items-center gap-3 w-full mb-6 h-12">
+                        <div className="md:hidden flex items-center gap-3 w-full mb-6 h-12 relative z-20">
                             {actionInput ? actionInput : (
                                 <>
                                     {isSelf ? (
