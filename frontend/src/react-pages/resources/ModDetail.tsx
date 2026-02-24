@@ -33,7 +33,7 @@ const ProjectSidebar: React.FC<{
     mod: Mod;
     dependencies?: ModDependency[];
     depMeta: Record<string, { icon: string, title: string }>;
-    jamMeta: Record<string, { title: string, slug: string, isWinner: boolean }>;
+    jamMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }>;
     sourceUrl?: string;
     navigate: (path: string) => void;
     contributors: User[];
@@ -99,6 +99,7 @@ const ProjectSidebar: React.FC<{
                             const title = meta.title;
                             const slug = meta.slug;
                             const isWinner = meta.isWinner;
+                            const imageUrl = getIconUrl(meta.imageUrl);
 
                             return (
                                 <Link
@@ -106,8 +107,12 @@ const ProjectSidebar: React.FC<{
                                     to={`/jams/${slug}`}
                                     className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all group text-left ${isWinner ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md'}`}
                                 >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isWinner ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-slate-100 dark:bg-black/20 text-slate-400 group-hover:text-modtale-accent transition-colors'}`}>
-                                        <Trophy className="w-4 h-4" />
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${isWinner ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30 border border-amber-400/50' : 'bg-slate-100 dark:bg-black/20 text-slate-400 group-hover:text-modtale-accent transition-colors'}`}>
+                                        {imageUrl ? (
+                                            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Trophy className="w-4 h-4" />
+                                        )}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className={`text-xs font-bold truncate transition-colors ${isWinner ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent'}`}>
@@ -493,7 +498,7 @@ export const ModDetail: React.FC<{
 
     const [isFollowing, setIsFollowing] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
-    const [jamMeta, setJamMeta] = useState<Record<string, { title: string, slug: string, isWinner: boolean }>>({});
+    const [jamMeta, setJamMeta] = useState<Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }>>({});
 
     const [contributors, setContributors] = useState<User[]>([]);
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
@@ -676,7 +681,7 @@ export const ModDetail: React.FC<{
             try {
                 const jamsRes = await api.get('/modjams');
                 const allJams = jamsRes.data;
-                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean }> = {};
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }> = {};
 
                 await Promise.all(missing.map(async (id) => {
                     const jam = allJams.find((j: any) => j.id === id);
@@ -689,17 +694,17 @@ export const ModDetail: React.FC<{
                                 isWinner = true;
                             }
                         } catch (e) {}
-                        newMeta[id] = { title: jam.title, slug: jam.slug, isWinner };
+                        newMeta[id] = { title: jam.title, slug: jam.slug, isWinner, imageUrl: jam.imageUrl };
                     } else {
-                        newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false };
+                        newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false, imageUrl: undefined };
                     }
                 }));
 
                 setJamMeta(prev => ({ ...prev, ...newMeta }));
             } catch (e) {
-                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean }> = {};
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }> = {};
                 missing.forEach(id => {
-                    newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false };
+                    newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false, imageUrl: undefined };
                 });
                 setJamMeta(prev => ({ ...prev, ...newMeta }));
             }
