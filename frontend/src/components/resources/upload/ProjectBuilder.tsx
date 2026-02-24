@@ -873,7 +873,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                         <div key={jamId} className="flex items-center justify-between p-3 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl">
                                                             <div className="flex items-center gap-3">
                                                                 <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200 dark:border-white/5">
-                                                                    {meta?.imageUrl ? <img src={`${BACKEND_URL}${meta.imageUrl}`} className="w-full h-full object-cover" alt="" /> : <Trophy className="w-4 h-4 text-slate-400" />}
+                                                                    {meta?.imageUrl ? <img src={meta.imageUrl.startsWith('http') ? meta.imageUrl : `${BACKEND_URL}${meta.imageUrl}`} className="w-full h-full object-cover" alt="" /> : <Trophy className="w-4 h-4 text-slate-400" />}
                                                                 </div>
                                                                 <div>
                                                                     <div className="text-sm font-bold text-slate-900 dark:text-white">{meta?.title || 'Loading...'}</div>
