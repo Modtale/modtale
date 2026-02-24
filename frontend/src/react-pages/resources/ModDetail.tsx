@@ -644,7 +644,7 @@ export const ModDetail: React.FC<{
                         try {
                             const subsRes = await api.get(`/modjams/${jam.slug}/submissions`);
                             const mySub = subsRes.data.find((s: any) => s.projectId === mod.id);
-                            if (mySub && mySub.rank === 1) {
+                            if (mySub && (mySub.winner || mySub.isWinner || mySub.rank === 1)) {
                                 isWinner = true;
                             }
                         } catch (e) {}
@@ -961,7 +961,7 @@ export const ModDetail: React.FC<{
                                 {currentUser && currentUser.username !== mod.author && (
                                     <button
                                         onClick={handleFollowToggle}
-                                        className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
+                                        className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-black tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
                                     >
                                         {isFollowing ? 'Unfollow' : 'Follow'}
                                     </button>
@@ -1128,6 +1128,7 @@ export const ModDetail: React.FC<{
                         navigate={navigate}
                         dependencies={latestDependencies}
                         depMeta={depMeta}
+                        jamMeta={jamMeta}
                         sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
                         contributors={contributors}
                         orgMembers={orgMembers}

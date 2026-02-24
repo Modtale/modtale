@@ -109,7 +109,21 @@ public class ModjamService {
             calculateScores(jam.getId());
         }
 
-        jam.setStatus(updatedJam.getStatus());
+        String targetStatus = updatedJam.getStatus();
+        if (!"COMPLETED".equals(targetStatus) && !"DRAFT".equals(targetStatus)) {
+            LocalDateTime now = LocalDateTime.now();
+            if (jam.getStartDate() != null && now.isBefore(jam.getStartDate())) {
+                targetStatus = "UPCOMING";
+            } else if (jam.getEndDate() != null && now.isBefore(jam.getEndDate())) {
+                targetStatus = "ACTIVE";
+            } else if (jam.getVotingEndDate() != null && now.isBefore(jam.getVotingEndDate())) {
+                targetStatus = "VOTING";
+            } else {
+                targetStatus = "AWAITING_WINNERS";
+            }
+        }
+
+        jam.setStatus(targetStatus);
         jam.setUpdatedAt(LocalDateTime.now());
 
         return modjamRepository.save(jam);
@@ -291,6 +305,33 @@ public class ModjamService {
             sub.setRank(rank++);
             submissionRepository.save(sub);
         }
+    }
+
+    public Modjam finalizeJam(String jamId, String userId, List<Map<String, String>> winnersData) {
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!jam.getHostId().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can finalize the jam");
+
+        calculateScores(jamId);
+
+        List<ModjamSubmission> allSubs = submissionRepository.findByJamId(jamId);
+        for (ModjamSubmission sub : allSubs) {
+            Optional<Map<String, String>> matchingWinner = winnersData.stream()
+                    .filter(w -> w.get("submissionId").equals(sub.getId()))
+                    .findFirst();
+
+            if (matchingWinner.isPresent()) {
+                sub.setWinner(true);
+                sub.setAwardTitle(matchingWinner.get().get("awardTitle"));
+            } else {
+                sub.setWinner(false);
+                sub.setAwardTitle(null);
+            }
+            submissionRepository.save(sub);
+        }
+
+        jam.setStatus("COMPLETED");
+        jam.setUpdatedAt(LocalDateTime.now());
+        return modjamRepository.save(jam);
     }
 
     @Scheduled(cron = "0 0 0 * * *")
