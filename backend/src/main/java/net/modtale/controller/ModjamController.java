@@ -120,4 +120,11 @@ public class ModjamController {
 
         return ResponseEntity.ok(modjamService.vote(jamId, submissionId, categoryId, score, user.getId()));
     }
+
+    @PostMapping("/{jamId}/finalize")
+    public ResponseEntity<Modjam> finalizeJam(@PathVariable String jamId, @RequestBody List<Map<String, String>> winners) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.finalizeJam(jamId, user.getId(), winners));
+    }
 }

@@ -181,7 +181,7 @@ export interface Modjam {
     startDate: string;
     endDate: string;
     votingEndDate: string;
-    status: 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'VOTING' | 'COMPLETED';
+    status: 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'VOTING' | 'AWAITING_WINNERS' | 'COMPLETED';
     participantIds: string[];
     categories: ModjamCategory[];
     allowPublicVoting: boolean;
@@ -212,5 +212,7 @@ export interface ModjamSubmission {
     categoryScores?: Record<string, number>;
     totalScore?: number;
     rank?: number;
+    isWinner?: boolean;
+    awardTitle?: string;
     createdAt: string;
 }

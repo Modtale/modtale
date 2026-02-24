@@ -1,56 +1,34 @@
 package net.modtale.model.jam;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "modjams")
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Modjam {
 
     @Id
     private String id;
-
-    @Indexed(unique = true)
     private String slug;
-
-    @Indexed
     private String title;
-
     private String description;
-    private String bannerUrl;
+
     private String imageUrl;
+    private String bannerUrl;
 
-    @Indexed
     private String hostId;
-
     private String hostName;
 
-    @Indexed
     private LocalDateTime startDate;
-
-    @Indexed
     private LocalDateTime endDate;
-
     private LocalDateTime votingEndDate;
 
-    @Indexed
     private String status = "DRAFT";
 
     private List<String> participantIds = new ArrayList<>();
-
-    private List<Category> categories = new ArrayList<>();
-
-    private boolean allowPublicVoting = true;
-    private boolean allowConcurrentVoting = false;
-    private boolean showResultsBeforeVotingEnds = true;
-
-    private LocalDateTime createdAt = LocalDateTime.now();
-    private LocalDateTime updatedAt = LocalDateTime.now();
 
     public static class Category {
         private String id;
@@ -59,6 +37,7 @@ public class Modjam {
         private int maxScore;
 
         public Category() {}
+
         public Category(String id, String name, String description, int maxScore) {
             this.id = id;
             this.name = name;
@@ -76,7 +55,15 @@ public class Modjam {
         public void setMaxScore(int maxScore) { this.maxScore = maxScore; }
     }
 
-    public Modjam() {}
+    private List<Category> categories = new ArrayList<>();
+
+    private boolean allowPublicVoting;
+    private boolean allowConcurrentVoting;
+    private boolean showResultsBeforeVotingEnds;
+
+    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -86,10 +73,10 @@ public class Modjam {
     public void setTitle(String title) { this.title = title; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
-    public String getBannerUrl() { return bannerUrl; }
-    public void setBannerUrl(String bannerUrl) { this.bannerUrl = bannerUrl; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getBannerUrl() { return bannerUrl; }
+    public void setBannerUrl(String bannerUrl) { this.bannerUrl = bannerUrl; }
     public String getHostId() { return hostId; }
     public void setHostId(String hostId) { this.hostId = hostId; }
     public String getHostName() { return hostName; }
