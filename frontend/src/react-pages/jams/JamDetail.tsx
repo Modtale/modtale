@@ -32,7 +32,11 @@ const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => 
     let label = 'Jam Starts In';
     let progress = 0;
 
-    if (now < start) {
+    if (jam.status === 'COMPLETED') {
+        target = 0;
+        label = 'Jam Completed';
+        progress = 100;
+    } else if (now < start) {
         target = start;
         label = 'Jam Starts In';
         progress = 0;
@@ -46,22 +50,24 @@ const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => 
         progress = 50 + ((now - end) / (voting - end)) * 50;
     } else {
         target = 0;
-        label = 'Jam Completed';
+        label = 'Voting Closed';
         progress = 100;
     }
 
     const diff = target - now;
     let timeStr = '--';
 
-    if (diff > 0) {
+    if (diff > 0 && jam.status !== 'COMPLETED') {
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
         const pad = (n: number) => n.toString().padStart(2, '0');
         timeStr = days > 0 ? `${days}d ${pad(hours)}h ${pad(minutes)}m` : `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
-    } else {
+    } else if (jam.status === 'COMPLETED') {
         timeStr = 'Finished';
+    } else {
+        timeStr = 'Closed';
     }
 
     return (
@@ -79,10 +85,12 @@ const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => 
                         <div className="h-full bg-modtale-accent transition-all duration-1000 rounded-full" style={{ width: `${progress}%` }} />
                     </div>
                     {phases.map((phase, idx) => {
-                        const isPast = now >= phase.time;
-                        const isCurrent = (idx === 0 && now >= start && now < end) ||
+                        const isPast = now >= phase.time || jam.status === 'COMPLETED';
+                        const isCurrent = jam.status !== 'COMPLETED' && (
+                            (idx === 0 && now >= start && now < end) ||
                             (idx === 1 && now >= end && now < voting) ||
-                            (idx === 2 && now >= voting && now < voting + 1000 * 60 * 60 * 24);
+                            (idx === 2 && now >= voting)
+                        );
 
                         return (
                             <div key={phase.label} className="flex flex-col items-center w-28 relative z-10">
@@ -201,6 +209,12 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
     const handleVote = async (submissionId: string, categoryId: string, score: number) => {
         if (!jam || !currentUser) return;
+
+        if (jam.votingEndDate && new Date().getTime() > new Date(jam.votingEndDate).getTime()) {
+            setStatusModal({ type: 'error', title: 'Voting Closed', message: 'The voting period has ended for this jam.' });
+            setVotingSubmissionId(null);
+            return;
+        }
 
         const previousSubmissions = [...submissions];
 
@@ -381,7 +395,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const isParticipating = currentUser?.id && (jam.participantIds || []).includes(currentUser.id);
     const hasSubmitted = submissions.some(s => s.submitterId === currentUser?.id);
 
-    const canVote = (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || currentUser?.id === jam.hostId);
+    const votingClosed = jam.votingEndDate && now > new Date(jam.votingEndDate).getTime();
+    const canVote = !votingClosed && (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || currentUser?.id === jam.hostId);
     const canSeeResults = jam.status === 'COMPLETED' || jam.showResultsBeforeVotingEnds || currentUser?.id === jam.hostId;
 
     return (
@@ -481,6 +496,15 @@ const JamDetailView: React.FC<{
         return url;
     };
 
+    const handleFinalizeJam = async () => {
+        try {
+            await api.put(`/modjams/${jam.id}`, { ...jam, status: 'COMPLETED' });
+            window.location.reload();
+        } catch (e) {
+            console.error("Failed to finalize jam", e);
+        }
+    };
+
     return (
         <JamLayout
             bannerUrl={jam.bannerUrl}
@@ -513,6 +537,11 @@ const JamDetailView: React.FC<{
                 <>
                     {currentUser?.id === jam.hostId && (
                         <div className="flex gap-2.5 shrink-0">
+                            {jam.status !== 'COMPLETED' && jam.votingEndDate && now > new Date(jam.votingEndDate).getTime() && (
+                                <button onClick={handleFinalizeJam} className="h-12 md:h-14 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95" title="Finalize Jam">
+                                    <Trophy className="w-4 h-4" /> Pick Winners
+                                </button>
+                            )}
                             <button onClick={startEditing} className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 hover:border-modtale-accent text-slate-900 dark:text-white shadow-sm flex items-center justify-center transition-all hover:scale-105 active:scale-95 group" title="Edit Jam">
                                 <Edit3 className="w-5 h-5 group-hover:text-modtale-accent transition-colors" />
                             </button>
