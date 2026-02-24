@@ -12,7 +12,7 @@ import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    CornerDownRight, Crown, Trash, Users, Flag
+    CornerDownRight, Crown, Trash, Users, Flag, Trophy
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -33,12 +33,13 @@ const ProjectSidebar: React.FC<{
     mod: Mod;
     dependencies?: ModDependency[];
     depMeta: Record<string, { icon: string, title: string }>;
+    jamMeta: Record<string, { title: string, slug: string, isWinner: boolean }>;
     sourceUrl?: string;
     navigate: (path: string) => void;
     contributors: User[];
     orgMembers: User[];
     author: User | null;
-}> = React.memo(({ mod, dependencies, depMeta, navigate, contributors, orgMembers, author }) => {
+}> = React.memo(({ mod, dependencies, depMeta, jamMeta, navigate, contributors, orgMembers, author }) => {
     const [copiedId, setCopiedId] = useState(false);
 
     const gameVersions = useMemo(() => {
@@ -82,6 +83,39 @@ const ProjectSidebar: React.FC<{
                     </div>
                 </div>
             </div>
+
+            {mod.modjamIds && mod.modjamIds.length > 0 && (
+                <SidebarSection title="Mod Jams" icon={Trophy}>
+                    <div className="space-y-2">
+                        {mod.modjamIds.map(jamId => {
+                            const meta = jamMeta[jamId];
+                            const title = meta?.title || `Jam ${jamId.substring(0, 6)}`;
+                            const slug = meta?.slug || jamId;
+                            const isWinner = meta?.isWinner || false;
+
+                            return (
+                                <Link
+                                    key={jamId}
+                                    to={`/jams/${slug}`}
+                                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all group text-left ${isWinner ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md'}`}
+                                >
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isWinner ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-slate-100 dark:bg-black/20 text-slate-400 group-hover:text-modtale-accent transition-colors'}`}>
+                                        <Trophy className={isWinner ? "w-4 h-4" : "w-4 h-4"} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className={`text-xs font-bold truncate transition-colors ${isWinner ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent'}`}>
+                                            {title}
+                                        </div>
+                                        <div className={`text-[10px] uppercase font-bold tracking-wider ${isWinner ? 'text-amber-600/80 dark:text-amber-500/80' : 'text-slate-500'}`}>
+                                            {isWinner ? 'Winner' : 'Submission'}
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </SidebarSection>
+            )}
 
             {gameVersions.length > 0 && (
                 <SidebarSection title="Supported Versions" icon={Gamepad2}>
@@ -452,6 +486,7 @@ export const ModDetail: React.FC<{
 
     const [isFollowing, setIsFollowing] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
+    const [jamMeta, setJamMeta] = useState<Record<string, { title: string, slug: string, isWinner: boolean }>>({});
 
     const [contributors, setContributors] = useState<User[]>([]);
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
@@ -580,6 +615,7 @@ export const ModDetail: React.FC<{
     const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
+    const fetchedJamMeta = useRef<Set<string>>(new Set());
 
     const projectMeta = mod ? generateProjectMeta(mod) : null;
     const breadcrumbSchema = mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null;
@@ -620,6 +656,36 @@ export const ModDetail: React.FC<{
 
         if (mod) fetchTeam();
     }, [mod?.id, mod?.author]);
+
+    useEffect(() => {
+        if (!mod?.modjamIds?.length) return;
+        const fetchJams = async () => {
+            const missing = mod.modjamIds!.filter(id => !jamMeta[id] && !fetchedJamMeta.current.has(id));
+            if (!missing.length) return;
+
+            missing.forEach(id => fetchedJamMeta.current.add(id));
+            const newMeta = { ...jamMeta };
+
+            await Promise.all(missing.map(async (id) => {
+                try {
+                    const jamRes = await api.get(`/jams/${id}`);
+                    let isWinner = false;
+                    try {
+                        const subRes = await api.get(`/jams/${id}/submissions/project/${mod.id}`);
+                        if (subRes.data?.rank === 1) {
+                            isWinner = true;
+                        }
+                    } catch (e) {
+                    }
+                    newMeta[id] = { title: jamRes.data.title, slug: jamRes.data.slug, isWinner };
+                } catch (e) {
+                    newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false };
+                }
+            }));
+            setJamMeta(prev => ({ ...prev, ...newMeta }));
+        };
+        fetchJams();
+    }, [mod?.modjamIds, mod?.id, jamMeta]);
 
     useEffect(() => {
         if (mod && !loading) {
@@ -693,7 +759,7 @@ export const ModDetail: React.FC<{
             setDepMeta(prev => ({...prev, ...newMeta}));
         };
         fetchMeta();
-    }, [latestDependencies]);
+    }, [latestDependencies, depMeta]);
 
     const handleShare = async () => {
         if (isMobile && navigator.share) {
@@ -1047,6 +1113,7 @@ export const ModDetail: React.FC<{
                         navigate={navigate}
                         dependencies={latestDependencies}
                         depMeta={depMeta}
+                        jamMeta={jamMeta}
                         sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
                         contributors={contributors}
                         orgMembers={orgMembers}
