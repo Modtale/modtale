@@ -32,7 +32,7 @@ if (initialData && initialData.id && initialData.classification) {
 const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
 
-const rawApiUrl = import.meta.env.PUBLIC_API_URL || "https://modtale-backend-dev-ptpi2wdeva-uc.a.run.app"; // Fallback if env missing
+const rawApiUrl = import.meta.env.PUBLIC_API_URL;
 let apiOrigin = rawApiUrl;
 try {
     apiOrigin = new URL(rawApiUrl).origin;
@@ -69,6 +69,8 @@ try {
     <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" />
 
     {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
 
