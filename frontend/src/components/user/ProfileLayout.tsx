@@ -134,13 +134,19 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             : "left-1/2 -translate-x-1/2";
 
         return (
-            <div className="relative inline-block align-middle">
-                <button
-                    onClick={(e) => { e.stopPropagation(); setActivePopup(isOpen ? null : account.provider); }}
-                    className={`${compact ? 'p-1.5' : 'p-2.5 md:p-2.5 p-2'} rounded-lg md:rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative flex-shrink-0 ${isOpen ? activeClass : `text-slate-400 ${btnHover}`}`}
+            <div
+                className="relative inline-block align-middle"
+                onMouseEnter={() => setActivePopup(account.provider)}
+                onMouseLeave={() => setActivePopup(null)}
+            >
+                <a
+                    href={finalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${compact ? 'p-1.5' : 'p-2.5 md:p-2.5 p-2'} rounded-lg md:rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative flex-shrink-0 inline-flex items-center justify-center ${isOpen ? activeClass : `text-slate-400 ${btnHover}`}`}
                 >
                     <Icon className={compact ? "w-3.5 h-3.5" : "w-4 h-4 md:w-5 md:h-5"} />
-                </button>
+                </a>
                 {isOpen && (
                     <>
                         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[105] md:hidden" onClick={() => setActivePopup(null)} />
@@ -199,7 +205,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         <>
             <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight pb-1 truncate min-h-[1.2em]">{displayTitle}</h1>
+                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words">{displayTitle}</h1>
                     <div className="flex gap-1.5 flex-wrap items-center">
                         {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
                         {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
@@ -283,7 +289,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                 <div className="w-full flex-1 min-w-0">
                                     {headerInput ? headerInput : <HeaderInfo />}
                                 </div>
-                                <div className="hidden md:flex items-center gap-2 mt-1">
+                                <div className="hidden md:flex items-center gap-2">
                                     {actionInput ? actionInput : (
                                         <>
                                             {isSelf ? (
