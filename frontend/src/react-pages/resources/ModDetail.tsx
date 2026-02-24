@@ -96,7 +96,7 @@ const ProjectSidebar: React.FC<{
                             return (
                                 <Link
                                     key={jamId}
-                                    to={`/jams/${slug}`}
+                                    to={`/jam/${slug}`}
                                     className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all group text-left ${isWinner ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md'}`}
                                 >
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isWinner ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-slate-100 dark:bg-black/20 text-slate-400 group-hover:text-modtale-accent transition-colors'}`}>
@@ -668,11 +668,12 @@ export const ModDetail: React.FC<{
 
             await Promise.all(missing.map(async (id) => {
                 try {
-                    const jamRes = await api.get(`/jams/${id}`);
+                    const jamRes = await api.get(`/modjams/${id}`);
                     let isWinner = false;
                     try {
-                        const subRes = await api.get(`/jams/${id}/submissions/project/${mod.id}`);
-                        if (subRes.data?.rank === 1) {
+                        const subsRes = await api.get(`/modjams/${id}/submissions`);
+                        const mySub = subsRes.data.find((s: any) => s.projectId === mod.id);
+                        if (mySub && mySub.rank === 1) {
                             isWinner = true;
                         }
                     } catch (e) {
