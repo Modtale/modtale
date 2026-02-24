@@ -21,10 +21,6 @@
 
 ## About
 
-Modtale is the premier community repository for hosting and discovering Hytale community content. 
-
-To balance performance with discoverability, Modtale utilizes a hybrid rendering strategy: standard traffic is served via Client-Side Rendering (CSR) for immediate interactivity using **React 19**, while search engine crawlers receive Server-Side Rendered (SSR) content via **Astro Node Adapter** for optimized SEO. Binary assets (mods, plugins, art) are distributed globally via **Cloudflare R2**.
-
 ### Supported Content Types
 
 Modtale is engineered to support the specific file structures and metadata requirements of Hytale's modification system:
@@ -39,7 +35,7 @@ Modtale is engineered to support the specific file structures and metadata requi
 
 ## Repository Structure
 
-This monorepo houses the core components of the Modtale ecosystem:
+This monorepo houses the core components of the Modtale app:
 
 ```text
 modtale/
