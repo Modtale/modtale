@@ -235,6 +235,11 @@ public class ModjamService {
 
     public ModjamSubmission vote(String jamId, String submissionId, String categoryId, int score, String userId) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        if (jam.getVotingEndDate() != null && LocalDateTime.now().isAfter(jam.getVotingEndDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voting has closed for this jam.");
+        }
+
         ModjamSubmission sub = submissionRepository.findById(submissionId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
         if (sub.getSubmitterId().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot vote on self");
