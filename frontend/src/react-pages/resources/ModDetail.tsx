@@ -33,13 +33,12 @@ const ProjectSidebar: React.FC<{
     mod: Mod;
     dependencies?: ModDependency[];
     depMeta: Record<string, { icon: string, title: string }>;
-    jamMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }>;
     sourceUrl?: string;
     navigate: (path: string) => void;
     contributors: User[];
     orgMembers: User[];
     author: User | null;
-}> = React.memo(({ mod, dependencies, depMeta, jamMeta, navigate, contributors, orgMembers, author }) => {
+}> = React.memo(({ mod, dependencies, depMeta, sourceUrl, navigate, contributors, orgMembers, author }) => {
     const [copiedId, setCopiedId] = useState(false);
 
     const gameVersions = useMemo(() => {
@@ -83,51 +82,6 @@ const ProjectSidebar: React.FC<{
                     </div>
                 </div>
             </div>
-
-            {mod.modjamIds && mod.modjamIds.length > 0 && (
-                <SidebarSection title="Mod Jams" icon={Trophy}>
-                    <div className="space-y-2">
-                        {mod.modjamIds.map(jamId => {
-                            const meta = jamMeta[jamId];
-
-                            if (!meta) {
-                                return (
-                                    <div key={jamId} className="w-full h-[62px] bg-slate-100 dark:bg-slate-800/50 rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />
-                                );
-                            }
-
-                            const title = meta.title;
-                            const slug = meta.slug;
-                            const isWinner = meta.isWinner;
-                            const imageUrl = getIconUrl(meta.imageUrl);
-
-                            return (
-                                <Link
-                                    key={jamId}
-                                    to={`/jams/${slug}`}
-                                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all group text-left ${isWinner ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md'}`}
-                                >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${isWinner ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30 border border-amber-400/50' : 'bg-slate-100 dark:bg-black/20 text-slate-400 group-hover:text-modtale-accent transition-colors'}`}>
-                                        {imageUrl ? (
-                                            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <Trophy className="w-4 h-4" />
-                                        )}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className={`text-xs font-bold truncate transition-colors ${isWinner ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent'}`}>
-                                            {title}
-                                        </div>
-                                        <div className={`text-[10px] uppercase font-bold tracking-wider ${isWinner ? 'text-amber-600/80 dark:text-amber-500/80' : 'text-slate-500'}`}>
-                                            {isWinner ? 'Winner' : 'Submission'}
-                                        </div>
-                                    </div>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </SidebarSection>
-            )}
 
             {gameVersions.length > 0 && (
                 <SidebarSection title="Supported Versions" icon={Gamepad2}>
@@ -842,11 +796,12 @@ export const ModDetail: React.FC<{
         }
     };
 
+    const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
+
     if (isNotFound) return <NotFound />;
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!mod) return null;
 
-    const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
 
     const links = [
@@ -1000,7 +955,7 @@ export const ModDetail: React.FC<{
                             </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
+                        <div className="flex flex-wrap items-center gap-x-4 md:gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
                                 <span>by <Link to={`/creator/${mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
                                 {currentUser && currentUser.username !== mod.author && (
@@ -1012,10 +967,45 @@ export const ModDetail: React.FC<{
                                     </button>
                                 )}
                             </div>
+
                             <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
+
                             <span suppressHydrationWarning className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
                                 <Calendar className="w-3 h-3" aria-hidden="true" /> Updated <span suppressHydrationWarning>{formatTimeAgo(mod.updatedAt)}</span>
                             </span>
+
+                            {mod.modjamIds && mod.modjamIds.map(jamId => {
+                                const meta = jamMeta[jamId];
+                                if (!meta) return null;
+                                const isWinner = meta.isWinner;
+                                const imageUrl = meta.imageUrl ? resolveUrl(meta.imageUrl) : null;
+
+                                return (
+                                    <React.Fragment key={jamId}>
+                                        <span className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
+                                        <Link
+                                            to={`/jams/${meta.slug}`}
+                                            className={`inline-flex items-center gap-2 pr-3 pl-1.5 py-1.5 rounded-full text-xs transition-all hover:scale-105 active:scale-95 backdrop-blur-md ${
+                                                isWinner
+                                                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 shadow-sm'
+                                                    : 'bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/50 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 hover:dark:bg-slate-700/80'
+                                            }`}
+                                        >
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${isWinner ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                                {imageUrl ? (
+                                                    <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Trophy className="w-3 h-3" />
+                                                )}
+                                            </div>
+                                            <span className="font-medium">
+                                                {isWinner ? 'Winner of ' : 'Submission to '}
+                                                <span className={`${isWinner ? 'font-black' : 'font-bold'}`}>{meta.title}</span>
+                                            </span>
+                                        </Link>
+                                    </React.Fragment>
+                                );
+                            })}
                         </div>
 
                         {mod.description && (
@@ -1138,7 +1128,6 @@ export const ModDetail: React.FC<{
                         navigate={navigate}
                         dependencies={latestDependencies}
                         depMeta={depMeta}
-                        jamMeta={jamMeta}
                         sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
                         contributors={contributors}
                         orgMembers={orgMembers}
