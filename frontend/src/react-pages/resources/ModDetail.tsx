@@ -89,18 +89,25 @@ const ProjectSidebar: React.FC<{
                     <div className="space-y-2">
                         {mod.modjamIds.map(jamId => {
                             const meta = jamMeta[jamId];
-                            const title = meta?.title || `Jam ${jamId.substring(0, 6)}`;
-                            const slug = meta?.slug || jamId;
-                            const isWinner = meta?.isWinner || false;
+
+                            if (!meta) {
+                                return (
+                                    <div key={jamId} className="w-full h-[62px] bg-slate-100 dark:bg-slate-800/50 rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />
+                                );
+                            }
+
+                            const title = meta.title;
+                            const slug = meta.slug;
+                            const isWinner = meta.isWinner;
 
                             return (
                                 <Link
                                     key={jamId}
-                                    to={`/jam/${slug}`}
+                                    to={`/jams/${slug}`}
                                     className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all group text-left ${isWinner ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md'}`}
                                 >
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isWinner ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-slate-100 dark:bg-black/20 text-slate-400 group-hover:text-modtale-accent transition-colors'}`}>
-                                        <Trophy className={isWinner ? "w-4 h-4" : "w-4 h-4"} />
+                                        <Trophy className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className={`text-xs font-bold truncate transition-colors ${isWinner ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent'}`}>
@@ -659,34 +666,46 @@ export const ModDetail: React.FC<{
 
     useEffect(() => {
         if (!mod?.modjamIds?.length) return;
+
+        const missing = mod.modjamIds.filter(id => !jamMeta[id] && !fetchedJamMeta.current.has(id));
+        if (!missing.length) return;
+
+        missing.forEach(id => fetchedJamMeta.current.add(id));
+
         const fetchJams = async () => {
-            const missing = mod.modjamIds!.filter(id => !jamMeta[id] && !fetchedJamMeta.current.has(id));
-            if (!missing.length) return;
+            try {
+                const jamsRes = await api.get('/modjams');
+                const allJams = jamsRes.data;
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean }> = {};
 
-            missing.forEach(id => fetchedJamMeta.current.add(id));
-            const newMeta = { ...jamMeta };
-
-            await Promise.all(missing.map(async (id) => {
-                try {
-                    const jamRes = await api.get(`/modjams/${id}`);
-                    let isWinner = false;
-                    try {
-                        const subsRes = await api.get(`/modjams/${id}/submissions`);
-                        const mySub = subsRes.data.find((s: any) => s.projectId === mod.id);
-                        if (mySub && mySub.rank === 1) {
-                            isWinner = true;
-                        }
-                    } catch (e) {
+                await Promise.all(missing.map(async (id) => {
+                    const jam = allJams.find((j: any) => j.id === id);
+                    if (jam) {
+                        let isWinner = false;
+                        try {
+                            const subsRes = await api.get(`/modjams/${jam.slug}/submissions`);
+                            const mySub = subsRes.data.find((s: any) => s.projectId === mod.id);
+                            if (mySub && mySub.rank === 1) {
+                                isWinner = true;
+                            }
+                        } catch (e) {}
+                        newMeta[id] = { title: jam.title, slug: jam.slug, isWinner };
+                    } else {
+                        newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false };
                     }
-                    newMeta[id] = { title: jamRes.data.title, slug: jamRes.data.slug, isWinner };
-                } catch (e) {
+                }));
+
+                setJamMeta(prev => ({ ...prev, ...newMeta }));
+            } catch (e) {
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean }> = {};
+                missing.forEach(id => {
                     newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false };
-                }
-            }));
-            setJamMeta(prev => ({ ...prev, ...newMeta }));
+                });
+                setJamMeta(prev => ({ ...prev, ...newMeta }));
+            }
         };
         fetchJams();
-    }, [mod?.modjamIds, mod?.id, jamMeta]);
+    }, [mod?.modjamIds, mod?.id]);
 
     useEffect(() => {
         if (mod && !loading) {
