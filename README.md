@@ -158,30 +158,6 @@ npm run dev
 
 ---
 
-## Production Build
-
-### Backend (executable JAR)
-
-```bash
-cd backend
-./gradlew clean build -x test
-# Output: build/libs/modtale-backend-0.0.1-SNAPSHOT.jar
-
-```
-
-### Frontend (Node Adapter)
-
-The frontend builds into a standalone Node.js server to support SSR.
-
-```bash
-cd frontend
-npm run build
-node dist/server/entry.mjs
-
-```
-
----
-
 ## License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
@@ -199,7 +175,7 @@ Modtale is free software: you can redistribute it and/or modify it under the ter
 
 ### Contributing
 
-Please refer to [CONTRIBUTING.md](https://www.google.com/search?q=CONTRIBUTING.md) for guidelines on submitting pull requests and reporting issues.
+Please refer to [CONTRIBUTING.md](https://github.com/Modtale/modtale?tab=contributing-ov-file) for guidelines on submitting pull requests and reporting issues.
 
 <div align="center">
 <p>© 2026 Modtale. The Hytale Community Repository.</p>
