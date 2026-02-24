@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     ChevronLeft, Upload, Plus, Image as ImageIcon,
-    Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, X,
+    Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink,
     UserPlus, UserCheck, Building2, Settings, Flag
 } from 'lucide-react';
 import { ImageCropperModal } from '../ui/ImageCropperModal';
@@ -54,22 +54,10 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const [copied, setCopied] = useState(false);
     const [popupCopied, setPopupCopied] = useState<string | null>(null);
-    const [activePopup, setActivePopup] = useState<string | null>(null);
-    const popupRef = useRef<HTMLDivElement>(null);
 
     const isOrg = user.accountType === 'ORGANIZATION';
     const displayTitle = user.username;
     const linkedAccounts = (user.connectedAccounts || []).filter(a => a.visible);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-                setActivePopup(null);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
@@ -110,73 +98,62 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const getProviderDetails = (provider: string) => {
         switch (provider) {
-            case 'github': return { icon: Github, label: 'GitHub', activeClass: 'text-slate-900 dark:text-white', btnHover: 'hover:text-slate-900 dark:hover:text-white', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
-            case 'gitlab': return { icon: Gitlab, label: 'GitLab', activeClass: 'text-[#FC6D26]', btnHover: 'hover:text-[#FC6D26]', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
-            case 'twitter': return { icon: Twitter, label: 'Twitter', activeClass: 'text-[#1DA1F2]', btnHover: 'hover:text-[#1DA1F2]', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
-            case 'discord': return { icon: DiscordIcon, label: 'Discord', activeClass: 'text-[#5865F2]', btnHover: 'hover:text-[#5865F2]', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
-            default: return { icon: Globe, label: 'Website', activeClass: 'text-blue-500', btnHover: 'hover:text-blue-500', iconBg: 'bg-blue-500/10 text-blue-500', profileBtnBg: 'bg-blue-500' };
+            case 'github': return { icon: Github, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
+            case 'gitlab': return { icon: Gitlab, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
+            case 'twitter': return { icon: Twitter, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
+            case 'discord': return { icon: DiscordIcon, label: 'Discord', activeClass: 'group-hover/social:text-[#5865F2] group-hover/social:border-[#5865F2]/30', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
+            default: return { icon: Globe, label: 'Website', activeClass: 'group-hover/social:text-blue-500 group-hover/social:border-blue-500/30', iconBg: 'bg-blue-500/10 text-blue-500', profileBtnBg: 'bg-blue-500' };
         }
     };
 
     const SocialButton = ({ account, compact = false, isRightMost = false }: { account: any, compact?: boolean, isRightMost?: boolean }) => {
-        const { icon: Icon, label, activeClass, btnHover, iconBg, profileBtnBg } = getProviderDetails(account.provider);
-        const isOpen = activePopup === account.provider;
+        const { icon: Icon, label, activeClass, iconBg, profileBtnBg } = getProviderDetails(account.provider);
         const displayUrl = account.profileUrl || '#';
         const isDiscord = account.provider === 'discord';
         const finalUrl = isDiscord ? `https://discord.com/users/${account.providerId}` : displayUrl;
 
         const popupPositionClasses = isRightMost
-            ? "md:right-0 md:left-auto md:translate-x-0"
-            : "md:left-1/2 md:-translate-x-1/2";
+            ? "right-0 left-auto translate-x-0"
+            : "left-1/2 -translate-x-1/2";
 
         const trianglePositionClasses = isRightMost
             ? "right-3 left-auto translate-x-0"
             : "left-1/2 -translate-x-1/2";
 
         return (
-            <div
-                className="relative inline-block align-middle"
-                onMouseEnter={() => setActivePopup(account.provider)}
-                onMouseLeave={() => setActivePopup(null)}
-            >
+            <div className="relative inline-block align-middle group/social">
                 <a
                     href={finalUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className={`${compact ? 'p-1.5' : 'p-2.5 md:p-2.5 p-2'} rounded-lg md:rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative flex-shrink-0 inline-flex items-center justify-center ${isOpen ? activeClass : `text-slate-400 ${btnHover}`}`}
+                    className={`${compact ? 'p-1.5' : 'p-2.5 md:p-2.5 p-2'} rounded-lg md:rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative flex-shrink-0 inline-flex items-center justify-center text-slate-400 ${activeClass}`}
                 >
                     <Icon className={compact ? "w-3.5 h-3.5" : "w-4 h-4 md:w-5 md:h-5"} />
                 </a>
-                {isOpen && (
-                    <>
-                        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[105] md:hidden" onClick={() => setActivePopup(null)} />
 
-                        <div ref={popupRef} className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-xs md:absolute md:bottom-full md:top-auto md:translate-y-0 md:mb-3 md:w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-[110] animate-in zoom-in-95 duration-200 text-left cursor-default ${popupPositionClasses}`}>
-                            <div className="absolute top-full left-0 w-full h-6 bg-transparent hidden md:block"></div>
+                <div className={`absolute bottom-full mb-3 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-[110] text-left cursor-default opacity-0 invisible group-hover/social:visible group-hover/social:opacity-100 transition-all duration-200 ${popupPositionClasses}`}>
+                    <div className="absolute top-full left-0 w-full h-4 bg-transparent"></div>
 
-                            <div className="flex justify-between items-start mb-3">
-                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label} Identity</h4>
-                                <button onClick={() => setActivePopup(null)}><X className="w-3 h-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" /></button>
-                            </div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className={`p-2 rounded-lg ${iconBg}`}><Icon className="w-6 h-6" /></div>
-                                <div className="min-w-0">
-                                    <p className="font-black text-slate-900 dark:text-white text-sm truncate">{account.username}</p>
-                                    <p className="text-[10px] text-slate-500">Connected Account</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 relative z-10">
-                                <button onClick={() => copyHandle(account.username, account.provider)} className="flex items-center justify-center gap-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 py-2 rounded-lg text-xs font-bold transition-colors text-slate-700 dark:text-slate-200">
-                                    {popupCopied === account.provider ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />} {popupCopied === account.provider ? 'Copied' : 'Copy'}
-                                </button>
-                                <a href={finalUrl} target="_blank" rel="noreferrer" className={`flex items-center justify-center gap-2 text-white py-2 rounded-lg text-xs font-bold transition-colors hover:opacity-90 ${profileBtnBg}`}>
-                                    <ExternalLink className="w-3 h-3" /> Profile
-                                </a>
-                            </div>
-                            <div className={`hidden md:block absolute top-full -mt-[1px] border-[6px] border-transparent border-t-white dark:border-t-slate-800 pointer-events-none ${trianglePositionClasses}`}></div>
+                    <div className="flex justify-between items-start mb-3">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label} Identity</h4>
+                    </div>
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className={`p-2 rounded-lg ${iconBg}`}><Icon className="w-6 h-6" /></div>
+                        <div className="min-w-0">
+                            <p className="font-black text-slate-900 dark:text-white text-sm truncate">{account.username}</p>
+                            <p className="text-[10px] text-slate-500">Connected Account</p>
                         </div>
-                    </>
-                )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 relative z-10">
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); copyHandle(account.username, account.provider); }} className="flex items-center justify-center gap-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 py-2 rounded-lg text-xs font-bold transition-colors text-slate-700 dark:text-slate-200">
+                            {popupCopied === account.provider ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />} {popupCopied === account.provider ? 'Copied' : 'Copy'}
+                        </button>
+                        <a href={finalUrl} target="_blank" rel="noreferrer" className={`flex items-center justify-center gap-2 text-white py-2 rounded-lg text-xs font-bold transition-colors hover:opacity-90 ${profileBtnBg}`}>
+                            <ExternalLink className="w-3 h-3" /> Profile
+                        </a>
+                    </div>
+                    <div className={`absolute top-full -mt-[1px] border-[6px] border-transparent border-t-white dark:border-t-slate-800 pointer-events-none ${trianglePositionClasses}`}></div>
+                </div>
             </div>
         );
     };
