@@ -22,23 +22,21 @@ const {
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
-const defaultImage = "https://modtale.net/assets/og-default.png";
-let image = propImage || defaultImage;
-
-if (initialData && initialData.id && initialData.classification) {
-    image = `api.modale.net/api/v1/og/project/${initialData.id}.png`;
-}
-
-const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
-const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
-
 const rawApiUrl = import.meta.env.PUBLIC_API_URL;
 let apiOrigin = rawApiUrl;
 try {
     apiOrigin = new URL(rawApiUrl).origin;
-} catch (e) {
-    console.warn("Invalid PUBLIC_API_URL, defaulting CSP to raw string", e);
+} catch (e) {}
+
+const defaultImage = "https://modtale.net/assets/og-default.png";
+let image = propImage || defaultImage;
+
+if (initialData && initialData.id && initialData.classification) {
+    image = `${apiOrigin}/api/v1/og/project/${initialData.id}.png`;
 }
+
+const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
+const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
 ---
 
 <!DOCTYPE html>
@@ -54,7 +52,6 @@ try {
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content={title} />
-
     <meta property="og:image" content={image} />
     <meta property="og:site_name" content="Modtale" />
 
