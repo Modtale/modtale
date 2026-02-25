@@ -3,7 +3,7 @@ package net.modtale.model.jam;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,9 +23,9 @@ public class Modjam {
     private String hostId;
     private String hostName;
 
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
-    private LocalDateTime votingEndDate;
+    private Instant startDate;
+    private Instant endDate;
+    private Instant votingEndDate;
 
     private String status = "DRAFT";
 
@@ -104,8 +104,8 @@ public class Modjam {
     private boolean showResultsBeforeVotingEnds;
     private boolean oneEntryPerPerson = true;
 
-    private LocalDateTime createdAt = LocalDateTime.now();
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private Instant createdAt = Instant.now();
+    private Instant updatedAt = Instant.now();
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -125,12 +125,12 @@ public class Modjam {
     public void setHostId(String hostId) { this.hostId = hostId; }
     public String getHostName() { return hostName; }
     public void setHostName(String hostName) { this.hostName = hostName; }
-    public LocalDateTime getStartDate() { return startDate; }
-    public void setStartDate(LocalDateTime startDate) { this.startDate = startDate; }
-    public LocalDateTime getEndDate() { return endDate; }
-    public void setEndDate(LocalDateTime endDate) { this.endDate = endDate; }
-    public LocalDateTime getVotingEndDate() { return votingEndDate; }
-    public void setVotingEndDate(LocalDateTime votingEndDate) { this.votingEndDate = votingEndDate; }
+    public Instant getStartDate() { return startDate; }
+    public void setStartDate(Instant startDate) { this.startDate = startDate; }
+    public Instant getEndDate() { return endDate; }
+    public void setEndDate(Instant endDate) { this.endDate = endDate; }
+    public Instant getVotingEndDate() { return votingEndDate; }
+    public void setVotingEndDate(Instant votingEndDate) { this.votingEndDate = votingEndDate; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public List<String> getParticipantIds() { return participantIds; }
@@ -147,8 +147,8 @@ public class Modjam {
     public void setShowResultsBeforeVotingEnds(boolean showResultsBeforeVotingEnds) { this.showResultsBeforeVotingEnds = showResultsBeforeVotingEnds; }
     public boolean isOneEntryPerPerson() { return oneEntryPerPerson; }
     public void setOneEntryPerPerson(boolean oneEntryPerPerson) { this.oneEntryPerPerson = oneEntryPerPerson; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }

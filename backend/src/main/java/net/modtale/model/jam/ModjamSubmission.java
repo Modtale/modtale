@@ -4,7 +4,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +32,7 @@ public class ModjamSubmission {
     private boolean isWinner;
     private String awardTitle;
 
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private Instant createdAt = Instant.now();
 
     @Transient
     private Integer votesCast;
@@ -92,11 +92,11 @@ public class ModjamSubmission {
     public Integer getRank() { return rank; }
     public void setRank(Integer rank) { this.rank = rank; }
     public boolean isWinner() { return isWinner; }
-    public void setWinner(boolean winner) { isWinner = winner; }
+    public void setWinner(boolean winner) { this.isWinner = winner; }
     public String getAwardTitle() { return awardTitle; }
     public void setAwardTitle(String awardTitle) { this.awardTitle = awardTitle; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Integer getVotesCast() { return votesCast; }
     public void setVotesCast(Integer votesCast) { this.votesCast = votesCast; }
     public Integer getCommentsGiven() { return commentsGiven; }
