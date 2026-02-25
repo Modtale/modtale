@@ -68,6 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
         : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
+    const isJamPage = currentPage === 'jams' || currentPage.startsWith('jam/');
+
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
             <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
@@ -100,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     <button
                                         onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
                                         className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                            isHomeLayout
+                                            isHomeLayout && !isJamPage
                                                 ? 'text-modtale-accent bg-modtale-accent/10'
                                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                         }`}
@@ -168,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 <Link
                                     to="/jams"
                                     className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                        currentPage === 'jams'
+                                        isJamPage
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                     }`}
@@ -296,7 +298,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
 
-                    <Link to="/jams" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Trophy className="w-4 h-4 mr-3" /> Modjams</Link>
+                    <Link to="/jams" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center p-3 rounded-lg font-bold text-left ${isJamPage ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5'}`}><Trophy className="w-4 h-4 mr-3" /> Modjams</Link>
 
                     {user && (
                         <>
