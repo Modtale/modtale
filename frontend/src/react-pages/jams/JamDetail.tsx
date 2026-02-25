@@ -567,8 +567,8 @@ const JamDetailView: React.FC<{
                             </button>
                         )}
                     </div>
-                    <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-                        <span className="flex items-center gap-1.5"><Users className="w-3 h-3" /> {(jam.participantIds || []).length} participants</span>
+                    <div className="flex items-center gap-4 text-xs font-black uppercase tracking-[0.1em] text-slate-500">
+                        <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {(jam.participantIds || []).length} participants</span>
                     </div>
                 </div>
             }
