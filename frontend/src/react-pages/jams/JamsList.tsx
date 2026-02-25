@@ -184,7 +184,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const handleSaveJam = async () => {
         setIsSavingJam(true);
         try {
-            let res;
+            let res: any;
             if (metaData.id) {
                 res = await api.put(`/modjams/${metaData.id}`, metaData);
             } else {
