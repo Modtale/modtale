@@ -635,11 +635,11 @@ const JamDetailView: React.FC<{
                     {jam.status === 'COMPLETED' && activeTab === 'overview' && (
                         <Link
                             to={`/jam/${jam.slug}/entries`}
-                            className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 p-5 md:p-6 rounded-2xl flex items-center justify-between mb-10 backdrop-blur-md cursor-pointer hover:bg-amber-500/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] group block w-full"
+                            className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 p-5 md:p-6 rounded-2xl flex items-center justify-between w-full mb-10 backdrop-blur-md cursor-pointer hover:bg-amber-500/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] group"
                         >
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-500/40">
-                                    <Trophy className="w-6 h-6 md:w-8 h-8" />
+                                    <Trophy className="w-6 h-6 md:w-8 md:h-8" />
                                 </div>
                                 <div>
                                     <h3 className="font-black text-lg md:text-xl drop-shadow-sm">This jam has ended!</h3>
@@ -652,7 +652,7 @@ const JamDetailView: React.FC<{
 
                     {activeTab === 'overview' ? (
                         <div className="space-y-10">
-                            <div className="prose dark:prose-invert prose-lg max-none bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 md:p-10 shadow-sm">
+                            <div className="prose dark:prose-invert prose-lg max-w-none w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 md:p-10 shadow-sm">
                                 {memoizedDescription}
                             </div>
 
