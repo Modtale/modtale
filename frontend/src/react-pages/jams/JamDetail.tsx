@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -130,14 +130,13 @@ const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => 
 export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [jam, setJam] = useState<Modjam | null>(null);
     const [submissions, setSubmissions] = useState<ModjamSubmission[]>([]);
     const [loading, setLoading] = useState(true);
     const [myProjects, setMyProjects] = useState<Mod[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
-
-    const [activeTab, setActiveTab] = useState<'overview' | 'entries'>('overview');
 
     const [isSubmittingModalOpen, setIsSubmittingModalOpen] = useState(false);
     const [votingSubmissionId, setVotingSubmissionId] = useState<string | null>(null);
@@ -157,6 +156,13 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [metaData, setMetaData] = useState<any>(null);
     const [builderTab, setBuilderTab] = useState<'details' | 'categories' | 'settings'>('details');
     const [isSavingJam, setIsSavingJam] = useState(false);
+
+    const activeTab = useMemo(() => {
+        if (location.pathname.endsWith('/entries')) return 'entries';
+        if (location.pathname.endsWith('/overview')) return 'overview';
+        if (jam && ['VOTING', 'COMPLETED', 'AWAITING_WINNERS'].includes(jam.status)) return 'entries';
+        return 'overview';
+    }, [location.pathname, jam?.status]);
 
     useEffect(() => {
         setNow(new Date().getTime());
@@ -178,10 +184,6 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                         const followRes = await api.get(`/user/following/${res.data.hostName}`);
                         setIsFollowing(followRes.data);
                     } catch (e) {}
-                }
-
-                if (['VOTING', 'COMPLETED', 'AWAITING_WINNERS'].includes(res.data.status)) {
-                    setActiveTab('entries');
                 }
             } catch (err) {
                 console.error(err);
@@ -494,7 +496,6 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 setIsSubmittingModalOpen={setIsSubmittingModalOpen}
                 setPickingWinners={setPickingWinners}
                 activeTab={activeTab}
-                setActiveTab={setActiveTab}
                 now={now}
                 canSeeResults={canSeeResults}
                 canVote={canVote}
@@ -519,7 +520,6 @@ const JamDetailView: React.FC<{
     setIsSubmittingModalOpen: (open: boolean) => void,
     setPickingWinners: (open: boolean) => void,
     activeTab: 'overview' | 'entries',
-    setActiveTab: (tab: 'overview' | 'entries') => void,
     now: number,
     canSeeResults: boolean,
     canVote: boolean,
@@ -527,7 +527,7 @@ const JamDetailView: React.FC<{
     memoizedDescription: React.ReactNode
 }> = ({
           jam, submissions, currentUser, isFollowing, handleFollowToggle, startEditing, handleDelete,
-          isParticipating, hasSubmitted, handleJoin, setIsSubmittingModalOpen, setPickingWinners, activeTab, setActiveTab,
+          isParticipating, hasSubmitted, handleJoin, setIsSubmittingModalOpen, setPickingWinners, activeTab,
           now, canSeeResults, canVote, setVotingSubmissionId, memoizedDescription
       }) => {
     const navigate = useNavigate();
@@ -548,7 +548,7 @@ const JamDetailView: React.FC<{
         <JamLayout
             bannerUrl={jam.bannerUrl}
             iconUrl={(jam as any).imageUrl}
-            onBack={() => navigate('/jams')}
+            backTo="/jams"
             titleContent={
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-xl leading-tight">
                     {jam.title}
@@ -557,7 +557,7 @@ const JamDetailView: React.FC<{
             hostContent={
                 <div className="flex flex-col gap-2 mt-2">
                     <div className="flex items-center gap-3">
-                        <span className="text-base md:text-lg font-medium text-slate-600 dark:text-slate-400">by <button onClick={() => navigate(`/creator/${jam.hostName}`)} className="font-black text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{jam.hostName}</button></span>
+                        <span className="text-base md:text-lg font-medium text-slate-600 dark:text-slate-400">by <Link to={`/creator/${jam.hostName}`} className="font-black text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{jam.hostName}</Link></span>
                         {currentUser && currentUser.username !== jam.hostName && (
                             <button
                                 onClick={handleFollowToggle}
@@ -608,18 +608,18 @@ const JamDetailView: React.FC<{
             tabsAndTimers={
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-2 border-slate-200/50 dark:border-white/5 pb-0 min-h-[4rem]">
                     <div className="flex items-center gap-8 md:gap-10">
-                        <button
-                            onClick={() => setActiveTab('overview')}
+                        <Link
+                            to={`/jam/${jam.slug}/overview`}
                             className={`pb-4 text-base font-black uppercase tracking-widest transition-colors ${activeTab === 'overview' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
                             Overview
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('entries')}
+                        </Link>
+                        <Link
+                            to={`/jam/${jam.slug}/entries`}
                             className={`pb-4 text-base font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${activeTab === 'entries' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
                             Entries <span className={`px-2.5 py-0.5 rounded-full text-[11px] ml-1 transition-colors ${activeTab === 'entries' ? 'bg-modtale-accent/20 text-modtale-accent' : 'bg-slate-200 dark:bg-white/10'}`}>{submissions.length}</span>
-                        </button>
+                        </Link>
                     </div>
 
                     {jam.status === 'COMPLETED' && (
@@ -633,9 +633,9 @@ const JamDetailView: React.FC<{
             mainContent={
                 <div className="animate-in fade-in slide-in-from-bottom-2 mt-8 md:mt-10">
                     {jam.status === 'COMPLETED' && activeTab === 'overview' && (
-                        <div
-                            className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 p-5 md:p-6 rounded-2xl flex items-center justify-between mb-10 backdrop-blur-md cursor-pointer hover:bg-amber-500/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] group"
-                            onClick={() => setActiveTab('entries')}
+                        <Link
+                            to={`/jam/${jam.slug}/entries`}
+                            className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 p-5 md:p-6 rounded-2xl flex items-center justify-between mb-10 backdrop-blur-md cursor-pointer hover:bg-amber-500/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] group block w-full"
                         >
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-500/40">
@@ -647,7 +647,7 @@ const JamDetailView: React.FC<{
                                 </div>
                             </div>
                             <ChevronRight className="w-6 h-6 transform group-hover:translate-x-1 transition-transform" />
-                        </div>
+                        </Link>
                     )}
 
                     {activeTab === 'overview' ? (
@@ -692,9 +692,9 @@ const JamDetailView: React.FC<{
                                             return (
                                                 <div
                                                     key={sub.id}
-                                                    onClick={() => navigate(`/mod/${sub.projectId}`)}
                                                     className="group bg-gradient-to-b from-amber-500/10 to-white/80 dark:to-slate-900/80 border border-amber-500/30 dark:border-amber-500/20 rounded-2xl overflow-hidden flex flex-col shadow-[0_8px_30px_rgba(245,158,11,0.15)] hover:-translate-y-1.5 hover:shadow-[0_12px_40px_rgba(245,158,11,0.25)] hover:border-amber-400 transition-all duration-300 relative cursor-pointer"
                                                 >
+                                                    <Link to={`/mod/${sub.projectId}`} className="absolute inset-0 z-10"><span className="sr-only">View {sub.projectTitle}</span></Link>
                                                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 z-20" />
 
                                                     <div className="absolute top-4 right-4 z-20">
@@ -717,8 +717,8 @@ const JamDetailView: React.FC<{
                                                         ) : null}
                                                     </div>
 
-                                                    <div className="px-6 flex-1 flex flex-col relative z-10 items-center text-center -mt-10">
-                                                        <div className="block w-20 h-20 rounded-xl bg-white dark:bg-slate-900 shadow-xl border-[4px] border-amber-500 overflow-hidden relative group-hover:scale-105 transition-transform mb-4 shrink-0">
+                                                    <div className="px-6 flex-1 flex flex-col relative items-center text-center -mt-10 z-20 pointer-events-none">
+                                                        <div className="block w-20 h-20 rounded-xl bg-white dark:bg-slate-900 shadow-xl border-[4px] border-amber-500 overflow-hidden relative group-hover:scale-105 transition-transform mb-4 shrink-0 pointer-events-auto">
                                                             {resolvedProjectImage ? (
                                                                 <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
                                                             ) : (
@@ -728,14 +728,13 @@ const JamDetailView: React.FC<{
                                                             )}
                                                         </div>
 
-                                                        <h3 className="text-xl font-black text-slate-900 dark:text-white truncate w-full group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                                        <h3 className="text-xl font-black text-slate-900 dark:text-white truncate w-full group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors pointer-events-auto">
                                                             {sub.projectTitle}
                                                         </h3>
 
-                                                        <div className="flex items-center justify-center gap-1 mt-2 mb-4">
+                                                        <div className="flex items-center justify-center gap-1 mt-2 mb-4 pointer-events-auto">
                                                             <Link
                                                                 to={`/creator/${sub.projectAuthor}`}
-                                                                onClick={(e) => e.stopPropagation()}
                                                                 className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-amber-600 hover:underline transition-colors bg-white/50 dark:bg-white/5 px-2.5 py-1 rounded-lg border border-slate-200/50 dark:border-white/5 relative z-20"
                                                             >
                                                                 by {sub.projectAuthor || 'Unknown'}
@@ -747,7 +746,7 @@ const JamDetailView: React.FC<{
                                                         </p>
                                                     </div>
 
-                                                    <div className="mt-auto px-6 py-5 bg-amber-50/50 dark:bg-amber-950/20 border-t border-amber-500/20 flex items-center justify-center relative z-10 backdrop-blur-md">
+                                                    <div className="mt-auto px-6 py-5 bg-amber-50/50 dark:bg-amber-950/20 border-t border-amber-500/20 flex items-center justify-center relative backdrop-blur-md z-20 pointer-events-none">
                                                         <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
                                                             <span className="text-[10px] font-black uppercase tracking-widest opacity-80">Final Score</span>
                                                             <span className="text-2xl font-black leading-none drop-shadow-sm">{sub.totalScore?.toFixed(2) || '---'}</span>
@@ -775,9 +774,9 @@ const JamDetailView: React.FC<{
                                     return (
                                         <div
                                             key={sub.id}
-                                            onClick={() => navigate(`/mod/${sub.projectId}`)}
                                             className="group bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col shadow-xl hover:-translate-y-1.5 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 relative cursor-pointer"
                                         >
+                                            <Link to={`/mod/${sub.projectId}`} className="absolute inset-0 z-10"><span className="sr-only">View {sub.projectTitle}</span></Link>
                                             <div className="block relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden border-b border-slate-200/50 dark:border-white/5">
                                                 {resolvedProjectBanner ? (
                                                     <img
@@ -791,8 +790,8 @@ const JamDetailView: React.FC<{
                                                 ) : null}
                                             </div>
 
-                                            <div className="px-6 flex-1 flex flex-col relative z-10 items-center text-center -mt-10">
-                                                <div className="block w-20 h-20 rounded-xl bg-white dark:bg-slate-900 shadow-xl border-[4px] border-white/90 dark:border-slate-800 overflow-hidden relative group-hover:scale-105 transition-transform mb-4 shrink-0">
+                                            <div className="px-6 flex-1 flex flex-col relative items-center text-center -mt-10 z-20 pointer-events-none">
+                                                <div className="block w-20 h-20 rounded-xl bg-white dark:bg-slate-900 shadow-xl border-[4px] border-white/90 dark:border-slate-800 overflow-hidden relative group-hover:scale-105 transition-transform mb-4 shrink-0 pointer-events-auto">
                                                     {resolvedProjectImage ? (
                                                         <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
                                                     ) : (
@@ -802,14 +801,13 @@ const JamDetailView: React.FC<{
                                                     )}
                                                 </div>
 
-                                                <h3 className="text-xl font-black text-slate-900 dark:text-white truncate w-full group-hover:text-modtale-accent transition-colors">
+                                                <h3 className="text-xl font-black text-slate-900 dark:text-white truncate w-full group-hover:text-modtale-accent transition-colors pointer-events-auto">
                                                     {sub.projectTitle}
                                                 </h3>
 
-                                                <div className="flex items-center justify-center gap-1 mt-2 mb-4">
+                                                <div className="flex items-center justify-center gap-1 mt-2 mb-4 pointer-events-auto">
                                                     <Link
                                                         to={`/creator/${sub.projectAuthor}`}
-                                                        onClick={(e) => e.stopPropagation()}
                                                         className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-modtale-accent hover:underline transition-colors bg-white/50 dark:bg-white/5 px-2.5 py-1 rounded-lg border border-slate-200/50 dark:border-white/5 relative z-20"
                                                     >
                                                         by {sub.projectAuthor || 'Unknown'}
@@ -821,7 +819,7 @@ const JamDetailView: React.FC<{
                                                 </p>
                                             </div>
 
-                                            <div className="mt-auto px-6 py-5 bg-white/40 dark:bg-black/20 border-t border-slate-200/50 dark:border-white/5 flex items-center justify-between relative z-10 backdrop-blur-md">
+                                            <div className="mt-auto px-6 py-5 bg-white/40 dark:bg-black/20 border-t border-slate-200/50 dark:border-white/5 flex items-center justify-between relative backdrop-blur-md z-20 pointer-events-none">
                                                 <div className="flex items-center gap-2">
                                                     {canSeeResults && sub.totalScore !== undefined ? (
                                                         <div className="flex flex-col text-left">
@@ -836,7 +834,7 @@ const JamDetailView: React.FC<{
                                                     )}
                                                 </div>
 
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-3 pointer-events-auto">
                                                     {isMySubmission ? (
                                                         <div className="px-4 py-2 bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 border border-green-500/20 shadow-sm relative z-20">
                                                             <CheckCircle2 className="w-4 h-4" /> Your Entry

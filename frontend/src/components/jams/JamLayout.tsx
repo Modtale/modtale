@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ImageIcon, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { BACKEND_URL } from '@/utils/api';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 
@@ -14,12 +15,13 @@ interface JamLayoutProps {
     actionContent?: React.ReactNode;
     tabsAndTimers?: React.ReactNode;
     mainContent: React.ReactNode;
+    backTo?: string;
     onBack?: () => void;
 }
 
 export const JamLayout: React.FC<JamLayoutProps> = ({
                                                         bannerUrl, iconUrl, isEditing, onBannerUpload, onIconUpload,
-                                                        titleContent, hostContent, actionContent, tabsAndTimers, mainContent, onBack
+                                                        titleContent, hostContent, actionContent, tabsAndTimers, mainContent, backTo, onBack
                                                     }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
@@ -78,13 +80,20 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-modtale-dark via-slate-50/20 dark:via-modtale-dark/20 to-transparent z-10" />
 
-                {onBack && (
+                {(backTo || onBack) && (
                     <div className="absolute top-0 left-0 right-0 z-40 max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 h-full pointer-events-none">
                         <div className="pt-6 md:pt-8 pointer-events-auto w-fit">
-                            <button type="button" onClick={onBack} className="flex items-center text-white/90 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group border border-white/10">
-                                <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                                Back
-                            </button>
+                            {backTo ? (
+                                <Link to={backTo} className="flex items-center text-white/90 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group border border-white/10">
+                                    <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                                    Back
+                                </Link>
+                            ) : (
+                                <button type="button" onClick={onBack} className="flex items-center text-white/90 font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl transition-all group border border-white/10">
+                                    <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                                    Back
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}
