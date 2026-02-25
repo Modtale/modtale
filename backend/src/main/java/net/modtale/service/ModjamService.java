@@ -3,6 +3,7 @@ package net.modtale.service;
 import net.modtale.model.jam.Modjam;
 import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.resources.Mod;
+import net.modtale.model.resources.ModVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.jam.ModjamRepository;
 import net.modtale.repository.jam.ModjamSubmissionRepository;
@@ -10,14 +11,28 @@ import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.resources.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.zip.ZipFile;
 
 @Service
 public class ModjamService {
@@ -28,14 +43,148 @@ public class ModjamService {
     @Autowired private ModRepository modRepository;
     @Autowired private StorageService storageService;
 
-    private void enrichSubmission(ModjamSubmission sub) {
-        modRepository.findById(sub.getProjectId()).ifPresent(project -> {
-            sub.setProjectTitle(project.getTitle());
-            sub.setProjectImageUrl(project.getImageUrl());
-            sub.setProjectBannerUrl(project.getBannerUrl());
-            sub.setProjectAuthor(project.getAuthor());
-            sub.setProjectDescription(project.getDescription());
-        });
+    @Value("${app.r2.public-domain:#{null}}")
+    private String publicDomain;
+
+    private static final RuntimeException FOUND_USAGE = new RuntimeException("Found usage of class or package", null, false, false) {};
+
+    public static final class CheckJarUseClass {
+        public static boolean checkUseClass(final File file, final String classOrPackage) {
+            final String searchPrefix = classOrPackage.replace('.', '/').replace("*", "");
+            try (final ZipFile zipFile = new ZipFile(file)) {
+                zipFile.stream().filter(entry -> entry.getName().endsWith(".class"))
+                        .forEach(zipEntry -> {
+                            try {
+                                new ClassReader(zipFile.getInputStream(zipEntry))
+                                        .accept(new PrefixUsageSearcher(searchPrefix),
+                                                ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+            } catch (Exception e) {
+                if (e == FOUND_USAGE) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static class PrefixUsageSearcher extends ClassVisitor {
+            private final String prefix;
+
+            public PrefixUsageSearcher(String prefix) {
+                super(Opcodes.ASM9);
+                this.prefix = prefix;
+            }
+
+            private void check(String internalName) {
+                if (internalName != null && internalName.startsWith(prefix)) {
+                    throw FOUND_USAGE;
+                }
+            }
+
+            private void checkDescriptor(String descriptor) {
+                if (descriptor != null && descriptor.contains(prefix)) {
+                    throw FOUND_USAGE;
+                }
+            }
+
+            @Override
+            public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+                check(superName);
+                if (interfaces != null) {
+                    for (String i : interfaces) check(i);
+                }
+                super.visit(version, access, name, signature, superName, interfaces);
+            }
+
+            @Override
+            public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+                checkDescriptor(descriptor);
+                return super.visitField(access, name, descriptor, signature, value);
+            }
+
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                checkDescriptor(descriptor);
+                return new MethodVisitor(Opcodes.ASM9, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                    @Override
+                    public void visitMethodInsn(int opcode, String owner, String mName, String mDescriptor, boolean isInterface) {
+                        check(owner);
+                        super.visitMethodInsn(opcode, owner, mName, mDescriptor, isInterface);
+                    }
+
+                    @Override
+                    public void visitFieldInsn(int opcode, String owner, String fName, String fDescriptor) {
+                        check(owner);
+                        super.visitFieldInsn(opcode, owner, fName, fDescriptor);
+                    }
+
+                    @Override
+                    public void visitTypeInsn(int opcode, String type) {
+                        check(type);
+                        super.visitTypeInsn(opcode, type);
+                    }
+                };
+            }
+        }
+    }
+
+    private void enrichSubmissions(String jamId, List<ModjamSubmission> subs) {
+        if (subs == null || subs.isEmpty()) return;
+
+        List<String> projectIds = subs.stream().map(ModjamSubmission::getProjectId).toList();
+        Iterable<Mod> projectsIterable = modRepository.findAllById(projectIds);
+        List<Mod> projects = new ArrayList<>();
+        projectsIterable.forEach(projects::add);
+
+        Map<String, Mod> projectMap = projects.stream().collect(Collectors.toMap(Mod::getId, p -> p));
+
+        Map<String, Integer> userVoteCount = new HashMap<>();
+        for (ModjamSubmission s : subs) {
+            if (s.getVotes() != null) {
+                for (ModjamSubmission.Vote v : s.getVotes()) {
+                    userVoteCount.put(v.getVoterId(), userVoteCount.getOrDefault(v.getVoterId(), 0) + 1);
+                }
+            }
+        }
+
+        Map<String, Integer> userCommentCount = new HashMap<>();
+        for (Mod p : projects) {
+            if (p.getComments() != null) {
+                for (net.modtale.model.resources.Comment c : p.getComments()) {
+                    if (!c.getUser().equals(p.getAuthor())) {
+                        userCommentCount.put(c.getUser(), userCommentCount.getOrDefault(c.getUser(), 0) + 1);
+                    }
+                }
+            }
+        }
+
+        for (ModjamSubmission sub : subs) {
+            Mod project = projectMap.get(sub.getProjectId());
+            if (project != null) {
+                sub.setProjectTitle(project.getTitle());
+                sub.setProjectImageUrl(project.getImageUrl());
+                sub.setProjectBannerUrl(project.getBannerUrl());
+                sub.setProjectAuthor(project.getAuthor());
+                sub.setProjectDescription(project.getDescription());
+            }
+            sub.setVotesCast(userVoteCount.getOrDefault(sub.getSubmitterId(), 0));
+            sub.setCommentsGiven(userCommentCount.getOrDefault(sub.getProjectAuthor(), 0));
+        }
+    }
+
+    private String extractStorageKey(String fileUrl) {
+        if (fileUrl == null) return null;
+        if (fileUrl.startsWith("/api/files/proxy/")) {
+            return fileUrl.replace("/api/files/proxy/", "");
+        } else if (publicDomain != null && fileUrl.startsWith(publicDomain + "/")) {
+            return fileUrl.replace(publicDomain + "/", "");
+        } else if (publicDomain != null && fileUrl.startsWith(publicDomain)) {
+            return fileUrl.replace(publicDomain, "");
+        }
+        return fileUrl;
     }
 
     public List<Modjam> getAllJams() {
@@ -87,12 +236,14 @@ public class ModjamService {
 
         jam.setTitle(updatedJam.getTitle());
         jam.setDescription(updatedJam.getDescription());
+        jam.setRules(updatedJam.getRules());
         jam.setStartDate(updatedJam.getStartDate());
         jam.setEndDate(updatedJam.getEndDate());
         jam.setVotingEndDate(updatedJam.getVotingEndDate());
         jam.setAllowPublicVoting(updatedJam.isAllowPublicVoting());
         jam.setAllowConcurrentVoting(updatedJam.isAllowConcurrentVoting());
         jam.setShowResultsBeforeVotingEnds(updatedJam.isShowResultsBeforeVotingEnds());
+        jam.setOneEntryPerPerson(updatedJam.isOneEntryPerPerson());
 
         if (updatedJam.getRestrictions() != null) {
             jam.setRestrictions(updatedJam.getRestrictions());
@@ -179,7 +330,7 @@ public class ModjamService {
 
     public List<ModjamSubmission> getSubmissions(String jamId) {
         List<ModjamSubmission> subs = submissionRepository.findByJamId(jamId);
-        subs.forEach(this::enrichSubmission);
+        enrichSubmissions(jamId, subs);
         return subs;
     }
 
@@ -188,6 +339,31 @@ public class ModjamService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (user.getJoinedModjamIds() != null) {
+            for (String joinedId : user.getJoinedModjamIds()) {
+                if (joinedId.equals(jamId)) continue;
+
+                Optional<Modjam> optOtherJam = modjamRepository.findById(joinedId);
+                if (optOtherJam.isPresent()) {
+                    Modjam otherJam = optOtherJam.get();
+                    boolean otherIsActive = "ACTIVE".equals(otherJam.getStatus()) || "UPCOMING".equals(otherJam.getStatus());
+                    boolean thisIsActive = "ACTIVE".equals(jam.getStatus()) || "UPCOMING".equals(jam.getStatus());
+
+                    if (otherIsActive && thisIsActive) {
+                        boolean otherRequiresUnique = otherJam.getRestrictions() != null && otherJam.getRestrictions().isRequireUniqueSubmission();
+                        boolean thisRequiresUnique = jam.getRestrictions() != null && jam.getRestrictions().isRequireUniqueSubmission();
+
+                        if (otherRequiresUnique) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "You are currently participating in '" + otherJam.getTitle() + "' which requires unique participation. You must leave it to join this jam.");
+                        }
+                        if (thisRequiresUnique) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "This jam requires unique participation. You are currently in '" + otherJam.getTitle() + "'. You must leave it to join this jam.");
+                        }
+                    }
+                }
+            }
+        }
 
         if (jam.getParticipantIds() == null) {
             jam.setParticipantIds(new ArrayList<>());
@@ -204,6 +380,30 @@ public class ModjamService {
 
         if (!user.getJoinedModjamIds().contains(jamId)) {
             user.getJoinedModjamIds().add(jamId);
+            userRepository.save(user);
+        }
+
+        return jam;
+    }
+
+    public Modjam leaveJam(String jamId, String userId) {
+        Modjam jam = modjamRepository.findById(jamId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        List<ModjamSubmission> existingSubs = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
+        if (!existingSubs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot leave a jam after submitting a project.");
+        }
+
+        if (jam.getParticipantIds() != null) {
+            jam.getParticipantIds().remove(userId);
+            modjamRepository.save(jam);
+        }
+
+        if (user.getJoinedModjamIds() != null) {
+            user.getJoinedModjamIds().remove(jamId);
             userRepository.save(user);
         }
 
@@ -227,6 +427,16 @@ public class ModjamService {
 
         if (!"PUBLISHED".equals(project.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must be published.");
+        }
+
+        List<ModjamSubmission> existing = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
+
+        if (jam.isOneEntryPerPerson() && !existing.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to one entry per person.");
+        }
+
+        if (existing.stream().anyMatch(s -> s.getProjectId().equals(projectId))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already submitted.");
         }
 
         Modjam.Restrictions res = jam.getRestrictions();
@@ -265,6 +475,26 @@ public class ModjamService {
                 }
             }
 
+            if (res.getAllowedGameVersions() != null && !res.getAllowedGameVersions().isEmpty()) {
+                boolean hasValidVersion = false;
+                if (project.getVersions() != null) {
+                    for (ModVersion pv : project.getVersions()) {
+                        if (pv.getGameVersions() != null) {
+                            for (String gv : pv.getGameVersions()) {
+                                if (res.getAllowedGameVersions().contains(gv)) {
+                                    hasValidVersion = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (hasValidVersion) break;
+                    }
+                }
+                if (!hasValidVersion) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project does not support any of the required game versions.");
+                }
+            }
+
             if (res.getRequiredDependencyId() != null && !res.getRequiredDependencyId().trim().isEmpty()) {
                 if (project.getModIds() == null || !project.getModIds().contains(res.getRequiredDependencyId().trim())) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project is missing the required dependency.");
@@ -300,11 +530,41 @@ public class ModjamService {
                     }
                 }
             }
-        }
 
-        List<ModjamSubmission> existing = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
-        if (existing.stream().anyMatch(s -> s.getProjectId().equals(projectId))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already submitted.");
+            if (res.getRequiredClassUsage() != null && !res.getRequiredClassUsage().trim().isEmpty()) {
+                if (project.getVersions() == null || project.getVersions().isEmpty()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project has no uploaded files to check.");
+                }
+
+                ModVersion latestVersion = project.getVersions().get(project.getVersions().size() - 1);
+                String fileUrl = latestVersion.getFileUrl();
+                if (fileUrl == null || fileUrl.isEmpty()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project version has no file associated.");
+                }
+
+                String storageKey = extractStorageKey(fileUrl);
+                File tempFile = null;
+                try {
+                    InputStream is = storageService.getStream(storageKey);
+                    tempFile = Files.createTempFile("jam_check_", ".jar").toFile();
+                    try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                        is.transferTo(fos);
+                    }
+
+                    boolean usesClass = CheckJarUseClass.checkUseClass(tempFile, res.getRequiredClassUsage().trim());
+                    if (!usesClass) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project does not use the required class/package: " + res.getRequiredClassUsage().trim());
+                    }
+                } catch (ResponseStatusException rse) {
+                    throw rse;
+                } catch (Exception e) {
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to analyze project file for required class usage.");
+                } finally {
+                    if (tempFile != null && tempFile.exists()) {
+                        tempFile.delete();
+                    }
+                }
+            }
         }
 
         ModjamSubmission sub = new ModjamSubmission();
@@ -320,7 +580,7 @@ public class ModjamService {
             modRepository.save(project);
         }
 
-        enrichSubmission(sub);
+        enrichSubmissions(jamId, Collections.singletonList(sub));
         return sub;
     }
 
@@ -344,7 +604,7 @@ public class ModjamService {
         calculateScores(jamId);
 
         ModjamSubmission updated = submissionRepository.findById(submissionId).orElse(sub);
-        enrichSubmission(updated);
+        enrichSubmissions(jamId, Collections.singletonList(updated));
         return updated;
     }
 

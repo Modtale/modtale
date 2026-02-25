@@ -10,7 +10,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2, ChevronRight, X, Crown, Check } from 'lucide-react';
+import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2, ChevronRight, X, Crown, Check, BookOpen, MessageSquare, LogOut } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/jams/JamBuilder.tsx';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -154,13 +154,14 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     } | null>(null);
 
     const [metaData, setMetaData] = useState<any>(null);
-    const [builderTab, setBuilderTab] = useState<'details' | 'categories' | 'settings'>('details');
+    const [builderTab, setBuilderTab] = useState<'details' | 'rules' | 'categories' | 'settings'>('details');
     const [isSavingJam, setIsSavingJam] = useState(false);
 
     const isEditRoute = location.pathname.endsWith('/edit');
 
     const activeTab = useMemo(() => {
         if (location.pathname.endsWith('/entries')) return 'entries';
+        if (location.pathname.endsWith('/rules')) return 'rules';
         if (location.pathname.endsWith('/overview')) return 'overview';
         if (jam && ['VOTING', 'COMPLETED', 'AWAITING_WINNERS'].includes(jam.status)) return 'entries';
         return 'overview';
@@ -220,6 +221,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 slug: jam.slug,
                 title: jam.title,
                 description: jam.description,
+                rules: (jam as any).rules,
                 imageUrl: (jam as any).imageUrl,
                 bannerUrl: jam.bannerUrl,
                 startDate: jam.startDate,
@@ -228,6 +230,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 allowPublicVoting: jam.allowPublicVoting,
                 allowConcurrentVoting: jam.allowConcurrentVoting,
                 showResultsBeforeVotingEnds: jam.showResultsBeforeVotingEnds,
+                oneEntryPerPerson: (jam as any).oneEntryPerPerson,
                 categories: jam.categories,
                 restrictions: (jam as any).restrictions || {},
                 status: jam.status
@@ -256,9 +259,37 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             await api.post(`/modjams/${jam.id}/participate`, {});
             setStatusModal({ type: 'success', title: 'Joined!', message: 'Successfully joined the jam.' });
             setJam({ ...jam, participantIds: [...(jam.participantIds || []), currentUser.id] });
-        } catch (err) {
-            setStatusModal({ type: 'error', title: 'Error', message: 'Failed to join the jam.' });
+        } catch (err: any) {
+            if (err.response?.status === 409) {
+                setStatusModal({
+                    type: 'warning',
+                    title: 'Uniqueness Conflict',
+                    message: err.response.data.message || 'You must leave your conflicting jam first.'
+                });
+            } else {
+                setStatusModal({ type: 'error', title: 'Error', message: 'Failed to join the jam.' });
+            }
         }
+    };
+
+    const handleLeave = () => {
+        if (!jam || !currentUser) return;
+        setStatusModal({
+            type: 'warning',
+            title: 'Leave Jam?',
+            message: 'Are you sure you want to leave this jam? You can rejoin later as long as the jam is active.',
+            actionLabel: 'Leave Jam',
+            secondaryLabel: 'Cancel',
+            onAction: async () => {
+                try {
+                    await api.post(`/modjams/${jam.id}/leave`, {});
+                    setJam({ ...jam, participantIds: (jam.participantIds || []).filter(id => id !== currentUser.id) });
+                    setStatusModal({ type: 'success', title: 'Left Jam', message: 'You have left the jam.' });
+                } catch (err: any) {
+                    setStatusModal({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Failed to leave the jam.' });
+                }
+            }
+        });
     };
 
     const handleVote = async (submissionId: string, categoryId: string, score: number) => {
@@ -373,6 +404,25 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         }
     };
 
+    const MarkdownComponents = {
+        code({node, inline, className, children, ...props}: any) {
+            const match = /language-(\w+)/.exec(className || '')
+            return !inline && match ? (
+                <SyntaxHighlighter {...props} style={vscDarkPlus} language={match[1]} PreTag="div" className="rounded-lg text-sm">
+                    {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+            ) : (
+                <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                    {children}
+                </code>
+            )
+        },
+        p({node, children, ...props}: any) { return <p className="my-2 [li>&]:my-0" {...props}>{children}</p> },
+        li({node, children, ...props}: any) { return <li className="my-1 [&>p]:my-0" {...props}>{children}</li> },
+        ul({node, children, ...props}: any) { return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul> },
+        ol({node, children, ...props}: any) { return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol> }
+    };
+
     const memoizedDescription = useMemo(() => {
         if (!jam?.description) return <p className="text-slate-500 italic">No description provided.</p>;
 
@@ -386,43 +436,33 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                         code: ['className']
                     }
                 }]]}
-                components={{
-                    code({node, inline, className, children, ...props}: any) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        return !inline && match ? (
-                            <SyntaxHighlighter
-                                {...props}
-                                style={vscDarkPlus}
-                                language={match[1]}
-                                PreTag="div"
-                                className="rounded-lg text-sm"
-                            >
-                                {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                        ) : (
-                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                                {children}
-                            </code>
-                        )
-                    },
-                    p({node, children, ...props}: any) {
-                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
-                    },
-                    li({node, children, ...props}: any) {
-                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
-                    },
-                    ul({node, children, ...props}: any) {
-                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
-                    },
-                    ol({node, children, ...props}: any) {
-                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
-                    }
-                }}
+                components={MarkdownComponents}
             >
                 {jam.description}
             </ReactMarkdown>
         );
     }, [jam?.description]);
+
+    const memoizedRules = useMemo(() => {
+        const rulesContent = (jam as any)?.rules;
+        if (!rulesContent) return <p className="text-slate-500 italic">No rules have been established for this jam.</p>;
+
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                    ...defaultSchema,
+                    attributes: {
+                        ...defaultSchema.attributes,
+                        code: ['className']
+                    }
+                }]]}
+                components={MarkdownComponents}
+            >
+                {rulesContent}
+            </ReactMarkdown>
+        );
+    }, [(jam as any)?.rules]);
 
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!jam) return <NotFound />;
@@ -507,6 +547,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 isParticipating={isParticipating}
                 hasSubmitted={hasSubmitted}
                 handleJoin={handleJoin}
+                handleLeave={handleLeave}
                 setIsSubmittingModalOpen={setIsSubmittingModalOpen}
                 setPickingWinners={setPickingWinners}
                 activeTab={activeTab}
@@ -515,6 +556,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 canVote={canVote}
                 setVotingSubmissionId={setVotingSubmissionId}
                 memoizedDescription={memoizedDescription}
+                memoizedRules={memoizedRules}
             />
         </>
     );
@@ -531,18 +573,20 @@ const JamDetailView: React.FC<{
     isParticipating: boolean,
     hasSubmitted: boolean,
     handleJoin: () => void,
+    handleLeave: () => void,
     setIsSubmittingModalOpen: (open: boolean) => void,
     setPickingWinners: (open: boolean) => void,
-    activeTab: 'overview' | 'entries',
+    activeTab: 'overview' | 'entries' | 'rules',
     now: number,
     canSeeResults: boolean,
     canVote: boolean,
     setVotingSubmissionId: (id: string | null) => void,
-    memoizedDescription: React.ReactNode
+    memoizedDescription: React.ReactNode,
+    memoizedRules: React.ReactNode
 }> = ({
           jam, submissions, currentUser, isFollowing, handleFollowToggle, startEditing, handleDelete,
-          isParticipating, hasSubmitted, handleJoin, setIsSubmittingModalOpen, setPickingWinners, activeTab,
-          now, canSeeResults, canVote, setVotingSubmissionId, memoizedDescription
+          isParticipating, hasSubmitted, handleJoin, handleLeave, setIsSubmittingModalOpen, setPickingWinners, activeTab,
+          now, canSeeResults, canVote, setVotingSubmissionId, memoizedDescription, memoizedRules
       }) => {
     const sortedSubmissions = useMemo(() => [...submissions].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)), [submissions]);
 
@@ -611,10 +655,17 @@ const JamDetailView: React.FC<{
                         <button onClick={handleJoin} className="h-12 md:h-14 px-8 md:px-10 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-base md:text-lg shadow-lg shadow-modtale-accent/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
                             <Users className="w-5 h-5" /> Join Jam
                         </button>
-                    ) : jam.status === 'ACTIVE' && !hasSubmitted ? (
-                        <button onClick={() => setIsSubmittingModalOpen(true)} className="h-12 md:h-14 px-8 md:px-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-base md:text-lg shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2 border border-slate-700 dark:border-white/20">
-                            <Upload className="w-6 h-6" /> Submit Project
-                        </button>
+                    ) : (jam.status === 'ACTIVE' || jam.status === 'UPCOMING') && !hasSubmitted ? (
+                        <div className="flex items-center gap-3">
+                            {jam.status === 'ACTIVE' && (
+                                <button onClick={() => setIsSubmittingModalOpen(true)} className="h-12 md:h-14 px-8 md:px-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-base md:text-lg shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2 border border-slate-700 dark:border-white/20">
+                                    <Upload className="w-6 h-6" /> Submit Project
+                                </button>
+                            )}
+                            <button onClick={handleLeave} className="h-12 md:h-14 px-6 md:px-8 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-xl font-black text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+                                <LogOut className="w-4 h-4" /> Leave
+                            </button>
+                        </div>
                     ) : null}
                 </>
             }
@@ -626,6 +677,12 @@ const JamDetailView: React.FC<{
                             className={`pb-4 text-base font-black uppercase tracking-widest transition-colors ${activeTab === 'overview' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
                             Overview
+                        </Link>
+                        <Link
+                            to={`/jam/${jam.slug}/rules`}
+                            className={`pb-4 text-base font-black uppercase tracking-widest transition-colors ${activeTab === 'rules' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                        >
+                            Rules
                         </Link>
                         <Link
                             to={`/jam/${jam.slug}/entries`}
@@ -645,7 +702,7 @@ const JamDetailView: React.FC<{
             }
             mainContent={
                 <div className="animate-in fade-in slide-in-from-bottom-2 mt-8 md:mt-10">
-                    {jam.status === 'COMPLETED' && activeTab === 'overview' && (
+                    {jam.status === 'COMPLETED' && (activeTab === 'overview' || activeTab === 'rules') && (
                         <Link
                             to={`/jam/${jam.slug}/entries`}
                             className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 p-5 md:p-6 rounded-2xl flex items-center justify-between w-full mb-10 backdrop-blur-md cursor-pointer hover:bg-amber-500/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] group"
@@ -687,6 +744,12 @@ const JamDetailView: React.FC<{
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    ) : activeTab === 'rules' ? (
+                        <div className="space-y-10">
+                            <div className="prose dark:prose-invert prose-lg max-w-none w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 md:p-10 shadow-sm">
+                                {memoizedRules}
+                            </div>
                         </div>
                     ) : (
                         <div className="space-y-10">
@@ -1031,6 +1094,16 @@ const PickWinnersModal: React.FC<{
                                                 <div>
                                                     <h4 className={`font-bold truncate transition-colors ${isSelected ? 'text-amber-700 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>{sub.projectTitle}</h4>
                                                     <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">by {sub.projectAuthor} • Score: {sub.totalScore?.toFixed(2) || 'N/A'}</div>
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded-lg">
+                                                            <Star className="w-3 h-3" />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">Votes Cast: {sub.votesCast || 0}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20 px-2 py-0.5 rounded-lg">
+                                                            <MessageSquare className="w-3 h-3" />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">Comments: {sub.commentsGiven || 0}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
 
