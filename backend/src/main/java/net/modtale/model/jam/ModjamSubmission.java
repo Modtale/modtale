@@ -1,6 +1,7 @@
 package net.modtale.model.jam;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -32,6 +33,12 @@ public class ModjamSubmission {
     private String awardTitle;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Transient
+    private Integer votesCast;
+
+    @Transient
+    private Integer commentsGiven;
 
     public static class Vote {
         private String id;
@@ -90,4 +97,8 @@ public class ModjamSubmission {
     public void setAwardTitle(String awardTitle) { this.awardTitle = awardTitle; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Integer getVotesCast() { return votesCast; }
+    public void setVotesCast(Integer votesCast) { this.votesCast = votesCast; }
+    public Integer getCommentsGiven() { return commentsGiven; }
+    public void setCommentsGiven(Integer commentsGiven) { this.commentsGiven = commentsGiven; }
 }

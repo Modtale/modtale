@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2 } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2 } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout.tsx';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -149,7 +149,30 @@ export const JamBuilder: React.FC<any> = ({
     const [isDirty, setIsDirty] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
+    const [rulesEditorMode, setRulesEditorMode] = useState<'generate' | 'write' | 'preview'>('generate');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [gameVersionOptions, setGameVersionOptions] = useState<{label: string, value: string}[]>([]);
+
+    useEffect(() => {
+        api.get('/meta/game-versions').then(res => {
+            const versions = Array.isArray(res.data) ? res.data : (res.data.content || []);
+            setGameVersionOptions(versions.map((v: string) => ({ label: v, value: v })));
+        }).catch(() => {});
+    }, []);
+
+    const [genState, setGenState] = useState({
+        allowNSFW: false,
+        allowPremade: true,
+        allowAI: false,
+        requireDiscord: false,
+        requireFeedback: true,
+        strictTheme: true,
+        strictStability: true,
+        requireLocalization: false,
+        mediaConsent: true,
+        collaborationCredit: true,
+        updateLock: true
+    });
 
     const publishChecklist = [
         { label: 'Title (min 5 chars)', met: (metaData.title || '').trim().length >= 5 },
@@ -181,6 +204,49 @@ export const JamBuilder: React.FC<any> = ({
     const updateField = (field: string, val: any) => {
         markDirty();
         setMetaData((prev: any) => ({ ...prev, [field]: val }));
+    };
+
+    const generateRulesText = () => {
+        let text = "### Official Modjam Rules\n\nPlease read and agree to the following rules before submitting your project.\n\n";
+
+        if (metaData.oneEntryPerPerson) text += "- **One Entry Limit:** Participants are restricted to a single project submission.\n";
+
+        const res = metaData.restrictions;
+        if (res?.requireNewProject) text += "- **Fresh Projects Only:** All submissions must be created *after* the jam start date. Old projects are not allowed.\n";
+        if (res?.requireSourceRepo) text += "- **Open Source (Repo):** A public source code repository must be linked to your project.\n";
+        if (res?.requireOsiLicense) text += "- **Open Source (License):** You must use an OSI-approved open source license.\n";
+        if (res?.requireUniqueSubmission) text += "- **Unique Submission:** Your project cannot be entered into multiple active jams simultaneously.\n";
+        if (res?.requireNewbie) text += "- **Newbies Only:** This jam is restricted to first-time jam participants.\n";
+        if (res?.minContributors || res?.maxContributors) {
+            text += `- **Team Size:** Teams must be between ${res.minContributors || 1} and ${res.maxContributors || 'unlimited'} members.\n`;
+        }
+        if (res?.allowedGameVersions && res.allowedGameVersions.length > 0) {
+            text += `- **Game Version Lock:** Submissions must support the following game version(s): ${res.allowedGameVersions.join(', ')}.\n`;
+        }
+        if (res?.requiredClassUsage) {
+            text += `- **Required Implementation:** Submissions must explicitly utilize the \`${res.requiredClassUsage}\` class or package in their compiled code.\n`;
+        }
+
+        text += "\n#### Community & Content Guidelines\n";
+
+        if (genState.strictTheme) text += "- **Thematic Relevance:** Entries must clearly relate to the jam's theme. The host reserves the right to disqualify off-topic projects.\n";
+        if (genState.strictStability) text += "- **Stability:** Projects containing game-breaking bugs, malicious intent, or severe instability will be disqualified.\n";
+        if (genState.updateLock) text += "- **Update Lock:** You agree not to upload new files or radically alter your project page after the submission deadline has passed (bug fixes may be allowed at host discretion).\n";
+        if (genState.collaborationCredit) text += "- **Credit Required:** You must clearly credit all external libraries, assets, and collaborators in your project description.\n";
+        if (genState.requireLocalization) text += "- **Localization:** Projects are expected to support localization (i18n) and provide language files where applicable.\n";
+
+        text += `- **NSFW Content:** ${genState.allowNSFW ? 'Allowed (Must be properly tagged as mature).' : 'Strictly prohibited. Submissions containing NSFW material will be disqualified.'}\n`;
+        text += `- **Premade Assets:** ${genState.allowPremade ? 'You may use pre-existing assets, provided you have the legal right to use them and declare them in your description.' : 'Not allowed. All assets, code, and resources must be created entirely within the jam timeframe.'}\n`;
+        text += `- **AI Generation:** ${genState.allowAI ? 'AI-generated assets or code are allowed.' : 'The use of AI-generated code, art, or audio is strictly forbidden.'}\n`;
+
+        text += "\n#### Participation Expectations\n";
+
+        if (genState.requireDiscord) text += "- **Community:** You must be a member of the official Jam Discord server to participate.\n";
+        if (genState.requireFeedback) text += "- **Feedback Loop:** To be eligible for winning, you are expected to actively participate by playing, voting, and leaving constructive comments on other participants' entries.\n";
+        if (genState.mediaConsent) text += "- **Media Consent:** By entering, you grant the host permission to feature, showcase, or stream your project publicly.\n";
+
+        updateField('rules', text);
+        setRulesEditorMode('write');
     };
 
     const MarkdownComponents = {
@@ -309,6 +375,7 @@ export const JamBuilder: React.FC<any> = ({
                         {[
                             {id: 'details', icon: FileText, label: 'Overview'},
                             {id: 'schedule', icon: Calendar, label: 'Schedule'},
+                            {id: 'rules', icon: BookOpen, label: 'Rules'},
                             {id: 'categories', icon: Scale, label: `Judging (${metaData.categories?.length || 0})`},
                             {id: 'restrictions', icon: Shield, label: 'Restrictions'},
                             {id: 'settings', icon: Settings, label: 'Settings'}
@@ -342,7 +409,7 @@ export const JamBuilder: React.FC<any> = ({
                                 <textarea
                                     value={metaData.description}
                                     onChange={e => updateField('description', e.target.value)}
-                                    placeholder="# Welcome to the Jam!&#10;&#10;Describe the rules, theme, goals, and glory..."
+                                    placeholder="# Welcome to the Jam!&#10;&#10;Describe the theme, goals, and glory..."
                                     className="w-full min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 text-slate-700 dark:text-slate-300 font-mono text-sm md:text-base resize-none focus:ring-2 focus:ring-modtale-accent shadow-sm outline-none transition-all custom-scrollbar"
                                 />
                             ) : (
@@ -352,6 +419,193 @@ export const JamBuilder: React.FC<any> = ({
                                             {metaData.description}
                                         </ReactMarkdown>
                                     ) : <p className="text-slate-500 italic">No description provided.</p>}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'rules' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between border-b border-slate-200/50 dark:border-white/5 pb-4">
+                                <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                                    <BookOpen className="w-4 h-4" /> Jam Rules
+                                </h3>
+                                <div className="flex bg-white/50 dark:bg-black/20 rounded-xl p-1 border border-slate-200/50 dark:border-white/5 shadow-sm">
+                                    <button type="button" onClick={() => setRulesEditorMode('generate')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${rulesEditorMode === 'generate' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Generator</button>
+                                    <button type="button" onClick={() => setRulesEditorMode('write')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${rulesEditorMode === 'write' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Write</button>
+                                    <button type="button" onClick={() => setRulesEditorMode('preview')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${rulesEditorMode === 'preview' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Preview</button>
+                                </div>
+                            </div>
+
+                            {rulesEditorMode === 'generate' && (
+                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 space-y-6 shadow-sm">
+                                    <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 p-4 rounded-xl flex items-start gap-3">
+                                        <Wand2 className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                                        <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                                            The rules generator automatically incorporates your active <strong>Restrictions</strong> and <strong>Settings</strong>. Use the toggles below to append community guidelines, then hit Generate to formulate the Markdown text!
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Strict Theme Requirement</span>
+                                                <span className="text-xs text-slate-500 font-medium">Allow disqualifying off-topic entries</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.strictTheme}
+                                                onChange={e => setGenState({...genState, strictTheme: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Feedback Loop</span>
+                                                <span className="text-xs text-slate-500 font-medium">Require participants to vote/comment</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.requireFeedback}
+                                                onChange={e => setGenState({...genState, requireFeedback: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Bug & Stability Clause</span>
+                                                <span className="text-xs text-slate-500 font-medium">Disqualify game-breaking entries</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.strictStability}
+                                                onChange={e => setGenState({...genState, strictStability: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Update Lock</span>
+                                                <span className="text-xs text-slate-500 font-medium">Prohibit updates after deadline</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.updateLock}
+                                                onChange={e => setGenState({...genState, updateLock: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Collaboration Credit</span>
+                                                <span className="text-xs text-slate-500 font-medium">Require listing third-party assets</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.collaborationCredit}
+                                                onChange={e => setGenState({...genState, collaborationCredit: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Require Localization</span>
+                                                <span className="text-xs text-slate-500 font-medium">Mandate translation support</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.requireLocalization}
+                                                onChange={e => setGenState({...genState, requireLocalization: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Allow Premade Assets</span>
+                                                <span className="text-xs text-slate-500 font-medium">Permit using existing code/art</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.allowPremade}
+                                                onChange={e => setGenState({...genState, allowPremade: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Allow AI Generation</span>
+                                                <span className="text-xs text-slate-500 font-medium">Permit AI generated assets/code</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.allowAI}
+                                                onChange={e => setGenState({...genState, allowAI: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Media Consent</span>
+                                                <span className="text-xs text-slate-500 font-medium">Require permission to feature entries</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.mediaConsent}
+                                                onChange={e => setGenState({...genState, mediaConsent: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+
+                                        <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">Require Discord</span>
+                                                <span className="text-xs text-slate-500 font-medium">Mandate joining a community server</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={genState.requireDiscord}
+                                                onChange={e => setGenState({...genState, requireDiscord: e.target.checked})}
+                                                className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                            />
+                                        </label>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-200/50 dark:border-white/5 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={generateRulesText}
+                                            className="px-6 py-3 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black shadow-lg shadow-modtale-accent/20 flex items-center gap-2 transition-all active:scale-95"
+                                        >
+                                            <Wand2 className="w-4 h-4" /> Generate Rules Text
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {rulesEditorMode === 'write' && (
+                                <textarea
+                                    value={metaData.rules || ''}
+                                    onChange={e => updateField('rules', e.target.value)}
+                                    placeholder="### Jam Rules&#10;&#10;Users will have to agree to these before submitting..."
+                                    className="w-full min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 text-slate-700 dark:text-slate-300 font-mono text-sm md:text-base resize-none focus:ring-2 focus:ring-modtale-accent shadow-sm outline-none transition-all custom-scrollbar"
+                                />
+                            )}
+
+                            {rulesEditorMode === 'preview' && (
+                                <div className="prose dark:prose-invert prose-lg max-w-none min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
+                                    {metaData.rules ? (
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, [rehypeSanitize, {...defaultSchema, attributes: {...defaultSchema.attributes, code: ['className']}}]]} components={MarkdownComponents}>
+                                            {metaData.rules}
+                                        </ReactMarkdown>
+                                    ) : <p className="text-slate-500 italic">No rules generated yet.</p>}
                                 </div>
                             )}
                         </div>
@@ -602,7 +856,31 @@ export const JamBuilder: React.FC<any> = ({
                                         />
                                     </div>
 
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-10">
+                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Game Version Lock</label>
+                                        <span className="text-xs text-slate-500 font-medium block mb-2">Select allowed game versions</span>
+                                        <MultiSelectDropdown
+                                            options={gameVersionOptions}
+                                            selected={metaData.restrictions?.allowedGameVersions || []}
+                                            onChange={val => updateField('restrictions', {...metaData.restrictions, allowedGameVersions: val})}
+                                            placeholder="Any Version"
+                                            direction="up"
+                                        />
+                                    </div>
+
                                     <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center">
+                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Required Class / Package Usage</label>
+                                        <span className="text-xs text-slate-500 font-medium block mb-2">Ensure jar utilizes an internal API</span>
+                                        <input
+                                            type="text"
+                                            value={metaData.restrictions?.requiredClassUsage || ''}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requiredClassUsage: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent font-mono text-xs"
+                                            placeholder="e.g., com.fox2code.hypertale.*"
+                                        />
+                                    </div>
+
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[5]">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Allowed Classifications</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Limit submissions to specific types</span>
                                         <MultiSelectDropdown
@@ -614,7 +892,7 @@ export const JamBuilder: React.FC<any> = ({
                                         />
                                     </div>
 
-                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center">
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[5]">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Allowed Specific Licenses</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Restrict submissions to explicit licenses</span>
                                         <MultiSelectDropdown
@@ -636,6 +914,19 @@ export const JamBuilder: React.FC<any> = ({
                                 <Settings className="w-4 h-4" /> Configuration
                             </h3>
                             <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 space-y-4 shadow-sm">
+                                <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">One Entry per Person</span>
+                                        <span className="text-xs text-slate-500 font-medium">Prevent users from submitting multiple projects to this jam</span>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={metaData.oneEntryPerPerson !== false}
+                                        onChange={e => updateField('oneEntryPerPerson', e.target.checked)}
+                                        className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                    />
+                                </label>
+
                                 <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
                                     <div className="flex flex-col">
                                         <span className="text-sm font-bold text-slate-900 dark:text-white">Public Participation</span>

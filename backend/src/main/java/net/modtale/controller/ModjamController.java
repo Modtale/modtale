@@ -102,6 +102,13 @@ public class ModjamController {
         return ResponseEntity.ok(modjamService.participate(jamId, user.getId()));
     }
 
+    @PostMapping("/{jamId}/leave")
+    public ResponseEntity<Modjam> leaveJam(@PathVariable String jamId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.leaveJam(jamId, user.getId()));
+    }
+
     @PostMapping("/{jamId}/submit")
     public ResponseEntity<ModjamSubmission> submitProject(@PathVariable String jamId, @RequestBody Map<String, String> body) {
         User user = userService.getCurrentUser();

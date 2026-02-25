@@ -13,6 +13,10 @@ export const JamSubmissionWizard: React.FC<{
 }> = ({ jam, myProjects, onSuccess, onCancel, onError }) => {
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');
     const [submitting, setSubmitting] = useState(false);
+    const [agreedToRules, setAgreedToRules] = useState(false);
+
+    // Cast as any to bypass strict type checking if 'rules' isn't in your frontend types yet
+    const hasRules = Boolean((jam as any).rules && (jam as any).rules.trim().length > 0);
 
     const resolveUrl = (url?: string | null) => {
         if (!url) return '';
@@ -49,7 +53,7 @@ export const JamSubmissionWizard: React.FC<{
                                 <button
                                     key={proj.id}
                                     onClick={() => setSelectedProjectId(proj.id)}
-                                    className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left ${selectedProjectId === proj.id ? 'border-modtale-accent bg-modtale-accent/5 ring-4 ring-modtale-accent/10' : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/20 hover:border-slate-300'}`}
+                                    className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left ${selectedProjectId === proj.id ? 'border-modtale-accent bg-modtale-accent/5 ring-4 ring-modtale-accent/10' : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/20 hover:border-slate-300 dark:hover:border-white/20'}`}
                                 >
                                     <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0">
                                         {resolvedImage ? (
@@ -70,20 +74,33 @@ export const JamSubmissionWizard: React.FC<{
                         }) : (
                             <div className="py-10 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-3xl h-full flex flex-col items-center justify-center">
                                 <LayoutGrid className="w-12 h-12 text-slate-300 mb-2 opacity-20" />
-                                <p className="text-sm font-bold text-slate-500">You don't have any projects yet.</p>
+                                <p className="text-sm font-bold text-slate-500">You don't have any published projects yet.</p>
                             </div>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-4 mt-8 shrink-0 pt-4 border-t border-slate-100 dark:border-white/5">
-                        <button onClick={onCancel} className="flex-1 h-14 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Go Back</button>
-                        <button
-                            disabled={!selectedProjectId || submitting}
-                            onClick={handleConfirm}
-                            className="flex-[2] h-16 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-lg shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                            {submitting ? <Spinner className="w-5 h-5" fullScreen={false} /> : <>Finalize Submission <Sparkles className="w-5 h-5" /></>}
-                        </button>
+                    <div className="flex flex-col gap-5 mt-6 shrink-0 pt-6 border-t border-slate-100 dark:border-white/5">
+                        {hasRules && (
+                            <label className="flex items-center justify-center gap-3 cursor-pointer group px-4">
+                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${agreedToRules ? 'bg-modtale-accent border-modtale-accent text-white' : 'border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                    {agreedToRules && <Check className="w-4 h-4" strokeWidth={3} />}
+                                </div>
+                                <span className="text-sm font-bold text-slate-600 dark:text-slate-400 text-left select-none">
+                                    I have read and agree to the official <a href={`/jam/${jam.slug}/rules`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-modtale-accent hover:underline">Jam Rules</a>.
+                                </span>
+                            </label>
+                        )}
+
+                        <div className="flex items-center gap-4 w-full">
+                            <button onClick={onCancel} className="flex-1 h-14 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Go Back</button>
+                            <button
+                                disabled={!selectedProjectId || (hasRules && !agreedToRules) || submitting}
+                                onClick={handleConfirm}
+                                className="flex-[2] h-16 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-lg shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {submitting ? <Spinner className="w-5 h-5" fullScreen={false} /> : <>Finalize Submission <Sparkles className="w-5 h-5" /></>}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

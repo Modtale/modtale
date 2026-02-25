@@ -215,4 +215,6 @@ export interface ModjamSubmission {
     isWinner?: boolean;
     awardTitle?: string;
     createdAt: string;
+    votesCast?: number;
+    commentsGiven?: number;
 }

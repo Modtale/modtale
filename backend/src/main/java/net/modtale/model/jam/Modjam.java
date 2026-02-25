@@ -15,6 +15,7 @@ public class Modjam {
     private String slug;
     private String title;
     private String description;
+    private String rules;
 
     private String imageUrl;
     private String bannerUrl;
@@ -65,7 +66,9 @@ public class Modjam {
         private boolean requireNewbie;
         private List<String> allowedLicenses = new ArrayList<>();
         private List<String> allowedClassifications = new ArrayList<>();
+        private List<String> allowedGameVersions = new ArrayList<>();
         private String requiredDependencyId;
+        private String requiredClassUsage;
 
         public boolean isRequireNewProject() { return requireNewProject; }
         public void setRequireNewProject(boolean requireNewProject) { this.requireNewProject = requireNewProject; }
@@ -85,8 +88,12 @@ public class Modjam {
         public void setAllowedLicenses(List<String> allowedLicenses) { this.allowedLicenses = allowedLicenses; }
         public List<String> getAllowedClassifications() { return allowedClassifications; }
         public void setAllowedClassifications(List<String> allowedClassifications) { this.allowedClassifications = allowedClassifications; }
+        public List<String> getAllowedGameVersions() { return allowedGameVersions; }
+        public void setAllowedGameVersions(List<String> allowedGameVersions) { this.allowedGameVersions = allowedGameVersions; }
         public String getRequiredDependencyId() { return requiredDependencyId; }
         public void setRequiredDependencyId(String requiredDependencyId) { this.requiredDependencyId = requiredDependencyId; }
+        public String getRequiredClassUsage() { return requiredClassUsage; }
+        public void setRequiredClassUsage(String requiredClassUsage) { this.requiredClassUsage = requiredClassUsage; }
     }
 
     private List<Category> categories = new ArrayList<>();
@@ -95,6 +102,7 @@ public class Modjam {
     private boolean allowPublicVoting;
     private boolean allowConcurrentVoting;
     private boolean showResultsBeforeVotingEnds;
+    private boolean oneEntryPerPerson = true;
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt = LocalDateTime.now();
@@ -107,6 +115,8 @@ public class Modjam {
     public void setTitle(String title) { this.title = title; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public String getRules() { return rules; }
+    public void setRules(String rules) { this.rules = rules; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getBannerUrl() { return bannerUrl; }
@@ -135,6 +145,8 @@ public class Modjam {
     public void setAllowConcurrentVoting(boolean allowConcurrentVoting) { this.allowConcurrentVoting = allowConcurrentVoting; }
     public boolean isShowResultsBeforeVotingEnds() { return showResultsBeforeVotingEnds; }
     public void setShowResultsBeforeVotingEnds(boolean showResultsBeforeVotingEnds) { this.showResultsBeforeVotingEnds = showResultsBeforeVotingEnds; }
+    public boolean isOneEntryPerPerson() { return oneEntryPerPerson; }
+    public void setOneEntryPerPerson(boolean oneEntryPerPerson) { this.oneEntryPerPerson = oneEntryPerPerson; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
