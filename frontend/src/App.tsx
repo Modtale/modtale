@@ -195,6 +195,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
                             <Route path="/jams" element={<JamsList currentUser={user} />} />
                             <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
+                            <Route path="/jam/:id/edit" element={<JamDetail currentUser={user} />} />
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :

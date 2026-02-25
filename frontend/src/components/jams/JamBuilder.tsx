@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2 } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout.tsx';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Spinner } from '@/components/ui/Spinner.tsx';
+import { api, BACKEND_URL } from '@/utils/api';
 
 const DateInput: React.FC<{ label: string, icon: any, value: string, minDate?: string, onChange: (v: string) => void }> = ({ label, icon: Icon, value, minDate, onChange }) => (
     <div className="flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] px-5 py-3 md:py-3.5 shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden group focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all min-w-[200px]">
@@ -31,6 +32,116 @@ const DateInput: React.FC<{ label: string, icon: any, value: string, minDate?: s
         />
     </div>
 );
+
+const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[], selected: string[], onChange: (val: string[]) => void, placeholder: string, direction?: 'up' | 'down' }> = ({ options, selected, onChange, placeholder, direction = 'down' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const popupClass = direction === 'up' ? 'absolute bottom-full mb-2' : 'absolute top-full mt-2';
+
+    return (
+        <div className="relative w-full" ref={ref}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center text-sm transition-all"
+            >
+                <span className="truncate">{selected.length > 0 ? `${selected.length} selected` : placeholder}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen && direction === 'down' ? 'rotate-180' : ''} ${!isOpen && direction === 'up' ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className={`${popupClass} left-0 right-0 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto custom-scrollbar p-1`}>
+                    {options.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                                if (selected.includes(opt.value)) onChange(selected.filter(v => v !== opt.value));
+                                else onChange([...selected, opt.value]);
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                        >
+                            <span className="text-slate-700 dark:text-slate-300 font-medium">{opt.label}</span>
+                            {selected.includes(opt.value) && <Check className="w-4 h-4 text-modtale-accent" />}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange: (id: string | undefined) => void }> = ({ selectedId, onChange }) => {
+    const [search, setSearch] = useState('');
+    const [results, setResults] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedMeta, setSelectedMeta] = useState<any>(null);
+
+    useEffect(() => {
+        if (selectedId && !selectedMeta) {
+            api.get(`/projects/${selectedId}/meta`).then(res => setSelectedMeta(res.data)).catch(() => {});
+        }
+    }, [selectedId, selectedMeta]);
+
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (search.length < 2) { setResults([]); return; }
+            setLoading(true);
+            try {
+                const res = await api.get(`/projects?search=${search}`);
+                setResults((res.data.content || []).filter((m: any) => m.classification !== 'MODPACK' && m.classification !== 'SAVE'));
+            } catch (e) { setResults([]); } finally { setLoading(false); }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const getIconUrl = (path?: string) => { if (!path) return '/assets/favicon.svg'; return path.startsWith('http') ? path : `${BACKEND_URL}${path}`; };
+
+    if (selectedId) {
+        return (
+            <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <img src={getIconUrl(selectedMeta?.icon)} className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
+                    <div>
+                        <div className="font-bold text-sm text-slate-900 dark:text-white">{selectedMeta?.title || selectedId}</div>
+                        <div className="text-xs text-slate-500">by {selectedMeta?.author || '...'}</div>
+                    </div>
+                </div>
+                <button type="button" onClick={() => { onChange(undefined); setSelectedMeta(null); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search for a project..." className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2.5 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent text-sm transition-all" />
+            {loading && <Loader2 className="absolute right-3 top-2.5 w-5 h-5 animate-spin text-modtale-accent" />}
+            {results.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                    {results.map(mod => (
+                        <button key={mod.id} type="button" onClick={() => { onChange(mod.id); setSelectedMeta({ title: mod.title, author: mod.author, icon: mod.imageUrl }); setSearch(''); setResults([]); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors text-left group">
+                            <img src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-800 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
+                            <div>
+                                <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors">{mod.title}</div>
+                                <div className="text-xs text-slate-500">by {mod.author}</div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const JamBuilder: React.FC<any> = ({
                                               metaData, setMetaData, handleSave, isLoading, activeTab, setActiveTab, onBack, onPublish
@@ -90,6 +201,26 @@ export const JamBuilder: React.FC<any> = ({
         ul({node, children, ...props}: any) { return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>; },
         ol({node, children, ...props}: any) { return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>; }
     };
+
+    const classificationOptions = [
+        { label: 'Plugin', value: 'PLUGIN' },
+        { label: 'Modpack', value: 'MODPACK' },
+        { label: 'Data Pack', value: 'DATA' },
+        { label: 'World / Save', value: 'SAVE' },
+        { label: 'Art Assets', value: 'ART' }
+    ];
+
+    const licenseOptions = [
+        { label: 'MIT', value: 'MIT' },
+        { label: 'Apache 2.0', value: 'APACHE' },
+        { label: 'LGPL v3', value: 'LGPL' },
+        { label: 'AGPL v3', value: 'AGPL' },
+        { label: 'GPL v3', value: 'GPL' },
+        { label: 'MPL 2.0', value: 'MPL' },
+        { label: 'BSD 3-Clause', value: 'BSD' },
+        { label: 'CC0', value: 'CC0' },
+        { label: 'The Unlicense', value: 'UNLICENSE' }
+    ];
 
     return (
         <JamLayout
@@ -174,26 +305,23 @@ export const JamBuilder: React.FC<any> = ({
             }
             tabsAndTimers={
                 <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 border-b-2 border-slate-200/50 dark:border-white/5 pb-3 xl:pb-0">
-                    <div className="flex items-center gap-6 md:gap-8 h-full">
+                    <div className="flex items-center gap-6 md:gap-8 h-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                         {[
                             {id: 'details', icon: FileText, label: 'Overview'},
+                            {id: 'schedule', icon: Calendar, label: 'Schedule'},
                             {id: 'categories', icon: Scale, label: `Judging (${metaData.categories?.length || 0})`},
+                            {id: 'restrictions', icon: Shield, label: 'Restrictions'},
                             {id: 'settings', icon: Settings, label: 'Settings'}
                         ].map(t => (
                             <button
                                 key={t.id}
                                 type="button"
                                 onClick={() => setActiveTab(t.id as any)}
-                                className={`pb-3 text-sm font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                                className={`pb-3 text-sm font-black uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === t.id ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                             >
                                 <t.icon className="w-4 h-4"/> {t.label}
                             </button>
                         ))}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 pb-3 xl:pb-2">
-                        <DateInput label="Starts" icon={Clock} value={metaData.startDate} onChange={v => updateField('startDate', v)} />
-                        <DateInput label="Submissions Close" icon={LayoutGrid} value={metaData.endDate} minDate={metaData.startDate} onChange={v => updateField('endDate', v)} />
-                        <DateInput label="Voting Ends" icon={Trophy} value={metaData.votingEndDate} minDate={metaData.endDate} onChange={v => updateField('votingEndDate', v)} />
                     </div>
                 </div>
             }
@@ -226,6 +354,65 @@ export const JamBuilder: React.FC<any> = ({
                                     ) : <p className="text-slate-500 italic">No description provided.</p>}
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {activeTab === 'schedule' && (
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-200/50 dark:border-white/5 pb-4 flex items-center gap-2">
+                                <Calendar className="w-4 h-4" /> Timeline Configuration
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                    <div className="w-14 h-14 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                                        <Play className="w-6 h-6 ml-1" />
+                                    </div>
+                                    <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Jam Starts</h4>
+                                    <p className="text-xs text-slate-500 mb-6 font-medium">When users can begin submitting projects to the jam.</p>
+                                    <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-white/5">
+                                        <input
+                                            type="datetime-local"
+                                            value={metaData.startDate ? new Date(new Date(metaData.startDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                                            onChange={e => updateField('startDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
+                                            className="w-full bg-transparent border-none p-0 text-sm font-black text-center text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                    <div className="w-14 h-14 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mb-4">
+                                        <LayoutGrid className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Submissions Close</h4>
+                                    <p className="text-xs text-slate-500 mb-6 font-medium">When the deadline passes and entries are locked.</p>
+                                    <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-white/5">
+                                        <input
+                                            type="datetime-local"
+                                            min={metaData.startDate ? new Date(new Date(metaData.startDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : undefined}
+                                            value={metaData.endDate ? new Date(new Date(metaData.endDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                                            onChange={e => updateField('endDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
+                                            className="w-full bg-transparent border-none p-0 text-sm font-black text-center text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                    <div className="w-14 h-14 bg-purple-500/10 text-purple-500 rounded-full flex items-center justify-center mb-4">
+                                        <Trophy className="w-6 h-6" />
+                                    </div>
+                                    <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Voting Ends</h4>
+                                    <p className="text-xs text-slate-500 mb-6 font-medium">When judging closes and results can be finalized.</p>
+                                    <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-white/5">
+                                        <input
+                                            type="datetime-local"
+                                            min={metaData.endDate ? new Date(new Date(metaData.endDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : undefined}
+                                            value={metaData.votingEndDate ? new Date(new Date(metaData.votingEndDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                                            onChange={e => updateField('votingEndDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
+                                            className="w-full bg-transparent border-none p-0 text-sm font-black text-center text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -301,6 +488,144 @@ export const JamBuilder: React.FC<any> = ({
                                         <p className="text-sm text-slate-500 font-bold">No scoring criteria added yet.</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'restrictions' && (
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-200/50 dark:border-white/5 pb-4 flex items-center gap-2">
+                                <Shield className="w-4 h-4" /> Submission Restrictions
+                            </h3>
+                            <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 space-y-4 shadow-sm">
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Require New Project</span>
+                                            <span className="text-xs text-slate-500 font-medium">Project must be created after jam starts</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requireNewProject || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireNewProject: e.target.checked})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Require Source Repo</span>
+                                            <span className="text-xs text-slate-500 font-medium">Must have a public repository linked</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requireSourceRepo || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireSourceRepo: e.target.checked})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Require Open Source</span>
+                                            <span className="text-xs text-slate-500 font-medium">Must use an OSI-approved open source license</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requireOsiLicense || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireOsiLicense: e.target.checked})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Unique Submission</span>
+                                            <span className="text-xs text-slate-500 font-medium">Cannot be submitted to other active jams</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requireUniqueSubmission || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireUniqueSubmission: e.target.checked})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm md:col-span-2">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Newbie Only</span>
+                                            <span className="text-xs text-slate-500 font-medium">Only users with no prior jam participations</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requireNewbie || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireNewbie: e.target.checked})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 relative">
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center">
+                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-2">Contributors</label>
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Min</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={metaData.restrictions?.minContributors || ''}
+                                                    onChange={e => updateField('restrictions', {...metaData.restrictions, minContributors: parseInt(e.target.value) || undefined})}
+                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent"
+                                                    placeholder="No min"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Max</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={metaData.restrictions?.maxContributors || ''}
+                                                    onChange={e => updateField('restrictions', {...metaData.restrictions, maxContributors: parseInt(e.target.value) || undefined})}
+                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent"
+                                                    placeholder="No max"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-20">
+                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Required Dependency</label>
+                                        <span className="text-xs text-slate-500 font-medium block mb-2">Search to force a required library</span>
+                                        <JamDependencySelector
+                                            selectedId={metaData.restrictions?.requiredDependencyId}
+                                            onChange={(id) => updateField('restrictions', {...metaData.restrictions, requiredDependencyId: id})}
+                                        />
+                                    </div>
+
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center">
+                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Allowed Classifications</label>
+                                        <span className="text-xs text-slate-500 font-medium block mb-2">Limit submissions to specific types</span>
+                                        <MultiSelectDropdown
+                                            options={classificationOptions}
+                                            selected={metaData.restrictions?.allowedClassifications || []}
+                                            onChange={val => updateField('restrictions', {...metaData.restrictions, allowedClassifications: val})}
+                                            placeholder="Any Type"
+                                            direction="up"
+                                        />
+                                    </div>
+
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center">
+                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Allowed Specific Licenses</label>
+                                        <span className="text-xs text-slate-500 font-medium block mb-2">Restrict submissions to explicit licenses</span>
+                                        <MultiSelectDropdown
+                                            options={licenseOptions}
+                                            selected={metaData.restrictions?.allowedLicenses || []}
+                                            onChange={val => updateField('restrictions', {...metaData.restrictions, allowedLicenses: val})}
+                                            placeholder="Any License"
+                                            direction="up"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
