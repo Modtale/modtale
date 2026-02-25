@@ -14,6 +14,7 @@ import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Tra
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/jams/JamBuilder.tsx';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
+import NotFound from '@/components/ui/error/NotFound';
 
 const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => {
     if (now === 0) return null;
@@ -128,7 +129,7 @@ const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => 
 };
 
 export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
-    const { slug } = useParams<{ slug: string }>();
+    const { slug, id } = useParams<{ slug?: string, id?: string }>();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -152,10 +153,11 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         secondaryLabel?: string
     } | null>(null);
 
-    const [isEditing, setIsEditing] = useState(false);
     const [metaData, setMetaData] = useState<any>(null);
     const [builderTab, setBuilderTab] = useState<'details' | 'categories' | 'settings'>('details');
     const [isSavingJam, setIsSavingJam] = useState(false);
+
+    const isEditRoute = location.pathname.endsWith('/edit');
 
     const activeTab = useMemo(() => {
         if (location.pathname.endsWith('/entries')) return 'entries';
@@ -173,7 +175,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     useEffect(() => {
         const fetchJamData = async () => {
             try {
-                const res = await api.get(`/modjams/${slug}`);
+                const jamIdentifier = slug || id;
+                const res = await api.get(`/modjams/${jamIdentifier}`);
                 setJam(res.data);
 
                 const subRes = await api.get(`/modjams/${res.data.id}/submissions`);
@@ -187,7 +190,6 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 }
             } catch (err) {
                 console.error(err);
-                setStatusModal({ type: 'error', title: 'Not Found', message: 'Failed to load jam details.' });
             } finally {
                 setLoading(false);
             }
@@ -203,7 +205,35 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             }
         };
         fetchJamData();
-    }, [slug, currentUser]);
+    }, [slug, id, currentUser]);
+
+    useEffect(() => {
+        if (jam && isEditRoute && currentUser?.id !== jam.hostId) {
+            navigate(`/jam/${jam.slug}/overview`, { replace: true });
+        }
+    }, [jam, isEditRoute, currentUser, navigate]);
+
+    useEffect(() => {
+        if (jam && isEditRoute && metaData?.id !== jam.id) {
+            setMetaData({
+                id: jam.id,
+                slug: jam.slug,
+                title: jam.title,
+                description: jam.description,
+                imageUrl: (jam as any).imageUrl,
+                bannerUrl: jam.bannerUrl,
+                startDate: jam.startDate,
+                endDate: jam.endDate,
+                votingEndDate: jam.votingEndDate,
+                allowPublicVoting: jam.allowPublicVoting,
+                allowConcurrentVoting: jam.allowConcurrentVoting,
+                showResultsBeforeVotingEnds: jam.showResultsBeforeVotingEnds,
+                categories: jam.categories,
+                restrictions: (jam as any).restrictions || {},
+                status: jam.status
+            });
+        }
+    }, [jam, isEditRoute, metaData]);
 
     const handleFollowToggle = async () => {
         if (!jam || !currentUser) return;
@@ -275,23 +305,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
     const startEditing = () => {
         if (!jam) return;
-        setMetaData({
-            id: jam.id,
-            slug: jam.slug,
-            title: jam.title,
-            description: jam.description,
-            imageUrl: (jam as any).imageUrl,
-            bannerUrl: jam.bannerUrl,
-            startDate: jam.startDate,
-            endDate: jam.endDate,
-            votingEndDate: jam.votingEndDate,
-            allowPublicVoting: jam.allowPublicVoting,
-            allowConcurrentVoting: jam.allowConcurrentVoting,
-            showResultsBeforeVotingEnds: jam.showResultsBeforeVotingEnds,
-            categories: jam.categories,
-            status: jam.status
-        });
-        setIsEditing(true);
+        navigate(`/jam/${jam.slug}/edit`);
     };
 
     const handleSaveJam = async () => {
@@ -411,19 +425,19 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     }, [jam?.description]);
 
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
-    if (!jam) return <div className="p-20 text-center font-bold text-slate-500">Jam not found.</div>;
+    if (!jam) return <NotFound />;
 
-    if (isEditing && metaData) {
+    if (isEditRoute && metaData) {
         return (
             <JamBuilder
                 metaData={metaData}
                 setMetaData={setMetaData}
                 handleSave={handleSaveJam}
-                onPublish={async () => { await handleSaveJam(); setIsEditing(false); }}
+                onPublish={async () => { await handleSaveJam(); navigate(`/jam/${jam.slug}/overview`); }}
                 isLoading={isSavingJam}
                 activeTab={builderTab}
                 setActiveTab={setBuilderTab}
-                onBack={() => setIsEditing(false)}
+                onBack={() => navigate(`/jam/${jam.slug}/overview`)}
             />
         );
     }
@@ -530,7 +544,6 @@ const JamDetailView: React.FC<{
           isParticipating, hasSubmitted, handleJoin, setIsSubmittingModalOpen, setPickingWinners, activeTab,
           now, canSeeResults, canVote, setVotingSubmissionId, memoizedDescription
       }) => {
-    const navigate = useNavigate();
     const sortedSubmissions = useMemo(() => [...submissions].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)), [submissions]);
 
     const winners = useMemo(() => sortedSubmissions.filter(s => (s as any).winner === true), [sortedSubmissions]);
