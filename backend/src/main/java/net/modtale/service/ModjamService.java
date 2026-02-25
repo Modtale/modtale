@@ -29,7 +29,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
@@ -208,14 +211,14 @@ public class ModjamService {
         String baseSlug = jam.getTitle().toLowerCase().replaceAll("[^a-z0-9]+", "-");
         jam.setSlug(baseSlug + "-" + UUID.randomUUID().toString().substring(0, 6));
 
-        if (jam.getStartDate() != null && jam.getStartDate().isAfter(LocalDateTime.now())) {
+        if (jam.getStartDate() != null && jam.getStartDate().isAfter(Instant.now())) {
             jam.setStatus("UPCOMING");
         } else if (!"DRAFT".equals(jam.getStatus())) {
             jam.setStatus("ACTIVE");
         }
 
-        jam.setCreatedAt(LocalDateTime.now());
-        jam.setUpdatedAt(LocalDateTime.now());
+        jam.setCreatedAt(Instant.now());
+        jam.setUpdatedAt(Instant.now());
 
         if (jam.getCategories() != null) {
             for (Modjam.Category cat : jam.getCategories()) {
@@ -266,7 +269,7 @@ public class ModjamService {
 
         String targetStatus = updatedJam.getStatus();
         if (!"COMPLETED".equals(targetStatus) && !"DRAFT".equals(targetStatus)) {
-            LocalDateTime now = LocalDateTime.now();
+            Instant now = Instant.now();
             if (jam.getStartDate() != null && now.isBefore(jam.getStartDate())) {
                 targetStatus = "UPCOMING";
             } else if (jam.getEndDate() != null && now.isBefore(jam.getEndDate())) {
@@ -279,7 +282,7 @@ public class ModjamService {
         }
 
         jam.setStatus(targetStatus);
-        jam.setUpdatedAt(LocalDateTime.now());
+        jam.setUpdatedAt(Instant.now());
 
         return modjamRepository.save(jam);
     }
@@ -291,7 +294,7 @@ public class ModjamService {
             String storageKey = storageService.upload(file, pathPrefix);
             String publicUrl = storageService.getPublicUrl(storageKey);
             jam.setImageUrl(publicUrl);
-            jam.setUpdatedAt(LocalDateTime.now());
+            jam.setUpdatedAt(Instant.now());
             modjamRepository.save(jam);
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload icon", e);
@@ -305,7 +308,7 @@ public class ModjamService {
             String storageKey = storageService.upload(file, pathPrefix);
             String publicUrl = storageService.getPublicUrl(storageKey);
             jam.setBannerUrl(publicUrl);
-            jam.setUpdatedAt(LocalDateTime.now());
+            jam.setUpdatedAt(Instant.now());
             modjamRepository.save(jam);
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload banner", e);
@@ -443,11 +446,18 @@ public class ModjamService {
         if (res != null) {
             if (res.isRequireNewProject() && jam.getStartDate() != null && project.getCreatedAt() != null) {
                 try {
-                    String cleanDate = project.getCreatedAt().replace("Z", "");
-                    LocalDateTime projCreated = LocalDateTime.parse(cleanDate);
+                    Instant projCreated;
+                    try {
+                        projCreated = Instant.parse(project.getCreatedAt());
+                    } catch (Exception e) {
+                        String cleanDate = project.getCreatedAt().replace("Z", "");
+                        projCreated = LocalDateTime.parse(cleanDate).toInstant(ZoneOffset.UTC);
+                    }
                     if (projCreated.isBefore(jam.getStartDate())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must be created after the jam start date.");
                     }
+                } catch (ResponseStatusException rse) {
+                    throw rse;
                 } catch (Exception ignored) {}
             }
 
@@ -587,7 +597,7 @@ public class ModjamService {
     public ModjamSubmission vote(String jamId, String submissionId, String categoryId, int score, String userId) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        if (jam.getVotingEndDate() != null && LocalDateTime.now().isAfter(jam.getVotingEndDate())) {
+        if (jam.getVotingEndDate() != null && Instant.now().isAfter(jam.getVotingEndDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voting has closed for this jam.");
         }
 
@@ -667,13 +677,13 @@ public class ModjamService {
         }
 
         jam.setStatus("COMPLETED");
-        jam.setUpdatedAt(LocalDateTime.now());
+        jam.setUpdatedAt(Instant.now());
         return modjamRepository.save(jam);
     }
 
     @Scheduled(cron = "0 0 0 * * *")
     public void cleanupStaleDrafts() {
-        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        Instant thirtyDaysAgo = Instant.now().minus(30, ChronoUnit.DAYS);
         List<Modjam> staleDrafts = modjamRepository.findByStatusAndUpdatedAtBefore("DRAFT", thirtyDaysAgo);
         for (Modjam jam : staleDrafts) {
             submissionRepository.deleteAll(submissionRepository.findByJamId(jam.getId()));

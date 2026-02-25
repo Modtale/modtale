@@ -10,28 +10,42 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Spinner } from '@/components/ui/Spinner.tsx';
 import { api, BACKEND_URL } from '@/utils/api';
 
-const DateInput: React.FC<{ label: string, icon: any, value: string, minDate?: string, onChange: (v: string) => void }> = ({ label, icon: Icon, value, minDate, onChange }) => (
-    <div className="flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] px-5 py-3 md:py-3.5 shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden group focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all min-w-[200px]">
-        <div className="flex items-center gap-2 mb-1.5 text-slate-500">
-            <Icon className="w-4 h-4 text-modtale-accent" />
-            <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+const DateInput: React.FC<{ label: string, icon: any, value: string, minDate?: string, onChange: (v: string) => void }> = ({ label, icon: Icon, value, minDate, onChange }) => {
+    const formatForInput = (isoString?: string) => {
+        if (!isoString) return '';
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const Y = d.getFullYear();
+        const M = pad(d.getMonth() + 1);
+        const D = pad(d.getDate());
+        const H = pad(d.getHours());
+        const m = pad(d.getMinutes());
+        return `${Y}-${M}-${D}T${H}:${m}`;
+    };
+
+    const handleInput = (val: string) => {
+        if (!val) { onChange(''); return; }
+        const d = new Date(val);
+        onChange(d.toISOString());
+    };
+
+    return (
+        <div className="flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] px-5 py-3 md:py-3.5 shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden group focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all min-w-[200px]">
+            <div className="flex items-center gap-2 mb-1.5 text-slate-500">
+                <Icon className="w-4 h-4 text-modtale-accent" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+            </div>
+            <input
+                type="datetime-local"
+                value={formatForInput(value)}
+                min={formatForInput(minDate)}
+                onChange={(e) => handleInput(e.target.value)}
+                className="w-full bg-transparent border-none p-0 text-sm md:text-base font-black text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
+            />
         </div>
-        <input
-            type="datetime-local"
-            value={value ? new Date(new Date(value).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-            min={minDate ? new Date(new Date(minDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : undefined}
-            onChange={(e) => {
-                if (e.target.value) {
-                    const d = new Date(e.target.value);
-                    onChange(d.toISOString());
-                } else {
-                    onChange('');
-                }
-            }}
-            className="w-full bg-transparent border-none p-0 text-sm md:text-base font-black text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
-        />
-    </div>
-);
+    );
+};
 
 const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[], selected: string[], onChange: (val: string[]) => void, placeholder: string, direction?: 'up' | 'down' }> = ({ options, selected, onChange, placeholder, direction = 'down' }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -667,6 +681,12 @@ export const JamBuilder: React.FC<any> = ({
                                     </div>
                                 </div>
                             </div>
+                            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 p-4 rounded-xl flex items-start gap-3">
+                                <Clock className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                                <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                                    Timezone configuration is automatic! All times are selected and displayed in your local timezone (<strong>{Intl.DateTimeFormat().resolvedOptions().timeZone}</strong>), but are securely stored as UTC on the backend so participants worldwide will see the correct local times for them.
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -729,7 +749,7 @@ export const JamBuilder: React.FC<any> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => updateField('categories', metaData.categories.filter((_:any, idx:number) => idx !== i))}
-                                                className="w-10 h-10 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center mt-3.5"
+                                                className="w-10 h-10 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-50 hover:text-white transition-all flex items-center justify-center mt-3.5"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -856,18 +876,6 @@ export const JamBuilder: React.FC<any> = ({
                                         />
                                     </div>
 
-                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-10">
-                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Game Version Lock</label>
-                                        <span className="text-xs text-slate-500 font-medium block mb-2">Select allowed game versions</span>
-                                        <MultiSelectDropdown
-                                            options={gameVersionOptions}
-                                            selected={metaData.restrictions?.allowedGameVersions || []}
-                                            onChange={val => updateField('restrictions', {...metaData.restrictions, allowedGameVersions: val})}
-                                            placeholder="Any Version"
-                                            direction="up"
-                                        />
-                                    </div>
-
                                     <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Required Class / Package Usage</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Ensure jar utilizes an internal API</span>
@@ -880,7 +888,19 @@ export const JamBuilder: React.FC<any> = ({
                                         />
                                     </div>
 
-                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[5]">
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[15]">
+                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Game Version Lock</label>
+                                        <span className="text-xs text-slate-500 font-medium block mb-2">Select allowed game versions</span>
+                                        <MultiSelectDropdown
+                                            options={gameVersionOptions}
+                                            selected={metaData.restrictions?.allowedGameVersions || []}
+                                            onChange={val => updateField('restrictions', {...metaData.restrictions, allowedGameVersions: val})}
+                                            placeholder="Any Version"
+                                            direction="up"
+                                        />
+                                    </div>
+
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[10]">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Allowed Classifications</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Limit submissions to specific types</span>
                                         <MultiSelectDropdown
