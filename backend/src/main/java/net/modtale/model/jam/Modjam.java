@@ -55,7 +55,42 @@ public class Modjam {
         public void setMaxScore(int maxScore) { this.maxScore = maxScore; }
     }
 
+    public static class Restrictions {
+        private boolean requireNewProject;
+        private boolean requireSourceRepo;
+        private boolean requireOsiLicense;
+        private Integer minContributors;
+        private Integer maxContributors;
+        private boolean requireUniqueSubmission;
+        private boolean requireNewbie;
+        private List<String> allowedLicenses = new ArrayList<>();
+        private List<String> allowedClassifications = new ArrayList<>();
+        private String requiredDependencyId;
+
+        public boolean isRequireNewProject() { return requireNewProject; }
+        public void setRequireNewProject(boolean requireNewProject) { this.requireNewProject = requireNewProject; }
+        public boolean isRequireSourceRepo() { return requireSourceRepo; }
+        public void setRequireSourceRepo(boolean requireSourceRepo) { this.requireSourceRepo = requireSourceRepo; }
+        public boolean isRequireOsiLicense() { return requireOsiLicense; }
+        public void setRequireOsiLicense(boolean requireOsiLicense) { this.requireOsiLicense = requireOsiLicense; }
+        public Integer getMinContributors() { return minContributors; }
+        public void setMinContributors(Integer minContributors) { this.minContributors = minContributors; }
+        public Integer getMaxContributors() { return maxContributors; }
+        public void setMaxContributors(Integer maxContributors) { this.maxContributors = maxContributors; }
+        public boolean isRequireUniqueSubmission() { return requireUniqueSubmission; }
+        public void setRequireUniqueSubmission(boolean requireUniqueSubmission) { this.requireUniqueSubmission = requireUniqueSubmission; }
+        public boolean isRequireNewbie() { return requireNewbie; }
+        public void setRequireNewbie(boolean requireNewbie) { this.requireNewbie = requireNewbie; }
+        public List<String> getAllowedLicenses() { return allowedLicenses; }
+        public void setAllowedLicenses(List<String> allowedLicenses) { this.allowedLicenses = allowedLicenses; }
+        public List<String> getAllowedClassifications() { return allowedClassifications; }
+        public void setAllowedClassifications(List<String> allowedClassifications) { this.allowedClassifications = allowedClassifications; }
+        public String getRequiredDependencyId() { return requiredDependencyId; }
+        public void setRequiredDependencyId(String requiredDependencyId) { this.requiredDependencyId = requiredDependencyId; }
+    }
+
     private List<Category> categories = new ArrayList<>();
+    private Restrictions restrictions = new Restrictions();
 
     private boolean allowPublicVoting;
     private boolean allowConcurrentVoting;
@@ -63,7 +98,6 @@ public class Modjam {
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime updatedAt = LocalDateTime.now();
-
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -93,6 +127,8 @@ public class Modjam {
     public void setParticipantIds(List<String> participantIds) { this.participantIds = participantIds; }
     public List<Category> getCategories() { return categories; }
     public void setCategories(List<Category> categories) { this.categories = categories; }
+    public Restrictions getRestrictions() { return restrictions; }
+    public void setRestrictions(Restrictions restrictions) { this.restrictions = restrictions; }
     public boolean isAllowPublicVoting() { return allowPublicVoting; }
     public void setAllowPublicVoting(boolean allowPublicVoting) { this.allowPublicVoting = allowPublicVoting; }
     public boolean isAllowConcurrentVoting() { return allowConcurrentVoting; }

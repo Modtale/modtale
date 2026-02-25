@@ -94,6 +94,10 @@ public class ModjamService {
         jam.setAllowConcurrentVoting(updatedJam.isAllowConcurrentVoting());
         jam.setShowResultsBeforeVotingEnds(updatedJam.isShowResultsBeforeVotingEnds());
 
+        if (updatedJam.getRestrictions() != null) {
+            jam.setRestrictions(updatedJam.getRestrictions());
+        }
+
         if (updatedJam.getCategories() != null) {
             for (Modjam.Category cat : updatedJam.getCategories()) {
                 if (cat.getId() == null || cat.getId().trim().isEmpty()) {
@@ -223,6 +227,79 @@ public class ModjamService {
 
         if (!"PUBLISHED".equals(project.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must be published.");
+        }
+
+        Modjam.Restrictions res = jam.getRestrictions();
+        if (res != null) {
+            if (res.isRequireNewProject() && jam.getStartDate() != null && project.getCreatedAt() != null) {
+                try {
+                    String cleanDate = project.getCreatedAt().replace("Z", "");
+                    LocalDateTime projCreated = LocalDateTime.parse(cleanDate);
+                    if (projCreated.isBefore(jam.getStartDate())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must be created after the jam start date.");
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            if (res.isRequireSourceRepo() && (project.getRepositoryUrl() == null || project.getRepositoryUrl().trim().isEmpty())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must have a linked public source repository.");
+            }
+
+            if (res.isRequireOsiLicense()) {
+                String l = project.getLicense() != null ? project.getLicense().toUpperCase().replaceAll("[^A-Z0-9]", "") : "";
+                boolean isOsi = l.contains("MIT") || l.contains("APACHE") || l.contains("LGPL") || l.contains("AGPL") || l.contains("GPL") || l.contains("MPL") || l.contains("BSD") || l.contains("UNLICENSE") || l.contains("CC0");
+                if (!isOsi) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must use an OSI-approved open source license.");
+                }
+            }
+
+            if (res.getAllowedClassifications() != null && !res.getAllowedClassifications().isEmpty()) {
+                if (!res.getAllowedClassifications().contains(project.getClassification())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project classification is not allowed for this jam.");
+                }
+            }
+
+            if (res.getAllowedLicenses() != null && !res.getAllowedLicenses().isEmpty()) {
+                if (!res.getAllowedLicenses().contains(project.getLicense())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project license is not allowed for this jam.");
+                }
+            }
+
+            if (res.getRequiredDependencyId() != null && !res.getRequiredDependencyId().trim().isEmpty()) {
+                if (project.getModIds() == null || !project.getModIds().contains(res.getRequiredDependencyId().trim())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project is missing the required dependency.");
+                }
+            }
+
+            int contributorCount = (project.getContributors() != null ? project.getContributors().size() : 0) + 1;
+            if (res.getMinContributors() != null && contributorCount < res.getMinContributors()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project does not meet the minimum contributor requirement.");
+            }
+
+            if (res.getMaxContributors() != null && contributorCount > res.getMaxContributors()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project exceeds the maximum contributor limit.");
+            }
+
+            if (res.isRequireUniqueSubmission() && project.getModjamIds() != null) {
+                for (String otherJamId : project.getModjamIds()) {
+                    if (otherJamId.equals(jamId)) continue;
+                    modjamRepository.findById(otherJamId).ifPresent(otherJam -> {
+                        if ("ACTIVE".equals(otherJam.getStatus()) || "VOTING".equals(otherJam.getStatus())) {
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project is currently entered in another active jam.");
+                        }
+                    });
+                }
+            }
+
+            if (res.isRequireNewbie()) {
+                User u = userRepository.findById(userId).orElse(null);
+                if (u != null && u.getJoinedModjamIds() != null) {
+                    long activeJams = u.getJoinedModjamIds().stream().filter(id -> !id.equals(jamId)).count();
+                    if (activeJams > 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to first-time participants.");
+                    }
+                }
+            }
         }
 
         List<ModjamSubmission> existing = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
