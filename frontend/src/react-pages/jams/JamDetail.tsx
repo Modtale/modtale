@@ -95,7 +95,7 @@ const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => 
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 shadow-sm w-full mb-10">
             <div className="flex flex-col shrink-0 min-w-[220px] text-center md:text-left">
                 <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-center md:justify-start gap-2">
-                    <Clock className="w-4 h-4" /> {label}
+                        <Clock className="w-4 h-4" /> {label}
                 </span>
                 <span className={`text-3xl md:text-4xl font-black font-mono drop-shadow-sm leading-none text-modtale-accent`}>{timeStr}</span>
             </div>
@@ -182,7 +182,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 if (currentUser) {
                     try {
                         const followRes = await api.get(`/user/following/${res.data.hostName}`);
-                        setIsFollowing(followRes.data);
+                        setIsFollowing(Boolean(followRes.data));
                     } catch (e) {}
                 }
             } catch (err) {
@@ -428,12 +428,12 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         );
     }
 
-    const isParticipating = currentUser?.id && (jam.participantIds || []).includes(currentUser.id);
-    const hasSubmitted = submissions.some(s => s.submitterId === currentUser?.id);
+    const isParticipating = Boolean(currentUser?.id && (jam.participantIds || []).includes(currentUser.id));
+    const hasSubmitted = Boolean(submissions.some(s => s.submitterId === currentUser?.id));
 
-    const votingClosed = jam.votingEndDate && now > new Date(jam.votingEndDate).getTime();
-    const canVote = !votingClosed && jam.status !== 'COMPLETED' && jam.status !== 'AWAITING_WINNERS' && (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || currentUser?.id === jam.hostId);
-    const canSeeResults = jam.status === 'COMPLETED' || jam.status === 'AWAITING_WINNERS' || jam.showResultsBeforeVotingEnds || currentUser?.id === jam.hostId;
+    const votingClosed = Boolean(jam.votingEndDate && now > new Date(jam.votingEndDate).getTime());
+    const canVote = Boolean(!votingClosed && jam.status !== 'COMPLETED' && jam.status !== 'AWAITING_WINNERS' && (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || currentUser?.id === jam.hostId));
+    const canSeeResults = Boolean(jam.status === 'COMPLETED' || jam.status === 'AWAITING_WINNERS' || jam.showResultsBeforeVotingEnds || currentUser?.id === jam.hostId);
 
     return (
         <>

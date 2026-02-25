@@ -1128,7 +1128,6 @@ export const ModDetail: React.FC<{
                         navigate={navigate}
                         dependencies={latestDependencies}
                         depMeta={depMeta}
-                        jamMeta={jamMeta}
                         sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
                         contributors={contributors}
                         orgMembers={orgMembers}
