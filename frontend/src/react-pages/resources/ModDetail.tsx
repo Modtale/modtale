@@ -642,7 +642,7 @@ export const ModDetail: React.FC<{
                     if (jam) {
                         let isWinner = false;
                         try {
-                            const subsRes = await api.get(`/modjams/${jam.slug}/submissions`);
+                            const subsRes = await api.get(`/modjams/${jam.id}/submissions`);
                             const mySub = subsRes.data.find((s: any) => s.projectId === mod.id);
                             if (mySub && (mySub.winner || mySub.isWinner || mySub.rank === 1)) {
                                 isWinner = true;
@@ -984,7 +984,7 @@ export const ModDetail: React.FC<{
                                     <React.Fragment key={jamId}>
                                         <span className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
                                         <Link
-                                            to={`/jams/${meta.slug}`}
+                                            to={`/jam/${meta.slug}`}
                                             className={`inline-flex items-center gap-2 pr-3 pl-1.5 py-1.5 rounded-full text-xs transition-all hover:scale-105 active:scale-95 backdrop-blur-md ${
                                                 isWinner
                                                     ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 shadow-sm'
