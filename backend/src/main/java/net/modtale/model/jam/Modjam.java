@@ -64,6 +64,9 @@ public class Modjam {
         private Integer maxContributors;
         private boolean requireUniqueSubmission;
         private boolean requireNewbie;
+        private boolean requirePriorJams;
+        private boolean requireNoPriorProjects;
+        private boolean requirePriorProjects;
         private List<String> allowedLicenses = new ArrayList<>();
         private List<String> allowedClassifications = new ArrayList<>();
         private List<String> allowedGameVersions = new ArrayList<>();
@@ -84,6 +87,12 @@ public class Modjam {
         public void setRequireUniqueSubmission(boolean requireUniqueSubmission) { this.requireUniqueSubmission = requireUniqueSubmission; }
         public boolean isRequireNewbie() { return requireNewbie; }
         public void setRequireNewbie(boolean requireNewbie) { this.requireNewbie = requireNewbie; }
+        public boolean isRequirePriorJams() { return requirePriorJams; }
+        public void setRequirePriorJams(boolean requirePriorJams) { this.requirePriorJams = requirePriorJams; }
+        public boolean isRequireNoPriorProjects() { return requireNoPriorProjects; }
+        public void setRequireNoPriorProjects(boolean requireNoPriorProjects) { this.requireNoPriorProjects = requireNoPriorProjects; }
+        public boolean isRequirePriorProjects() { return requirePriorProjects; }
+        public void setRequirePriorProjects(boolean requirePriorProjects) { this.requirePriorProjects = requirePriorProjects; }
         public List<String> getAllowedLicenses() { return allowedLicenses; }
         public void setAllowedLicenses(List<String> allowedLicenses) { this.allowedLicenses = allowedLicenses; }
         public List<String> getAllowedClassifications() { return allowedClassifications; }

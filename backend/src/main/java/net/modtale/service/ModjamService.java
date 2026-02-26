@@ -444,6 +444,19 @@ public class ModjamService {
 
         Modjam.Restrictions res = jam.getRestrictions();
         if (res != null) {
+            if (res.isRequireNoPriorProjects() || res.isRequirePriorProjects()) {
+                long priorPublishedProjects = modRepository.findByAuthorIdList(userId).stream()
+                        .filter(p -> !p.getId().equals(projectId) && "PUBLISHED".equals(p.getStatus()))
+                        .count();
+
+                if (res.isRequireNoPriorProjects() && priorPublishedProjects > 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to users who have never published a project before.");
+                }
+                if (res.isRequirePriorProjects() && priorPublishedProjects == 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to users who have previously published at least one project.");
+                }
+            }
+
             if (res.isRequireNewProject() && jam.getStartDate() != null && project.getCreatedAt() != null) {
                 try {
                     Instant projCreated;
@@ -538,6 +551,13 @@ public class ModjamService {
                     if (activeJams > 0) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to first-time participants.");
                     }
+                }
+            }
+
+            if (res.isRequirePriorJams()) {
+                User u = userRepository.findById(userId).orElse(null);
+                if (u == null || u.getJoinedModjamIds() == null || u.getJoinedModjamIds().stream().filter(id -> !id.equals(jamId)).count() == 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to experienced participants who have joined a jam before.");
                 }
             }
 
