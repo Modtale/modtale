@@ -136,7 +136,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
     const { startDate, endDate, totalDays, days } = useMemo(() => {
         const start = new Date();
-        start.setDate(start.getDate() - 3);
+        start.setDate(start.getDate() - 2); // 48 hours back
         start.setHours(0, 0, 0, 0);
         const total = 90;
         const end = new Date(start);
@@ -311,7 +311,13 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const isNowInWindow = now >= startDate.getTime() && now <= endDate.getTime();
     const nowLeftPx = ((now - startDate.getTime()) / (1000 * 60 * 60 * 24)) * DAY_WIDTH;
 
-    const pastJams = jams.filter(jam => ['VOTING', 'COMPLETED'].includes(jam.status));
+    // A past jam is one that is VOTING or COMPLETED AND its end date is completely before the calendar's 48h lookback window
+    const pastJams = jams.filter(jam => {
+        if (!['VOTING', 'COMPLETED'].includes(jam.status)) return false;
+        if (!jam.votingEndDate && !jam.endDate) return false;
+        const jamEndMs = new Date(jam.votingEndDate || jam.endDate).getTime();
+        return jamEndMs < startDate.getTime();
+    });
 
     return (
         <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-8 md:pt-16 pb-32">
