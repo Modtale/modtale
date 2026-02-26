@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2 } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout.tsx';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -10,39 +10,223 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Spinner } from '@/components/ui/Spinner.tsx';
 import { api, BACKEND_URL } from '@/utils/api';
 
-const DateInput: React.FC<{ label: string, icon: any, value: string, minDate?: string, onChange: (v: string) => void }> = ({ label, icon: Icon, value, minDate, onChange }) => {
-    const formatForInput = (isoString?: string) => {
-        if (!isoString) return '';
-        const d = new Date(isoString);
-        if (isNaN(d.getTime())) return '';
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        const Y = d.getFullYear();
-        const M = pad(d.getMonth() + 1);
-        const D = pad(d.getDate());
-        const H = pad(d.getHours());
-        const m = pad(d.getMinutes());
-        return `${Y}-${M}-${D}T${H}:${m}`;
-    };
+const CalendarWidget = ({ viewDate, setViewDate, selectedDate, onSelect, minDate }: { viewDate: Date, setViewDate: (d: Date) => void, selectedDate: Date, onSelect: (d: Date) => void, minDate: Date }) => {
+    const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+    const getFirstDay = (year: number, month: number) => new Date(year, month, 1).getDay();
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const startDay = getFirstDay(year, month);
 
-    const handleInput = (val: string) => {
-        if (!val) { onChange(''); return; }
-        const d = new Date(val);
-        onChange(d.toISOString());
+    const days = [];
+    for (let i = 0; i < startDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
+    const changeMonth = (delta: number) => { setViewDate(new Date(year, month + delta, 1)); };
+
+    const isSelected = (d: number) => { return selectedDate.getDate() === d && selectedDate.getMonth() === month && selectedDate.getFullYear() === year; };
+
+    const isDisabled = (d: number) => {
+        const checkDate = new Date(year, month, d, 23, 59, 59, 999);
+        return checkDate.getTime() < minDate.getTime();
     };
 
     return (
-        <div className="flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] px-5 py-3 md:py-3.5 shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden group focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all min-w-[200px]">
-            <div className="flex items-center gap-2 mb-1.5 text-slate-500">
-                <Icon className="w-4 h-4 text-modtale-accent" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-white/5">
+            <div className="flex justify-between items-center mb-3">
+                <button type="button" onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors"><ChevronLeft className="w-4 h-4 text-slate-500" /></button>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
+                <button type="button" onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors"><ChevronRight className="w-4 h-4 text-slate-500" /></button>
             </div>
-            <input
-                type="datetime-local"
-                value={formatForInput(value)}
-                min={formatForInput(minDate)}
-                onChange={(e) => handleInput(e.target.value)}
-                className="w-full bg-transparent border-none p-0 text-sm md:text-base font-black text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
-            />
+            <div className="grid grid-cols-7 gap-1 text-center mb-2">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (<div key={d} className="text-[10px] font-bold text-slate-400 uppercase">{d}</div>))}</div>
+            <div className="grid grid-cols-7 gap-1">
+                {days.map((d, i) => (
+                    d ? (
+                        <button
+                            key={i}
+                            type="button"
+                            disabled={isDisabled(d)}
+                            onClick={() => !isDisabled(d) && onSelect(new Date(year, month, d))}
+                            className={`w-8 h-8 mx-auto flex items-center justify-center rounded-full text-xs font-medium transition-all ${isDisabled(d) ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40' : isSelected(d) ? 'bg-modtale-accent text-white shadow-md shadow-modtale-accent/30 scale-110' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                        >
+                            {d}
+                        </button>
+                    ) : <div key={i} />
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const TimeDropdown = ({ value, options, onChange }: { value: string | number, options: {label: string, value: string | number}[], onChange: (val: any) => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(o => o.value === value)?.label || value;
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-modtale-accent text-center min-w-[3.5rem] flex justify-center items-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
+            >
+                {selectedLabel}
+            </button>
+            {isOpen && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[150] max-h-48 overflow-y-auto custom-scrollbar p-1 min-w-[4rem]">
+                    {options.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                            className={`w-full text-center px-2 py-2 text-sm rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${value === opt.value ? 'bg-modtale-accent/10 text-modtale-accent font-bold' : 'text-slate-700 dark:text-slate-300 font-medium'}`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, minDate?: string, onChange: (v: string) => void }> = ({ label, icon: Icon, value, minDate, onChange }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const isPassed = value && new Date(value).getTime() <= Date.now();
+
+    const twentyFourHoursFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const effectiveMinDate = minDate ? new Date(Math.max(twentyFourHoursFromNow.getTime(), new Date(minDate).getTime())) : twentyFourHoursFromNow;
+
+    const initialDate = value ? new Date(value) : effectiveMinDate;
+    const [tempDate, setTempDate] = useState<Date>(initialDate);
+    const [viewDate, setViewDate] = useState<Date>(initialDate);
+
+    useEffect(() => {
+        if (isOpen) {
+            const start = value ? new Date(value) : effectiveMinDate;
+            setTempDate(start);
+            setViewDate(start);
+        }
+    }, [isOpen, value, effectiveMinDate]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleDateSelect = (d: Date) => {
+        const newDate = new Date(tempDate);
+        newDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+        setTempDate(newDate);
+    };
+
+    const currentHour24 = tempDate.getHours();
+    const displayHour = currentHour24 % 12 || 12;
+    const currentMinute = tempDate.getMinutes();
+    const currentPeriod = currentHour24 >= 12 ? 'PM' : 'AM';
+
+    const handleHourChange = (h12: number) => {
+        let h24 = h12;
+        if (currentPeriod === 'AM' && h12 === 12) h24 = 0;
+        if (currentPeriod === 'PM' && h12 !== 12) h24 += 12;
+        const newDate = new Date(tempDate);
+        newDate.setHours(h24);
+        setTempDate(newDate);
+    };
+
+    const handleMinuteChange = (m: number) => {
+        const newDate = new Date(tempDate);
+        newDate.setMinutes(m);
+        setTempDate(newDate);
+    };
+
+    const handlePeriodChange = (p: 'AM' | 'PM') => {
+        if (p === currentPeriod) return;
+        let h24 = displayHour;
+        if (p === 'AM' && displayHour === 12) h24 = 0;
+        if (p === 'PM' && displayHour !== 12) h24 += 12;
+        const newDate = new Date(tempDate);
+        newDate.setHours(h24);
+        setTempDate(newDate);
+    };
+
+    const handleApply = () => {
+        if (tempDate.getTime() < effectiveMinDate.getTime()) {
+            alert("Please select a valid time (At least 24 hours from now, and sequentially after previous phases).");
+            return;
+        }
+        onChange(tempDate.toISOString());
+        setIsOpen(false);
+    };
+
+    const formatDisplay = (iso?: string) => {
+        if (!iso) return 'Not set';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return 'Invalid Date';
+        return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+    };
+
+    const hourOptions = Array.from({length: 12}, (_, i) => ({ value: i + 1, label: (i + 1).toString() }));
+    const minuteOptions = Array.from({length: 12}, (_, i) => ({ value: i * 5, label: (i * 5).toString().padStart(2, '0') }));
+    const periodOptions = [{ value: 'AM', label: 'AM' }, { value: 'PM', label: 'PM' }];
+
+    return (
+        <div className={`relative w-full ${isOpen ? 'z-[100]' : 'z-10'}`} ref={containerRef}>
+            <button
+                type="button"
+                onClick={() => !isPassed && setIsOpen(!isOpen)}
+                className={`w-full flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] px-5 py-3 md:py-3.5 shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden group transition-all text-left ${isPassed ? 'opacity-60 cursor-not-allowed grayscale' : 'hover:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent'}`}
+            >
+                <div className="flex items-center justify-between w-full mb-1.5">
+                    <div className="flex items-center gap-2 text-slate-500">
+                        <Icon className="w-4 h-4 text-modtale-accent" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+                    </div>
+                    {isPassed && <span className="text-[9px] bg-slate-200 dark:bg-white/10 px-1.5 py-0.5 rounded font-bold uppercase text-slate-500">Locked</span>}
+                </div>
+                <span className="text-sm md:text-base font-black text-slate-900 dark:text-white truncate">
+                    {formatDisplay(value)}
+                </span>
+            </button>
+
+            {isOpen && !isPassed && (
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[300px] md:w-[320px] max-w-[90vw] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] z-[9999] p-4 animate-in fade-in zoom-in-95 duration-200 origin-top">
+                    <CalendarWidget viewDate={viewDate} setViewDate={setViewDate} selectedDate={tempDate} onSelect={handleDateSelect} minDate={effectiveMinDate} />
+
+                    <div className="mt-4 flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">
+                        <div className="flex items-center gap-2 pl-1">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Time</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <TimeDropdown value={displayHour} options={hourOptions} onChange={handleHourChange} />
+                            <span className="font-black text-slate-400 pb-0.5">:</span>
+                            <TimeDropdown value={currentMinute} options={minuteOptions} onChange={handleMinuteChange} />
+                            <div className="w-1" />
+                            <TimeDropdown value={currentPeriod} options={periodOptions} onChange={handlePeriodChange} />
+                        </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5 flex justify-end gap-2">
+                        <button type="button" onClick={() => setIsOpen(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Cancel</button>
+                        <button type="button" onClick={handleApply} className="px-5 py-2 rounded-xl text-xs font-bold bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-md transition-all">Apply</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -62,7 +246,7 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
     const popupClass = direction === 'up' ? 'absolute bottom-full mb-2' : 'absolute top-full mt-2';
 
     return (
-        <div className="relative w-full" ref={ref}>
+        <div className={`relative w-full ${isOpen ? 'z-[100]' : 'z-10'}`} ref={ref}>
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
@@ -72,7 +256,7 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen && direction === 'down' ? 'rotate-180' : ''} ${!isOpen && direction === 'up' ? 'rotate-180' : ''}`} />
             </button>
             {isOpen && (
-                <div className={`${popupClass} left-0 right-0 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto custom-scrollbar p-1`}>
+                <div className={`${popupClass} left-0 right-0 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] z-[9999] max-h-48 overflow-y-auto custom-scrollbar p-1`}>
                     {options.map((opt) => (
                         <button
                             key={opt.value}
@@ -351,7 +535,7 @@ export const JamBuilder: React.FC<any> = ({
 
                     {!isPublished && (
                         <div className="relative group">
-                            <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-50">
+                            <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-[100]">
                                 <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-white/5 pb-3">
                                     <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Requirements</span>
                                     <span className={`text-xs font-black ${isReadyToPublish ? 'text-green-500' : 'text-slate-400'}`}>
@@ -626,57 +810,58 @@ export const JamBuilder: React.FC<any> = ({
                     )}
 
                     {activeTab === 'schedule' && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 pb-48">
                             <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-200/50 dark:border-white/5 pb-4 flex items-center gap-2">
                                 <Calendar className="w-4 h-4" /> Timeline Configuration
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center transition-all">
                                     <div className="w-14 h-14 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-4">
                                         <Play className="w-6 h-6 ml-1" />
                                     </div>
                                     <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Jam Starts</h4>
                                     <p className="text-xs text-slate-500 mb-6 font-medium">When users can begin submitting projects to the jam.</p>
-                                    <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-white/5">
-                                        <input
-                                            type="datetime-local"
-                                            value={metaData.startDate ? new Date(new Date(metaData.startDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-                                            onChange={e => updateField('startDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
-                                            className="w-full bg-transparent border-none p-0 text-sm font-black text-center text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
+                                    <div className="w-full">
+                                        <CustomDateTimePicker
+                                            label="Jam Starts"
+                                            icon={Play}
+                                            value={metaData.startDate}
+                                            minDate={undefined}
+                                            onChange={(v: string) => updateField('startDate', v)}
                                         />
                                     </div>
                                 </div>
 
-                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center transition-all">
                                     <div className="w-14 h-14 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mb-4">
                                         <LayoutGrid className="w-6 h-6" />
                                     </div>
                                     <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Submissions Close</h4>
                                     <p className="text-xs text-slate-500 mb-6 font-medium">When the deadline passes and entries are locked.</p>
-                                    <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-white/5">
-                                        <input
-                                            type="datetime-local"
-                                            min={metaData.startDate ? new Date(new Date(metaData.startDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : undefined}
-                                            value={metaData.endDate ? new Date(new Date(metaData.endDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-                                            onChange={e => updateField('endDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
-                                            className="w-full bg-transparent border-none p-0 text-sm font-black text-center text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
+                                    <div className="w-full">
+                                        <CustomDateTimePicker
+                                            label="Submissions Close"
+                                            icon={LayoutGrid}
+                                            value={metaData.endDate}
+                                            minDate={metaData.startDate}
+                                            onChange={(v: string) => updateField('endDate', v)}
                                         />
                                     </div>
                                 </div>
 
-                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center focus-within:ring-2 focus-within:ring-modtale-accent transition-all">
+                                <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center transition-all">
                                     <div className="w-14 h-14 bg-purple-500/10 text-purple-500 rounded-full flex items-center justify-center mb-4">
                                         <Trophy className="w-6 h-6" />
                                     </div>
                                     <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Voting Ends</h4>
                                     <p className="text-xs text-slate-500 mb-6 font-medium">When judging closes and results can be finalized.</p>
-                                    <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-white/5">
-                                        <input
-                                            type="datetime-local"
-                                            min={metaData.endDate ? new Date(new Date(metaData.endDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : undefined}
-                                            value={metaData.votingEndDate ? new Date(new Date(metaData.votingEndDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-                                            onChange={e => updateField('votingEndDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
-                                            className="w-full bg-transparent border-none p-0 text-sm font-black text-center text-slate-900 dark:text-white outline-none focus:ring-0 color-scheme-dark"
+                                    <div className="w-full">
+                                        <CustomDateTimePicker
+                                            label="Voting Ends"
+                                            icon={Trophy}
+                                            value={metaData.votingEndDate}
+                                            minDate={metaData.endDate}
+                                            onChange={(v: string) => updateField('votingEndDate', v)}
                                         />
                                     </div>
                                 </div>
