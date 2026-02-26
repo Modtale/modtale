@@ -410,11 +410,14 @@ export const JamBuilder: React.FC<any> = ({
         if (metaData.oneEntryPerPerson) text += "- **One Entry Limit:** Participants are restricted to a single project submission.\n";
 
         const res = metaData.restrictions;
+        if (res?.requireNewbie) text += "- **First-Time Jammers Only:** This jam is restricted to users who have never participated in a Modjam before.\n";
+        if (res?.requirePriorJams) text += "- **Veteran Jammers Only:** You must have participated in at least one previous Modjam.\n";
+        if (res?.requireNoPriorProjects) text += "- **First-Time Modders Only:** You must not have any previously published projects on the platform.\n";
+        if (res?.requirePriorProjects) text += "- **Veteran Modders Only:** You must have at least one previously published project on the platform.\n";
         if (res?.requireNewProject) text += "- **Fresh Projects Only:** All submissions must be created *after* the jam start date. Old projects are not allowed.\n";
         if (res?.requireSourceRepo) text += "- **Open Source (Repo):** A public source code repository must be linked to your project.\n";
         if (res?.requireOsiLicense) text += "- **Open Source (License):** You must use an OSI-approved open source license.\n";
         if (res?.requireUniqueSubmission) text += "- **Unique Submission:** Your project cannot be entered into multiple active jams simultaneously.\n";
-        if (res?.requireNewbie) text += "- **Newbies Only:** This jam is restricted to first-time jam participants.\n";
         if (res?.minContributors || res?.maxContributors) {
             text += `- **Team Size:** Teams must be between ${res.minContributors || 1} and ${res.maxContributors || 'unlimited'} members.\n`;
         }
@@ -1011,15 +1014,54 @@ export const JamBuilder: React.FC<any> = ({
                                         />
                                     </label>
 
-                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm md:col-span-2">
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Newbie Only</span>
-                                            <span className="text-xs text-slate-500 font-medium">Only users with no prior jam participations</span>
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">First-Time Jammer</span>
+                                            <span className="text-xs text-slate-500 font-medium">Has never participated in a jam before</span>
                                         </div>
                                         <input
                                             type="checkbox"
                                             checked={metaData.restrictions?.requireNewbie || false}
-                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireNewbie: e.target.checked})}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireNewbie: e.target.checked, requirePriorJams: e.target.checked ? false : metaData.restrictions?.requirePriorJams})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Veteran Jammer</span>
+                                            <span className="text-xs text-slate-500 font-medium">Has participated in a previous jam</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requirePriorJams || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requirePriorJams: e.target.checked, requireNewbie: e.target.checked ? false : metaData.restrictions?.requireNewbie})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">First-Time Modder</span>
+                                            <span className="text-xs text-slate-500 font-medium">Has no previously published projects</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requireNoPriorProjects || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requireNoPriorProjects: e.target.checked, requirePriorProjects: e.target.checked ? false : metaData.restrictions?.requirePriorProjects})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Veteran Modder</span>
+                                            <span className="text-xs text-slate-500 font-medium">Has at least one published project</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.restrictions?.requirePriorProjects || false}
+                                            onChange={e => updateField('restrictions', {...metaData.restrictions, requirePriorProjects: e.target.checked, requireNoPriorProjects: e.target.checked ? false : metaData.restrictions?.requireNoPriorProjects})}
                                             className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
                                         />
                                     </label>
@@ -1052,7 +1094,7 @@ export const JamBuilder: React.FC<any> = ({
                                         </div>
                                     </div>
 
-                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-20">
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[20]">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Required Dependency</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Search to force a required library</span>
                                         <JamDependencySelector
