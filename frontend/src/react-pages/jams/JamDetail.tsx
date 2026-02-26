@@ -671,29 +671,29 @@ const JamDetailView: React.FC<{
             }
             tabsAndTimers={
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-2 border-slate-200/50 dark:border-white/5 pb-0 min-h-[4rem]">
-                    <div className="flex items-center gap-8 md:gap-10">
+                    <div className="flex items-center gap-8 md:gap-10 w-full overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                         <Link
                             to={`/jam/${jam.slug}/overview`}
-                            className={`pb-4 text-base font-black uppercase tracking-widest transition-colors ${activeTab === 'overview' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                            className={`pb-4 text-base font-black uppercase tracking-widest transition-colors whitespace-nowrap ${activeTab === 'overview' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
                             Overview
                         </Link>
                         <Link
                             to={`/jam/${jam.slug}/rules`}
-                            className={`pb-4 text-base font-black uppercase tracking-widest transition-colors ${activeTab === 'rules' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                            className={`pb-4 text-base font-black uppercase tracking-widest transition-colors whitespace-nowrap ${activeTab === 'rules' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
                             Rules
                         </Link>
                         <Link
                             to={`/jam/${jam.slug}/entries`}
-                            className={`pb-4 text-base font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${activeTab === 'entries' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                            className={`pb-4 text-base font-black uppercase tracking-widest transition-all flex items-center gap-2.5 whitespace-nowrap ${activeTab === 'entries' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
                             Entries <span className={`px-2.5 py-0.5 rounded-full text-[11px] ml-1 transition-colors ${activeTab === 'entries' ? 'bg-modtale-accent/20 text-modtale-accent' : 'bg-slate-200 dark:bg-white/10'}`}>{submissions.length}</span>
                         </Link>
                     </div>
 
                     {jam.status === 'COMPLETED' && (
-                        <div className="pb-4 flex items-center gap-2.5 text-slate-500">
+                        <div className="pb-4 flex items-center gap-2.5 text-slate-500 whitespace-nowrap shrink-0">
                             <Clock className="w-4 h-4" />
                             <span className="text-[11px] font-black uppercase tracking-widest">Finished on {new Date(jam.updatedAt || jam.votingEndDate).toLocaleDateString()}</span>
                         </div>

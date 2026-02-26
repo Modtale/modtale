@@ -572,7 +572,7 @@ export const JamBuilder: React.FC<any> = ({
             }
             tabsAndTimers={
                 <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 border-b-2 border-slate-200/50 dark:border-white/5 pb-3 xl:pb-0">
-                    <div className="flex items-center gap-6 md:gap-8 h-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    <div className="flex items-center gap-6 md:gap-8 h-full w-full overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                         {[
                             {id: 'details', icon: FileText, label: 'Overview'},
                             {id: 'schedule', icon: Calendar, label: 'Schedule'},
@@ -585,7 +585,7 @@ export const JamBuilder: React.FC<any> = ({
                                 key={t.id}
                                 type="button"
                                 onClick={() => setActiveTab(t.id as any)}
-                                className={`pb-3 text-sm font-black uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === t.id ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                                className={`pb-3 text-sm font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                             >
                                 <t.icon className="w-4 h-4"/> {t.label}
                             </button>
