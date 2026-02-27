@@ -22,7 +22,7 @@ const {
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
-const rawApiUrl = import.meta.env.PUBLIC_API_URL;
+const rawApiUrl = import.meta.env.PUBLIC_API_URL || "https://modtale-backend-dev-ptpi2wdeva-uc.a.run.app";
 let apiOrigin = rawApiUrl;
 try {
     apiOrigin = new URL(rawApiUrl).origin;
