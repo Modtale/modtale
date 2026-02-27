@@ -57,6 +57,55 @@ interface ProjectBuilderProps {
     readOnly?: boolean;
 }
 
+const JamSelectDropdown = ({ value, options, onChange }: { value: string, options: any[], onChange: (v: string) => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selected = options.find(o => o.id === value);
+
+    return (
+        <div className="relative w-full" ref={ref}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center transition-all shadow-sm hover:border-modtale-accent/50"
+            >
+                <span className="truncate">{selected ? selected.title : '-- Do not enter a jam --'}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                    <button
+                        type="button"
+                        onClick={() => { onChange(''); setIsOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${!value ? 'bg-modtale-accent/10 text-modtale-accent font-black' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 font-medium'}`}
+                    >
+                        -- Do not enter a jam --
+                    </button>
+                    {options.map((opt) => (
+                        <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => { onChange(opt.id); setIsOpen(false); }}
+                            className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-black' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 font-medium'}`}
+                        >
+                            {opt.title}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                                   modData, setModData, metaData, setMetaData, versionData, setVersionData,
                                                                   bannerPreview, setBannerPreview, setBannerFile,
@@ -93,6 +142,12 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [jamMeta, setJamMeta] = useState<Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }>>({});
     const fetchedJamMeta = useRef<Set<string>>(new Set());
 
+    // Jam Submission State
+    const [activeJams, setActiveJams] = useState<any[]>([]);
+    const [selectedPublishJamId, setSelectedPublishJamId] = useState<string>('');
+    const [agreedToPublishJamRules, setAgreedToPublishJamRules] = useState(false);
+    const [isPublishingJam, setIsPublishingJam] = useState(false);
+
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
     const hasTags = metaData.tags.length > 0;
@@ -127,6 +182,15 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const hasGithub = currentUser?.connectedAccounts?.some(a => a.provider === 'github') || false;
     const hasGitlab = currentUser?.connectedAccounts?.some(a => a.provider === 'gitlab') || false;
     const [provider, setProvider] = useState<'github' | 'gitlab'>(hasGithub ? 'github' : (hasGitlab ? 'gitlab' : 'github'));
+
+    useEffect(() => {
+        if (!readOnly && currentUser) {
+            api.get('/modjams').then(res => {
+                const active = (res.data || []).filter((j: any) => j.status === 'ACTIVE');
+                setActiveJams(active);
+            }).catch(() => {});
+        }
+    }, [readOnly, currentUser]);
 
     const fetchRepos = useCallback(() => {
         if (readOnly || manualRepo) return;
@@ -419,6 +483,22 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const executePublish = async () => {
+        if (selectedPublishJamId && modData?.id) {
+            setIsPublishingJam(true);
+            try {
+                await api.post(`/modjams/${selectedPublishJamId}/submit`, { projectId: modData.id });
+            } catch (e: any) {
+                onShowStatus('error', 'Jam Submission Failed', e.response?.data?.message || 'Failed to submit to jam');
+                setIsPublishingJam(false);
+                return;
+            }
+        }
+        setIsPublishingJam(false);
+        setShowPublishConfirm(false);
+        if (handlePublish) handlePublish();
+    };
+
     const handleEditVersion = (version: ProjectVersion) => {
         const formattedDependencies = version.dependencies?.map(d =>
             `${d.modId}:${d.versionNumber}${d.isOptional ? ':optional' : ''}`
@@ -600,15 +680,83 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             )}
 
             {showPublishConfirm && handlePublish && (
-                <StatusModal
-                    type="info"
-                    title="Ready to publish?"
-                    message="Your project will be submitted for verification. Once approved, it will be live on Modtale."
-                    onClose={() => setShowPublishConfirm(false)}
-                    actionLabel="Submit Now"
-                    onAction={() => { setShowPublishConfirm(false); handlePublish(); }}
-                    secondaryLabel="Cancel"
-                />
+                <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col">
+                        <div className="p-8 pb-6">
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Ready to publish?</h2>
+                            <p className="text-slate-500 text-sm font-medium mb-6">Your project will be submitted for verification. Once approved, it will be live on Modtale.</p>
+
+                            {activeJams.length > 0 && (
+                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/10 p-5 mb-2">
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                                        <Trophy className="w-4 h-4 text-amber-500" /> Enter a Modjam (Optional)
+                                    </h3>
+
+                                    <JamSelectDropdown
+                                        value={selectedPublishJamId}
+                                        options={activeJams}
+                                        onChange={(v) => { setSelectedPublishJamId(v); setAgreedToPublishJamRules(false); }}
+                                    />
+
+                                    {(() => {
+                                        const j = activeJams.find(jam => jam.id === selectedPublishJamId);
+                                        if (!j) return null;
+                                        const hides = Boolean(j.hideSubmissions);
+                                        const rules = Boolean(j.rules?.trim().length > 0);
+
+                                        return (
+                                            <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                                                {hides && (
+                                                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-3">
+                                                        <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400">Secret Submissions Active</h4>
+                                                            <p className="text-xs text-amber-600/80 dark:text-amber-500/80 mt-1">
+                                                                This jam hides entries until voting starts. Your project will remain private until <strong className="text-amber-700 dark:text-amber-400">{new Date(j.votingEndDate).toLocaleDateString()}</strong>.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {rules && (
+                                                    <div className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setAgreedToPublishJamRules(!agreedToPublishJamRules); }}>
+                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-all ${agreedToPublishJamRules ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                            {agreedToPublishJamRules && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+                                                        </div>
+                                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400 select-none">
+                                                            I agree to the <a href={`/jam/${j.slug}/rules`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-modtale-accent hover:underline">Jam Rules</a>.
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowPublishConfirm(false)}
+                                disabled={isPublishingJam}
+                                className="px-6 py-3 rounded-xl font-bold text-sm bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executePublish}
+                                disabled={isPublishingJam || (() => {
+                                    const j = activeJams.find(jam => jam.id === selectedPublishJamId);
+                                    return j && Boolean(j.rules?.trim().length > 0) && !agreedToPublishJamRules;
+                                })()}
+                                className="px-8 py-3 rounded-xl font-black text-sm bg-modtale-accent hover:bg-modtale-accentHover text-white shadow-lg shadow-modtale-accent/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isPublishingJam ? <Spinner className="w-4 h-4" fullScreen={false} /> : <UploadCloud className="w-4 h-4" />}
+                                {selectedPublishJamId ? 'Submit to Jam & Publish' : 'Publish Project'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {showCardPreview && (

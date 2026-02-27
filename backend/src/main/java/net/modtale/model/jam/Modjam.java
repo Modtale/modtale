@@ -119,6 +119,7 @@ public class Modjam {
     private boolean allowConcurrentVoting;
     private boolean showResultsBeforeVotingEnds;
     private boolean oneEntryPerPerson = true;
+    private boolean hideSubmissions;
 
     private Instant createdAt = Instant.now();
     private Instant updatedAt = Instant.now();
@@ -169,6 +170,8 @@ public class Modjam {
     public void setShowResultsBeforeVotingEnds(boolean showResultsBeforeVotingEnds) { this.showResultsBeforeVotingEnds = showResultsBeforeVotingEnds; }
     public boolean isOneEntryPerPerson() { return oneEntryPerPerson; }
     public void setOneEntryPerPerson(boolean oneEntryPerPerson) { this.oneEntryPerPerson = oneEntryPerPerson; }
+    public boolean isHideSubmissions() { return hideSubmissions; }
+    public void setHideSubmissions(boolean hideSubmissions) { this.hideSubmissions = hideSubmissions; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

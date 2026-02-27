@@ -9,9 +9,12 @@ import net.modtale.repository.jam.ModjamRepository;
 import net.modtale.repository.jam.ModjamSubmissionRepository;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.resources.ModService;
 import net.modtale.service.resources.StorageService;
+import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -49,6 +52,11 @@ public class ModjamService {
     @Autowired private ModRepository modRepository;
     @Autowired private StorageService storageService;
     @Autowired private MongoTemplate mongoTemplate;
+    @Autowired private UserService userService;
+
+    @Autowired
+    @Lazy
+    private ModService modService;
 
     @Value("${app.r2.public-domain:#{null}}")
     private String publicDomain;
@@ -261,6 +269,8 @@ public class ModjamService {
         Modjam jam = modjamRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
 
+        String oldStatus = jam.getStatus();
+
         jam.setTitle(updatedJam.getTitle());
         jam.setDescription(updatedJam.getDescription());
         jam.setRules(updatedJam.getRules());
@@ -271,6 +281,7 @@ public class ModjamService {
         jam.setAllowConcurrentVoting(updatedJam.isAllowConcurrentVoting());
         jam.setShowResultsBeforeVotingEnds(updatedJam.isShowResultsBeforeVotingEnds());
         jam.setOneEntryPerPerson(updatedJam.isOneEntryPerPerson());
+        jam.setHideSubmissions(updatedJam.isHideSubmissions());
 
         if (updatedJam.getRestrictions() != null) {
             jam.setRestrictions(updatedJam.getRestrictions());
@@ -307,6 +318,11 @@ public class ModjamService {
 
         jam.setStatus(targetStatus);
         jam.setUpdatedAt(Instant.now());
+
+        if (jam.isHideSubmissions() && !List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(oldStatus)
+                && List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(targetStatus)) {
+            modService.revealHiddenJamMods(jam.getId());
+        }
 
         return enrichAndReturn(modjamRepository.save(jam));
     }
@@ -441,7 +457,19 @@ public class ModjamService {
     }
 
     public List<ModjamSubmission> getSubmissions(String jamId) {
+        Modjam jam = modjamRepository.findById(jamId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
         List<ModjamSubmission> subs = submissionRepository.findByJamId(jamId);
+
+        if (jam.isHideSubmissions() && List.of("DRAFT", "UPCOMING", "ACTIVE").contains(jam.getStatus())) {
+            User currentUser = userService.getCurrentUser();
+            boolean canSeeAll = currentUser != null && (currentUser.getId().equals(jam.getHostId()) || (currentUser.getRoles() != null && currentUser.getRoles().contains("ADMIN")));
+            if (!canSeeAll) {
+                String currentUserId = currentUser != null ? currentUser.getId() : null;
+                subs = subs.stream().filter(s -> s.getSubmitterId().equals(currentUserId)).collect(Collectors.toList());
+            }
+        }
+
         enrichSubmissions(jamId, subs);
         return subs;
     }
@@ -537,8 +565,12 @@ public class ModjamService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your project");
         }
 
-        if (!"PUBLISHED".equals(project.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must be published.");
+        if (!List.of("PUBLISHED", "PENDING", "APPROVED_HIDDEN", "DRAFT").contains(project.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project cannot be submitted in its current state.");
+        }
+
+        if (jam.isHideSubmissions() && "PUBLISHED".equals(project.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam hides submissions until voting opens. You cannot submit an already-public project.");
         }
 
         List<ModjamSubmission> existing = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
@@ -549,6 +581,15 @@ public class ModjamService {
 
         if (existing.stream().anyMatch(s -> s.getProjectId().equals(projectId))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already submitted.");
+        }
+
+        if ("DRAFT".equals(project.getStatus())) {
+            try {
+                modService.submitMod(projectId, userId);
+                project = modRepository.findById(projectId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+            }
         }
 
         Modjam.Restrictions res = jam.getRestrictions();
@@ -831,6 +872,37 @@ public class ModjamService {
         jam.setStatus("COMPLETED");
         jam.setUpdatedAt(Instant.now());
         return enrichAndReturn(modjamRepository.save(jam));
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void updateJamStates() {
+        List<Modjam> jams = modjamRepository.findAll();
+        Instant now = Instant.now();
+        for (Modjam jam : jams) {
+            if ("DRAFT".equals(jam.getStatus()) || "COMPLETED".equals(jam.getStatus())) continue;
+
+            String newStatus = jam.getStatus();
+            if (jam.getStartDate() != null && now.isBefore(jam.getStartDate())) {
+                newStatus = "UPCOMING";
+            } else if (jam.getEndDate() != null && now.isBefore(jam.getEndDate())) {
+                newStatus = "ACTIVE";
+            } else if (jam.getVotingEndDate() != null && now.isBefore(jam.getVotingEndDate())) {
+                newStatus = "VOTING";
+            } else {
+                newStatus = "AWAITING_WINNERS";
+            }
+
+            if (!newStatus.equals(jam.getStatus())) {
+                String oldStatus = jam.getStatus();
+                jam.setStatus(newStatus);
+                modjamRepository.save(jam);
+
+                if (jam.isHideSubmissions() && !List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(oldStatus)
+                        && List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(newStatus)) {
+                    modService.revealHiddenJamMods(jam.getId());
+                }
+            }
+        }
     }
 
     @Scheduled(cron = "0 0 0 * * *")

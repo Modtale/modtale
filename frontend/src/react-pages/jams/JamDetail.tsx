@@ -272,9 +272,14 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
             if (currentUser) {
                 try {
-                    const projRes = await api.get(`/creators/${currentUser.username}/projects?size=100`);
+                    let projRes;
+                    try {
+                        projRes = await api.get(`/user/projects?size=100`);
+                    } catch (e) {
+                        projRes = await api.get(`/creators/${currentUser.username}/projects?size=100`);
+                    }
                     const allProjects: Mod[] = projRes.data.content || [];
-                    setMyProjects(allProjects.filter(p => p.status === 'PUBLISHED'));
+                    setMyProjects(allProjects);
                 } catch (e) {
                     console.error("Failed to fetch user projects for jam submission", e);
                 }
@@ -306,6 +311,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 allowConcurrentVoting: jam.allowConcurrentVoting,
                 showResultsBeforeVotingEnds: jam.showResultsBeforeVotingEnds,
                 oneEntryPerPerson: (jam as any).oneEntryPerPerson,
+                hideSubmissions: (jam as any).hideSubmissions,
                 categories: jam.categories,
                 restrictions: (jam as any).restrictions || {},
                 judgeIds: (jam as any).judgeIds || [],
