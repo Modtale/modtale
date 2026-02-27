@@ -137,7 +137,13 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
         api.get(endpoint)
             .then(res => setRepos(res.data || []))
-            .catch(e => console.error(e))
+            .catch(e => {
+                console.error(e);
+                const errorMsg = typeof e.response?.data === 'string'
+                    ? e.response.data
+                    : e.response?.data?.message || 'Failed to fetch repositories.';
+                onShowStatus('error', 'Repository Error', errorMsg);
+            })
             .finally(() => setLoadingRepos(false));
     }, [provider, hasGithub, hasGitlab, readOnly, manualRepo]);
 
@@ -236,7 +242,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             setInviteUsername('');
             onShowStatus('success', 'Invited', `Invited ${inviteUsername}`);
         } catch (e: any) {
-            onShowStatus('error', 'Error', e.response?.data || 'Failed to invite user');
+            const errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to invite user.';
+            onShowStatus('error', 'Error', errorMsg);
         } finally {
             setIsInviting(false);
         }
@@ -256,7 +265,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             });
             onShowStatus('success', 'Removed', `Removed ${username}`);
         } catch (e: any) {
-            onShowStatus('error', 'Error', 'Failed to remove contributor');
+            const errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to remove contributor.';
+            onShowStatus('error', 'Error', errorMsg);
         }
     };
 
@@ -369,16 +381,37 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const handleSaveClick = async () => {
+        try {
+            const success = await handleSave(false);
+            if (success) {
+                setIsDirty(false);
+            }
+        } catch (e: any) {
+            const errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to save project.';
+            onShowStatus('error', 'Save Failed', errorMsg);
+        }
+    };
+
     const handleConfirmSlug = async (useCurrent: boolean) => {
         setSlugError(null);
         if (!useCurrent && metaData.slug) {
-            const success = await handleSave(true);
-            if (success) {
-                setShowSlugPrompt(false);
-                setIsDirty(false);
-                setShowPublishConfirm(true);
-            } else {
-                setSlugError("Unable to save slug. It may be taken.");
+            try {
+                const success = await handleSave(true);
+                if (success) {
+                    setShowSlugPrompt(false);
+                    setIsDirty(false);
+                    setShowPublishConfirm(true);
+                } else {
+                    setSlugError("Unable to save slug. It may be taken.");
+                }
+            } catch (e: any) {
+                const errorMsg = typeof e.response?.data === 'string'
+                    ? e.response.data
+                    : e.response?.data?.message || 'Failed to save slug.';
+                setSlugError(errorMsg);
             }
         } else {
             setShowSlugPrompt(false);
@@ -420,7 +453,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             setEditVersionData(null);
             onShowStatus('success', 'Updated', 'Version metadata updated successfully.');
         } catch (e: any) {
-            onShowStatus('error', 'Update Failed', e.response?.data?.message || 'Failed to update version.');
+            const errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to update version.';
+            onShowStatus('error', 'Update Failed', errorMsg);
         } finally {
             setIsSavingVersion(false);
         }
@@ -630,7 +666,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             </Link>
 
                             {!readOnly && (
-                                <button onClick={() => { handleSave(false); setIsDirty(false); }} disabled={isLoading} className="h-10 px-5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 font-bold flex items-center gap-2 hover:bg-slate-200">{isLoading ? <Spinner className="w-4 h-4"/> : <Save className="w-4 h-4" />} Save</button>
+                                <button onClick={handleSaveClick} disabled={isLoading} className="h-10 px-5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 font-bold flex items-center gap-2 hover:bg-slate-200">{isLoading ? <Spinner className="w-4 h-4"/> : <Save className="w-4 h-4" />} Save</button>
                             )}
 
                             {!readOnly && handlePublish && (
