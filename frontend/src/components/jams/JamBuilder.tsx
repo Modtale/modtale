@@ -506,6 +506,7 @@ export const JamBuilder: React.FC<any> = ({
     const generateRulesText = () => {
         let text = "### Official Modjam Rules\n\nPlease read and agree to the following rules before submitting your project.\n\n";
 
+        if (metaData.hideSubmissions) text += "- **Secret Submissions:** All project entries will remain completely hidden from the public until the voting phase commences.\n";
         if (metaData.oneEntryPerPerson) text += "- **One Entry Limit:** Participants are restricted to a single project submission.\n";
 
         const res = metaData.restrictions;
@@ -1271,6 +1272,19 @@ export const JamBuilder: React.FC<any> = ({
                                             type="checkbox"
                                             checked={metaData.restrictions?.requirePriorProjects || false}
                                             onChange={e => updateField('restrictions', {...metaData.restrictions, requirePriorProjects: e.target.checked, requireNoPriorProjects: e.target.checked ? false : metaData.restrictions?.requireNoPriorProjects})}
+                                            className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm md:col-span-2">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-white">Hide Submissions</span>
+                                            <span className="text-xs text-slate-500 font-medium">Keep project submissions secret until the voting phase begins</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={metaData.hideSubmissions || false}
+                                            onChange={e => updateField('hideSubmissions', e.target.checked)}
                                             className="w-5 h-5 rounded-md border-slate-300 text-modtale-accent focus:ring-modtale-accent transition-all"
                                         />
                                     </label>
