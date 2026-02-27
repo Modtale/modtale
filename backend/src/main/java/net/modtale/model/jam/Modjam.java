@@ -1,11 +1,13 @@
 package net.modtale.model.jam;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Document(collection = "modjams")
 public class Modjam {
@@ -30,6 +32,11 @@ public class Modjam {
     private String status = "DRAFT";
 
     private List<String> participantIds = new ArrayList<>();
+    private List<String> judgeIds = new ArrayList<>();
+    private List<String> pendingJudgeInvites = new ArrayList<>();
+
+    @Transient
+    private List<Map<String, String>> judgeProfiles = new ArrayList<>();
 
     public static class Category {
         private String id;
@@ -144,6 +151,12 @@ public class Modjam {
     public void setStatus(String status) { this.status = status; }
     public List<String> getParticipantIds() { return participantIds; }
     public void setParticipantIds(List<String> participantIds) { this.participantIds = participantIds; }
+    public List<String> getJudgeIds() { return judgeIds; }
+    public void setJudgeIds(List<String> judgeIds) { this.judgeIds = judgeIds; }
+    public List<String> getPendingJudgeInvites() { return pendingJudgeInvites; }
+    public void setPendingJudgeInvites(List<String> pendingJudgeInvites) { this.pendingJudgeInvites = pendingJudgeInvites; }
+    public List<Map<String, String>> getJudgeProfiles() { return judgeProfiles; }
+    public void setJudgeProfiles(List<Map<String, String>> judgeProfiles) { this.judgeProfiles = judgeProfiles; }
     public List<Category> getCategories() { return categories; }
     public void setCategories(List<Category> categories) { this.categories = categories; }
     public Restrictions getRestrictions() { return restrictions; }

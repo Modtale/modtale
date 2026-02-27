@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout.tsx';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -351,12 +351,49 @@ export const JamBuilder: React.FC<any> = ({
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [gameVersionOptions, setGameVersionOptions] = useState<{label: string, value: string}[]>([]);
 
+    // User search states
+    const [inviteUsername, setInviteUsername] = useState('');
+    const [inviteStatus, setInviteStatus] = useState('');
+    const [isInviting, setIsInviting] = useState(false);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [showResults, setShowResults] = useState(false);
+    const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const searchWrapperRef = useRef<HTMLDivElement>(null);
+    const [judgeProfiles, setJudgeProfiles] = useState<Record<string, User>>({});
+
     useEffect(() => {
         api.get('/meta/game-versions').then(res => {
             const versions = Array.isArray(res.data) ? res.data : (res.data.content || []);
             setGameVersionOptions(versions.map((v: string) => ({ label: v, value: v })));
         }).catch(() => {});
     }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+                setShowResults(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'judges' && metaData.judgeIds && metaData.judgeIds.length > 0) {
+            const missingIds = metaData.judgeIds.filter((id: string) => !judgeProfiles[id]);
+            if (missingIds.length > 0) {
+                api.post('/users/batch/ids', { ids: missingIds })
+                    .then(res => {
+                        const newProfiles = { ...judgeProfiles };
+                        res.data.forEach((u: any) => {
+                            newProfiles[u.id] = u;
+                        });
+                        setJudgeProfiles(newProfiles);
+                    })
+                    .catch(console.error);
+            }
+        }
+    }, [activeTab, metaData.judgeIds, judgeProfiles]);
 
     const [genState, setGenState] = useState({
         allowNSFW: false,
@@ -402,6 +439,68 @@ export const JamBuilder: React.FC<any> = ({
     const updateField = (field: string, val: any) => {
         markDirty();
         setMetaData((prev: any) => ({ ...prev, [field]: val }));
+    };
+
+    const handleInputSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setInviteUsername(val);
+        if (searchTimeout.current) clearTimeout(searchTimeout.current);
+        if (val.trim().length > 1) {
+            searchTimeout.current = setTimeout(async () => {
+                try {
+                    const res = await api.get('/users/search', { params: { query: val } });
+                    setSearchResults(res.data);
+                    setShowResults(true);
+                } catch (e) {
+                    setSearchResults([]);
+                }
+            }, 300);
+        } else {
+            setSearchResults([]);
+            setShowResults(false);
+        }
+    };
+
+    const handleSelectUser = (user: any) => {
+        setInviteUsername(user.username);
+        setShowResults(false);
+    };
+
+    const handleInviteJudge = async () => {
+        if (!metaData.id) {
+            setInviteStatus("Please save the jam draft first before inviting judges.");
+            return;
+        }
+        setIsInviting(true);
+        try {
+            const res = await api.post(`/modjams/${metaData.id}/judges/invite`, { username: inviteUsername });
+            setMetaData((prev: any) => ({
+                ...prev,
+                pendingJudgeInvites: res.data.pendingJudgeInvites,
+                judgeIds: res.data.judgeIds
+            }));
+            setInviteUsername('');
+            setInviteStatus("Invited successfully!");
+            setTimeout(() => setInviteStatus(''), 3000);
+        } catch (e: any) {
+            setInviteStatus(e.response?.data?.message || 'Failed to invite user.');
+        } finally {
+            setIsInviting(false);
+        }
+    };
+
+    const handleRemoveJudge = async (username: string) => {
+        if (!metaData.id) return;
+        try {
+            const res = await api.delete(`/modjams/${metaData.id}/judges/${username}`);
+            setMetaData((prev: any) => ({
+                ...prev,
+                pendingJudgeInvites: res.data.pendingJudgeInvites,
+                judgeIds: res.data.judgeIds
+            }));
+        } catch (e: any) {
+            alert(e.response?.data?.message || 'Failed to remove judge.');
+        }
     };
 
     const generateRulesText = () => {
@@ -578,6 +677,7 @@ export const JamBuilder: React.FC<any> = ({
                             {id: 'schedule', icon: Calendar, label: 'Schedule'},
                             {id: 'rules', icon: BookOpen, label: 'Rules'},
                             {id: 'categories', icon: Scale, label: `Judging (${metaData.categories?.length || 0})`},
+                            {id: 'judges', icon: Users, label: 'Judges'},
                             {id: 'restrictions', icon: Shield, label: 'Restrictions'},
                             {id: 'settings', icon: Settings, label: 'Settings'}
                         ].map(t => (
@@ -950,6 +1050,115 @@ export const JamBuilder: React.FC<any> = ({
                                         <p className="text-sm text-slate-500 font-bold">No scoring criteria added yet.</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'judges' && (
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-200/50 dark:border-white/5 pb-4 flex items-center gap-2">
+                                <Users className="w-4 h-4" /> Panel of Judges
+                            </h3>
+
+                            <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm">
+                                <div className="flex flex-col md:flex-row gap-6 mb-8">
+                                    <div className="flex-1 space-y-2">
+                                        <h4 className="font-black text-lg text-slate-900 dark:text-white">Invite a Judge</h4>
+                                        <p className="text-sm text-slate-500 font-medium">Judges have their scores tracked separately, giving organizers clear insight into expert opinions when picking winners.</p>
+                                    </div>
+                                    <div className="flex-1 relative z-50" ref={searchWrapperRef}>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1 group">
+                                                <UserIcon className="absolute left-4 top-3 w-4 h-4 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
+                                                <input
+                                                    type="text"
+                                                    value={inviteUsername}
+                                                    onChange={handleInputSearchChange}
+                                                    onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
+                                                    placeholder="Search username..."
+                                                    className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent transition-all"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={handleInviteJudge}
+                                                disabled={isInviting || !inviteUsername.trim()}
+                                                className="px-6 py-2.5 bg-modtale-accent hover:bg-modtale-accentHover text-white font-black rounded-xl shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 shrink-0"
+                                            >
+                                                {isInviting ? <Spinner className="w-4 h-4" fullScreen={false} /> : <UserPlus className="w-4 h-4" />} Invite
+                                            </button>
+                                        </div>
+
+                                        {showResults && searchResults.length > 0 && (
+                                            <div className="absolute top-full left-0 right-[100px] mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                                                {searchResults.map(user => (
+                                                    <button
+                                                        key={user.id}
+                                                        type="button"
+                                                        onClick={() => handleSelectUser(user)}
+                                                        className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0">
+                                                            <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{user.username}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {inviteStatus && (
+                                            <p className={`text-xs font-bold mt-2 ml-1 ${inviteStatus.includes('success') ? 'text-green-500' : 'text-red-500'}`}>
+                                                {inviteStatus}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {((metaData.judgeIds || []).length === 0 && (metaData.pendingJudgeInvites || []).length === 0) ? (
+                                        <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-2xl text-slate-400">
+                                            <p className="font-bold text-sm">No judges invited yet.</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {(metaData.pendingJudgeInvites || []).map((username: string) => (
+                                                <div key={username} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center"><Users className="w-4 h-4 text-slate-400" /></div>
+                                                        <div>
+                                                            <div className="font-bold text-slate-900 dark:text-white">{username}</div>
+                                                            <div className="text-[10px] font-black uppercase tracking-widest text-orange-500">Pending Invite</div>
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => handleRemoveJudge(username)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {(metaData.judgeIds || []).map((id: string) => {
+                                                const profile = judgeProfiles[id];
+                                                return (
+                                                    <div key={id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-sm">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200 dark:border-white/5">
+                                                                {profile?.avatarUrl ? <img src={profile.avatarUrl} className="w-full h-full object-cover" alt="" /> : <CheckCircle2 className="w-4 h-4 text-modtale-accent" />}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-slate-900 dark:text-white">{profile?.username || `ID: ${id.substring(0, 8)}`}</div>
+                                                                <div className="text-[10px] font-black uppercase tracking-widest text-green-500">Active Judge</div>
+                                                            </div>
+                                                        </div>
+                                                        {profile?.username && (
+                                                            <button onClick={() => handleRemoveJudge(profile.username)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
