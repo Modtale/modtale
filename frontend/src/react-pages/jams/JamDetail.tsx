@@ -258,11 +258,14 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 const subRes = await api.get(`/modjams/${res.data.id}/submissions`);
                 setSubmissions(subRes.data);
 
-                if (currentUser) {
+                // Only check follow status if the user is logged in and is NOT the host
+                if (currentUser && res.data.hostName && res.data.hostName !== currentUser.username) {
                     try {
                         const followRes = await api.get(`/user/following/${res.data.hostName}`);
                         setIsFollowing(Boolean(followRes.data));
-                    } catch (e) {}
+                    } catch (e) {
+                        setIsFollowing(false); // Fails gracefully (backend may return 404 if not followed)
+                    }
                 }
             } catch (err) {
                 console.error(err);
@@ -1007,7 +1010,7 @@ const JamDetailView: React.FC<{
                                                     <div className="mt-auto px-6 py-5 bg-amber-50/50 dark:bg-amber-950/20 border-t border-amber-500/20 flex items-center justify-center relative backdrop-blur-md z-20 pointer-events-none">
                                                         <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
                                                             <span className="text-[10px] font-black uppercase tracking-widest opacity-80">Final Score</span>
-                                                            <span className="text-2xl font-black leading-none drop-shadow-sm">{sub.totalScore?.toFixed(2) || '---'}</span>
+                                                            <span className="text-2xl font-black leading-none drop-shadow-sm">{sub.totalScore != null ? sub.totalScore.toFixed(2) : '---'}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1079,7 +1082,7 @@ const JamDetailView: React.FC<{
 
                                             <div className="mt-auto px-6 py-5 bg-white/40 dark:bg-black/20 border-t border-slate-200/50 dark:border-white/5 flex items-center justify-between relative backdrop-blur-md z-20 pointer-events-none">
                                                 <div className="flex items-center gap-2">
-                                                    {canSeeResults && sub.totalScore !== undefined ? (
+                                                    {canSeeResults && sub.totalScore != null ? (
                                                         <div className="flex flex-col text-left">
                                                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{jam.status === 'COMPLETED' ? 'Final Score' : 'Score'}</span>
                                                             <span className="text-xl font-black text-slate-900 dark:text-white leading-none mt-1 drop-shadow-sm">{sub.totalScore.toFixed(2)}</span>
@@ -1278,11 +1281,11 @@ const PickWinnersModal: React.FC<{
                                                     <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5 flex items-center gap-1.5 flex-wrap">
                                                         <span>by {sub.projectAuthor}</span>
                                                         <span>•</span>
-                                                        <span className="text-slate-600 dark:text-slate-300">Public: <span className="font-bold">{sub.totalPublicScore?.toFixed(2) || 'N/A'}</span></span>
+                                                        <span className="text-slate-600 dark:text-slate-300">Public: <span className="font-bold">{sub.totalPublicScore != null ? sub.totalPublicScore.toFixed(2) : 'N/A'}</span></span>
                                                         <span>•</span>
-                                                        <span className="text-blue-500 dark:text-blue-400">Judge: <span className="font-bold">{sub.totalJudgeScore?.toFixed(2) || 'N/A'}</span></span>
+                                                        <span className="text-blue-500 dark:text-blue-400">Judge: <span className="font-bold">{sub.totalJudgeScore != null ? sub.totalJudgeScore.toFixed(2) : 'N/A'}</span></span>
                                                         <span>•</span>
-                                                        <span className="text-modtale-accent">Overall: <span className="font-bold">{sub.totalScore?.toFixed(2) || 'N/A'}</span></span>
+                                                        <span className="text-modtale-accent">Overall: <span className="font-bold">{sub.totalScore != null ? sub.totalScore.toFixed(2) : 'N/A'}</span></span>
                                                     </div>
                                                     <div className="flex items-center gap-2 mt-2">
                                                         <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded-lg">
