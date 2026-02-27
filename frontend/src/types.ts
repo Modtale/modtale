@@ -183,6 +183,8 @@ export interface Modjam {
     votingEndDate: string;
     status: 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'VOTING' | 'AWAITING_WINNERS' | 'COMPLETED';
     participantIds: string[];
+    judgeIds?: string[];
+    pendingJudgeInvites?: string[];
     categories: ModjamCategory[];
     allowPublicVoting: boolean;
     allowConcurrentVoting: boolean;
@@ -196,6 +198,7 @@ export interface ModjamVote {
     voterId: string;
     categoryId: string;
     score: number;
+    isJudge?: boolean;
 }
 
 export interface ModjamSubmission {
@@ -211,6 +214,9 @@ export interface ModjamSubmission {
     votes: ModjamVote[];
     categoryScores?: Record<string, number>;
     totalScore?: number;
+    judgeCategoryScores?: Record<string, number>;
+    totalJudgeScore?: number;
+    totalPublicScore?: number;
     rank?: number;
     isWinner?: boolean;
     awardTitle?: string;

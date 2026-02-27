@@ -342,6 +342,14 @@ public class UserService {
         return mongoTemplate.find(query, User.class);
     }
 
+    public List<User> getPublicProfilesByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return new ArrayList<>();
+
+        Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
+        query.fields().include("username", "avatarUrl", "accountType", "badges", "id", "roles", "tier");
+        return mongoTemplate.find(query, User.class);
+    }
+
     public void deleteUser(String userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         user.setDeletedAt(LocalDateTime.now());

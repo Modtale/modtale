@@ -12,6 +12,9 @@ import net.modtale.repository.user.UserRepository;
 import net.modtale.service.resources.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -45,6 +48,7 @@ public class ModjamService {
     @Autowired private UserRepository userRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private StorageService storageService;
+    @Autowired private MongoTemplate mongoTemplate;
 
     @Value("${app.r2.public-domain:#{null}}")
     private String publicDomain;
@@ -134,6 +138,23 @@ public class ModjamService {
         }
     }
 
+    private Modjam enrichAndReturn(Modjam jam) {
+        if (jam != null && jam.getJudgeIds() != null && !jam.getJudgeIds().isEmpty()) {
+            List<Map<String, String>> profiles = new ArrayList<>();
+            for (String jId : jam.getJudgeIds()) {
+                userRepository.findById(jId).ifPresent(u -> {
+                    Map<String, String> p = new HashMap<>();
+                    p.put("id", u.getId());
+                    p.put("username", u.getUsername());
+                    p.put("avatarUrl", u.getAvatarUrl());
+                    profiles.add(p);
+                });
+            }
+            jam.setJudgeProfiles(profiles);
+        }
+        return jam;
+    }
+
     private void enrichSubmissions(String jamId, List<ModjamSubmission> subs) {
         if (subs == null || subs.isEmpty()) return;
 
@@ -191,16 +212,16 @@ public class ModjamService {
     }
 
     public List<Modjam> getAllJams() {
-        return modjamRepository.findAll();
+        return modjamRepository.findAll().stream().map(this::enrichAndReturn).collect(Collectors.toList());
     }
 
     public List<Modjam> getUserHostedJams(String hostId) {
-        return modjamRepository.findByHostId(hostId);
+        return modjamRepository.findByHostId(hostId).stream().map(this::enrichAndReturn).collect(Collectors.toList());
     }
 
     public Modjam getJamBySlug(String slug) {
-        return modjamRepository.findBySlug(slug)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+        return enrichAndReturn(modjamRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found")));
     }
 
     public Modjam createJam(Modjam jam, String hostId, String hostName) {
@@ -230,7 +251,10 @@ public class ModjamService {
             jam.setCategories(new ArrayList<>());
         }
 
-        return modjamRepository.save(jam);
+        if (jam.getJudgeIds() == null) jam.setJudgeIds(new ArrayList<>());
+        if (jam.getPendingJudgeInvites() == null) jam.setPendingJudgeInvites(new ArrayList<>());
+
+        return enrichAndReturn(modjamRepository.save(jam));
     }
 
     public Modjam updateJam(String id, Modjam updatedJam) {
@@ -284,7 +308,92 @@ public class ModjamService {
         jam.setStatus(targetStatus);
         jam.setUpdatedAt(Instant.now());
 
-        return modjamRepository.save(jam);
+        return enrichAndReturn(modjamRepository.save(jam));
+    }
+
+    public Modjam inviteJudge(String jamId, String username, String hostId) {
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+        if (!jam.getHostId().equals(hostId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can invite judges.");
+
+        Query query = new Query(Criteria.where("username").regex("^" + username + "$", "i"));
+        User targetUser = mongoTemplate.findOne(query, User.class);
+
+        if (targetUser == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User '" + username + "' not found.");
+        }
+
+        if (targetUser.getId().equals(hostId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot invite yourself.");
+        }
+
+        if (jam.getPendingJudgeInvites() == null) jam.setPendingJudgeInvites(new ArrayList<>());
+        if (jam.getJudgeIds() == null) jam.setJudgeIds(new ArrayList<>());
+
+        if (jam.getJudgeIds().contains(targetUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already a judge.");
+        }
+        if (jam.getPendingJudgeInvites().contains(targetUser.getUsername())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already invited.");
+        }
+
+        jam.getPendingJudgeInvites().add(targetUser.getUsername());
+
+        org.bson.Document notif = new org.bson.Document();
+        notif.put("userId", targetUser.getId());
+        notif.put("title", "Jam Judge Invitation");
+        notif.put("message", "You have been invited to be a judge for " + jam.getTitle());
+        notif.put("link", "/jam/" + jam.getSlug() + "/overview");
+        notif.put("read", false);
+        notif.put("createdAt", Instant.now());
+        mongoTemplate.save(notif, "notifications");
+
+        return enrichAndReturn(modjamRepository.save(jam));
+    }
+
+    public Modjam removeJudge(String jamId, String username, String hostId) {
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+        if (!jam.getHostId().equals(hostId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can remove judges.");
+
+        if (jam.getPendingJudgeInvites() != null) {
+            jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
+        }
+
+        if (jam.getJudgeIds() != null) {
+            Query query = new Query(Criteria.where("username").regex("^" + username + "$", "i"));
+            User targetUser = mongoTemplate.findOne(query, User.class);
+            if (targetUser != null) {
+                jam.getJudgeIds().remove(targetUser.getId());
+            }
+        }
+
+        return enrichAndReturn(modjamRepository.save(jam));
+    }
+
+    public Modjam acceptJudgeInvite(String jamId, String userId, String username) {
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+
+        if (jam.getPendingJudgeInvites() == null || jam.getPendingJudgeInvites().stream().noneMatch(u -> u.equalsIgnoreCase(username))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You don't have a pending invite for this jam.");
+        }
+
+        jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
+
+        if (jam.getJudgeIds() == null) jam.setJudgeIds(new ArrayList<>());
+        if (!jam.getJudgeIds().contains(userId)) {
+            jam.getJudgeIds().add(userId);
+        }
+
+        return enrichAndReturn(modjamRepository.save(jam));
+    }
+
+    public Modjam declineJudgeInvite(String jamId, String username) {
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+
+        if (jam.getPendingJudgeInvites() != null) {
+            jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
+        }
+
+        return enrichAndReturn(modjamRepository.save(jam));
     }
 
     public void updateIcon(String jamId, MultipartFile file) {
@@ -386,7 +495,7 @@ public class ModjamService {
             userRepository.save(user);
         }
 
-        return jam;
+        return enrichAndReturn(jam);
     }
 
     public Modjam leaveJam(String jamId, String userId) {
@@ -410,7 +519,7 @@ public class ModjamService {
             userRepository.save(user);
         }
 
-        return jam;
+        return enrichAndReturn(jam);
     }
 
     public ModjamSubmission submitProject(String jamId, String projectId, String userId) {
@@ -625,9 +734,11 @@ public class ModjamService {
 
         if (sub.getSubmitterId().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot vote on self");
 
+        boolean isJudge = jam.getJudgeIds() != null && jam.getJudgeIds().contains(userId);
+
         sub.getVotes().removeIf(v -> v.getVoterId().equals(userId) && v.getCategoryId().equals(categoryId));
 
-        ModjamSubmission.Vote vote = new ModjamSubmission.Vote(UUID.randomUUID().toString(), userId, categoryId, score);
+        ModjamSubmission.Vote vote = new ModjamSubmission.Vote(UUID.randomUUID().toString(), userId, categoryId, score, isJudge);
         sub.getVotes().add(vote);
 
         submissionRepository.save(sub);
@@ -643,26 +754,28 @@ public class ModjamService {
         if (submissions == null || submissions.isEmpty()) return;
 
         for (ModjamSubmission sub : submissions) {
-            Map<String, List<Integer>> categoryScoresMap = new HashMap<>();
+            Map<String, List<Integer>> allScoresMap = new HashMap<>();
+            Map<String, List<Integer>> publicScoresMap = new HashMap<>();
+            Map<String, List<Integer>> judgeScoresMap = new HashMap<>();
+
             if (sub.getVotes() != null) {
                 for (ModjamSubmission.Vote vote : sub.getVotes()) {
-                    categoryScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
+                    allScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
+                    if (vote.isJudge()) {
+                        judgeScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
+                    } else {
+                        publicScoresMap.computeIfAbsent(vote.getCategoryId(), k -> new ArrayList<>()).add(vote.getScore());
+                    }
                 }
             }
 
-            Map<String, Double> averagedCategoryScores = new HashMap<>();
-            double totalScoreSum = 0;
-            int categoryCount = 0;
+            sub.setCategoryScores(calculateAveragesMap(allScoresMap));
+            sub.setTotalScore(calculateOverallAverage(allScoresMap));
 
-            for (Map.Entry<String, List<Integer>> entry : categoryScoresMap.entrySet()) {
-                double avg = entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
-                averagedCategoryScores.put(entry.getKey(), avg);
-                totalScoreSum += avg;
-                categoryCount++;
-            }
+            sub.setJudgeCategoryScores(calculateAveragesMap(judgeScoresMap));
+            sub.setTotalJudgeScore(calculateOverallAverage(judgeScoresMap));
 
-            sub.setCategoryScores(averagedCategoryScores);
-            sub.setTotalScore(categoryCount > 0 ? totalScoreSum / categoryCount : 0.0);
+            sub.setTotalPublicScore(calculateOverallAverage(publicScoresMap));
         }
 
         submissions.sort((s1, s2) -> Double.compare(s2.getTotalScore() != null ? s2.getTotalScore() : 0.0, s1.getTotalScore() != null ? s1.getTotalScore() : 0.0));
@@ -672,6 +785,25 @@ public class ModjamService {
             sub.setRank(rank++);
             submissionRepository.save(sub);
         }
+    }
+
+    private Map<String, Double> calculateAveragesMap(Map<String, List<Integer>> scoresMap) {
+        Map<String, Double> averaged = new HashMap<>();
+        for (Map.Entry<String, List<Integer>> entry : scoresMap.entrySet()) {
+            double avg = entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
+            averaged.put(entry.getKey(), avg);
+        }
+        return averaged;
+    }
+
+    private Double calculateOverallAverage(Map<String, List<Integer>> scoresMap) {
+        double totalSum = 0;
+        int count = 0;
+        for (Map.Entry<String, List<Integer>> entry : scoresMap.entrySet()) {
+            totalSum += entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0.0);
+            count++;
+        }
+        return count > 0 ? totalSum / count : 0.0;
     }
 
     public Modjam finalizeJam(String jamId, String userId, List<Map<String, String>> winnersData) {
@@ -698,7 +830,7 @@ public class ModjamService {
 
         jam.setStatus("COMPLETED");
         jam.setUpdatedAt(Instant.now());
-        return modjamRepository.save(jam);
+        return enrichAndReturn(modjamRepository.save(jam));
     }
 
     @Scheduled(cron = "0 0 0 * * *")

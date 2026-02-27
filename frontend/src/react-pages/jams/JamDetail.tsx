@@ -10,7 +10,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2, ChevronRight, X, Crown, Check, BookOpen, MessageSquare, LogOut } from 'lucide-react';
+import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2, ChevronRight, X, Crown, Check, BookOpen, MessageSquare, LogOut, ShieldCheck, ExternalLink } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/jams/JamBuilder.tsx';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -128,6 +128,77 @@ const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => 
     );
 };
 
+const JudgesModal: React.FC<{ judgeIds: string[], onClose: () => void }> = ({ judgeIds, onClose }) => {
+    const [judges, setJudges] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchJudges = async () => {
+            setLoading(true);
+            try {
+                const res = await api.post('/users/batch/ids', { ids: judgeIds });
+                setJudges(res.data || []);
+            } catch (e) {
+                console.error("Failed to fetch judges", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (judgeIds.length > 0) {
+            fetchJudges();
+        } else {
+            setLoading(false);
+        }
+    }, [judgeIds]);
+
+    return (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                        <ShieldCheck className="w-6 h-6 text-blue-500" /> Event Judges
+                    </h3>
+                    <button onClick={onClose} className="p-2 bg-slate-200 dark:bg-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+                    {loading ? (
+                        <div className="flex justify-center py-10"><Spinner className="w-6 h-6" fullScreen={false} /></div>
+                    ) : judges.length > 0 ? (
+                        <div className="grid gap-2">
+                            {judges.map(judge => (
+                                <Link
+                                    key={judge.id}
+                                    to={`/creator/${judge.username}`}
+                                    onClick={onClose}
+                                    className="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 hover:border-blue-500/50 dark:hover:border-blue-500/50 hover:shadow-md transition-all group"
+                                >
+                                    <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden shrink-0">
+                                        <img src={judge.avatarUrl} alt={judge.username} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-900 dark:text-white truncate group-hover:text-blue-500 transition-colors">{judge.username}</span>
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-0.5 block">Official Judge</span>
+                                    </div>
+                                    <ExternalLink className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity transform -translate-x-2 group-hover:translate-x-0" />
+                                </Link>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-10 text-slate-500">
+                            <p className="font-bold text-sm">Cannot load judge profiles.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
     const { slug, id } = useParams<{ slug?: string, id?: string }>();
     const navigate = useNavigate();
@@ -142,6 +213,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [isSubmittingModalOpen, setIsSubmittingModalOpen] = useState(false);
     const [votingSubmissionId, setVotingSubmissionId] = useState<string | null>(null);
     const [pickingWinners, setPickingWinners] = useState(false);
+    const [showJudgesModal, setShowJudgesModal] = useState(false);
     const [now, setNow] = useState(0);
 
     const [statusModal, setStatusModal] = useState<{
@@ -156,6 +228,9 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     const [metaData, setMetaData] = useState<any>(null);
     const [builderTab, setBuilderTab] = useState<'details' | 'rules' | 'categories' | 'settings'>('details');
     const [isSavingJam, setIsSavingJam] = useState(false);
+
+    const [showInviteModal, setShowInviteModal] = useState(true);
+    const [isResolvingInvite, setIsResolvingInvite] = useState(false);
 
     const isEditRoute = location.pathname.endsWith('/edit');
 
@@ -233,6 +308,8 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 oneEntryPerPerson: (jam as any).oneEntryPerPerson,
                 categories: jam.categories,
                 restrictions: (jam as any).restrictions || {},
+                judgeIds: (jam as any).judgeIds || [],
+                pendingJudgeInvites: (jam as any).pendingJudgeInvites || [],
                 status: jam.status
             });
         }
@@ -404,6 +481,35 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         }
     };
 
+    const handleAcceptJudge = async () => {
+        if (!jam) return;
+        setIsResolvingInvite(true);
+        try {
+            const res = await api.post(`/modjams/${jam.id}/judges/accept`);
+            setJam(res.data);
+            setShowInviteModal(false);
+            setStatusModal({ type: 'success', title: 'Accepted!', message: 'You are now an official judge for this jam.' });
+        } catch (e: any) {
+            setStatusModal({ type: 'error', title: 'Error', message: e.response?.data?.message || 'Failed to accept invitation.' });
+        } finally {
+            setIsResolvingInvite(false);
+        }
+    };
+
+    const handleDeclineJudge = async () => {
+        if (!jam) return;
+        setIsResolvingInvite(true);
+        try {
+            const res = await api.post(`/modjams/${jam.id}/judges/decline`);
+            setJam(res.data);
+            setShowInviteModal(false);
+        } catch (e: any) {
+            setStatusModal({ type: 'error', title: 'Error', message: e.response?.data?.message || 'Failed to decline invitation.' });
+        } finally {
+            setIsResolvingInvite(false);
+        }
+    };
+
     const MarkdownComponents = {
         code({node, inline, className, children, ...props}: any) {
             const match = /language-(\w+)/.exec(className || '')
@@ -483,11 +589,13 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     }
 
     const isParticipating = Boolean(currentUser?.id && (jam.participantIds || []).includes(currentUser.id));
+    const isJudge = Boolean(currentUser?.id && jam.judgeIds?.includes(currentUser.id));
+    const isInvitedJudge = Boolean(currentUser?.username && jam.pendingJudgeInvites?.some(u => u.toLowerCase() === currentUser.username.toLowerCase()));
     const hasSubmitted = Boolean(submissions.some(s => s.submitterId === currentUser?.id));
 
     const votingClosed = Boolean(jam.votingEndDate && now > new Date(jam.votingEndDate).getTime());
-    const canVote = Boolean(!votingClosed && jam.status !== 'COMPLETED' && jam.status !== 'AWAITING_WINNERS' && (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || currentUser?.id === jam.hostId));
-    const canSeeResults = Boolean(jam.status === 'COMPLETED' || jam.status === 'AWAITING_WINNERS' || jam.showResultsBeforeVotingEnds || currentUser?.id === jam.hostId);
+    const canVote = Boolean(!votingClosed && jam.status !== 'COMPLETED' && jam.status !== 'AWAITING_WINNERS' && (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || currentUser?.id === jam.hostId || isJudge));
+    const canSeeResults = Boolean(jam.status === 'COMPLETED' || jam.status === 'AWAITING_WINNERS' || jam.showResultsBeforeVotingEnds || currentUser?.id === jam.hostId || isJudge);
 
     return (
         <>
@@ -500,6 +608,13 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                     onAction={statusModal.onAction}
                     actionLabel={statusModal.actionLabel}
                     secondaryLabel={statusModal.secondaryLabel}
+                />
+            )}
+
+            {showJudgesModal && jam.judgeIds && (
+                <JudgesModal
+                    judgeIds={jam.judgeIds}
+                    onClose={() => setShowJudgesModal(false)}
                 />
             )}
 
@@ -536,6 +651,31 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 />
             )}
 
+            {isInvitedJudge && showInviteModal && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setShowInviteModal(false)}>
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 p-10 text-center" onClick={e => e.stopPropagation()}>
+                        <div className="w-24 h-24 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border-8 border-white dark:border-slate-800 shadow-xl">
+                            <ShieldCheck className="w-10 h-10 text-blue-500" />
+                        </div>
+                        <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-3">You're Invited!</h2>
+                        <p className="text-slate-500 font-medium mb-10 text-base">
+                            <strong>{jam.hostName}</strong> has invited you to be an official judge for <strong>{jam.title}</strong>. Your scores will directly influence the final winners.
+                        </p>
+                        <div className="flex flex-col gap-3">
+                            <button onClick={handleAcceptJudge} disabled={isResolvingInvite} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-lg transition-all shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center">
+                                {isResolvingInvite ? <Spinner className="w-5 h-5 mx-auto" fullScreen={false} /> : 'Accept Role'}
+                            </button>
+                            <button onClick={handleDeclineJudge} disabled={isResolvingInvite} className="w-full h-14 bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50">
+                                Decline
+                            </button>
+                            <button onClick={() => setShowInviteModal(false)} disabled={isResolvingInvite} className="mt-4 text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline decoration-transparent hover:decoration-current">
+                                Look around first
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <JamDetailView
                 jam={jam}
                 submissions={submissions}
@@ -557,6 +697,10 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 setVotingSubmissionId={setVotingSubmissionId}
                 memoizedDescription={memoizedDescription}
                 memoizedRules={memoizedRules}
+                isInvitedJudge={isInvitedJudge}
+                handleAcceptJudge={handleAcceptJudge}
+                handleDeclineJudge={handleDeclineJudge}
+                onShowJudges={() => setShowJudgesModal(true)}
             />
         </>
     );
@@ -582,11 +726,16 @@ const JamDetailView: React.FC<{
     canVote: boolean,
     setVotingSubmissionId: (id: string | null) => void,
     memoizedDescription: React.ReactNode,
-    memoizedRules: React.ReactNode
+    memoizedRules: React.ReactNode,
+    isInvitedJudge: boolean,
+    handleAcceptJudge: () => void,
+    handleDeclineJudge: () => void,
+    onShowJudges: () => void
 }> = ({
           jam, submissions, currentUser, isFollowing, handleFollowToggle, startEditing, handleDelete,
           isParticipating, hasSubmitted, handleJoin, handleLeave, setIsSubmittingModalOpen, setPickingWinners, activeTab,
-          now, canSeeResults, canVote, setVotingSubmissionId, memoizedDescription, memoizedRules
+          now, canSeeResults, canVote, setVotingSubmissionId, memoizedDescription, memoizedRules,
+          isInvitedJudge, handleAcceptJudge, handleDeclineJudge, onShowJudges
       }) => {
     const sortedSubmissions = useMemo(() => [...submissions].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)), [submissions]);
 
@@ -626,6 +775,14 @@ const JamDetailView: React.FC<{
                     </div>
                     <div className="flex items-center gap-4 text-xs font-black uppercase tracking-[0.1em] text-slate-500">
                         <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {(jam.participantIds || []).length} participants</span>
+                        {jam.judgeIds && jam.judgeIds.length > 0 && (
+                            <button
+                                onClick={onShowJudges}
+                                className="flex items-center gap-1.5 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors hover:underline decoration-blue-500/30 underline-offset-2"
+                            >
+                                <ShieldCheck className="w-4 h-4" /> {jam.judgeIds.length} judges
+                            </button>
+                        )}
                     </div>
                 </div>
             }
@@ -702,6 +859,25 @@ const JamDetailView: React.FC<{
             }
             mainContent={
                 <div className="animate-in fade-in slide-in-from-bottom-2 mt-8 md:mt-10">
+
+                    {isInvitedJudge && (
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between shadow-2xl gap-6 mb-10 border border-white/20">
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0 border-2 border-white/30">
+                                    <ShieldCheck className="w-7 h-7 text-white" />
+                                </div>
+                                <div>
+                                    <h4 className="font-black text-xl leading-none mb-1">Judge Invitation Pending</h4>
+                                    <p className="text-blue-100 text-sm font-medium">Please accept or decline the invitation to judge this jam.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <button onClick={handleDeclineJudge} className="flex-1 md:flex-none px-6 py-3 bg-black/20 hover:bg-black/30 text-white font-bold rounded-xl transition-colors">Decline</button>
+                                <button onClick={handleAcceptJudge} className="flex-1 md:flex-none px-8 py-3 bg-white text-blue-600 hover:bg-blue-50 font-black rounded-xl shadow-lg transition-transform active:scale-95">Accept Invite</button>
+                            </div>
+                        </div>
+                    )}
+
                     {jam.status === 'COMPLETED' && (activeTab === 'overview' || activeTab === 'rules') && (
                         <Link
                             to={`/jam/${jam.slug}/entries`}
@@ -1093,7 +1269,15 @@ const PickWinnersModal: React.FC<{
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <h4 className={`font-bold truncate transition-colors ${isSelected ? 'text-amber-700 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>{sub.projectTitle}</h4>
-                                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">by {sub.projectAuthor} • Score: {sub.totalScore?.toFixed(2) || 'N/A'}</div>
+                                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                                        <span>by {sub.projectAuthor}</span>
+                                                        <span>•</span>
+                                                        <span className="text-slate-600 dark:text-slate-300">Public: <span className="font-bold">{sub.totalPublicScore?.toFixed(2) || 'N/A'}</span></span>
+                                                        <span>•</span>
+                                                        <span className="text-blue-500 dark:text-blue-400">Judge: <span className="font-bold">{sub.totalJudgeScore?.toFixed(2) || 'N/A'}</span></span>
+                                                        <span>•</span>
+                                                        <span className="text-modtale-accent">Overall: <span className="font-bold">{sub.totalScore?.toFixed(2) || 'N/A'}</span></span>
+                                                    </div>
                                                     <div className="flex items-center gap-2 mt-2">
                                                         <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded-lg">
                                                             <Star className="w-3 h-3" />

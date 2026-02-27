@@ -25,8 +25,14 @@ public class ModjamSubmission {
 
     private String submitterId;
     private List<Vote> votes = new ArrayList<>();
+
     private Map<String, Double> categoryScores;
     private Double totalScore;
+
+    private Map<String, Double> judgeCategoryScores;
+    private Double totalJudgeScore;
+    private Double totalPublicScore;
+
     private Integer rank;
 
     private boolean isWinner;
@@ -45,14 +51,16 @@ public class ModjamSubmission {
         private String voterId;
         private String categoryId;
         private int score;
+        private boolean isJudge;
 
         public Vote() {}
 
-        public Vote(String id, String voterId, String categoryId, int score) {
+        public Vote(String id, String voterId, String categoryId, int score, boolean isJudge) {
             this.id = id;
             this.voterId = voterId;
             this.categoryId = categoryId;
             this.score = score;
+            this.isJudge = isJudge;
         }
 
         public String getId() { return id; }
@@ -63,6 +71,8 @@ public class ModjamSubmission {
         public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
         public int getScore() { return score; }
         public void setScore(int score) { this.score = score; }
+        public boolean isJudge() { return isJudge; }
+        public void setJudge(boolean judge) { isJudge = judge; }
     }
 
     public String getId() { return id; }
@@ -89,6 +99,12 @@ public class ModjamSubmission {
     public void setCategoryScores(Map<String, Double> categoryScores) { this.categoryScores = categoryScores; }
     public Double getTotalScore() { return totalScore; }
     public void setTotalScore(Double totalScore) { this.totalScore = totalScore; }
+    public Map<String, Double> getJudgeCategoryScores() { return judgeCategoryScores; }
+    public void setJudgeCategoryScores(Map<String, Double> judgeCategoryScores) { this.judgeCategoryScores = judgeCategoryScores; }
+    public Double getTotalJudgeScore() { return totalJudgeScore; }
+    public void setTotalJudgeScore(Double totalJudgeScore) { this.totalJudgeScore = totalJudgeScore; }
+    public Double getTotalPublicScore() { return totalPublicScore; }
+    public void setTotalPublicScore(Double totalPublicScore) { this.totalPublicScore = totalPublicScore; }
     public Integer getRank() { return rank; }
     public void setRank(Integer rank) { this.rank = rank; }
     public boolean isWinner() { return isWinner; }

@@ -134,4 +134,33 @@ public class ModjamController {
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.finalizeJam(jamId, user.getId(), winners));
     }
+
+    // Judging Endpoints
+    @PostMapping("/{jamId}/judges/invite")
+    public ResponseEntity<Modjam> inviteJudge(@PathVariable String jamId, @RequestBody Map<String, String> body) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.inviteJudge(jamId, body.get("username"), user.getId()));
+    }
+
+    @PostMapping("/{jamId}/judges/accept")
+    public ResponseEntity<Modjam> acceptJudge(@PathVariable String jamId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.acceptJudgeInvite(jamId, user.getId(), user.getUsername()));
+    }
+
+    @PostMapping("/{jamId}/judges/decline")
+    public ResponseEntity<Modjam> declineJudge(@PathVariable String jamId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.declineJudgeInvite(jamId, user.getUsername()));
+    }
+
+    @DeleteMapping("/{jamId}/judges/{username}")
+    public ResponseEntity<Modjam> removeJudge(@PathVariable String jamId, @PathVariable String username) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.removeJudge(jamId, username, user.getId()));
+    }
 }
