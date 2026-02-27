@@ -240,8 +240,17 @@ public class ModjamService {
         jam.setHostId(hostId);
         jam.setHostName(hostName);
 
-        String baseSlug = jam.getTitle().toLowerCase().replaceAll("[^a-z0-9]+", "-");
-        jam.setSlug(baseSlug + "-" + UUID.randomUUID().toString().substring(0, 6));
+        if (jam.getSlug() == null || jam.getSlug().trim().isEmpty()) {
+            throw new IllegalArgumentException("A custom URL slug is required.");
+        }
+        String newSlug = jam.getSlug().toLowerCase();
+        if (!newSlug.matches("^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$")) {
+            throw new IllegalArgumentException("Invalid URL Slug. Must be 3-50 characters, lowercase alphanumeric with dashes, and cannot start or end with a dash.");
+        }
+        if (modjamRepository.findBySlug(newSlug).isPresent()) {
+            throw new IllegalArgumentException("Jam URL '" + newSlug + "' is already taken.");
+        }
+        jam.setSlug(newSlug);
 
         if (jam.getStartDate() != null && jam.getStartDate().isAfter(Instant.now())) {
             jam.setStatus("UPCOMING");
@@ -271,6 +280,20 @@ public class ModjamService {
     public Modjam updateJam(String id, Modjam updatedJam) {
         Modjam jam = modjamRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+
+        if (updatedJam.getSlug() == null || updatedJam.getSlug().trim().isEmpty()) {
+            throw new IllegalArgumentException("A custom URL slug is required.");
+        }
+        String newSlug = updatedJam.getSlug().toLowerCase();
+        if (!newSlug.equals(jam.getSlug())) {
+            if (!newSlug.matches("^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$")) {
+                throw new IllegalArgumentException("Invalid URL Slug. Must be 3-50 characters, lowercase alphanumeric with dashes, and cannot start or end with a dash.");
+            }
+            if (modjamRepository.findBySlug(newSlug).isPresent()) {
+                throw new IllegalArgumentException("Jam URL '" + newSlug + "' is already taken.");
+            }
+            jam.setSlug(newSlug);
+        }
 
         String oldStatus = jam.getStatus();
 
