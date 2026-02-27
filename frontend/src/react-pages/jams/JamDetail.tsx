@@ -10,7 +10,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Mod } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2, ChevronRight, X, Crown, Check, BookOpen, MessageSquare, LogOut, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2, ChevronRight, X, Crown, Check, BookOpen, MessageSquare, LogOut, ShieldCheck, ExternalLink, EyeOff } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout';
 import { JamBuilder } from '@/components/jams/JamBuilder.tsx';
 import { JamSubmissionWizard } from '@/react-pages/jams/JamSubmissionWizard';
@@ -751,6 +751,8 @@ const JamDetailView: React.FC<{
     const winners = useMemo(() => sortedSubmissions.filter(s => (s as any).winner === true), [sortedSubmissions]);
     const regularEntries = useMemo(() => jam.status === 'COMPLETED' ? sortedSubmissions.filter(s => (s as any).winner !== true) : sortedSubmissions, [jam.status, sortedSubmissions]);
 
+    const isSecretPhase = Boolean((jam as any).hideSubmissions && ['DRAFT', 'UPCOMING', 'ACTIVE'].includes(jam.status));
+
     const resolveUrl = (url?: string | null) => {
         if (!url) return '';
         if (url.startsWith('/api') || url.startsWith('/uploads')) {
@@ -854,7 +856,7 @@ const JamDetailView: React.FC<{
                             to={`/jam/${jam.slug}/entries`}
                             className={`pb-4 text-base font-black uppercase tracking-widest transition-all flex items-center gap-2.5 whitespace-nowrap ${activeTab === 'entries' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
-                            Entries <span className={`px-2.5 py-0.5 rounded-full text-[11px] ml-1 transition-colors ${activeTab === 'entries' ? 'bg-modtale-accent/20 text-modtale-accent' : 'bg-slate-200 dark:bg-white/10'}`}>{submissions.length}</span>
+                            Entries {!isSecretPhase && <span className={`px-2.5 py-0.5 rounded-full text-[11px] ml-1 transition-colors ${activeTab === 'entries' ? 'bg-modtale-accent/20 text-modtale-accent' : 'bg-slate-200 dark:bg-white/10'}`}>{submissions.length}</span>}
                         </Link>
                     </div>
 
@@ -939,6 +941,19 @@ const JamDetailView: React.FC<{
                     ) : (
                         <div className="space-y-10">
                             <EventTimeline jam={jam} now={now} />
+
+                            {isSecretPhase && (
+                                <div className="bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 p-5 md:p-6 rounded-2xl flex items-start gap-4 mb-8">
+                                    <EyeOff className="w-6 h-6 shrink-0 mt-0.5 text-blue-500" />
+                                    <div>
+                                        <h4 className="font-black text-lg md:text-xl mb-1">Submissions are Hidden</h4>
+                                        <p className="font-medium text-sm md:text-base opacity-90 leading-relaxed">
+                                            The host has chosen to keep all project submissions secret until the voting phase begins on <strong>{new Date(jam.votingEndDate).toLocaleDateString()}</strong>.
+                                            {hasSubmitted && ' You can only see your own submission for now.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             {jam.status === 'COMPLETED' && winners.length > 0 && (
                                 <div className="mb-16">
@@ -1115,9 +1130,19 @@ const JamDetailView: React.FC<{
                                 })}
                                 {submissions.length === 0 && (
                                     <div className="col-span-full py-24 text-center text-slate-500 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border-2 border-dashed border-white/60 dark:border-white/10 rounded-2xl">
-                                        <LayoutGrid className="w-16 h-16 mx-auto mb-6 opacity-20" />
-                                        <p className="text-xl font-black text-slate-700 dark:text-slate-300">No submissions yet.</p>
-                                        <p className="text-base font-medium mt-2">Be the first to submit a project!</p>
+                                        {isSecretPhase ? (
+                                            <>
+                                                <EyeOff className="w-16 h-16 mx-auto mb-6 opacity-20" />
+                                                <p className="text-xl font-black text-slate-700 dark:text-slate-300">It's a secret to everybody.</p>
+                                                <p className="text-base font-medium mt-2">Entries will be revealed when voting opens.</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <LayoutGrid className="w-16 h-16 mx-auto mb-6 opacity-20" />
+                                                <p className="text-xl font-black text-slate-700 dark:text-slate-300">No submissions yet.</p>
+                                                <p className="text-base font-medium mt-2">Be the first to submit a project!</p>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
