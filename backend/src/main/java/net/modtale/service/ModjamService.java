@@ -161,18 +161,14 @@ public class ModjamService {
         return jam;
     }
 
-    private void enrichSubmissions(String jamId, List<ModjamSubmission> subs) {
+    private void enrichSubmissions(String jamId, List<ModjamSubmission> subs, Map<String, Mod> projectMap) {
         if (subs == null || subs.isEmpty()) return;
 
-        List<String> projectIds = subs.stream().map(ModjamSubmission::getProjectId).toList();
-        Iterable<Mod> projectsIterable = modRepository.findAllById(projectIds);
-        List<Mod> projects = new ArrayList<>();
-        projectsIterable.forEach(projects::add);
-
-        Map<String, Mod> projectMap = projects.stream().collect(Collectors.toMap(Mod::getId, p -> p));
-
         Map<String, Integer> userVoteCount = new HashMap<>();
+        Set<String> visibleProjectIds = new HashSet<>();
+
         for (ModjamSubmission s : subs) {
+            visibleProjectIds.add(s.getProjectId());
             if (s.getVotes() != null) {
                 for (ModjamSubmission.Vote v : s.getVotes()) {
                     userVoteCount.put(v.getVoterId(), userVoteCount.getOrDefault(v.getVoterId(), 0) + 1);
@@ -181,8 +177,8 @@ public class ModjamService {
         }
 
         Map<String, Integer> userCommentCount = new HashMap<>();
-        for (Mod p : projects) {
-            if (p.getComments() != null) {
+        for (Mod p : projectMap.values()) {
+            if (visibleProjectIds.contains(p.getId()) && p.getComments() != null) {
                 for (net.modtale.model.resources.Comment c : p.getComments()) {
                     if (!c.getUser().equals(p.getAuthor())) {
                         userCommentCount.put(c.getUser(), userCommentCount.getOrDefault(c.getUser(), 0) + 1);
@@ -203,6 +199,15 @@ public class ModjamService {
             sub.setVotesCast(userVoteCount.getOrDefault(sub.getSubmitterId(), 0));
             sub.setCommentsGiven(userCommentCount.getOrDefault(sub.getProjectAuthor(), 0));
         }
+    }
+
+    private void enrichSubmissions(String jamId, List<ModjamSubmission> subs) {
+        if (subs == null || subs.isEmpty()) return;
+        List<String> projectIds = subs.stream().map(ModjamSubmission::getProjectId).toList();
+        Iterable<Mod> projectsIterable = modRepository.findAllById(projectIds);
+        Map<String, Mod> projectMap = new HashMap<>();
+        projectsIterable.forEach(p -> projectMap.put(p.getId(), p));
+        enrichSubmissions(jamId, subs, projectMap);
     }
 
     private String extractStorageKey(String fileUrl) {
@@ -457,19 +462,41 @@ public class ModjamService {
     public List<ModjamSubmission> getSubmissions(String jamId) {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        List<ModjamSubmission> subs = submissionRepository.findByJamId(jamId);
+        List<ModjamSubmission> allSubs = submissionRepository.findByJamId(jamId);
 
-        if (jam.isHideSubmissions() && List.of("DRAFT", "UPCOMING", "ACTIVE").contains(jam.getStatus())) {
-            User currentUser = userService.getCurrentUser();
-            boolean canSeeAll = currentUser != null && (currentUser.getId().equals(jam.getHostId()) || (currentUser.getRoles() != null && currentUser.getRoles().contains("ADMIN")));
-            if (!canSeeAll) {
-                String currentUserId = currentUser != null ? currentUser.getId() : null;
-                subs = subs.stream().filter(s -> s.getSubmitterId().equals(currentUserId)).collect(Collectors.toList());
+        if (allSubs == null || allSubs.isEmpty()) return new ArrayList<>();
+
+        User currentUser = userService.getCurrentUser();
+        boolean isAdmin = currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("ADMIN");
+        boolean isHost = currentUser != null && currentUser.getId().equals(jam.getHostId());
+
+        boolean isJamHiding = jam.isHideSubmissions() && List.of("DRAFT", "UPCOMING", "ACTIVE").contains(jam.getStatus());
+
+        List<String> projectIds = allSubs.stream().map(ModjamSubmission::getProjectId).toList();
+        Iterable<Mod> projectsIterable = modRepository.findAllById(projectIds);
+        Map<String, Mod> projectMap = new HashMap<>();
+        projectsIterable.forEach(p -> projectMap.put(p.getId(), p));
+
+        List<ModjamSubmission> visibleSubs = new ArrayList<>();
+
+        for (ModjamSubmission sub : allSubs) {
+            Mod project = projectMap.get(sub.getProjectId());
+            if (project == null) continue;
+
+            boolean isSubmitter = currentUser != null && currentUser.getId().equals(sub.getSubmitterId());
+            boolean canSeeHidden = isAdmin || isHost || isSubmitter;
+            boolean isPublicProject = "PUBLISHED".equals(project.getStatus()) || "ARCHIVED".equals(project.getStatus());
+
+            if (!canSeeHidden) {
+                if (!isPublicProject || isJamHiding) {
+                    continue; // Backend enforces filtering out unreleased or jam-hidden projects
+                }
             }
+            visibleSubs.add(sub);
         }
 
-        enrichSubmissions(jamId, subs);
-        return subs;
+        enrichSubmissions(jamId, visibleSubs, projectMap);
+        return visibleSubs;
     }
 
     public Modjam participate(String jamId, String userId) {
