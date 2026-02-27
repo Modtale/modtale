@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, User } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
-import { Trophy, Plus, ArrowLeft, Calendar, Users, LayoutGrid } from 'lucide-react';
+import {Trophy, Plus, ArrowLeft, Calendar, Users, AlertCircle, LayoutGrid} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JamBuilder } from '@/components/jams/JamBuilder.tsx';
 
@@ -79,7 +79,7 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
                 <div className="mt-auto w-full flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 px-3 py-2 rounded-lg border border-slate-200/50 dark:border-white/5">
                         <Users className="w-4 h-4 text-modtale-accent" />
-                        <span>{jam.participantIds?.length || 0}</span>
+                        <span>{jam.participantIds?.length || 0} Participants</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 px-3 py-2 rounded-lg border border-slate-200/50 dark:border-white/5">
                         <Calendar className="w-4 h-4 text-modtale-accent" />
@@ -104,6 +104,9 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const [isCreating, setIsCreating] = useState(false);
     const [step, setStep] = useState(0);
     const [isSavingJam, setIsSavingJam] = useState(false);
+
+    const [slugError, setSlugError] = useState<string | null>(null);
+    const [createError, setCreateError] = useState<string | null>(null);
 
     const [metaData, setMetaData] = useState({
         id: '',
@@ -181,16 +184,56 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         return { tracks: t, jamTracks: jt, sortedJams: sj };
     }, [jams, startDate, endDate]);
 
+    const validateSlugFormat = (val: string) => {
+        if (!val) return "Slug is required.";
+        const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;
+        if (!slugRegex.test(val)) return "Must be 3-50 chars, lowercase alphanumeric, no start/end dash.";
+        return null;
+    };
+
+    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setMetaData(prev => {
+            const next = { ...prev, title: val };
+            if (!prev.slug || prev.slug === prev.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')) {
+                const newSlug = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+                next.slug = newSlug;
+                setSlugError(validateSlugFormat(newSlug));
+            }
+            return next;
+        });
+    };
+
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setMetaData(prev => ({...prev, slug: val}));
+        setSlugError(validateSlugFormat(val));
+        setCreateError(null);
+    };
+
+    const handleInitialCreate = async () => {
+        setIsSavingJam(true);
+        setCreateError(null);
+        try {
+            const res = await api.post('/modjams', metaData);
+            setMetaData(prev => ({ ...prev, id: res.data.id, slug: res.data.slug }));
+            setJams(prev => [res.data, ...prev]);
+            setStep(2);
+        } catch (e: any) {
+            let errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to create jam.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
+            setCreateError(errorMsg);
+        } finally {
+            setIsSavingJam(false);
+        }
+    };
+
     const handleSaveJam = async () => {
         setIsSavingJam(true);
         try {
-            let res: any;
-            if (metaData.id) {
-                res = await api.put(`/modjams/${metaData.id}`, metaData);
-            } else {
-                res = await api.post('/modjams', metaData);
-                setMetaData(prev => ({ ...prev, id: res.data.id, slug: res.data.slug }));
-            }
+            let res = await api.put(`/modjams/${metaData.id}`, metaData);
 
             const currentId = res.data.id;
             let filesUploaded = false;
@@ -220,9 +263,9 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
             });
             setIsSavingJam(false);
             return res.data;
-        } catch (e) {
+        } catch (e: any) {
             setIsSavingJam(false);
-            return null;
+            throw e;
         }
     };
 
@@ -230,22 +273,26 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         let currentId = metaData.id;
         let currentSlug = metaData.slug;
 
-        if (!currentId) {
+        setIsSavingJam(true);
+        try {
             const savedJam = await handleSaveJam();
             if (!savedJam) return;
             currentId = savedJam.id;
             currentSlug = savedJam.slug;
-        }
 
-        setIsSavingJam(true);
-        try {
             const updated = { ...metaData, status: 'PUBLISHED' };
             await api.put(`/modjams/${currentId}`, updated);
 
             setIsCreating(false);
             setStep(0);
             navigate(`/jam/${currentSlug}`);
-        } catch (e) {} finally {
+        } catch (e: any) {
+            let errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to publish jam.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
+            alert(errorMsg);
+        } finally {
             setIsSavingJam(false);
         }
     };
@@ -267,18 +314,40 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Event Title</label>
                             <input
                                 value={metaData.title}
-                                onChange={e => setMetaData(prev => ({...prev, title: e.target.value}))}
+                                onChange={handleTitleChange}
                                 className="w-full bg-slate-50 dark:bg-black/20 border-none rounded-xl px-6 py-5 font-black text-xl shadow-inner outline-none focus:ring-2 focus:ring-modtale-accent transition-all"
                                 placeholder="Summer Hackathon 2026"
                             />
                         </div>
+
+                        <div className="space-y-3 mt-4">
+                            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Jam URL</label>
+                            <div className={`flex items-center w-full bg-slate-50 dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/5'}`}>
+                                <div className="px-4 py-4 bg-slate-100 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-400 text-sm font-mono whitespace-nowrap select-none">modtale.net/jam/</div>
+                                <input
+                                    value={metaData.slug}
+                                    onChange={handleSlugChange}
+                                    className={`flex-1 bg-transparent border-none px-4 py-4 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`}
+                                    placeholder="my-awesome-jam"
+                                />
+                            </div>
+                            {slugError && <p className="text-[10px] text-red-500 font-bold px-2">{slugError}</p>}
+                        </div>
+
+                        {createError && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm font-bold flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                                <p>{createError}</p>
+                            </div>
+                        )}
+
                         <button
                             type="button"
-                            onClick={() => setStep(2)}
-                            disabled={!metaData.title || metaData.title.trim().length < 5}
+                            onClick={handleInitialCreate}
+                            disabled={!metaData.title || metaData.title.trim().length < 5 || !!slugError || !metaData.slug || isSavingJam}
                             className="w-full h-14 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-lg shadow-md shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 hover:scale-[1.02] active:scale-95"
                         >
-                            Draft Event Details
+                            {isSavingJam ? <Spinner className="w-5 h-5 text-white" /> : 'Draft Event Details'}
                         </button>
                     </div>
                 </div>

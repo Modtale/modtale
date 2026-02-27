@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon, Link2 } from 'lucide-react';
 import { JamLayout } from '@/components/jams/JamLayout.tsx';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -351,6 +351,8 @@ export const JamBuilder: React.FC<any> = ({
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [gameVersionOptions, setGameVersionOptions] = useState<{label: string, value: string}[]>([]);
 
+    const [slugError, setSlugError] = useState<string | null>(null);
+
     // User search states
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviteStatus, setInviteStatus] = useState('');
@@ -411,6 +413,7 @@ export const JamBuilder: React.FC<any> = ({
 
     const publishChecklist = [
         { label: 'Title (min 5 chars)', met: (metaData.title || '').trim().length >= 5 },
+        { label: 'Valid URL Slug', met: !!metaData.slug && !slugError },
         { label: 'Description (min 10 chars)', met: (metaData.description || '').trim().length >= 10 },
         { label: 'Start Date set', met: !!metaData.startDate },
         { label: 'Timeline follows order', met: !!metaData.endDate && !!metaData.votingEndDate && new Date(metaData.votingEndDate) > new Date(metaData.endDate) && new Date(metaData.endDate) > new Date(metaData.startDate) },
@@ -428,17 +431,39 @@ export const JamBuilder: React.FC<any> = ({
     };
 
     const performSave = async () => {
-        const success = await handleSave();
-        if (success) {
-            setIsDirty(false);
-            setIsSaved(true);
-            setTimeout(() => setIsSaved(false), 3000);
+        try {
+            const success = await handleSave();
+            if (success) {
+                setIsDirty(false);
+                setIsSaved(true);
+                setTimeout(() => setIsSaved(false), 3000);
+            }
+        } catch (e: any) {
+            let errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to save jam.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
+            alert(errorMsg);
         }
     };
 
     const updateField = (field: string, val: any) => {
         markDirty();
         setMetaData((prev: any) => ({ ...prev, [field]: val }));
+    };
+
+    const validateSlugFormat = (val: string) => {
+        if (!val) return "Slug is required.";
+        const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;
+        if (!slugRegex.test(val)) return "Must be 3-50 chars, lowercase alphanumeric, no start/end dash.";
+        return null;
+    };
+
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        markDirty();
+        const val = e.target.value;
+        setMetaData((prev: any) => ({...prev, slug: val}));
+        setSlugError(validateSlugFormat(val));
     };
 
     const handleInputSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -483,7 +508,11 @@ export const JamBuilder: React.FC<any> = ({
             setInviteStatus("Invited successfully!");
             setTimeout(() => setInviteStatus(''), 3000);
         } catch (e: any) {
-            setInviteStatus(e.response?.data?.message || 'Failed to invite user.');
+            let errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to invite user.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
+            setInviteStatus(errorMsg);
         } finally {
             setIsInviting(false);
         }
@@ -499,7 +528,11 @@ export const JamBuilder: React.FC<any> = ({
                 judgeIds: res.data.judgeIds
             }));
         } catch (e: any) {
-            alert(e.response?.data?.message || 'Failed to remove judge.');
+            let errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to remove judge.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
+            alert(errorMsg);
         }
     };
 
@@ -1384,6 +1417,17 @@ export const JamBuilder: React.FC<any> = ({
                                 <Settings className="w-4 h-4" /> Configuration
                             </h3>
                             <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 space-y-4 shadow-sm">
+                                <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
+                                    <div className="flex flex-col gap-2">
+                                        <div><h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-slate-500" /> Jam Slug</h3><p className="text-xs text-slate-500">Customize the URL.</p></div>
+                                        <div className={`flex items-center w-full bg-white dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`}>
+                                            <div className="px-4 py-3 bg-slate-50 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-500 text-sm font-mono whitespace-nowrap select-none">modtale.net/jam/</div>
+                                            <input value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder="jam-slug" />
+                                        </div>
+                                        {slugError && <p className="text-[10px] text-red-500 font-bold">{slugError}</p>}
+                                    </div>
+                                </div>
+
                                 <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
                                     <div className="flex flex-col">
                                         <span className="text-sm font-bold text-slate-900 dark:text-white">One Entry per Person</span>
