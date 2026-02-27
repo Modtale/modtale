@@ -78,8 +78,8 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
 
                 <div className="mt-auto w-full flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 px-3 py-2 rounded-lg border border-slate-200/50 dark:border-white/5">
-                        <LayoutGrid className="w-4 h-4 text-modtale-accent" />
-                        <span>{jam.participantIds?.length || 0} Entries</span>
+                        <Users className="w-4 h-4 text-modtale-accent" />
+                        <span>{jam.participantIds?.length || 0}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 px-3 py-2 rounded-lg border border-slate-200/50 dark:border-white/5">
                         <Calendar className="w-4 h-4 text-modtale-accent" />
@@ -413,9 +413,10 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
                                             <div className="flex flex-col flex-1 min-w-0 pr-1">
                                                 <span className="font-bold text-sm text-slate-900 dark:text-white truncate drop-shadow-sm leading-tight mb-0.5 group-hover:text-modtale-accent transition-colors">{jam.title}</span>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Users className="w-3 h-3 text-slate-500 dark:text-slate-400" />
                                                     <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                                                        {jam.participantIds?.length || 0} entries
+                                                        {jam.participantIds?.length || 0}
                                                     </span>
                                                 </div>
                                             </div>
