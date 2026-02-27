@@ -3,6 +3,8 @@ package net.modtale.service.resources;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
+import net.modtale.model.jam.Modjam;
+import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.resources.*;
 import net.modtale.model.user.User;
 import net.modtale.repository.resources.ModRepository;
@@ -141,7 +143,6 @@ public class ModService {
     private final Map<String, Bucket> modpackGenBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> rescanBuckets = new ConcurrentHashMap<>();
 
-    // Batch metrics handling
     private final ConcurrentHashMap<String, Integer> pendingDownloadIncrements = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> pendingFavoriteIncrements = new ConcurrentHashMap<>();
 
@@ -420,6 +421,10 @@ public class ModService {
             User currentUser = userService.getCurrentUser();
             boolean isPrivileged = hasEditPermission(mod, currentUser) || isAdmin(currentUser);
 
+            if (!isPrivileged && !List.of("PUBLISHED", "UNLISTED", "ARCHIVED").contains(mod.getStatus())) {
+                return null;
+            }
+
             if (!isPrivileged && mod.getVersions() != null) {
                 List<ModVersion> visibleVersions = mod.getVersions().stream()
                         .filter(v -> v.getReviewStatus() == ModVersion.ReviewStatus.APPROVED)
@@ -588,6 +593,10 @@ public class ModService {
         User user = userService.getCurrentUser();
         if(mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
 
+        if ("PENDING".equals(mod.getStatus()) || "APPROVED_HIDDEN".equals(mod.getStatus())) {
+            return;
+        }
+
         if (user != null && !user.isEmailVerified()) {
             throw new SecurityException("Email verification required.");
         }
@@ -616,12 +625,14 @@ public class ModService {
         User user = userService.getCurrentUser();
         if (mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
 
-        if (!"PENDING".equals(mod.getStatus())) {
-            throw new IllegalArgumentException("Only pending projects can be reverted to draft.");
+        if (!"PENDING".equals(mod.getStatus()) && !"APPROVED_HIDDEN".equals(mod.getStatus())) {
+            throw new IllegalArgumentException("Only pending or hidden jam projects can be reverted to draft.");
         }
 
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
+        mod.setModjamIds(new ArrayList<>());
+        mongoTemplate.remove(new Query(Criteria.where("projectId").is(mod.getId())), ModjamSubmission.class);
         modRepository.save(mod);
         evictProjectDetails(mod);
     }
@@ -677,7 +688,15 @@ public class ModService {
 
         boolean isNewRelease = "PENDING".equals(mod.getStatus()) || mod.getCreatedAt() == null;
 
-        mod.setStatus("PUBLISHED");
+        boolean shouldHide = false;
+        if (isNewRelease && mod.getModjamIds() != null && !mod.getModjamIds().isEmpty()) {
+            Query jamQuery = new Query(Criteria.where("_id").in(mod.getModjamIds())
+                    .and("hideSubmissions").is(true)
+                    .and("status").in("ACTIVE", "UPCOMING", "DRAFT"));
+            shouldHide = mongoTemplate.exists(jamQuery, Modjam.class);
+        }
+
+        mod.setStatus(shouldHide ? "APPROVED_HIDDEN" : "PUBLISHED");
         mod.setExpiresAt(null);
         mod.setUpdatedAt(LocalDateTime.now().toString());
 
@@ -705,13 +724,58 @@ public class ModService {
         evictProjectDetails(mod);
 
         if (isNewRelease) {
-            notifyNewProject(saved);
-            triggerWebhook(saved);
-            triggerDiscordWebhook(saved);
-            analyticsService.logNewProject(saved.getId());
-            User author = getAuthorUser(saved);
+            if (shouldHide) {
+                User author = getAuthorUser(saved);
+                if (author != null) {
+                    notificationService.sendNotification(
+                            List.of(author.getId()),
+                            "Submission Approved",
+                            saved.getTitle() + " has been approved! It will remain hidden until the jam voting opens.",
+                            URI.create("/dashboard/projects"),
+                            saved.getImageUrl()
+                    );
+                }
+            } else {
+                notifyNewProject(saved);
+                triggerWebhook(saved);
+                triggerDiscordWebhook(saved);
+                analyticsService.logNewProject(saved.getId());
+                User author = getAuthorUser(saved);
+                if(author != null) {
+                    notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", URI.create(getProjectLink(saved)), saved.getImageUrl());
+                }
+            }
+        }
+    }
+
+    public void revealHiddenJamMods(String jamId) {
+        Query query = new Query(Criteria.where("modjamIds").is(jamId).and("status").is("APPROVED_HIDDEN"));
+        List<Mod> hiddenMods = mongoTemplate.find(query, Mod.class);
+
+        for (Mod mod : hiddenMods) {
+            mod.setStatus("PUBLISHED");
+            mod.setUpdatedAt(LocalDateTime.now().toString());
+
+            if (mod.getCreatedAt() == null) {
+                mod.setCreatedAt(LocalDateTime.now().toString());
+            }
+
+            modRepository.save(mod);
+            evictProjectDetails(mod);
+
+            notifyNewProject(mod);
+            triggerWebhook(mod);
+            triggerDiscordWebhook(mod);
+            analyticsService.logNewProject(mod.getId());
+            User author = getAuthorUser(mod);
             if(author != null) {
-                notificationService.sendNotification(List.of(author.getId()), "Project Approved", saved.getTitle() + " has been approved and is now live!", URI.create(getProjectLink(saved)), saved.getImageUrl());
+                notificationService.sendNotification(
+                        List.of(author.getId()),
+                        "Project Published",
+                        mod.getTitle() + " has been revealed as jam voting has opened!",
+                        URI.create(getProjectLink(mod)),
+                        mod.getImageUrl()
+                );
             }
         }
     }
@@ -894,6 +958,8 @@ public class ModService {
 
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
+        mod.setModjamIds(new ArrayList<>());
+        mongoTemplate.remove(new Query(Criteria.where("projectId").is(mod.getId())), ModjamSubmission.class);
         modRepository.save(mod);
         evictProjectDetails(mod);
 
@@ -1890,7 +1956,7 @@ public class ModService {
         }
     }
 
-    @Scheduled(fixedDelayString = "${app.metrics.flush-rate:60000}") // Runs every minute
+    @Scheduled(fixedDelayString = "${app.metrics.flush-rate:60000}")
     public void flushMetricsToDatabase() {
         if (pendingDownloadIncrements.isEmpty() && pendingFavoriteIncrements.isEmpty()) {
             return;

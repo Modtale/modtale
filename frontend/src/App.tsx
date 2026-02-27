@@ -38,6 +38,9 @@ const MfaVerify = lazy(() => import('./react-pages/auth/MfaVerify').then(module 
 const Analytics = lazy(() => import('@/components/dashboard/Analytics.tsx').then(module => ({ default: module.Analytics })));
 const NotFound = lazy(() => import('./components/ui/error/NotFound.tsx'));
 
+const JamsList = lazy(() => import('./react-pages/jams/JamsList').then(module => ({ default: module.JamsList })));
+const JamDetail = lazy(() => import('./react-pages/jams/JamDetail').then(module => ({ default: module.JamDetail })));
+
 const ScrollToTop = () => {
     const { pathname } = useLocation();
     useEffect(() => {
@@ -189,6 +192,10 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/worlds" element={renderHome('SAVE')} />
                             <Route path="/art" element={renderHome('ART')} />
                             <Route path="/data" element={renderHome('DATA')} />
+
+                            <Route path="/jams" element={<JamsList currentUser={user} />} />
+                            <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
+                            <Route path="/jam/:id/edit" element={<JamDetail currentUser={user} />} />
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :

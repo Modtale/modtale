@@ -11,7 +11,7 @@ import {
     GitMerge, Settings,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
     UserPlus, Scale, Check, Copy, Link2, Edit2, X, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
-    AlertCircle, Clock, Archive, Globe, EyeOff, Image as ImageIcon, MessageSquare, ExternalLink, Sparkles
+    AlertCircle, Clock, Archive, Globe, EyeOff, Image as ImageIcon, MessageSquare, ExternalLink, Sparkles, Trophy
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -57,6 +57,55 @@ interface ProjectBuilderProps {
     readOnly?: boolean;
 }
 
+const JamSelectDropdown = ({ value, options, onChange }: { value: string, options: any[], onChange: (v: string) => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selected = options.find(o => o.id === value);
+
+    return (
+        <div className="relative w-full" ref={ref}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center transition-all shadow-sm hover:border-modtale-accent/50"
+            >
+                <span className="truncate">{selected ? selected.title : '-- Do not enter a jam --'}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                    <button
+                        type="button"
+                        onClick={() => { onChange(''); setIsOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${!value ? 'bg-modtale-accent/10 text-modtale-accent font-black' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 font-medium'}`}
+                    >
+                        -- Do not enter a jam --
+                    </button>
+                    {options.map((opt) => (
+                        <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => { onChange(opt.id); setIsOpen(false); }}
+                            className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${value === opt.id ? 'bg-modtale-accent/10 text-modtale-accent font-black' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 font-medium'}`}
+                        >
+                            {opt.title}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                                   modData, setModData, metaData, setMetaData, versionData, setVersionData,
                                                                   bannerPreview, setBannerPreview, setBannerFile,
@@ -89,6 +138,16 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [editingVersion, setEditingVersion] = useState<ProjectVersion | null>(null);
     const [editVersionData, setEditVersionData] = useState<VersionFormData | null>(null);
     const [isSavingVersion, setIsSavingVersion] = useState(false);
+
+    const [jamMeta, setJamMeta] = useState<Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }>>({});
+    const fetchedJamMeta = useRef<Set<string>>(new Set());
+
+    // Jam Submission State
+    const [activeJams, setActiveJams] = useState<any[]>([]);
+    const [selectedPublishJamId, setSelectedPublishJamId] = useState<string>('');
+    const [agreedToPublishJamRules, setAgreedToPublishJamRules] = useState(false);
+    const [isPublishingJam, setIsPublishingJam] = useState(false);
+    const [jamSubmitError, setJamSubmitError] = useState<string | null>(null);
 
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
@@ -124,6 +183,15 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const hasGithub = currentUser?.connectedAccounts?.some(a => a.provider === 'github') || false;
     const hasGitlab = currentUser?.connectedAccounts?.some(a => a.provider === 'gitlab') || false;
     const [provider, setProvider] = useState<'github' | 'gitlab'>(hasGithub ? 'github' : (hasGitlab ? 'gitlab' : 'github'));
+
+    useEffect(() => {
+        if (!readOnly && currentUser) {
+            api.get('/modjams').then(res => {
+                const active = (res.data || []).filter((j: any) => j.status === 'ACTIVE');
+                setActiveJams(active);
+            }).catch(() => {});
+        }
+    }, [readOnly, currentUser]);
 
     const fetchRepos = useCallback(() => {
         if (readOnly || manualRepo) return;
@@ -168,6 +236,51 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
+    useEffect(() => {
+        if (!modData?.modjamIds?.length) return;
+
+        const missing = modData.modjamIds.filter(id => !jamMeta[id] && !fetchedJamMeta.current.has(id));
+        if (!missing.length) return;
+
+        missing.forEach(id => fetchedJamMeta.current.add(id));
+
+        const fetchJams = async () => {
+            try {
+                const jamsRes = await api.get('/modjams');
+                const allJams = jamsRes.data;
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }> = {};
+
+                await Promise.all(missing.map(async (id) => {
+                    const jam = allJams.find((j: any) => j.id === id);
+                    if (jam) {
+                        let isWinner = false;
+                        try {
+                            if (modData?.id) {
+                                const subsRes = await api.get(`/modjams/${jam.slug}/submissions`);
+                                const mySub = subsRes.data.find((s: any) => s.projectId === modData.id);
+                                if (mySub && mySub.rank === 1) {
+                                    isWinner = true;
+                                }
+                            }
+                        } catch (e) {}
+                        newMeta[id] = { title: jam.title, slug: jam.slug, isWinner, imageUrl: jam.imageUrl };
+                    } else {
+                        newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false, imageUrl: undefined };
+                    }
+                }));
+
+                setJamMeta(prev => ({ ...prev, ...newMeta }));
+            } catch (e) {
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }> = {};
+                missing.forEach(id => {
+                    newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false, imageUrl: undefined };
+                });
+                setJamMeta(prev => ({ ...prev, ...newMeta }));
+            }
+        };
+        fetchJams();
+    }, [modData?.modjamIds, modData?.id]);
+
     const toggleTag = (tag: string) => {
         if (readOnly) return;
         markDirty();
@@ -194,9 +307,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             setInviteUsername('');
             onShowStatus('success', 'Invited', `Invited ${inviteUsername}`);
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to invite user.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Error', errorMsg);
         } finally {
             setIsInviting(false);
@@ -217,9 +331,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             });
             onShowStatus('success', 'Removed', `Removed ${username}`);
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to remove contributor.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Error', errorMsg);
         }
     };
@@ -279,6 +394,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         favoriteCount: modData?.favoriteCount || 0,
         sizeBytes: modData?.sizeBytes || 0,
         modIds: modData?.modIds || [],
+        modjamIds: modData?.modjamIds?.filter(id => !((modData as any).hiddenModjamIds || []).includes(id)) || [],
         childProjectIds: modData?.childProjectIds || [],
         versions: modData?.versions || [],
         comments: [],
@@ -339,9 +455,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 setIsDirty(false);
             }
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to save project.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Save Failed', errorMsg);
         }
     };
@@ -359,15 +476,38 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                     setSlugError("Unable to save slug. It may be taken.");
                 }
             } catch (e: any) {
-                const errorMsg = typeof e.response?.data === 'string'
+                let errorMsg = typeof e.response?.data === 'string'
                     ? e.response.data
                     : e.response?.data?.message || 'Failed to save slug.';
+                errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
                 setSlugError(errorMsg);
             }
         } else {
             setShowSlugPrompt(false);
             setShowPublishConfirm(true);
         }
+    };
+
+    const executePublish = async () => {
+        setJamSubmitError(null);
+        if (selectedPublishJamId && modData?.id) {
+            setIsPublishingJam(true);
+            try {
+                await api.post(`/modjams/${selectedPublishJamId}/submit`, { projectId: modData.id });
+            } catch (e: any) {
+                let errorMsg = typeof e.response?.data === 'string'
+                    ? e.response.data
+                    : (e.response?.data?.message || 'Failed to submit to jam');
+                errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
+
+                setJamSubmitError(errorMsg);
+                setIsPublishingJam(false);
+                return;
+            }
+        }
+        setIsPublishingJam(false);
+        setShowPublishConfirm(false);
+        if (handlePublish) handlePublish();
     };
 
     const handleEditVersion = (version: ProjectVersion) => {
@@ -404,9 +544,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             setEditVersionData(null);
             onShowStatus('success', 'Updated', 'Version metadata updated successfully.');
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to update version.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Update Failed', errorMsg);
         } finally {
             setIsSavingVersion(false);
@@ -438,7 +579,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             {modData?.status === 'ARCHIVED' && (
                 <div className="bg-slate-800 border-b border-slate-700 px-8 py-3 flex items-center justify-between backdrop-blur-sm sticky top-0 z-50">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-slate-70 flex items-center justify-center">
                             <Archive className="w-5 h-5 text-slate-400" />
                         </div>
                         <div>
@@ -551,15 +692,94 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             )}
 
             {showPublishConfirm && handlePublish && (
-                <StatusModal
-                    type="info"
-                    title="Ready to publish?"
-                    message="Your project will be submitted for verification. Once approved, it will be live on Modtale."
-                    onClose={() => setShowPublishConfirm(false)}
-                    actionLabel="Submit Now"
-                    onAction={() => { setShowPublishConfirm(false); handlePublish(); }}
-                    secondaryLabel="Cancel"
-                />
+                <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col">
+                        <div className="p-8 pb-6">
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Ready to publish?</h2>
+                            <p className="text-slate-500 text-sm font-medium mb-6">Your project will be submitted for verification. Once approved, it will be live on Modtale.</p>
+
+                            {activeJams.length > 0 && (
+                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/10 p-5 mb-2">
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                                        <Trophy className="w-4 h-4 text-amber-500" /> Enter a Modjam (Optional)
+                                    </h3>
+
+                                    <JamSelectDropdown
+                                        value={selectedPublishJamId}
+                                        options={activeJams}
+                                        onChange={(v) => { setSelectedPublishJamId(v); setAgreedToPublishJamRules(false); setJamSubmitError(null); }}
+                                    />
+
+                                    {(() => {
+                                        const j = activeJams.find(jam => jam.id === selectedPublishJamId);
+                                        if (!j) return null;
+                                        const hides = Boolean(j.hideSubmissions);
+                                        const rules = Boolean(j.rules?.trim().length > 0);
+
+                                        return (
+                                            <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                                                {hides && (
+                                                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-3">
+                                                        <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400">Secret Submissions Active</h4>
+                                                            <p className="text-xs text-amber-600/80 dark:text-amber-500/80 mt-1">
+                                                                This jam hides entries until voting starts. Your project will remain private until <strong className="text-amber-700 dark:text-amber-400">{new Date(j.votingEndDate).toLocaleDateString()}</strong>.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {rules && (
+                                                    <div className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setAgreedToPublishJamRules(!agreedToPublishJamRules); }}>
+                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-all ${agreedToPublishJamRules ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-modtale-accent'}`}>
+                                                            {agreedToPublishJamRules && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+                                                        </div>
+                                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400 select-none">
+                                                            I agree to the <a href={`/jam/${j.slug}/rules`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-modtale-accent hover:underline">Jam Rules</a>.
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+
+                            {jamSubmitError && (
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-4 flex items-start gap-3 animate-in fade-in zoom-in-95">
+                                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                    <div>
+                                        <h4 className="text-sm font-bold text-red-700 dark:text-red-400">Jam Submission Failed</h4>
+                                        <p className="text-xs text-red-600/80 dark:text-red-500/80 mt-1">{jamSubmitError}</p>
+                                        <p className="text-[10px] text-red-600/60 dark:text-red-500/60 mt-2 font-bold uppercase tracking-widest">Fix the issue, or choose "-- Do not enter a jam --"</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowPublishConfirm(false)}
+                                disabled={isPublishingJam}
+                                className="px-6 py-3 rounded-xl font-bold text-sm bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executePublish}
+                                disabled={isPublishingJam || (() => {
+                                    const j = activeJams.find(jam => jam.id === selectedPublishJamId);
+                                    return j && Boolean(j.rules?.trim().length > 0) && !agreedToPublishJamRules;
+                                })()}
+                                className="px-8 py-3 rounded-xl font-black text-sm bg-modtale-accent hover:bg-modtale-accentHover text-white shadow-lg shadow-modtale-accent/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isPublishingJam ? <Spinner className="w-4 h-4" fullScreen={false} /> : <UploadCloud className="w-4 h-4" />}
+                                {selectedPublishJamId ? 'Submit to Jam & Publish' : 'Publish Project'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {showCardPreview && (
@@ -843,12 +1063,57 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowModpacks: !prev.allowModpacks} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowModpacks ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowModpacks ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
-                                    <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center justify-between mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
                                         <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Comments</h3><p className="text-xs text-slate-500">Enable community comments?</p></div>
                                         <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowComments: !prev.allowComments} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowComments ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowComments ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
-                                    <div className="pt-4 border-t border-slate-200 dark:border-white/5">
+                                    {modData?.modjamIds && modData.modjamIds.length > 0 && (
+                                        <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1"><Trophy className="w-4 h-4 inline mr-2 text-slate-500" /> Displayed Modjams</h3>
+                                            <p className="text-xs text-slate-500 mb-4">Choose which jams are featured on your project page.</p>
+                                            <div className="space-y-2">
+                                                {modData.modjamIds.map(jamId => {
+                                                    const meta = jamMeta[jamId];
+                                                    const isHidden = ((modData as any).hiddenModjamIds || []).includes(jamId);
+                                                    return (
+                                                        <div key={jamId} className="flex items-center justify-between p-3 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200 dark:border-white/5">
+                                                                    {meta?.imageUrl ? <img src={meta.imageUrl.startsWith('http') ? meta.imageUrl : `${BACKEND_URL}${meta.imageUrl}`} className="w-full h-full object-cover" alt="" /> : <Trophy className="w-4 h-4 text-slate-400" />}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-sm font-bold text-slate-900 dark:text-white">{meta?.title || 'Loading...'}</div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest">{meta?.isWinner ? 'Winner' : 'Submission'}</div>
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                disabled={readOnly}
+                                                                onClick={() => {
+                                                                    markDirty();
+                                                                    setModData(prev => {
+                                                                        if (!prev) return null;
+                                                                        const hidden = (prev as any).hiddenModjamIds || [];
+                                                                        return {
+                                                                            ...prev,
+                                                                            hiddenModjamIds: hidden.includes(jamId)
+                                                                                ? hidden.filter((id: string) => id !== jamId)
+                                                                                : [...hidden, jamId]
+                                                                        };
+                                                                    });
+                                                                }}
+                                                                className={`transition-colors ${readOnly ? 'opacity-50' : !isHidden ? 'text-green-500' : 'text-slate-600'}`}
+                                                            >
+                                                                {!isHidden ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="pt-2">
                                         <h3 className="text-sm font-bold mb-2">Contributors</h3>
                                         <div className="flex gap-2 mb-4">
                                             <input disabled={readOnly} value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="Username" className="flex-1 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm" />

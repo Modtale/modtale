@@ -61,6 +61,18 @@ public class UserController {
                 .collect(Collectors.toList()));
     }
 
+    @PostMapping("/users/batch/ids")
+    public ResponseEntity<List<UserDTO>> getUsersBatchByIds(@RequestBody Map<String, List<String>> body) {
+        List<String> ids = body.get("ids");
+        if (ids == null || ids.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<User> users = userService.getPublicProfilesByIds(ids);
+        return ResponseEntity.ok(users.stream()
+                .map(u -> UserDTO.fromEntity(u, false))
+                .collect(Collectors.toList()));
+    }
+
     @PostMapping("/orgs")
     public ResponseEntity<?> createOrganization(@RequestBody Map<String, String> payload) {
         User user = userService.getCurrentUser();

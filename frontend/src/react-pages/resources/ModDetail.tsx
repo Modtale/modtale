@@ -12,7 +12,7 @@ import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive
+    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Trophy
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -38,7 +38,7 @@ const ProjectSidebar: React.FC<{
     contributors: User[];
     orgMembers: User[];
     author: User | null;
-}> = React.memo(({ mod, dependencies, depMeta, navigate, contributors, orgMembers, author }) => {
+}> = React.memo(({ mod, dependencies, depMeta, sourceUrl, navigate, contributors, orgMembers, author }) => {
     const [copiedId, setCopiedId] = useState(false);
 
     const gameVersions = useMemo(() => {
@@ -452,6 +452,7 @@ export const ModDetail: React.FC<{
 
     const [isFollowing, setIsFollowing] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
+    const [jamMeta, setJamMeta] = useState<Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }>>({});
 
     const [contributors, setContributors] = useState<User[]>([]);
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
@@ -580,6 +581,7 @@ export const ModDetail: React.FC<{
     const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
+    const fetchedJamMeta = useRef<Set<string>>(new Set());
 
     const projectMeta = mod ? generateProjectMeta(mod) : null;
     const breadcrumbSchema = mod ? generateBreadcrumbSchema([...getBreadcrumbsForClassification(mod.classification || 'PLUGIN'), { name: mod.title, url: getProjectUrl(mod) }]) : null;
@@ -620,6 +622,49 @@ export const ModDetail: React.FC<{
 
         if (mod) fetchTeam();
     }, [mod?.id, mod?.author]);
+
+    useEffect(() => {
+        if (!mod?.modjamIds?.length) return;
+
+        const missing = mod.modjamIds.filter(id => !jamMeta[id] && !fetchedJamMeta.current.has(id));
+        if (!missing.length) return;
+
+        missing.forEach(id => fetchedJamMeta.current.add(id));
+
+        const fetchJams = async () => {
+            try {
+                const jamsRes = await api.get('/modjams');
+                const allJams = jamsRes.data;
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }> = {};
+
+                await Promise.all(missing.map(async (id) => {
+                    const jam = allJams.find((j: any) => j.id === id);
+                    if (jam) {
+                        let isWinner = false;
+                        try {
+                            const subsRes = await api.get(`/modjams/${jam.id}/submissions`);
+                            const mySub = subsRes.data.find((s: any) => s.projectId === mod.id);
+                            if (mySub && (mySub.winner || mySub.isWinner || mySub.rank === 1)) {
+                                isWinner = true;
+                            }
+                        } catch (e) {}
+                        newMeta[id] = { title: jam.title, slug: jam.slug, isWinner, imageUrl: jam.imageUrl };
+                    } else {
+                        newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false, imageUrl: undefined };
+                    }
+                }));
+
+                setJamMeta(prev => ({ ...prev, ...newMeta }));
+            } catch (e) {
+                const newMeta: Record<string, { title: string, slug: string, isWinner: boolean, imageUrl?: string }> = {};
+                missing.forEach(id => {
+                    newMeta[id] = { title: `Jam ${id.substring(0,8)}`, slug: id, isWinner: false, imageUrl: undefined };
+                });
+                setJamMeta(prev => ({ ...prev, ...newMeta }));
+            }
+        };
+        fetchJams();
+    }, [mod?.modjamIds, mod?.id]);
 
     useEffect(() => {
         if (mod && !loading) {
@@ -693,7 +738,7 @@ export const ModDetail: React.FC<{
             setDepMeta(prev => ({...prev, ...newMeta}));
         };
         fetchMeta();
-    }, [latestDependencies]);
+    }, [latestDependencies, depMeta]);
 
     const handleShare = async () => {
         if (isMobile && navigator.share) {
@@ -751,11 +796,12 @@ export const ModDetail: React.FC<{
         }
     };
 
+    const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
+
     if (isNotFound) return <NotFound />;
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!mod) return null;
 
-    const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
 
     const links = [
@@ -928,22 +974,57 @@ export const ModDetail: React.FC<{
                             </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
+                        <div className="flex flex-wrap items-center gap-x-4 md:gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
                                 <span>by <Link to={`/creator/${mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
                                 {currentUser && currentUser.username !== mod.author && (
                                     <button
                                         onClick={handleFollowToggle}
-                                        className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
+                                        className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-black tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
                                     >
                                         {isFollowing ? 'Unfollow' : 'Follow'}
                                     </button>
                                 )}
                             </div>
+
                             <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
+
                             <span suppressHydrationWarning className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
                                 <Calendar className="w-3 h-3" aria-hidden="true" /> Updated <span suppressHydrationWarning>{formatTimeAgo(mod.updatedAt)}</span>
                             </span>
+
+                            {mod.modjamIds && mod.modjamIds.map(jamId => {
+                                const meta = jamMeta[jamId];
+                                if (!meta) return null;
+                                const isWinner = meta.isWinner;
+                                const imageUrl = meta.imageUrl ? resolveUrl(meta.imageUrl) : null;
+
+                                return (
+                                    <React.Fragment key={jamId}>
+                                        <span className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
+                                        <Link
+                                            to={`/jam/${meta.slug}`}
+                                            className={`inline-flex items-center gap-2 pr-3 pl-1.5 py-1.5 rounded-full text-xs transition-all hover:scale-105 active:scale-95 backdrop-blur-md ${
+                                                isWinner
+                                                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 shadow-sm'
+                                                    : 'bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/50 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 hover:dark:bg-slate-700/80'
+                                            }`}
+                                        >
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${isWinner ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                                {imageUrl ? (
+                                                    <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Trophy className="w-3 h-3" />
+                                                )}
+                                            </div>
+                                            <span className="font-medium">
+                                                {isWinner ? 'Winner of ' : 'Submission to '}
+                                                <span className={`${isWinner ? 'font-black' : 'font-bold'}`}>{meta.title}</span>
+                                            </span>
+                                        </Link>
+                                    </React.Fragment>
+                                );
+                            })}
                         </div>
 
                         {mod.description && (
