@@ -18,11 +18,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -229,7 +227,7 @@ public class ModjamService {
 
     public Modjam getJamBySlug(String slug) {
         return enrichAndReturn(modjamRepository.findBySlug(slug)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found")));
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found")));
     }
 
     public Modjam createJam(Modjam jam, String hostId, String hostName) {
@@ -267,7 +265,7 @@ public class ModjamService {
 
     public Modjam updateJam(String id, Modjam updatedJam) {
         Modjam jam = modjamRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
         String oldStatus = jam.getStatus();
 
@@ -328,28 +326,28 @@ public class ModjamService {
     }
 
     public Modjam inviteJudge(String jamId, String username, String hostId) {
-        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
-        if (!jam.getHostId().equals(hostId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can invite judges.");
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+        if (!jam.getHostId().equals(hostId)) throw new SecurityException("Only the host can invite judges.");
 
         Query query = new Query(Criteria.where("username").regex("^" + username + "$", "i"));
         User targetUser = mongoTemplate.findOne(query, User.class);
 
         if (targetUser == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User '" + username + "' not found.");
+            throw new IllegalArgumentException("User '" + username + "' not found.");
         }
 
         if (targetUser.getId().equals(hostId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot invite yourself.");
+            throw new IllegalArgumentException("You cannot invite yourself.");
         }
 
         if (jam.getPendingJudgeInvites() == null) jam.setPendingJudgeInvites(new ArrayList<>());
         if (jam.getJudgeIds() == null) jam.setJudgeIds(new ArrayList<>());
 
         if (jam.getJudgeIds().contains(targetUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already a judge.");
+            throw new IllegalArgumentException("User is already a judge.");
         }
         if (jam.getPendingJudgeInvites().contains(targetUser.getUsername())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already invited.");
+            throw new IllegalArgumentException("User is already invited.");
         }
 
         jam.getPendingJudgeInvites().add(targetUser.getUsername());
@@ -367,8 +365,8 @@ public class ModjamService {
     }
 
     public Modjam removeJudge(String jamId, String username, String hostId) {
-        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
-        if (!jam.getHostId().equals(hostId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can remove judges.");
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+        if (!jam.getHostId().equals(hostId)) throw new SecurityException("Only the host can remove judges.");
 
         if (jam.getPendingJudgeInvites() != null) {
             jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
@@ -386,10 +384,10 @@ public class ModjamService {
     }
 
     public Modjam acceptJudgeInvite(String jamId, String userId, String username) {
-        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
         if (jam.getPendingJudgeInvites() == null || jam.getPendingJudgeInvites().stream().noneMatch(u -> u.equalsIgnoreCase(username))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You don't have a pending invite for this jam.");
+            throw new IllegalArgumentException("You don't have a pending invite for this jam.");
         }
 
         jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
@@ -403,7 +401,7 @@ public class ModjamService {
     }
 
     public Modjam declineJudgeInvite(String jamId, String username) {
-        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
         if (jam.getPendingJudgeInvites() != null) {
             jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
@@ -414,7 +412,7 @@ public class ModjamService {
 
     public void updateIcon(String jamId, MultipartFile file) {
         try {
-            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
             String pathPrefix = "modjams/" + jamId + "/icon";
             String storageKey = storageService.upload(file, pathPrefix);
             String publicUrl = storageService.getPublicUrl(storageKey);
@@ -428,7 +426,7 @@ public class ModjamService {
 
     public void updateBanner(String jamId, MultipartFile file) {
         try {
-            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
             String pathPrefix = "modjams/" + jamId + "/banner";
             String storageKey = storageService.upload(file, pathPrefix);
             String publicUrl = storageService.getPublicUrl(storageKey);
@@ -442,10 +440,10 @@ public class ModjamService {
 
     public void deleteJam(String jamId, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
         if (!jam.getHostId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can delete this jam");
+            throw new SecurityException("Only the host can delete this jam");
         }
 
         List<ModjamSubmission> submissions = submissionRepository.findByJamId(jamId);
@@ -458,7 +456,7 @@ public class ModjamService {
 
     public List<ModjamSubmission> getSubmissions(String jamId) {
         Modjam jam = modjamRepository.findById(jamId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
         List<ModjamSubmission> subs = submissionRepository.findByJamId(jamId);
 
         if (jam.isHideSubmissions() && List.of("DRAFT", "UPCOMING", "ACTIVE").contains(jam.getStatus())) {
@@ -476,9 +474,9 @@ public class ModjamService {
 
     public Modjam participate(String jamId, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (user.getJoinedModjamIds() != null) {
             for (String joinedId : user.getJoinedModjamIds()) {
@@ -495,10 +493,10 @@ public class ModjamService {
                         boolean thisRequiresUnique = jam.getRestrictions() != null && jam.getRestrictions().isRequireUniqueSubmission();
 
                         if (otherRequiresUnique) {
-                            throw new ResponseStatusException(HttpStatus.CONFLICT, "You are currently participating in '" + otherJam.getTitle() + "' which requires unique participation. You must leave it to join this jam.");
+                            throw new IllegalStateException("You are currently participating in '" + otherJam.getTitle() + "' which requires unique participation. You must leave it to join this jam.");
                         }
                         if (thisRequiresUnique) {
-                            throw new ResponseStatusException(HttpStatus.CONFLICT, "This jam requires unique participation. You are currently in '" + otherJam.getTitle() + "'. You must leave it to join this jam.");
+                            throw new IllegalStateException("This jam requires unique participation. You are currently in '" + otherJam.getTitle() + "'. You must leave it to join this jam.");
                         }
                     }
                 }
@@ -528,13 +526,13 @@ public class ModjamService {
 
     public Modjam leaveJam(String jamId, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         List<ModjamSubmission> existingSubs = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
         if (!existingSubs.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot leave a jam after submitting a project.");
+            throw new IllegalArgumentException("Cannot leave a jam after submitting a project.");
         }
 
         if (jam.getParticipantIds() != null) {
@@ -552,43 +550,43 @@ public class ModjamService {
 
     public ModjamSubmission submitProject(String jamId, String projectId, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
         if (!"ACTIVE".equals(jam.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Submissions are closed.");
+            throw new IllegalArgumentException("Submissions are closed.");
         }
 
         Mod project = modRepository.findById(projectId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
 
         if (!project.getAuthorId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your project");
+            throw new SecurityException("Not your project");
         }
 
         if (!List.of("PUBLISHED", "PENDING", "APPROVED_HIDDEN", "DRAFT").contains(project.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project cannot be submitted in its current state.");
+            throw new IllegalArgumentException("Project cannot be submitted in its current state.");
         }
 
         if (jam.isHideSubmissions() && "PUBLISHED".equals(project.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam hides submissions until voting opens. You cannot submit an already-public project.");
+            throw new IllegalArgumentException("This jam hides submissions until voting opens. You cannot submit an already-public project.");
         }
 
         List<ModjamSubmission> existing = submissionRepository.findByJamIdAndSubmitterId(jamId, userId);
 
         if (jam.isOneEntryPerPerson() && !existing.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to one entry per person.");
+            throw new IllegalArgumentException("This jam is restricted to one entry per person.");
         }
 
         if (existing.stream().anyMatch(s -> s.getProjectId().equals(projectId))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already submitted.");
+            throw new IllegalArgumentException("Already submitted.");
         }
 
         if ("DRAFT".equals(project.getStatus())) {
             try {
                 modService.submitMod(projectId, userId);
-                project = modRepository.findById(projectId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+                project = modRepository.findById(projectId).orElseThrow(() -> new IllegalArgumentException("Project not found"));
             } catch (Exception e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+                throw new IllegalArgumentException(e.getMessage());
             }
         }
 
@@ -600,10 +598,10 @@ public class ModjamService {
                         .count();
 
                 if (res.isRequireNoPriorProjects() && priorPublishedProjects > 0) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to users who have never published a project before.");
+                    throw new IllegalArgumentException("This jam is restricted to users who have never published a project before.");
                 }
                 if (res.isRequirePriorProjects() && priorPublishedProjects == 0) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to users who have previously published at least one project.");
+                    throw new IllegalArgumentException("This jam is restricted to users who have previously published at least one project.");
                 }
             }
 
@@ -617,34 +615,34 @@ public class ModjamService {
                         projCreated = LocalDateTime.parse(cleanDate).toInstant(ZoneOffset.UTC);
                     }
                     if (projCreated.isBefore(jam.getStartDate())) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must be created after the jam start date.");
+                        throw new IllegalArgumentException("Project must be created after the jam start date.");
                     }
-                } catch (ResponseStatusException rse) {
+                } catch (IllegalArgumentException rse) {
                     throw rse;
                 } catch (Exception ignored) {}
             }
 
             if (res.isRequireSourceRepo() && (project.getRepositoryUrl() == null || project.getRepositoryUrl().trim().isEmpty())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must have a linked public source repository.");
+                throw new IllegalArgumentException("Project must have a linked public source repository.");
             }
 
             if (res.isRequireOsiLicense()) {
                 String l = project.getLicense() != null ? project.getLicense().toUpperCase().replaceAll("[^A-Z0-9]", "") : "";
                 boolean isOsi = l.contains("MIT") || l.contains("APACHE") || l.contains("LGPL") || l.contains("AGPL") || l.contains("GPL") || l.contains("MPL") || l.contains("BSD") || l.contains("UNLICENSE") || l.contains("CC0");
                 if (!isOsi) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project must use an OSI-approved open source license.");
+                    throw new IllegalArgumentException("Project must use an OSI-approved open source license.");
                 }
             }
 
             if (res.getAllowedClassifications() != null && !res.getAllowedClassifications().isEmpty()) {
                 if (!res.getAllowedClassifications().contains(project.getClassification())) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project classification is not allowed for this jam.");
+                    throw new IllegalArgumentException("Project classification is not allowed for this jam.");
                 }
             }
 
             if (res.getAllowedLicenses() != null && !res.getAllowedLicenses().isEmpty()) {
                 if (!res.getAllowedLicenses().contains(project.getLicense())) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project license is not allowed for this jam.");
+                    throw new IllegalArgumentException("Project license is not allowed for this jam.");
                 }
             }
 
@@ -664,23 +662,23 @@ public class ModjamService {
                     }
                 }
                 if (!hasValidVersion) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project does not support any of the required game versions.");
+                    throw new IllegalArgumentException("Project does not support any of the required game versions.");
                 }
             }
 
             if (res.getRequiredDependencyId() != null && !res.getRequiredDependencyId().trim().isEmpty()) {
                 if (project.getModIds() == null || !project.getModIds().contains(res.getRequiredDependencyId().trim())) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project is missing the required dependency.");
+                    throw new IllegalArgumentException("Project is missing the required dependency.");
                 }
             }
 
             int contributorCount = (project.getContributors() != null ? project.getContributors().size() : 0) + 1;
             if (res.getMinContributors() != null && contributorCount < res.getMinContributors()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project does not meet the minimum contributor requirement.");
+                throw new IllegalArgumentException("Project does not meet the minimum contributor requirement.");
             }
 
             if (res.getMaxContributors() != null && contributorCount > res.getMaxContributors()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project exceeds the maximum contributor limit.");
+                throw new IllegalArgumentException("Project exceeds the maximum contributor limit.");
             }
 
             if (res.isRequireUniqueSubmission() && project.getModjamIds() != null) {
@@ -688,7 +686,7 @@ public class ModjamService {
                     if (otherJamId.equals(jamId)) continue;
                     modjamRepository.findById(otherJamId).ifPresent(otherJam -> {
                         if ("ACTIVE".equals(otherJam.getStatus()) || "VOTING".equals(otherJam.getStatus())) {
-                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project is currently entered in another active jam.");
+                            throw new IllegalArgumentException("Project is currently entered in another active jam.");
                         }
                     });
                 }
@@ -699,7 +697,7 @@ public class ModjamService {
                 if (u != null && u.getJoinedModjamIds() != null) {
                     long activeJams = u.getJoinedModjamIds().stream().filter(id -> !id.equals(jamId)).count();
                     if (activeJams > 0) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to first-time participants.");
+                        throw new IllegalArgumentException("This jam is restricted to first-time participants.");
                     }
                 }
             }
@@ -707,19 +705,19 @@ public class ModjamService {
             if (res.isRequirePriorJams()) {
                 User u = userRepository.findById(userId).orElse(null);
                 if (u == null || u.getJoinedModjamIds() == null || u.getJoinedModjamIds().stream().filter(id -> !id.equals(jamId)).count() == 0) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This jam is restricted to experienced participants who have joined a jam before.");
+                    throw new IllegalArgumentException("This jam is restricted to experienced participants who have joined a jam before.");
                 }
             }
 
             if (res.getRequiredClassUsage() != null && !res.getRequiredClassUsage().trim().isEmpty()) {
                 if (project.getVersions() == null || project.getVersions().isEmpty()) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project has no uploaded files to check.");
+                    throw new IllegalArgumentException("Project has no uploaded files to check.");
                 }
 
                 ModVersion latestVersion = project.getVersions().get(project.getVersions().size() - 1);
                 String fileUrl = latestVersion.getFileUrl();
                 if (fileUrl == null || fileUrl.isEmpty()) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project version has no file associated.");
+                    throw new IllegalArgumentException("Project version has no file associated.");
                 }
 
                 String storageKey = extractStorageKey(fileUrl);
@@ -733,12 +731,12 @@ public class ModjamService {
 
                     boolean usesClass = CheckJarUseClass.checkUseClass(tempFile, res.getRequiredClassUsage().trim());
                     if (!usesClass) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project does not use the required class/package: " + res.getRequiredClassUsage().trim());
+                        throw new IllegalArgumentException("Project does not use the required class/package: " + res.getRequiredClassUsage().trim());
                     }
-                } catch (ResponseStatusException rse) {
+                } catch (IllegalArgumentException rse) {
                     throw rse;
                 } catch (Exception e) {
-                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to analyze project file for required class usage.");
+                    throw new IllegalStateException("Failed to analyze project file for required class usage.");
                 } finally {
                     if (tempFile != null && tempFile.exists()) {
                         tempFile.delete();
@@ -765,15 +763,15 @@ public class ModjamService {
     }
 
     public ModjamSubmission vote(String jamId, String submissionId, String categoryId, int score, String userId) {
-        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
         if (jam.getVotingEndDate() != null && Instant.now().isAfter(jam.getVotingEndDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voting has closed for this jam.");
+            throw new IllegalArgumentException("Voting has closed for this jam.");
         }
 
-        ModjamSubmission sub = submissionRepository.findById(submissionId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        ModjamSubmission sub = submissionRepository.findById(submissionId).orElseThrow(() -> new IllegalArgumentException("Submission not found"));
 
-        if (sub.getSubmitterId().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot vote on self");
+        if (sub.getSubmitterId().equals(userId)) throw new SecurityException("Cannot vote on self");
 
         boolean isJudge = jam.getJudgeIds() != null && jam.getJudgeIds().contains(userId);
 
@@ -848,8 +846,8 @@ public class ModjamService {
     }
 
     public Modjam finalizeJam(String jamId, String userId, List<Map<String, String>> winnersData) {
-        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!jam.getHostId().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can finalize the jam");
+        Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+        if (!jam.getHostId().equals(userId)) throw new SecurityException("Only the host can finalize the jam");
 
         calculateScores(jamId);
 

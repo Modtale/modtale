@@ -39,23 +39,12 @@ export const JamSubmissionWizard: React.FC<{
             onSuccess(res.data);
         } catch (e: any) {
             setSubmitting(false);
+            let errorMsg = typeof e.response?.data === 'string'
+                ? e.response.data
+                : e.response?.data?.message || 'Failed to submit project.';
 
-            let errorMsg = 'Failed to submit project.';
-            if (typeof e.response?.data === 'string') {
-                errorMsg = e.response.data;
-            } else if (e.response?.data?.message) {
-                errorMsg = e.response.data.message;
-            }
-
-            // Clean up Spring Boot's raw ResponseStatusException prefix if it leaked through
-            if (errorMsg.includes('400 BAD_REQUEST "')) {
-                errorMsg = errorMsg.split('400 BAD_REQUEST "')[1].replace(/"$/, '');
-            } else if (errorMsg.includes('BAD_REQUEST "')) {
-                errorMsg = errorMsg.split('BAD_REQUEST "')[1].replace(/"$/, '');
-            }
-
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onError(errorMsg);
-            // Intentionally not calling onCancel() here so the modal stays open and they can read the error
         }
     };
 

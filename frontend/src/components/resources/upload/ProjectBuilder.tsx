@@ -147,6 +147,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [selectedPublishJamId, setSelectedPublishJamId] = useState<string>('');
     const [agreedToPublishJamRules, setAgreedToPublishJamRules] = useState(false);
     const [isPublishingJam, setIsPublishingJam] = useState(false);
+    const [jamSubmitError, setJamSubmitError] = useState<string | null>(null);
 
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
@@ -306,9 +307,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             setInviteUsername('');
             onShowStatus('success', 'Invited', `Invited ${inviteUsername}`);
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to invite user.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Error', errorMsg);
         } finally {
             setIsInviting(false);
@@ -329,9 +331,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             });
             onShowStatus('success', 'Removed', `Removed ${username}`);
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to remove contributor.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Error', errorMsg);
         }
     };
@@ -452,9 +455,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 setIsDirty(false);
             }
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to save project.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Save Failed', errorMsg);
         }
     };
@@ -472,9 +476,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                     setSlugError("Unable to save slug. It may be taken.");
                 }
             } catch (e: any) {
-                const errorMsg = typeof e.response?.data === 'string'
+                let errorMsg = typeof e.response?.data === 'string'
                     ? e.response.data
                     : e.response?.data?.message || 'Failed to save slug.';
+                errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
                 setSlugError(errorMsg);
             }
         } else {
@@ -484,12 +489,18 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     const executePublish = async () => {
+        setJamSubmitError(null);
         if (selectedPublishJamId && modData?.id) {
             setIsPublishingJam(true);
             try {
                 await api.post(`/modjams/${selectedPublishJamId}/submit`, { projectId: modData.id });
             } catch (e: any) {
-                onShowStatus('error', 'Jam Submission Failed', e.response?.data?.message || 'Failed to submit to jam');
+                let errorMsg = typeof e.response?.data === 'string'
+                    ? e.response.data
+                    : (e.response?.data?.message || 'Failed to submit to jam');
+                errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
+
+                setJamSubmitError(errorMsg);
                 setIsPublishingJam(false);
                 return;
             }
@@ -533,9 +544,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             setEditVersionData(null);
             onShowStatus('success', 'Updated', 'Version metadata updated successfully.');
         } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string'
+            let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to update version.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Update Failed', errorMsg);
         } finally {
             setIsSavingVersion(false);
@@ -695,7 +707,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     <JamSelectDropdown
                                         value={selectedPublishJamId}
                                         options={activeJams}
-                                        onChange={(v) => { setSelectedPublishJamId(v); setAgreedToPublishJamRules(false); }}
+                                        onChange={(v) => { setSelectedPublishJamId(v); setAgreedToPublishJamRules(false); setJamSubmitError(null); }}
                                     />
 
                                     {(() => {
@@ -731,6 +743,17 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             </div>
                                         );
                                     })()}
+                                </div>
+                            )}
+
+                            {jamSubmitError && (
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mt-4 flex items-start gap-3 animate-in fade-in zoom-in-95">
+                                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                    <div>
+                                        <h4 className="text-sm font-bold text-red-700 dark:text-red-400">Jam Submission Failed</h4>
+                                        <p className="text-xs text-red-600/80 dark:text-red-500/80 mt-1">{jamSubmitError}</p>
+                                        <p className="text-[10px] text-red-600/60 dark:text-red-500/60 mt-2 font-bold uppercase tracking-widest">Fix the issue, or choose "-- Do not enter a jam --"</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
