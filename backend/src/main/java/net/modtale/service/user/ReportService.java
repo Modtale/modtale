@@ -102,10 +102,18 @@ public class ReportService {
 
         reportRepository.save(report);
 
+        String message = "Your report regarding " + report.getTargetSummary() + " has been " + status.name().toLowerCase() + ".";
+
+        if (note != null && !note.trim().isEmpty()) {
+            message += "\n\nModerator response: " + note;
+        }
+
+        String title = status == Report.ReportStatus.RESOLVED ? "Report Resolved" : "Report Dismissed";
+
         notificationService.sendNotification(
                 List.of(report.getReporterId()),
-                "Report Resolved",
-                "Your report regarding " + report.getTargetSummary() + " has been resolved.",
+                title,
+                message,
                 URI.create("/dashboard"),
                 null
         );
