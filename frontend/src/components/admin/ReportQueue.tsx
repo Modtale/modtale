@@ -10,13 +10,19 @@ interface ReportQueueProps {
 
 export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) => {
     const [processing, setProcessing] = useState<string | null>(null);
+    const [responses, setResponses] = useState<Record<string, string>>({});
 
     const handleResolve = async (id: string, action: 'RESOLVED' | 'DISMISSED') => {
         setProcessing(id);
         try {
             await api.post(`/admin/reports/${id}/resolve`, {
                 status: action,
-                note: action === 'RESOLVED' ? 'Action taken' : 'Dismissed by admin'
+                note: responses[id] || (action === 'RESOLVED' ? 'Action taken' : 'Dismissed by admin')
+            });
+            setResponses(prev => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
             });
             onRefresh();
         } catch (e) {
@@ -78,9 +84,16 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) 
                             "{report.description}"
                         </p>
 
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-4">
                             <span>Reported by: <span className="text-slate-700 dark:text-slate-300">{report.reporterUsername}</span></span>
                         </div>
+
+                        <textarea
+                            value={responses[report.id] || ''}
+                            onChange={(e) => setResponses(prev => ({ ...prev, [report.id]: e.target.value }))}
+                            placeholder="Add an optional response to the reporter..."
+                            className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y min-h-[80px]"
+                        />
                     </div>
 
                     <div className="flex flex-col gap-2 justify-center min-w-[180px]">
@@ -97,14 +110,14 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports, onRefresh }) 
                         <button
                             onClick={() => handleResolve(report.id, 'RESOLVED')}
                             disabled={!!processing}
-                            className="w-full py-2 bg-red-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                            className="w-full py-2 bg-red-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20 disabled:opacity-50"
                         >
                             <Check className="w-3 h-3" /> Mark Resolved
                         </button>
                         <button
                             onClick={() => handleResolve(report.id, 'DISMISSED')}
                             disabled={!!processing}
-                            className="w-full py-2 border border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                            className="w-full py-2 border border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                         >
                             <X className="w-3 h-3" /> Dismiss
                         </button>

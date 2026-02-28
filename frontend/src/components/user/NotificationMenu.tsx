@@ -127,7 +127,7 @@ export const NotificationMenu: React.FC = () => {
                                             <div className={`font-bold text-sm text-slate-800 dark:text-slate-200 mb-0.5 truncate ${!n.read ? 'text-modtale-accent' : ''}`}>
                                                 {n.title} {!n.read && <span className="inline-block w-1.5 h-1.5 bg-red-500 rounded-full ml-1 mb-0.5"></span>}
                                             </div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{n.message}</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words">{n.message}</div>
 
                                             {(n.type === 'TRANSFER_REQUEST' || n.type === 'ORG_INVITE' || n.type === 'CONTRIBUTOR_INVITE') ? (
                                                 <div className="flex gap-2 mt-3">
