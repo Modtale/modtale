@@ -35,7 +35,7 @@ public class ReportService {
 
     private final Map<String, Bucket> reportBuckets = new ConcurrentHashMap<>();
 
-    public void createReport(String targetId, Report.TargetType targetType, String reason, String description, User reporter) {
+    public Report createReport(String targetId, Report.TargetType targetType, String reason, String description, User reporter) {
         Bucket bucket = reportBuckets.computeIfAbsent(reporter.getId(),
                 k -> Bucket.builder()
                         .addLimit(Bandwidth.classic(reportsPerDay, Refill.greedy(reportsPerDay, Duration.ofDays(1))))
@@ -85,11 +85,15 @@ public class ReportService {
         report.setStatus(Report.ReportStatus.OPEN);
         report.setCreatedAt(LocalDateTime.now());
 
-        reportRepository.save(report);
+        return reportRepository.save(report);
     }
 
     public List<Report> getOpenReports() {
-        return reportRepository.findByStatus(Report.ReportStatus.OPEN);
+        return getReportsByStatus(Report.ReportStatus.OPEN);
+    }
+
+    public List<Report> getReportsByStatus(Report.ReportStatus status) {
+        return reportRepository.findByStatus(status);
     }
 
     public void resolveReport(String reportId, Report.ReportStatus status, String note, User admin) {

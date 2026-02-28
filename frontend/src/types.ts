@@ -158,4 +158,6 @@ export interface Report {
     description: string;
     status: 'OPEN' | 'RESOLVED' | 'DISMISSED';
     createdAt: string;
+    resolvedBy?: string;
+    resolutionNote?: string;
 }
