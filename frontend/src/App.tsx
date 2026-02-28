@@ -144,6 +144,17 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
         />
     );
 
+    const renderModDetail = () => (
+        <ModDetail
+            onToggleFavorite={handleToggleFavorite}
+            isLiked={(id) => user?.likedModIds?.includes(id) || false}
+            currentUser={user}
+            onRefresh={async () => {}}
+            onDownload={handleDownload}
+            downloadedSessionIds={downloadedSessionIds}
+        />
+    );
+
     return (
         <NotificationProvider userId={user?.id}>
             <div className={`min-h-screen bg-white dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
@@ -208,21 +219,27 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                                         <Navigate to="/" />
                             } />
 
-                            <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/mod/:id" element={renderModDetail()} />
+                            <Route path="/mod/:id/download" element={renderModDetail()} />
+                            <Route path="/mod/:id/changelog" element={renderModDetail()} />
                             <Route path="/mod/:id/edit" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <EditMod currentUser={user} /> :
                                         <Navigate to="/" />
                             } />
 
-                            <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/modpack/:id" element={renderModDetail()} />
+                            <Route path="/modpack/:id/download" element={renderModDetail()} />
+                            <Route path="/modpack/:id/changelog" element={renderModDetail()} />
                             <Route path="/modpack/:id/edit" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <EditMod currentUser={user} /> :
                                         <Navigate to="/" />
                             } />
 
-                            <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/world/:id" element={renderModDetail()} />
+                            <Route path="/world/:id/download" element={renderModDetail()} />
+                            <Route path="/world/:id/changelog" element={renderModDetail()} />
 
                             <Route path="/creator/:username" element={
                                 <CreatorProfile

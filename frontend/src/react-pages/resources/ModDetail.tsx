@@ -242,7 +242,10 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
     const startEditing = useCallback((comment: Comment) => {
         setText(comment.content);
         setEditingCommentId(comment.id);
-        if(innerRef?.current) innerRef.current.scrollIntoView({behavior:'smooth'});
+        if(innerRef?.current) {
+            const y = innerRef.current.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({top: y, behavior: 'smooth'});
+        }
     }, [innerRef]);
 
     const cancelEdit = useCallback(() => {
@@ -296,7 +299,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
     if (commentsDisabled && !isCreator) return null;
 
     return (
-        <div ref={innerRef} className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10">
+        <div ref={innerRef} id="comments" className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10 scroll-mt-24">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
                 <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> Comments <span className="text-sm font-medium text-slate-500 dark:text-slate-400">({comments.length})</span>
             </h2>
@@ -443,8 +446,8 @@ export const ModDetail: React.FC<{
     const [loading, setLoading] = useState(!initialMod);
     const [isNotFound, setIsNotFound] = useState(false);
 
-    const [showDownloadModal, setShowDownloadModal] = useState(false);
-    const [showAllVersionsModal, setShowAllVersionsModal] = useState(false);
+    const [showDownloadModal, setShowDownloadModal] = useState(location.hash === '#download' || location.pathname.endsWith('/download'));
+    const [showAllVersionsModal, setShowAllVersionsModal] = useState(location.hash === '#changelog' || location.pathname.endsWith('/changelog'));
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
@@ -627,10 +630,22 @@ export const ModDetail: React.FC<{
             const currentPath = location.pathname;
 
             if (currentPath.replace(/\/$/, "") !== canonicalPath.replace(/\/$/, "")) {
-                navigate(canonicalPath, { replace: true });
+                if (!currentPath.endsWith('/download') && !currentPath.endsWith('/changelog')) {
+                    navigate(canonicalPath, { replace: true });
+                }
+            }
+
+            if (location.hash === '#comments' && commentsRef.current) {
+                const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
+                window.scrollTo({top: y, behavior: 'smooth'});
             }
         }
-    }, [mod, loading, location.pathname, navigate]);
+    }, [mod, loading, location.pathname, location.hash, navigate]);
+
+    useEffect(() => {
+        if (location.pathname.endsWith('/download')) setShowDownloadModal(true);
+        if (location.pathname.endsWith('/changelog')) setShowAllVersionsModal(true);
+    }, [location.pathname]);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
@@ -733,6 +748,8 @@ export const ModDetail: React.FC<{
                 }
                 setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
                 setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+
+                if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
                 return;
             }
 
@@ -746,6 +763,8 @@ export const ModDetail: React.FC<{
             }
             setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
             setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+
+            if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
         } catch (error) {
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
@@ -778,6 +797,8 @@ export const ModDetail: React.FC<{
 
     const isUnlisted = mod.status === 'UNLISTED';
     const isArchived = mod.status === 'ARCHIVED';
+
+    const projectUrl = getProjectUrl(mod);
 
     return (
         <>
@@ -826,17 +847,27 @@ export const ModDetail: React.FC<{
 
             <DownloadModal
                 show={showDownloadModal}
-                onClose={() => setShowDownloadModal(false)}
+                onClose={() => {
+                    setShowDownloadModal(false);
+                    if (location.pathname.endsWith('/download')) navigate(projectUrl, { replace: true });
+                }}
                 versionsByGame={latestForGame}
                 onDownload={initiateDownload}
                 showExperimental={showExperimental}
                 onToggleExperimental={() => setShowExperimental(!showExperimental)}
-                onViewHistory={() => { setShowDownloadModal(false); setShowAllVersionsModal(true); }}
+                onViewHistory={() => {
+                    setShowDownloadModal(false);
+                    setShowAllVersionsModal(true);
+                    if (location.pathname.endsWith('/download')) navigate(`${projectUrl}/changelog`, { replace: true });
+                }}
             />
 
             <HistoryModal
                 show={showAllVersionsModal}
-                onClose={() => setShowAllVersionsModal(false)}
+                onClose={() => {
+                    setShowAllVersionsModal(false);
+                    if (location.pathname.endsWith('/changelog')) navigate(projectUrl, { replace: true });
+                }}
                 history={sortedHistory}
                 showExperimental={showExperimental}
                 onToggleExperimental={() => setShowExperimental(!showExperimental)}
@@ -913,9 +944,9 @@ export const ModDetail: React.FC<{
                             <Flag className="w-5 h-5" aria-hidden="true" />
                         </button>
                         {Boolean(canEdit) && (
-                            <button onClick={() => navigate(`${getProjectUrl(mod)}/edit`)} aria-label="Edit Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" title="Edit Project">
+                            <Link to={`${projectUrl}/edit`} aria-label="Edit Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all block" title="Edit Project">
                                 <Edit className="w-5 h-5" aria-hidden="true" />
-                            </button>
+                            </Link>
                         )}
                     </>
                 }
@@ -956,13 +987,13 @@ export const ModDetail: React.FC<{
                 actionBar={
                     <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 w-full">
                         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full xl:w-auto">
-                            <button
-                                onClick={() => setShowDownloadModal(true)}
+                            <Link
+                                to={`${projectUrl}/download`}
                                 className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
                             >
                                 <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
                                 Download
-                            </button>
+                            </Link>
 
                             <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-2"></div>
 
@@ -970,8 +1001,22 @@ export const ModDetail: React.FC<{
                                 {mod.galleryImages && mod.galleryImages.length > 0 && (
                                     <button onClick={() => {if(mod.galleryImages?.length) setGalleryIndex(0)}} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</button>
                                 )}
-                                <button onClick={() => setShowAllVersionsModal(true)} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</button>
-                                <button onClick={() => commentsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments</button>
+                                <Link to={`${projectUrl}/changelog`} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</Link>
+                                <a
+                                    href={`${projectUrl}#comments`}
+                                    onClick={(e) => {
+                                        if (location.pathname === projectUrl) {
+                                            e.preventDefault();
+                                            if (commentsRef.current) {
+                                                const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
+                                                window.scrollTo({top: y, behavior: 'smooth'});
+                                            }
+                                        }
+                                    }}
+                                    className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
+                                >
+                                    <MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments
+                                </a>
                             </div>
                         </div>
 
@@ -991,9 +1036,10 @@ export const ModDetail: React.FC<{
                                                 const title = meta?.title || dep.modTitle || dep.modId;
                                                 const path = `/mod/${createSlug(title, dep.modId)}`;
                                                 return (
-                                                    <button
+                                                    <Link
                                                         key={idx}
-                                                        onClick={() => { navigate(path); setShowMobileDeps(false); }}
+                                                        to={path}
+                                                        onClick={() => setShowMobileDeps(false)}
                                                         className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white text-left"
                                                     >
                                                         <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center border border-white/5 shrink-0 overflow-hidden">
@@ -1004,7 +1050,7 @@ export const ModDetail: React.FC<{
                                                             <div className="text-[10px] text-slate-400 font-mono">v{dep.versionNumber}</div>
                                                         </div>
                                                         <ExternalLink className="w-3 h-3 opacity-50 shrink-0" aria-hidden="true" />
-                                                    </button>
+                                                    </Link>
                                                 );
                                             })}
                                         </div>
