@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Flag, X, AlertTriangle, ChevronDown, Check } from 'lucide-react';
+import { Flag, X, AlertTriangle, ChevronDown, Check, ShieldCheck } from 'lucide-react';
 import { api } from '../../../utils/api';
 
 interface ReportModalProps {
@@ -24,6 +24,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [reportId, setReportId] = useState<string | null>(null);
     const [error, setError] = useState('');
 
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -40,6 +41,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
         }
         return () => {
             document.body.style.overflow = '';
+            // Reset state when closed
+            if (!isOpen) {
+                setSubmitted(false);
+                setReportId(null);
+                setDescription('');
+                setReason(REPORT_REASONS[0].id);
+            }
         };
     }, [isOpen]);
 
@@ -73,19 +81,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
         setError('');
 
         try {
-            await api.post('/reports', {
+            const res = await api.post('/reports', {
                 targetId: effectiveTargetId,
                 targetType,
                 reason,
                 description
             });
+            setReportId(res.data.id);
             setSubmitted(true);
-            setTimeout(() => {
-                onClose();
-                setSubmitted(false);
-                setDescription('');
-                setReason(REPORT_REASONS[0].id);
-            }, 2000);
         } catch (e) {
             setError('Failed to submit report. Please try again.');
         } finally {
@@ -110,12 +113,26 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
 
                 <div className="p-6">
                     {submitted ? (
-                        <div className="text-center py-8">
+                        <div className="text-center py-6">
                             <div className="w-16 h-16 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Flag className="w-8 h-8" />
+                                <ShieldCheck className="w-8 h-8" />
                             </div>
                             <h4 className="text-xl font-bold text-slate-900 dark:text-white">Report Submitted</h4>
-                            <p className="text-slate-500 mt-2">Thank you for helping keep the community safe.</p>
+                            <p className="text-slate-500 mt-2 text-sm">Thank you for helping keep the community safe. A moderator will review this shortly.</p>
+
+                            {reportId && (
+                                <div className="mt-6 p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl">
+                                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Report ID</p>
+                                    <p className="font-mono text-slate-900 dark:text-white text-sm select-all">{reportId}</p>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={onClose}
+                                className="mt-8 px-6 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-white rounded-xl font-bold transition-colors"
+                            >
+                                Close
+                            </button>
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
