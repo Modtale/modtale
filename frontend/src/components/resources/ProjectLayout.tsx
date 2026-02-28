@@ -169,7 +169,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/5 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
-                                <label className={`block w-32 h-32 rounded-2xl bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-4 border-slate-950 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-32 h-32 rounded-2xl bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
                                         <img src={finalIcon} alt="Icon" width={128} height={128} className="w-full h-full object-cover" />
@@ -187,7 +187,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
-                                <label className={`block w-56 h-56 rounded-[2.5rem] bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-[8px] border-white dark:border-slate-800 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-56 h-56 rounded-[2.5rem] bg-slate-200 dark:bg-black/20 shadow-xl border-[8px] border-white dark:border-slate-800 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
                                         <img src={finalIcon} alt="Icon" width={224} height={224} className="w-full h-full object-cover" />
