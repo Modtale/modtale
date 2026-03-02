@@ -311,12 +311,12 @@ public class OgImageController {
         String title = truncateText(g2d, mod.getTitle(), maxTextWidth);
         g2d.drawString(title, textX, textStartY + 30);
 
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 24));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 28));
         g2d.setColor(TEXT_SECONDARY);
         g2d.drawString("by " + mod.getAuthor(), textX, textStartY + 75);
 
-        int descY = textStartY + 140;
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 22));
+        int descY = textStartY + 135;
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 32));
         g2d.setColor(TEXT_DESC);
 
         String desc = mod.getDescription() != null ? mod.getDescription() : "";
