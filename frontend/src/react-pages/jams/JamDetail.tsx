@@ -258,13 +258,12 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 const subRes = await api.get(`/modjams/${res.data.id}/submissions`);
                 setSubmissions(subRes.data);
 
-                // Only check follow status if the user is logged in and is NOT the host
                 if (currentUser && res.data.hostName && res.data.hostName !== currentUser.username) {
                     try {
                         const followRes = await api.get(`/user/following/${res.data.hostName}`);
                         setIsFollowing(Boolean(followRes.data));
                     } catch (e) {
-                        setIsFollowing(false); // Fails gracefully (backend may return 404 if not followed)
+                        setIsFollowing(false);
                     }
                 }
             } catch (err) {
@@ -748,10 +747,21 @@ const JamDetailView: React.FC<{
       }) => {
     const sortedSubmissions = useMemo(() => [...submissions].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)), [submissions]);
 
-    const winners = useMemo(() => sortedSubmissions.filter(s => (s as any).winner === true), [sortedSubmissions]);
-    const regularEntries = useMemo(() => jam.status === 'COMPLETED' ? sortedSubmissions.filter(s => (s as any).winner !== true) : sortedSubmissions, [jam.status, sortedSubmissions]);
-
     const isSecretPhase = Boolean((jam as any).hideSubmissions && ['DRAFT', 'UPCOMING', 'ACTIVE'].includes(jam.status));
+
+    const winners = useMemo(() => sortedSubmissions.filter(s => (s as any).winner === true), [sortedSubmissions]);
+    const regularEntries = useMemo(() => {
+        let entries = sortedSubmissions;
+        if (jam.status === 'COMPLETED') {
+            entries = entries.filter(s => (s as any).winner !== true);
+        }
+
+        if (isSecretPhase) {
+            entries = entries.filter(s => s.submitterId === currentUser?.id);
+        }
+
+        return entries;
+    }, [jam.status, sortedSubmissions, isSecretPhase, currentUser]);
 
     const resolveUrl = (url?: string | null) => {
         if (!url) return '';
@@ -830,7 +840,7 @@ const JamDetailView: React.FC<{
                                     <Upload className="w-6 h-6" /> Submit Project
                                 </button>
                             )}
-                            <button onClick={handleLeave} className="h-12 md:h-14 px-6 md:px-8 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-xl font-black text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+                            <button onClick={handleLeave} className="h-12 md:h-14 px-6 md:px-8 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-50 hover:text-white rounded-xl font-black text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
                                 <LogOut className="w-4 h-4" /> Leave
                             </button>
                         </div>
@@ -943,15 +953,18 @@ const JamDetailView: React.FC<{
                             <EventTimeline jam={jam} now={now} />
 
                             {isSecretPhase && (
-                                <div className="bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 p-5 md:p-6 rounded-2xl flex items-start gap-4 mb-8">
-                                    <EyeOff className="w-6 h-6 shrink-0 mt-0.5 text-blue-500" />
-                                    <div>
-                                        <h4 className="font-black text-lg md:text-xl mb-1">Submissions are Hidden</h4>
-                                        <p className="font-medium text-sm md:text-base opacity-90 leading-relaxed">
-                                            The host has chosen to keep all project submissions secret until the voting phase begins on <strong>{new Date(jam.votingEndDate).toLocaleDateString()}</strong>.
-                                            {hasSubmitted && ' You can only see your own submission for now.'}
-                                        </p>
+                                <div className="flex flex-col items-center justify-center py-24 px-6 text-center bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border-2 border-dashed border-white/60 dark:border-white/10 rounded-[2.5rem] animate-in fade-in zoom-in-95">
+                                    <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
+                                        <EyeOff className="w-10 h-10 text-slate-400" />
                                     </div>
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Submissions are Hidden</h3>
+                                    <p className="text-slate-500 font-medium max-w-md mx-auto leading-relaxed">
+                                        The host has chosen to keep all project submissions secret until the voting phase begins on
+                                        <span className="text-modtale-accent font-bold ml-1">
+                                            {new Date(jam.endDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}
+                                        </span>.
+                                        {hasSubmitted && <span className="block mt-2 text-modtale-accent">You can only see your own submission for now.</span>}
+                                    </p>
                                 </div>
                             )}
 
@@ -1130,19 +1143,13 @@ const JamDetailView: React.FC<{
                                 })}
                                 {submissions.length === 0 && (
                                     <div className="col-span-full py-24 text-center text-slate-500 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border-2 border-dashed border-white/60 dark:border-white/10 rounded-2xl">
-                                        {isSecretPhase ? (
-                                            <>
-                                                <EyeOff className="w-16 h-16 mx-auto mb-6 opacity-20" />
-                                                <p className="text-xl font-black text-slate-700 dark:text-slate-300">It's a secret to everybody.</p>
-                                                <p className="text-base font-medium mt-2">Entries will be revealed when voting opens.</p>
-                                            </>
-                                        ) : (
+                                        {!isSecretPhase ? (
                                             <>
                                                 <LayoutGrid className="w-16 h-16 mx-auto mb-6 opacity-20" />
                                                 <p className="text-xl font-black text-slate-700 dark:text-slate-300">No submissions yet.</p>
                                                 <p className="text-base font-medium mt-2">Be the first to submit a project!</p>
                                             </>
-                                        )}
+                                        ) : null}
                                     </div>
                                 )}
                             </div>
