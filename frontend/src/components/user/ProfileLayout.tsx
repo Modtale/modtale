@@ -59,6 +59,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const displayTitle = user.username;
     const linkedAccounts = (user.connectedAccounts || []).filter(a => a.visible);
 
+    const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
         const file = e.target.files[0];
@@ -212,7 +214,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-900/90 to-transparent md:to-black/30" />
 
                 {onBack && (
-                    <div className="absolute top-0 left-0 right-0 z-40 mx-auto w-full px-4 sm:px-8 md:px-12 lg:px-16 h-full pointer-events-none">
+                    <div className={`absolute top-0 left-0 right-0 z-40 mx-auto w-full ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
                         <div className="pt-6 pointer-events-auto w-fit">
                             <button onClick={onBack} className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
                                 <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
@@ -250,7 +252,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 )}
             </div>
 
-            <div className="w-full mx-auto px-4 sm:px-8 md:px-12 lg:px-16 relative z-50 transition-[max-width,padding] duration-300">
+            <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300`}>
                 <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start md:-mt-32">
 
                     <div className="hidden md:block flex-shrink-0 self-start md:-mt-24">
