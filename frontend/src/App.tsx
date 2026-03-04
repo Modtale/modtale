@@ -222,6 +222,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/mod/:id" element={renderModDetail()} />
                             <Route path="/mod/:id/download" element={renderModDetail()} />
                             <Route path="/mod/:id/changelog" element={renderModDetail()} />
+                            <Route path="/mod/:id/gallery" element={renderModDetail()} />
                             <Route path="/mod/:id/edit" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <EditMod currentUser={user} /> :
@@ -231,6 +232,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/modpack/:id" element={renderModDetail()} />
                             <Route path="/modpack/:id/download" element={renderModDetail()} />
                             <Route path="/modpack/:id/changelog" element={renderModDetail()} />
+                            <Route path="/modpack/:id/gallery" element={renderModDetail()} />
                             <Route path="/modpack/:id/edit" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <EditMod currentUser={user} /> :
@@ -240,6 +242,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/world/:id" element={renderModDetail()} />
                             <Route path="/world/:id/download" element={renderModDetail()} />
                             <Route path="/world/:id/changelog" element={renderModDetail()} />
+                            <Route path="/world/:id/gallery" element={renderModDetail()} />
 
                             <Route path="/creator/:username" element={
                                 <CreatorProfile

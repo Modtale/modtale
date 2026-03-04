@@ -446,12 +446,15 @@ export const ModDetail: React.FC<{
     const [loading, setLoading] = useState(!initialMod);
     const [isNotFound, setIsNotFound] = useState(false);
 
-    const [showDownloadModal, setShowDownloadModal] = useState(location.hash === '#download' || location.pathname.endsWith('/download'));
-    const [showAllVersionsModal, setShowAllVersionsModal] = useState(location.hash === '#changelog' || location.pathname.endsWith('/changelog'));
+    const [showDownloadModal, setShowDownloadModal] = useState(location.pathname.endsWith('/download'));
+    const [showAllVersionsModal, setShowAllVersionsModal] = useState(location.pathname.endsWith('/changelog'));
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
-    const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
     const [pendingDownloadVer, setPendingDownloadVer] = useState<{url: string, ver: string, deps: any[]} | null>(null);
+
+    const isGalleryRoute = location.pathname.endsWith('/gallery');
+    const parsedHash = parseInt(location.hash.replace('#', ''));
+    const galleryIndex = isGalleryRoute && !isNaN(parsedHash) && parsedHash > 0 && mod?.galleryImages && parsedHash <= mod.galleryImages.length ? parsedHash - 1 : null;
 
     const [isFollowing, setIsFollowing] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
@@ -573,6 +576,15 @@ export const ModDetail: React.FC<{
     }, [realId]);
 
     useEffect(() => {
+        if (location.pathname.endsWith('/gallery') && mod?.galleryImages?.length) {
+            const hashNum = parseInt(location.hash.replace('#', ''));
+            if (isNaN(hashNum) || hashNum < 1 || hashNum > mod.galleryImages.length) {
+                navigate(`${getProjectUrl(mod)}/gallery#1`, { replace: true });
+            }
+        }
+    }, [location.pathname, location.hash, mod, navigate]);
+
+    useEffect(() => {
         if (currentUser?.followingIds && mod?.author) {
             setIsFollowing(currentUser.followingIds.includes(mod.author));
         } else {
@@ -630,7 +642,7 @@ export const ModDetail: React.FC<{
             const currentPath = location.pathname;
 
             if (currentPath.replace(/\/$/, "") !== canonicalPath.replace(/\/$/, "")) {
-                if (!currentPath.endsWith('/download') && !currentPath.endsWith('/changelog')) {
+                if (!currentPath.endsWith('/download') && !currentPath.endsWith('/changelog') && !currentPath.endsWith('/gallery')) {
                     navigate(canonicalPath, { replace: true });
                 }
             }
@@ -874,13 +886,13 @@ export const ModDetail: React.FC<{
                 onDownload={initiateDownload}
             />
 
-            {galleryIndex !== null && mod.galleryImages && (
-                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setGalleryIndex(null)}>
+            {galleryIndex !== null && mod.galleryImages && mod.galleryImages[galleryIndex] && (
+                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => navigate(projectUrl, { replace: true })}>
                     <div className="relative w-full max-w-6xl max-h-[85dvh] bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-white/10" onClick={e => e.stopPropagation()}>
 
                         <div className="p-4 flex justify-between items-center bg-black/20 border-b border-white/10 z-10 shrink-0">
                             <span className="text-sm font-bold text-white/70">Image {galleryIndex + 1} of {mod.galleryImages.length}</span>
-                            <button aria-label="Close gallery" onClick={() => setGalleryIndex(null)} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
+                            <button aria-label="Close gallery" onClick={() => navigate(projectUrl, { replace: true })} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
                         </div>
 
                         <div className="flex-1 relative flex items-center justify-center bg-black/40 overflow-hidden group">
@@ -888,14 +900,22 @@ export const ModDetail: React.FC<{
                                 <>
                                     <button
                                         aria-label="Previous image"
-                                        onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex - 1 + mod.galleryImages!.length) % mod.galleryImages!.length)}}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const prevIdx = (galleryIndex - 1 + mod.galleryImages!.length) % mod.galleryImages!.length;
+                                            navigate(`${projectUrl}/gallery#${prevIdx + 1}`, { replace: true });
+                                        }}
                                         className="absolute left-4 p-3 bg-black/50 hover:bg-modtale-accent text-white rounded-full transition-all z-20 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0"
                                     >
                                         <ChevronLeft className="w-6 h-6" aria-hidden="true" />
                                     </button>
                                     <button
                                         aria-label="Next image"
-                                        onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex + 1) % mod.galleryImages!.length)}}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const nextIdx = (galleryIndex + 1) % mod.galleryImages!.length;
+                                            navigate(`${projectUrl}/gallery#${nextIdx + 1}`, { replace: true });
+                                        }}
                                         className="absolute right-4 p-3 bg-black/50 hover:bg-modtale-accent text-white rounded-full transition-all z-20 opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0"
                                     >
                                         <ChevronRight className="w-6 h-6" aria-hidden="true" />
@@ -999,7 +1019,7 @@ export const ModDetail: React.FC<{
 
                             <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto">
                                 {mod.galleryImages && mod.galleryImages.length > 0 && (
-                                    <button onClick={() => {if(mod.galleryImages?.length) setGalleryIndex(0)}} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</button>
+                                    <Link to={`${projectUrl}/gallery#1`} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</Link>
                                 )}
                                 <Link to={`${projectUrl}/changelog`} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</Link>
                                 <a
