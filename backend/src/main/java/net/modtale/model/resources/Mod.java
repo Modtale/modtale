@@ -87,6 +87,9 @@ public class Mod {
     private boolean allowModpacks = true;
     private boolean allowComments = true;
 
+    private boolean hmWikiEnabled = false;
+    private String hmWikiSlug;
+
     @Indexed
     private String status = "PUBLISHED";
     private String expiresAt;
@@ -192,6 +195,12 @@ public class Mod {
 
     public boolean isAllowComments() { return allowComments; }
     public void setAllowComments(boolean allowComments) { this.allowComments = allowComments; }
+
+    public boolean isHmWikiEnabled() { return hmWikiEnabled; }
+    public void setHmWikiEnabled(boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
+
+    public String getHmWikiSlug() { return hmWikiSlug; }
+    public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

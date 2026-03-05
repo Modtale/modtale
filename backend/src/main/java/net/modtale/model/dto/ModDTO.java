@@ -36,6 +36,8 @@ public class ModDTO {
     private List<String> modIds;
     private boolean allowModpacks;
     private boolean allowComments;
+    private boolean hmWikiEnabled;
+    private String hmWikiSlug;
     private String status;
     private String expiresAt;
     private List<String> contributors;
@@ -76,6 +78,8 @@ public class ModDTO {
         dto.setModIds(mod.getModIds());
         dto.setAllowModpacks(mod.isAllowModpacks());
         dto.setAllowComments(mod.isAllowComments());
+        dto.setHmWikiEnabled(mod.isHmWikiEnabled());
+        dto.setHmWikiSlug(mod.getHmWikiSlug());
         dto.setStatus(mod.getStatus());
         dto.setExpiresAt(mod.getExpiresAt());
         dto.setContributors(mod.getContributors());
@@ -152,6 +156,10 @@ public class ModDTO {
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public boolean isAllowComments() { return allowComments; }
     public void setAllowComments(boolean allowComments) { this.allowComments = allowComments; }
+    public boolean isHmWikiEnabled() { return hmWikiEnabled; }
+    public void setHmWikiEnabled(boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
+    public String getHmWikiSlug() { return hmWikiSlug; }
+    public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
