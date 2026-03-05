@@ -1140,7 +1140,7 @@ export const ModDetail: React.FC<{
                 }
                 mainContent={
                     <>
-                        <div className="prose dark:prose-invert prose-lg max-none">
+                        <div className="prose dark:prose-invert prose-lg max-w-none">
                             {memoizedDescription}
                         </div>
                         <CommentSection
