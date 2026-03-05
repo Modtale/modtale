@@ -29,6 +29,125 @@ import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../..
 import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
 import { useMobile } from '../../context/MobileContext';
 
+const markdownComponents = {
+    code({node, inline, className, children, ...props}: any) {
+        const match = /language-(\w+)/.exec(className || '')
+        return !inline && match ? (
+            <SyntaxHighlighter
+                {...props}
+                style={vscDarkPlus}
+                language={match[1]}
+                PreTag="div"
+                className="rounded-lg text-sm"
+            >
+                {String(children).replace(/\n$/, '')}
+            </SyntaxHighlighter>
+        ) : (
+            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
+                {children}
+            </code>
+        )
+    },
+    p({node, children, ...props}: any) {
+        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
+    },
+    li({node, children, ...props}: any) {
+        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
+    },
+    ul({node, children, ...props}: any) {
+        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
+    },
+    ol({node, children, ...props}: any) {
+        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
+    }
+};
+
+const useHMWiki = (modId: string, pageSlug?: string, enabled: boolean = false) => {
+    const [data, setData] = useState<{mod: any, content: any} | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        if (!enabled || !modId) return;
+
+        let isMounted = true;
+        setLoading(true);
+        setError(false);
+
+        fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${modId}`, {
+            headers: { 'Authorization': `Bearer 086e1b4b7715c0b82eed27601362be5732f102bcd7b13a82c0c53f75b0227895` }
+        })
+            .then(res => {
+                if (!res.ok) throw new Error('Wiki not found');
+                return res.json();
+            })
+            .then(async (modData) => {
+                if (!isMounted) return;
+
+                let content = null;
+                const targetSlug = pageSlug || modData.index?.slug;
+
+                if (targetSlug) {
+                    try {
+                        const res = await fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${modId}/${targetSlug}`, {
+                            headers: { 'Authorization': `Bearer 086e1b4b7715c0b82eed27601362be5732f102bcd7b13a82c0c53f75b0227895` }
+                        });
+                        if (res.ok) {
+                            content = await res.json();
+                        }
+                    } catch (e) {}
+                }
+
+                if (isMounted) {
+                    setData({ mod: modData, content });
+                    setLoading(false);
+                }
+            })
+            .catch(() => {
+                if (isMounted) {
+                    setError(true);
+                    setLoading(false);
+                }
+            });
+
+        return () => { isMounted = false; };
+    }, [modId, pageSlug, enabled]);
+
+    return { data, loading, error };
+};
+
+const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string }> = ({ tree, projectUrl, currentSlug, indexSlug }) => {
+    const renderNodes = (pages: any[]) => {
+        return (
+            <ul className="space-y-1">
+                {pages.map(p => {
+                    const isActive = currentSlug === p.slug || (!currentSlug && indexSlug === p.slug);
+                    return (
+                        <li key={p.id}>
+                            <Link to={`${projectUrl}/wiki/${p.slug}`} className={`block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-modtale-accent text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                {p.title}
+                            </Link>
+                            {p.children && p.children.length > 0 && (
+                                <div className="pl-3 mt-1 border-l border-slate-200 dark:border-white/10 ml-3">
+                                    {renderNodes(p.children)}
+                                </div>
+                            )}
+                        </li>
+                    )
+                })}
+            </ul>
+        );
+    };
+
+    if (!tree || tree.length === 0) return null;
+
+    return (
+        <SidebarSection title="Wiki Navigation" icon={BookOpen} defaultOpen={true}>
+            {renderNodes(tree)}
+        </SidebarSection>
+    );
+};
+
 const ProjectSidebar: React.FC<{
     mod: Mod;
     dependencies?: ModDependency[];
@@ -452,6 +571,12 @@ export const ModDetail: React.FC<{
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [pendingDownloadVer, setPendingDownloadVer] = useState<{url: string, ver: string, deps: any[]} | null>(null);
 
+    const isWikiRoute = location.pathname.includes('/wiki');
+    const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
+    const wikiPageSlug = wikiMatch && wikiMatch[1] ? wikiMatch[1] : undefined;
+
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(mod?.id || '', wikiPageSlug, isWikiRoute);
+
     const isGalleryRoute = location.pathname.endsWith('/gallery');
     const parsedHash = parseInt(location.hash.replace('#', ''));
     const galleryIndex = isGalleryRoute && !isNaN(parsedHash) && parsedHash > 0 && mod?.galleryImages && parsedHash <= mod.galleryImages.length ? parsedHash - 1 : null;
@@ -493,38 +618,7 @@ export const ModDetail: React.FC<{
                         code: ['className']
                     }
                 }]]}
-                components={{
-                    code({node, inline, className, children, ...props}: any) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        return !inline && match ? (
-                            <SyntaxHighlighter
-                                {...props}
-                                style={vscDarkPlus}
-                                language={match[1]}
-                                PreTag="div"
-                                className="rounded-lg text-sm"
-                            >
-                                {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                        ) : (
-                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                                {children}
-                            </code>
-                        )
-                    },
-                    p({node, children, ...props}: any) {
-                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
-                    },
-                    li({node, children, ...props}: any) {
-                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
-                    },
-                    ul({node, children, ...props}: any) {
-                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
-                    },
-                    ol({node, children, ...props}: any) {
-                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
-                    }
-                }}
+                components={markdownComponents}
             >
                 {mod.about}
             </ReactMarkdown>
@@ -642,7 +736,7 @@ export const ModDetail: React.FC<{
             const currentPath = location.pathname;
 
             if (currentPath.replace(/\/$/, "") !== canonicalPath.replace(/\/$/, "")) {
-                if (!currentPath.endsWith('/download') && !currentPath.endsWith('/changelog') && !currentPath.endsWith('/gallery')) {
+                if (!currentPath.endsWith('/download') && !currentPath.endsWith('/changelog') && !currentPath.endsWith('/gallery') && !currentPath.includes('/wiki')) {
                     navigate(canonicalPath, { replace: true });
                 }
             }
@@ -1018,6 +1112,9 @@ export const ModDetail: React.FC<{
                             <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-2"></div>
 
                             <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto">
+                                <Link to={`${projectUrl}/wiki`} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap">
+                                    <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
+                                </Link>
                                 {mod.galleryImages && mod.galleryImages.length > 0 && (
                                     <Link to={`${projectUrl}/gallery#1`} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</Link>
                                 )}
@@ -1127,35 +1224,89 @@ export const ModDetail: React.FC<{
                     </div>
                 }
                 sidebarContent={
-                    <ProjectSidebar
-                        mod={mod}
-                        navigate={navigate}
-                        dependencies={latestDependencies}
-                        depMeta={depMeta}
-                        sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
-                        contributors={contributors}
-                        orgMembers={orgMembers}
-                        author={authorProfile}
-                    />
+                    isWikiRoute ? (
+                        wikiLoading ? (
+                            <div className="flex justify-center p-4"><Spinner /></div>
+                        ) : wikiError || !wikiData ? (
+                            <SidebarSection title="Wiki" icon={BookOpen}>
+                                <div className="text-sm text-slate-500">Navigation unavailable.</div>
+                            </SidebarSection>
+                        ) : (
+                            <>
+                                <WikiSidebar tree={wikiData.mod.pages || []} projectUrl={projectUrl} currentSlug={wikiPageSlug} indexSlug={wikiData.mod.index?.slug} />
+                                <SidebarSection title="Project Info" icon={Box}>
+                                    <Link to={projectUrl} className="block text-sm font-bold text-modtale-accent hover:underline flex items-center gap-2">
+                                        <ChevronLeft className="w-4 h-4" /> Back to Project
+                                    </Link>
+                                </SidebarSection>
+                            </>
+                        )
+                    ) : (
+                        <ProjectSidebar
+                            mod={mod}
+                            navigate={navigate}
+                            dependencies={latestDependencies}
+                            depMeta={depMeta}
+                            sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
+                            contributors={contributors}
+                            orgMembers={orgMembers}
+                            author={authorProfile}
+                        />
+                    )
                 }
                 mainContent={
-                    <>
-                        <div className="prose dark:prose-invert prose-lg max-w-none">
-                            {memoizedDescription}
-                        </div>
-                        <CommentSection
-                            modId={mod.id}
-                            comments={mod.comments || []}
-                            currentUser={currentUser}
-                            isCreator={Boolean(canEdit)}
-                            commentsDisabled={mod.allowComments === false}
-                            onCommentSubmitted={handleCommentSubmitted}
-                            onError={handleError}
-                            onSuccess={handleSuccess}
-                            innerRef={commentsRef}
-                            onReport={handleReport}
-                        />
-                    </>
+                    isWikiRoute ? (
+                        wikiLoading ? (
+                            <div className="flex justify-center p-12"><Spinner /></div>
+                        ) : wikiError || !wikiData ? (
+                            <div className="text-center py-12 text-slate-500">
+                                <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">No Wiki Available</h3>
+                                <p className="mt-2">This project does not have a HytaleModding wiki set up.</p>
+                            </div>
+                        ) : (
+                            <div className="prose dark:prose-invert prose-lg max-w-none">
+                                {wikiData.content?.content ? (
+                                    <>
+                                        <h1 className="text-4xl font-black mb-6">{wikiData.content.title || wikiData.mod.name}</h1>
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                                                ...defaultSchema,
+                                                attributes: {
+                                                    ...defaultSchema.attributes,
+                                                    code: ['className']
+                                                }
+                                            }]]}
+                                            components={markdownComponents}
+                                        >
+                                            {wikiData.content.content}
+                                        </ReactMarkdown>
+                                    </>
+                                ) : (
+                                    <div className="text-slate-500 italic">Page content is empty.</div>
+                                )}
+                            </div>
+                        )
+                    ) : (
+                        <>
+                            <div className="prose dark:prose-invert prose-lg max-w-none">
+                                {memoizedDescription}
+                            </div>
+                            <CommentSection
+                                modId={mod.id}
+                                comments={mod.comments || []}
+                                currentUser={currentUser}
+                                isCreator={Boolean(canEdit)}
+                                commentsDisabled={mod.allowComments === false}
+                                onCommentSubmitted={handleCommentSubmitted}
+                                onError={handleError}
+                                onSuccess={handleSuccess}
+                                innerRef={commentsRef}
+                                onReport={handleReport}
+                            />
+                        </>
+                    )
                 }
             />
         </>
