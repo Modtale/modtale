@@ -1110,6 +1110,13 @@ public class ModService {
         existing.setAllowModpacks(updatedMod.isAllowModpacks());
         existing.setAllowComments(updatedMod.isAllowComments());
 
+        existing.setHmWikiEnabled(updatedMod.isHmWikiEnabled());
+        if (updatedMod.getHmWikiSlug() != null) {
+            existing.setHmWikiSlug(updatedMod.getHmWikiSlug().trim());
+        } else {
+            existing.setHmWikiSlug(null);
+        }
+
         if (updatedMod.getLinks() != null) existing.setLinks(updatedMod.getLinks());
         if (updatedMod.getImageUrl() != null) existing.setImageUrl(updatedMod.getImageUrl());
 

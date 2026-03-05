@@ -62,19 +62,19 @@ const markdownComponents = {
     }
 };
 
-const useHMWiki = (modId: string, pageSlug?: string, enabled: boolean = false) => {
+const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boolean = false) => {
     const [data, setData] = useState<{mod: any, content: any} | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
 
     useEffect(() => {
-        if (!enabled || !modId) return;
+        if (!enabled || !hmWikiSlug) return;
 
         let isMounted = true;
         setLoading(true);
         setError(false);
 
-        fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${modId}`, {
+        fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${hmWikiSlug}`, {
             headers: { 'Authorization': `Bearer 086e1b4b7715c0b82eed27601362be5732f102bcd7b13a82c0c53f75b0227895` }
         })
             .then(res => {
@@ -89,7 +89,7 @@ const useHMWiki = (modId: string, pageSlug?: string, enabled: boolean = false) =
 
                 if (targetSlug) {
                     try {
-                        const res = await fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${modId}/${targetSlug}`, {
+                        const res = await fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${hmWikiSlug}/${targetSlug}`, {
                             headers: { 'Authorization': `Bearer 086e1b4b7715c0b82eed27601362be5732f102bcd7b13a82c0c53f75b0227895` }
                         });
                         if (res.ok) {
@@ -111,7 +111,7 @@ const useHMWiki = (modId: string, pageSlug?: string, enabled: boolean = false) =
             });
 
         return () => { isMounted = false; };
-    }, [modId, pageSlug, enabled]);
+    }, [hmWikiSlug, pageSlug, enabled]);
 
     return { data, loading, error };
 };
@@ -575,7 +575,7 @@ export const ModDetail: React.FC<{
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
     const wikiPageSlug = wikiMatch && wikiMatch[1] ? wikiMatch[1] : undefined;
 
-    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(mod?.id || '', wikiPageSlug, isWikiRoute);
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(mod?.hmWikiSlug, wikiPageSlug, isWikiRoute && mod?.hmWikiEnabled === true);
 
     const isGalleryRoute = location.pathname.endsWith('/gallery');
     const parsedHash = parseInt(location.hash.replace('#', ''));
@@ -749,11 +749,6 @@ export const ModDetail: React.FC<{
     }, [mod, loading, location.pathname, location.hash, navigate]);
 
     useEffect(() => {
-        if (location.pathname.endsWith('/download')) setShowDownloadModal(true);
-        if (location.pathname.endsWith('/changelog')) setShowAllVersionsModal(true);
-    }, [location.pathname]);
-
-    useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
                 setShowMobileLinks(false);
@@ -879,6 +874,9 @@ export const ModDetail: React.FC<{
     if (isNotFound) return <NotFound />;
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!mod) return null;
+
+    if (isWikiRoute && (!mod.hmWikiEnabled || !mod.hmWikiSlug)) return <NotFound />;
+    if (isGalleryRoute && (!mod.galleryImages || mod.galleryImages.length === 0)) return <NotFound />;
 
     const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
@@ -1112,9 +1110,11 @@ export const ModDetail: React.FC<{
                             <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-2"></div>
 
                             <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto">
-                                <Link to={`${projectUrl}/wiki`} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap">
-                                    <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
-                                </Link>
+                                {mod.hmWikiEnabled && mod.hmWikiSlug && (
+                                    <Link to={`${projectUrl}/wiki`} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap">
+                                        <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
+                                    </Link>
+                                )}
                                 {mod.galleryImages && mod.galleryImages.length > 0 && (
                                     <Link to={`${projectUrl}/gallery#1`} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</Link>
                                 )}

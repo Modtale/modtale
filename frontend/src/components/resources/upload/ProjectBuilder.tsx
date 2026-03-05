@@ -848,6 +848,25 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowComments: !prev.allowComments} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowComments ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowComments ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">HytaleModding Wiki</h3><p className="text-xs text-slate-500">Enable integration with the HytaleModding Wiki.</p></div>
+                                        <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, hmWikiEnabled: !prev.hmWikiEnabled} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.hmWikiEnabled ? 'text-green-500' : 'text-slate-600'}`}>{modData?.hmWikiEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                                    </div>
+
+                                    {modData?.hmWikiEnabled && (
+                                        <div className="mb-4 p-4 bg-slate-100 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-white/10 animate-in slide-in-from-top-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1 mb-2 block">Wiki Project Slug / ID</label>
+                                            <input
+                                                value={modData.hmWikiSlug || ''}
+                                                onChange={e => { markDirty(); setModData(prev => prev ? {...prev, hmWikiSlug: e.target.value} : null); }}
+                                                disabled={readOnly}
+                                                placeholder="e.g., my-awesome-mod"
+                                                className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all"
+                                            />
+                                            <p className="text-xs text-slate-500 mt-2">This is the unique identifier used in the HytaleModding Wiki URL for your project.</p>
+                                        </div>
+                                    )}
+
                                     <div className="pt-4 border-t border-slate-200 dark:border-white/5">
                                         <h3 className="text-sm font-bold mb-2">Contributors</h3>
                                         <div className="flex gap-2 mb-4">

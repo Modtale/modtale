@@ -126,6 +126,8 @@ export interface Mod {
     lastTrendingNotification?: string;
     allowModpacks?: boolean;
     allowComments?: boolean;
+    hmWikiEnabled?: boolean;
+    hmWikiSlug?: string;
     status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;
