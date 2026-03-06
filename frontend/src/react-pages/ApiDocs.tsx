@@ -1,4 +1,3 @@
-// frontend/react-pages/ApiDocs.tsx
 import React from 'react';
 import {
     Shield,

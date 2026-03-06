@@ -4,6 +4,7 @@ import java.util.UUID;
 
 public class Comment {
     private String id;
+    private String userId;
     private String user;
     private String userAvatarUrl;
     private String content;
@@ -14,15 +15,16 @@ public class Comment {
 
     public Comment() {}
 
-    public Comment(String user, String userAvatarUrl, String content) {
+    public Comment(String userId, String userAvatarUrl, String content) {
         this.id = UUID.randomUUID().toString();
-        this.user = user;
+        this.userId = userId;
         this.userAvatarUrl = userAvatarUrl;
         this.content = content;
         this.date = java.time.LocalDate.now().toString();
     }
 
     public static class Reply {
+        private String userId;
         private String user;
         private String userAvatarUrl;
         private String content;
@@ -30,13 +32,15 @@ public class Comment {
 
         public Reply() {}
 
-        public Reply(String user, String userAvatarUrl, String content) {
-            this.user = user;
+        public Reply(String userId, String userAvatarUrl, String content) {
+            this.userId = userId;
             this.userAvatarUrl = userAvatarUrl;
             this.content = content;
             this.date = java.time.LocalDate.now().toString();
         }
 
+        public String getUserId() { return userId; }
+        public void setUserId(String userId) { this.userId = userId; }
         public String getUser() { return user; }
         public void setUser(String user) { this.user = user; }
         public String getUserAvatarUrl() { return userAvatarUrl; }
@@ -49,6 +53,8 @@ public class Comment {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
     public String getUser() { return user; }
     public void setUser(String user) { this.user = user; }
     public String getUserAvatarUrl() { return userAvatarUrl; }
