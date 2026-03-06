@@ -67,6 +67,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                               }) => {
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>(readOnly ? 'preview' : 'write');
     const [inviteUsername, setInviteUsername] = useState('');
+    const [inviteUserId, setInviteUserId] = useState('');
+    const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
+    const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+
     const [isInviting, setIsInviting] = useState(false);
     const [showPublishConfirm, setShowPublishConfirm] = useState(false);
     const [showSlugPrompt, setShowSlugPrompt] = useState(false);
@@ -164,9 +168,25 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 setRepoDropdownOpen(false);
             }
         };
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (!inviteUsername || inviteUsername.length < 2 || inviteUserId) {
+            setUserSearchResults([]);
+            return;
+        }
+        const delayDebounceFn = setTimeout(async () => {
+            setIsSearchingUsers(true);
+            try {
+                const res = await api.get(`/users/search?query=${inviteUsername}`);
+                setUserSearchResults(res.data);
+            } catch (e) { /* ignore */ }
+            finally { setIsSearchingUsers(false); }
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [inviteUsername, inviteUserId]);
 
     const toggleTag = (tag: string) => {
         if (readOnly) return;
@@ -183,16 +203,17 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     const handleInvite = async () => {
-        if (!modData?.id || !inviteUsername) return;
+        if (!modData?.id || !inviteUserId) return;
         setIsInviting(true);
         try {
-            await api.post(`/projects/${modData.id}/invite`, null, { params: { username: inviteUsername } });
+            await api.post(`/projects/${modData.id}/invite`, null, { params: { userId: inviteUserId } });
             setModData(prev => prev ? ({
                 ...prev,
                 pendingInvites: [...(prev.pendingInvites || []), inviteUsername]
             }) : null);
             setInviteUsername('');
-            onShowStatus('success', 'Invited', `Invited ${inviteUsername}`);
+            setInviteUserId('');
+            onShowStatus('success', 'Invited', `Invited user`);
         } catch (e: any) {
             const errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
@@ -206,7 +227,13 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const handleRemoveContributor = async (username: string) => {
         if (!modData?.id) return;
         try {
-            await api.delete(`/projects/${modData.id}/contributors/${username}`);
+            const searchRes = await api.get(`/users/search?query=${username}`);
+            const targetUser = searchRes.data.find((u: User) => u.username === username);
+
+            if (!targetUser) throw new Error("User not found");
+
+            await api.delete(`/projects/${modData.id}/contributors/${targetUser.id}`);
+
             setModData(prev => {
                 if (!prev) return null;
                 return {
@@ -219,7 +246,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         } catch (e: any) {
             const errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
-                : e.response?.data?.message || 'Failed to remove contributor.';
+                : e.response?.data?.message || e.message || 'Failed to remove contributor.';
             onShowStatus('error', 'Error', errorMsg);
         }
     };
@@ -270,6 +297,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         id: modData?.id || 'new-project',
         title: metaData.title || 'Untitled Project',
         description: metaData.summary || 'No summary provided.',
+        authorId: modData?.authorId || currentUser?.id || '',
         author: modData?.author || currentUser?.username || 'You',
         imageUrl: metaData.iconPreview || modData?.imageUrl || '',
         bannerUrl: bannerPreview || modData?.bannerUrl || '',
@@ -869,9 +897,32 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                                     <div className="pt-4 border-t border-slate-200 dark:border-white/5">
                                         <h3 className="text-sm font-bold mb-2">Contributors</h3>
-                                        <div className="flex gap-2 mb-4">
-                                            <input disabled={readOnly} value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="Username" className="flex-1 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm" />
-                                            <button onClick={handleInvite} disabled={readOnly || isInviting || !inviteUsername} className="bg-modtale-accent text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><UserPlus className="w-3 h-3" /> Invite</button>
+                                        <div className="flex flex-col md:flex-row gap-4 items-end relative mb-4">
+                                            <div className="flex-1 w-full relative">
+                                                <input
+                                                    disabled={readOnly}
+                                                    value={inviteUsername}
+                                                    onChange={e => { setInviteUsername(e.target.value); setInviteUserId(''); }}
+                                                    placeholder="Search username..."
+                                                    className="w-full bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm"
+                                                />
+                                                {userSearchResults.length > 0 && (
+                                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                                                        {userSearchResults.map(res => (
+                                                            <button
+                                                                key={res.id}
+                                                                type="button"
+                                                                onClick={() => { setInviteUsername(res.username); setInviteUserId(res.id); setUserSearchResults([]); }}
+                                                                className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                                                            >
+                                                                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
+                                                                <span className="font-bold text-sm text-slate-900 dark:text-white">{res.username}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button onClick={handleInvite} disabled={readOnly || isInviting || !inviteUserId} className="bg-modtale-accent text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 h-9 w-full md:w-auto"><UserPlus className="w-3 h-3" /> Invite</button>
                                         </div>
                                         {allContributors.map(u => (
                                             <div key={u.username} className="flex justify-between items-center p-2 bg-slate-100 dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/5 mb-2">

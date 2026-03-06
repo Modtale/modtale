@@ -39,6 +39,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     const [createError, setCreateError] = useState<string | null>(null);
 
     const [inviteUsername, setInviteUsername] = useState('');
+    const [inviteUserId, setInviteUserId] = useState('');
     const [inviteRole, setInviteRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
     const [manageError, setManageError] = useState<string | null>(null);
     const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
@@ -73,8 +74,8 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     useEffect(() => {
         if (selectedOrg) {
             if (prevOrgIdRef.current !== selectedOrg.id) {
-                fetchMembers(selectedOrg.username);
-                fetchProjects(selectedOrg.username);
+                fetchMembers(selectedOrg.id);
+                fetchProjects(selectedOrg.id);
                 setDisplayName(selectedOrg.username);
                 setBio(selectedOrg.bio || '');
                 setActiveTab('MEMBERS');
@@ -99,7 +100,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     }, []);
 
     useEffect(() => {
-        if (!inviteUsername || inviteUsername.length < 2) {
+        if (!inviteUsername || inviteUsername.length < 2 || inviteUserId) {
             setUserSearchResults([]);
             return;
         }
@@ -112,7 +113,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
             finally { setIsSearchingUsers(false); }
         }, 300);
         return () => clearTimeout(delayDebounceFn);
-    }, [inviteUsername]);
+    }, [inviteUsername, inviteUserId]);
 
     const fetchOrgs = async () => {
         try {
@@ -122,16 +123,16 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         finally { setLoading(false); }
     };
 
-    const fetchMembers = async (username: string) => {
+    const fetchMembers = async (orgId: string) => {
         try {
-            const res = await api.get(`/orgs/${username}/members`);
+            const res = await api.get(`/orgs/${orgId}/members`);
             setMembers(res.data);
         } catch (e) { console.error(e); }
     };
 
-    const fetchProjects = async (username: string) => {
+    const fetchProjects = async (orgId: string) => {
         try {
-            const res = await api.get(`/creators/${username}/projects?size=100`);
+            const res = await api.get(`/creators/${orgId}/projects?size=100`);
             setOrgProjects(res.data.content || []);
         } catch (e) { console.error(e); }
     };
@@ -151,12 +152,13 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
     const handleAddMember = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedOrg) return;
+        if (!selectedOrg || !inviteUserId) return;
         setManageError(null);
         try {
-            await api.post(`/orgs/${selectedOrg.id}/members`, { username: inviteUsername, role: inviteRole });
-            await fetchMembers(selectedOrg.username);
+            await api.post(`/orgs/${selectedOrg.id}/members`, { userId: inviteUserId, role: inviteRole });
+            await fetchMembers(selectedOrg.id);
             setInviteUsername('');
+            setInviteUserId('');
             setUserSearchResults([]);
         } catch (err: any) { setManageError(err.response?.data || "Failed to add member."); }
     };
@@ -170,7 +172,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         if (!selectedOrg || !memberToRemove) return;
         try {
             await api.delete(`/orgs/${selectedOrg.id}/members/${memberToRemove}`);
-            await fetchMembers(selectedOrg.username);
+            await fetchMembers(selectedOrg.id);
             if (memberToRemove === user.id) {
                 setSelectedOrg(null);
                 fetchOrgs();
@@ -197,7 +199,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                 updatedOrg.organizationMembers[memberIdx].role = newRole as "ADMIN" | "MEMBER";
                 setSelectedOrg(updatedOrg);
             }
-            await fetchMembers(selectedOrg.username);
+            await fetchMembers(selectedOrg.id);
         } catch (err: any) {
             setManageError(err.response?.data || "Failed to update role.");
         } finally {
@@ -453,6 +455,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                 {transferModal && (
                     <TransferProjectModal
                         project={transferModal}
+                        myOrgs={orgs}
                         onClose={() => setTransferModal(null)}
                         onSuccess={(msg) => setStatus({ type: 'success', title: 'Request Sent', msg })}
                         onError={(msg) => setStatus({ type: 'error', title: 'Transfer Failed', msg })}
@@ -514,9 +517,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Username</label>
                                         <input
                                             type="text"
-                                            placeholder="Enter username..."
+                                            placeholder="Search username..."
                                             value={inviteUsername}
-                                            onChange={e => setInviteUsername(e.target.value)}
+                                            onChange={e => { setInviteUsername(e.target.value); setInviteUserId(''); }}
                                             className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white font-medium"
                                         />
 
@@ -526,7 +529,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                     <button
                                                         key={res.id}
                                                         type="button"
-                                                        onClick={() => { setInviteUsername(res.username); setUserSearchResults([]); }}
+                                                        onClick={() => { setInviteUsername(res.username); setInviteUserId(res.id); setUserSearchResults([]); }}
                                                         className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
                                                     >
                                                         <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
@@ -581,7 +584,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
                                     <button
                                         type="submit"
-                                        disabled={!inviteUsername}
+                                        disabled={!inviteUserId}
                                         className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
                                         <Plus className="w-4 h-4" /> Invite

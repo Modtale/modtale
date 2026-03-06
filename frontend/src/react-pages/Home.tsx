@@ -20,7 +20,7 @@ interface HomeProps {
     onModClick: (mod: Mod) => void;
     onModpackClick: (modpack: Modpack) => void;
     onWorldClick: (world: World) => void;
-    onAuthorClick: (author: string) => void;
+    onAuthorClick: (authorId: string) => void;
     likedModIds: string[];
     onToggleFavoriteMod: (modId: string) => void;
     onToggleFavoriteModpack: (modpackId: string) => void;
