@@ -61,8 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     }, [isMobile]);
 
     const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
-    const detailPrefixes = ['mod/', 'world/', 'modpack/', 'creator/'];
-    const isHomeLayout = homeLikePages.includes(currentPage) || detailPrefixes.some(prefix => currentPage.startsWith(prefix) && currentPage.split('/').length < 2);
+    const isHomeLayout = homeLikePages.includes(currentPage);
 
     const widthClass = isHomeLayout
         ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
