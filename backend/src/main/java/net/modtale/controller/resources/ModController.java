@@ -333,7 +333,7 @@ public class ModController {
             String effectiveAuthor = author != null && !author.isEmpty() ? author : creator;
             String authorId = null;
             if (effectiveAuthor != null) {
-                Optional<User> u = userRepository.findByUsernameIgnoreCase(effectiveAuthor);
+                Optional<User> u = userRepository.findById(effectiveAuthor);
                 if (u.isPresent()) authorId = u.get().getId();
             }
 
@@ -448,14 +448,14 @@ public class ModController {
         return ResponseEntity.ok(creators);
     }
 
-    @GetMapping("/creators/{username}/projects")
+    @GetMapping("/creators/{userId}/projects")
     public ResponseEntity<Page<ModDTO>> getCreatorProjects(
-            @PathVariable String username,
+            @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
         User currentUser = userService.getCurrentUser();
-        User targetUser = userRepository.findByUsernameIgnoreCase(username)
+        User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         boolean hasPrivilege = false;
@@ -777,8 +777,8 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/invite")
-    public ResponseEntity<?> inviteContributor(@PathVariable String id, @RequestParam String username) {
-        User targetUser = userRepository.findByUsernameIgnoreCase(username)
+    public ResponseEntity<?> inviteContributor(@PathVariable String id, @RequestParam String userId) {
+        User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         try {
@@ -810,9 +810,9 @@ public class ModController {
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/projects/{id}/contributors/{username}")
-    public ResponseEntity<?> removeContributor(@PathVariable String id, @PathVariable String username) {
-        User targetUser = userRepository.findByUsernameIgnoreCase(username)
+    @DeleteMapping("/projects/{id}/contributors/{userId}")
+    public ResponseEntity<?> removeContributor(@PathVariable String id, @PathVariable String userId) {
+        User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         try {
@@ -826,9 +826,9 @@ public class ModController {
     public ResponseEntity<?> requestTransfer(@PathVariable String id, @RequestBody Map<String, String> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        String targetUsername = body.get("username");
+        String targetUserId = body.get("userId");
 
-        User targetUser = userRepository.findByUsernameIgnoreCase(targetUsername)
+        User targetUser = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Target user not found"));
 
         try {
