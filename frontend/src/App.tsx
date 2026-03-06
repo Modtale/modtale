@@ -116,7 +116,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     };
 
     const handleNavigate = (page: string) => { navigate(page === 'home' ? '/' : `/${page}`); };
-    const handleAuthorClick = (author: string) => { navigate(`/creator/${author}`); };
+    const handleAuthorClick = (authorId: string) => { navigate(`/creator/${authorId}`); };
     const handleModClick = (mod: Mod) => { navigate(`/mod/${createSlug(mod.title, mod.id)}`); }
     const handleWorldClick = (world: World) => { navigate(`/world/${createSlug(world.title, world.id)}`); }
 
@@ -247,7 +247,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/world/:id/gallery" element={renderModDetail()} />
                             <Route path="/world/:id/wiki/*" element={renderModDetail()} />
 
-                            <Route path="/creator/:username" element={
+                            <Route path="/creator/:id" element={
                                 <CreatorProfile
                                     onModClick={handleModClick}
                                     onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}

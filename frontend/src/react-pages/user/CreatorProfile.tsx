@@ -25,7 +25,7 @@ interface CreatorProfileProps {
 export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                                                   onModClick, onModpackClick, onBack, likedModIds, onToggleFavorite, onToggleFavoriteModpack, currentUser, onRefreshUser
                                                               }) => {
-    const { username } = useParams<{ username: string }>();
+    const { id: userId } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const projectsTitleRef = useRef<HTMLHeadingElement>(null);
 
@@ -72,23 +72,23 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
 
     useEffect(() => {
         const fetchCreatorData = async () => {
-            if (!username) return;
+            if (!userId) return;
             setLoadingCreator(true);
             setNotFound(false);
             try {
-                const userRes = await api.get(`/user/profile/${username}`);
+                const userRes = await api.get(`/user/profile/${userId}`);
                 const userData = userRes.data;
                 setCreator(userData);
 
                 if (userData.accountType === 'ORGANIZATION') {
                     try {
-                        const membersRes = await api.get(`/orgs/${username}/members`);
+                        const membersRes = await api.get(`/orgs/${userId}/members`);
                         setOrgMembers(membersRes.data);
                     } catch (e) {
                     }
                 } else {
                     try {
-                        const orgsRes = await api.get(`/users/${username}/organizations`);
+                        const orgsRes = await api.get(`/users/${userId}/organizations`);
                         setMemberOrgs(orgsRes.data);
                     } catch (e) {
                     }
@@ -102,21 +102,19 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
             }
         };
         fetchCreatorData();
-    }, [username]);
+    }, [userId]);
 
     const fetchProjects = useCallback(async () => {
-        if (!username) return;
+        if (!userId) return;
 
         setLoadingProjects(true);
         try {
             const params = {
-                author: username,
                 page,
                 size: itemsPerPage,
-                sort: 'newest',
             };
 
-            const projectsRes = await api.get('/projects', { params });
+            const projectsRes = await api.get(`/creators/${userId}/projects`, { params });
 
             setProjects(projectsRes.data.content);
             setTotalPages(projectsRes.data.totalPages);
@@ -126,7 +124,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         } finally {
             setLoadingProjects(false);
         }
-    }, [username, page, itemsPerPage]);
+    }, [userId, page, itemsPerPage]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -141,8 +139,8 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         const previousState = actualIsFollowing;
         setIsFollowingOptimistic(!previousState);
         try {
-            if (previousState) await api.post(`/user/unfollow/${creator.username}`);
-            else await api.post(`/user/follow/${creator.username}`);
+            if (previousState) await api.post(`/user/unfollow/${creator.id}`);
+            else await api.post(`/user/follow/${creator.id}`);
             if (onRefreshUser) onRefreshUser();
         } catch (e) {
             setIsFollowingOptimistic(previousState);
@@ -226,7 +224,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                 stats={stats}
                 isFollowing={actualIsFollowing}
                 onToggleFollow={handleToggleFollow}
-                isSelf={currentUser?.username === creator.username}
+                isSelf={currentUser?.id === creator.id}
                 isLoggedIn={!!currentUser}
                 onBack={onBack}
                 onReport={() => setShowReportModal(true)}
@@ -242,7 +240,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                 {orgMembers.map(member => (
                                     <Link
                                         key={member.id}
-                                        to={`/creator/${member.username}`}
+                                        to={`/creator/${member.id}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -274,7 +272,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                 {memberOrgs.map(org => (
                                     <Link
                                         key={org.id}
-                                        to={`/creator/${org.username}`}
+                                        to={`/creator/${org.id}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">

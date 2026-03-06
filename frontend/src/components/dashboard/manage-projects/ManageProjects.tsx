@@ -30,13 +30,13 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 const orgsData = orgsRes.data || [];
                 setMyOrgs(orgsData);
 
-                const personalPromise = api.get(`/creators/${user.username}/projects?size=100`);
+                const personalPromise = api.get(`/creators/${user.id}/projects?size=100`);
                 const contribPromise = api.get('/projects/user/contributed').catch(() => ({ data: { content: [] } }));
 
                 const orgPromises = orgsData.map((org: User) =>
-                    api.get(`/creators/${org.username}/projects?size=100`)
-                        .then(res => ({ username: org.username, projects: res.data.content || [] }))
-                        .catch(() => ({ username: org.username, projects: [] }))
+                    api.get(`/creators/${org.id}/projects?size=100`)
+                        .then(res => ({ id: org.id, projects: res.data.content || [] }))
+                        .catch(() => ({ id: org.id, projects: [] }))
                 );
 
                 const [personalRes, contribRes, ...orgResults] = await Promise.all([
@@ -51,7 +51,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 const orgData: Record<string, Mod[]> = {};
                 orgResults.forEach((result: any) => {
                     if (result.projects.length > 0) {
-                        orgData[result.username] = result.projects;
+                        orgData[result.id] = result.projects;
                     }
                 });
                 setOrgProjects(orgData);
@@ -63,7 +63,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
             }
         };
         init();
-    }, [user.username, user.id]);
+    }, [user.id]);
 
     const handleDelete = async () => {
         if (!deleteModal) return;
@@ -136,29 +136,33 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                     ))}
                 </div>
 
-                {Object.entries(orgProjects).map(([orgName, pList]) => (
-                    <div key={orgName} className="border-t border-slate-200 dark:border-white/5 pt-8">
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Building2 className="w-5 h-5 text-purple-500" />
-                            {myOrgs.find(o => o.username === orgName)?.displayName || orgName}
-                        </h2>
-                        <div className="grid grid-cols-1 gap-4">
-                            {pList.map(project => {
-                                const isOrgAdmin = myOrgs.some(o => o.username === orgName && o.organizationMembers?.some(m => m.userId === user.id && m.role === 'ADMIN'));
-                                return (
-                                    <ProjectListItem
-                                        key={project.id}
-                                        project={project}
-                                        canManage={isOrgAdmin}
-                                        showAuthor={false}
-                                        onTransfer={setTransferModal}
-                                        onDelete={setDeleteModal}
-                                    />
-                                );
-                            })}
+                {Object.entries(orgProjects).map(([orgId, pList]) => {
+                    const orgUser = myOrgs.find(o => o.id === orgId);
+                    const orgDisplayName = orgUser?.displayName || orgUser?.username || orgId;
+                    return (
+                        <div key={orgId} className="border-t border-slate-200 dark:border-white/5 pt-8">
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Building2 className="w-5 h-5 text-purple-500" />
+                                {orgDisplayName}
+                            </h2>
+                            <div className="grid grid-cols-1 gap-4">
+                                {pList.map(project => {
+                                    const isOrgAdmin = myOrgs.some(o => o.id === orgId && o.organizationMembers?.some(m => m.userId === user.id && m.role === 'ADMIN'));
+                                    return (
+                                        <ProjectListItem
+                                            key={project.id}
+                                            project={project}
+                                            canManage={isOrgAdmin}
+                                            showAuthor={false}
+                                            onTransfer={setTransferModal}
+                                            onDelete={setDeleteModal}
+                                        />
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {contributedProjects.length > 0 && (
                     <div className="border-t border-slate-200 dark:border-white/5 pt-8">
@@ -168,7 +172,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                         </h2>
                         <div className="grid grid-cols-1 gap-4">
                             {contributedProjects.map(project => {
-                                const isOwner = project.author.toLowerCase() === user.username.toLowerCase();
+                                const isOwner = project.authorId === user.id;
                                 return (
                                     <ProjectListItem
                                         key={project.id}
