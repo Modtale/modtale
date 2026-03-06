@@ -51,11 +51,11 @@ public class UserController {
 
     @PostMapping("/users/batch")
     public ResponseEntity<List<UserDTO>> getUsersBatch(@RequestBody Map<String, List<String>> body) {
-        List<String> usernames = body.get("usernames");
-        if (usernames == null || usernames.isEmpty()) {
+        List<String> userIds = body.get("userIds");
+        if (userIds == null || userIds.isEmpty()) {
             return ResponseEntity.ok(List.of());
         }
-        List<User> users = userService.getPublicProfilesByUsernames(usernames);
+        List<User> users = userService.getPublicProfilesByIds(userIds);
         return ResponseEntity.ok(users.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
@@ -89,18 +89,18 @@ public class UserController {
                 .collect(Collectors.toList()));
     }
 
-    @GetMapping("/users/{username}/organizations")
-    public ResponseEntity<List<UserDTO>> getUserOrganizations(@PathVariable String username) {
-        List<User> orgs = userService.getUserOrganizationsByUsername(username);
+    @GetMapping("/users/{userId}/organizations")
+    public ResponseEntity<List<UserDTO>> getUserOrganizations(@PathVariable String userId) {
+        List<User> orgs = userService.getUserOrganizations(userId);
         return ResponseEntity.ok(orgs.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
     }
 
-    @GetMapping("/orgs/{username}/members")
-    public ResponseEntity<?> getOrgMembers(@PathVariable String username) {
+    @GetMapping("/orgs/{orgId}/members")
+    public ResponseEntity<?> getOrgMembers(@PathVariable String orgId) {
         try {
-            return ResponseEntity.ok(userService.getOrganizationMembers(username));
+            return ResponseEntity.ok(userService.getOrganizationMembers(orgId));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
@@ -111,11 +111,11 @@ public class UserController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String targetUsername = payload.get("username");
+        String targetUserId = payload.get("userId");
         String role = payload.getOrDefault("role", "MEMBER");
 
         try {
-            userService.inviteOrganizationMember(orgId, targetUsername, role, user);
+            userService.inviteOrganizationMember(orgId, targetUserId, role, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(e.getMessage());
@@ -354,9 +354,9 @@ public class UserController {
         }
     }
 
-    @GetMapping("/user/profile/{username}")
-    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String username) {
-        User user = userService.getPublicProfile(username);
+    @GetMapping("/user/profile/{userId}")
+    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String userId) {
+        User user = userService.getPublicProfile(userId);
         if (user == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(UserDTO.fromEntity(user, false));
     }
@@ -457,24 +457,24 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/user/follow/{targetUsername}")
-    public ResponseEntity<?> followUser(@PathVariable String targetUsername) {
+    @PostMapping("/user/follow/{targetId}")
+    public ResponseEntity<?> followUser(@PathVariable String targetId) {
         User currentUser = userService.getCurrentUser();
         if (currentUser == null) return ResponseEntity.status(401).build();
         try {
-            userService.followUser(currentUser.getId(), targetUsername);
+            userService.followUser(currentUser.getId(), targetId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
-    @PostMapping("/user/unfollow/{targetUsername}")
-    public ResponseEntity<?> unfollowUser(@PathVariable String targetUsername) {
+    @PostMapping("/user/unfollow/{targetId}")
+    public ResponseEntity<?> unfollowUser(@PathVariable String targetId) {
         User currentUser = userService.getCurrentUser();
         if (currentUser == null) return ResponseEntity.status(401).build();
         try {
-            userService.unfollowUser(currentUser.getId(), targetUsername);
+            userService.unfollowUser(currentUser.getId(), targetId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -598,17 +598,17 @@ public class UserController {
         return getGithubRepos(authentication, request, response);
     }
 
-    @GetMapping("/users/{username}/following")
-    public ResponseEntity<List<UserDTO>> getUserFollowing(@PathVariable String username) {
-        List<User> following = userService.getFollowing(username);
+    @GetMapping("/users/{userId}/following")
+    public ResponseEntity<List<UserDTO>> getUserFollowing(@PathVariable String userId) {
+        List<User> following = userService.getFollowing(userId);
         return ResponseEntity.ok(following.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
     }
 
-    @GetMapping("/users/{username}/followers")
-    public ResponseEntity<List<UserDTO>> getUserFollowers(@PathVariable String username) {
-        List<User> followers = userService.getFollowers(username);
+    @GetMapping("/users/{userId}/followers")
+    public ResponseEntity<List<UserDTO>> getUserFollowers(@PathVariable String userId) {
+        List<User> followers = userService.getFollowers(userId);
         return ResponseEntity.ok(followers.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
