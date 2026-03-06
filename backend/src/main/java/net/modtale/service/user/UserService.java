@@ -328,16 +328,16 @@ public class UserService {
         return mongoTemplate.find(dbQuery, User.class);
     }
 
-    public User getPublicProfile(String username) {
-        User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+    public User getPublicProfile(String userId) {
+        User user = userRepository.findById(userId).orElse(null);
         if (user != null && user.isDeleted()) return null;
         return user;
     }
 
-    public List<User> getPublicProfilesByUsernames(List<String> usernames) {
-        if (usernames == null || usernames.isEmpty()) return new ArrayList<>();
+    public List<User> getPublicProfilesByIds(List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) return new ArrayList<>();
 
-        Query query = new Query(Criteria.where("username").in(usernames).and("deletedAt").is(null));
+        Query query = new Query(Criteria.where("_id").in(userIds).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "accountType", "badges", "id", "roles", "tier");
         return mongoTemplate.find(query, User.class);
     }
@@ -482,7 +482,7 @@ public class UserService {
         return userRepository.save(org);
     }
 
-    public void inviteOrganizationMember(String orgId, String targetUsername, String role, User requester) {
+    public void inviteOrganizationMember(String orgId, String targetUserId, String role, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
         if (org.getAccountType() != User.AccountType.ORGANIZATION) throw new IllegalArgumentException("Target is not an organization");
 
@@ -490,7 +490,7 @@ public class UserService {
                 .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
         if (!isAdmin) throw new SecurityException("Only organization admins can invite members.");
 
-        User target = userRepository.findByUsernameIgnoreCase(targetUsername).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User target = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (org.getOrganizationMembers().stream().anyMatch(m -> m.getUserId().equals(target.getId()))) {
             throw new IllegalArgumentException("User is already a member.");
@@ -647,8 +647,8 @@ public class UserService {
         deleteUser(orgId);
     }
 
-    public List<User> getOrganizationMembers(String username) {
-        User org = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+    public List<User> getOrganizationMembers(String orgId) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
         if (org.getOrganizationMembers() == null || org.getOrganizationMembers().isEmpty()) return new ArrayList<>();
 
         if (org.isDeleted()) return new ArrayList<>();
@@ -665,21 +665,6 @@ public class UserService {
     public List<User> getUserOrganizations(String userId) {
         List<User> orgs = userRepository.findOrganizationsByMemberId(userId);
         return orgs.stream().filter(o -> !o.isDeleted()).collect(Collectors.toList());
-    }
-
-    public List<User> getUserOrganizationsByUsername(String username) {
-        User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
-        if (user == null) return new ArrayList<>();
-
-        List<User> orgs = userRepository.findOrganizationsByMemberId(user.getId());
-        return orgs.stream()
-                .filter(o -> !o.isDeleted())
-                .peek(o -> {
-                    o.setEmail(null);
-                    o.setGithubAccessToken(null);
-                    o.setGitlabAccessToken(null);
-                })
-                .collect(Collectors.toList());
     }
 
     public DefaultOAuth2User linkAccountToOrg(String orgId, String provider, OAuth2User oauthUser, String accessToken) {
@@ -1039,8 +1024,8 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public void followUser(String currentUserId, String targetUsername) {
-        User target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new IllegalArgumentException("Target not found"));
+    public void followUser(String currentUserId, String targetId) {
+        User target = userRepository.findById(targetId).orElseThrow(() -> new IllegalArgumentException("Target not found"));
         if (target.getId().equals(currentUserId)) throw new IllegalArgumentException("Cannot follow yourself.");
 
         if (target.isDeleted()) throw new IllegalArgumentException("Target user not found.");
@@ -1062,15 +1047,15 @@ public class UserService {
                         List.of(target.getId()),
                         "New Follower",
                         currentUser.getUsername() + " started following you.",
-                        URI.create("/creator/" + currentUser.getUsername()),
+                        URI.create("/creator/" + currentUser.getId()),
                         currentUser.getAvatarUrl()
                 );
             }
         }
     }
 
-    public void unfollowUser(String currentUserId, String targetUsername) {
-        User target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new IllegalArgumentException("Target not found"));
+    public void unfollowUser(String currentUserId, String targetId) {
+        User target = userRepository.findById(targetId).orElseThrow(() -> new IllegalArgumentException("Target not found"));
         User currentUser = userRepository.findById(currentUserId).orElseThrow();
 
         if (currentUser.getFollowingIds() != null) {
@@ -1083,8 +1068,8 @@ public class UserService {
         }
     }
 
-    public List<User> getFollowing(String username) {
-        Optional<User> userOpt = userRepository.findByUsername(username);
+    public List<User> getFollowing(String userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) return new ArrayList<>();
 
         if (userOpt.get().isDeleted()) return new ArrayList<>();
@@ -1096,8 +1081,8 @@ public class UserService {
         return mongoTemplate.find(query, User.class);
     }
 
-    public List<User> getFollowers(String username) {
-        Optional<User> userOpt = userRepository.findByUsername(username);
+    public List<User> getFollowers(String userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) return new ArrayList<>();
 
         if (userOpt.get().isDeleted()) return new ArrayList<>();
@@ -1109,12 +1094,13 @@ public class UserService {
         return mongoTemplate.find(query, User.class);
     }
 
-    public CreatorAnalytics getCreatorAnalytics(String username) {
-        return analyticsService.getCreatorDashboard(username, "30d", null);
+    public CreatorAnalytics getCreatorAnalytics(String userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return analyticsService.getCreatorDashboard(user.getUsername(), "30d", null);
     }
 
-    public void setUserTier(String username, ApiKey.Tier newTier) {
-        User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    public void setUserTier(String userId, ApiKey.Tier newTier) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         user.setTier(newTier);
         userRepository.save(user);
         mongoTemplate.updateMulti(new Query(Criteria.where("userId").is(user.getId())), new Update().set("tier", newTier), ApiKey.class);
