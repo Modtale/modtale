@@ -510,7 +510,7 @@ public class ModController {
     public ResponseEntity<?> toggleFavorite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        modService.toggleFavorite(id, user.getUsername());
+        modService.toggleFavorite(id, user.getId());
         return ResponseEntity.ok().build();
     }
 
@@ -520,7 +520,7 @@ public class ModController {
         if (user == null) return ResponseEntity.status(401).build();
         String content = (String) body.get("content");
         try {
-            modService.addComment(id, user.getUsername(), content);
+            modService.addComment(id, user.getId(), content);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -535,7 +535,7 @@ public class ModController {
         if (user == null) return ResponseEntity.status(401).build();
         String content = (String) body.get("content");
         try {
-            modService.editComment(id, commentId, user.getUsername(), content);
+            modService.editComment(id, commentId, user.getId(), content);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -549,7 +549,7 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
-            modService.deleteComment(id, commentId, user.getUsername());
+            modService.deleteComment(id, commentId, user.getId());
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -562,7 +562,7 @@ public class ModController {
         if (user == null) return ResponseEntity.status(401).build();
         String reply = (String) body.get("reply");
         try {
-            modService.replyToComment(id, commentId, reply, user.getUsername());
+            modService.replyToComment(id, commentId, reply, user.getId());
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -778,11 +778,8 @@ public class ModController {
 
     @PostMapping("/projects/{id}/invite")
     public ResponseEntity<?> inviteContributor(@PathVariable String id, @RequestParam String userId) {
-        User targetUser = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
         try {
-            modService.inviteContributor(id, targetUser.getId());
+            modService.inviteContributor(id, userId);
             return ResponseEntity.ok().build();
         }
         catch (SecurityException e) { return ResponseEntity.status(403).body(e.getMessage()); }
@@ -812,11 +809,8 @@ public class ModController {
 
     @DeleteMapping("/projects/{id}/contributors/{userId}")
     public ResponseEntity<?> removeContributor(@PathVariable String id, @PathVariable String userId) {
-        User targetUser = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
         try {
-            modService.removeContributor(id, targetUser.getId());
+            modService.removeContributor(id, userId);
             return ResponseEntity.ok().build();
         }
         catch (Exception e) { return ResponseEntity.status(403).body(e.getMessage()); }
@@ -828,11 +822,8 @@ public class ModController {
         if (user == null) return ResponseEntity.status(401).build();
         String targetUserId = body.get("userId");
 
-        User targetUser = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("Target user not found"));
-
         try {
-            modService.requestTransfer(id, targetUser.getId(), user);
+            modService.requestTransfer(id, targetUserId, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) { return ResponseEntity.status(403).body(e.getMessage()); }
         catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
