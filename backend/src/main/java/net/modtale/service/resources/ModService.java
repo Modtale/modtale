@@ -141,6 +141,7 @@ public class ModService {
     private final Map<String, Bucket> modpackGenBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> rescanBuckets = new ConcurrentHashMap<>();
 
+    // Batch metrics handling
     private final ConcurrentHashMap<String, Integer> pendingDownloadIncrements = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> pendingFavoriteIncrements = new ConcurrentHashMap<>();
 
@@ -435,41 +436,57 @@ public class ModService {
             }
 
             if (mod.getComments() != null && !mod.getComments().isEmpty()) {
-                Set<String> usersToFetch = new HashSet<>();
+                Set<String> userIdsToFetch = new HashSet<>();
+                Set<String> usernamesToFetch = new HashSet<>();
+
                 for (Comment c : mod.getComments()) {
                     if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
-                        usersToFetch.add(c.getUser());
+                        if (c.getUserId() != null) userIdsToFetch.add(c.getUserId());
+                        else if (c.getUser() != null) usernamesToFetch.add(c.getUser());
                     }
                     if (c.getDeveloperReply() != null) {
                         if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
-                            usersToFetch.add(c.getDeveloperReply().getUser());
+                            if (c.getDeveloperReply().getUserId() != null) userIdsToFetch.add(c.getDeveloperReply().getUserId());
+                            else if (c.getDeveloperReply().getUser() != null) usernamesToFetch.add(c.getDeveloperReply().getUser());
                         }
                     }
                 }
 
-                if (!usersToFetch.isEmpty()) {
+                if (!userIdsToFetch.isEmpty() || !usernamesToFetch.isEmpty()) {
                     try {
-                        List<User> users = userRepository.findByUsernameIn(usersToFetch);
-                        Map<String, String> avatarMap = users.stream()
-                                .collect(Collectors.toMap(
-                                        u -> u.getUsername().toLowerCase(),
-                                        u -> u.getAvatarUrl() != null ? u.getAvatarUrl() : "",
-                                        (existing, replacement) -> existing
-                                ));
+                        List<User> users = new ArrayList<>();
+                        if (!userIdsToFetch.isEmpty()) {
+                            users.addAll(mongoTemplate.find(new Query(Criteria.where("_id").in(userIdsToFetch)), User.class));
+                        }
+                        if (!usernamesToFetch.isEmpty()) {
+                            users.addAll(userRepository.findByUsernameIn(usernamesToFetch));
+                        }
+
+                        Map<String, String> avatarMapById = new HashMap<>();
+                        Map<String, String> avatarMapByName = new HashMap<>();
+
+                        for (User u : users) {
+                            if (u.getAvatarUrl() != null) {
+                                avatarMapById.put(u.getId(), u.getAvatarUrl());
+                                avatarMapByName.put(u.getUsername().toLowerCase(), u.getAvatarUrl());
+                            }
+                        }
 
                         for (Comment c : mod.getComments()) {
                             if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
-                                String avatar = avatarMap.get(c.getUser().toLowerCase());
-                                if (avatar != null && !avatar.isEmpty()) {
-                                    c.setUserAvatarUrl(avatar);
-                                }
+                                String avatar = null;
+                                if (c.getUserId() != null) avatar = avatarMapById.get(c.getUserId());
+                                else if (c.getUser() != null) avatar = avatarMapByName.get(c.getUser().toLowerCase());
+
+                                if (avatar != null && !avatar.isEmpty()) c.setUserAvatarUrl(avatar);
                             }
                             if (c.getDeveloperReply() != null) {
                                 if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
-                                    String avatar = avatarMap.get(c.getDeveloperReply().getUser().toLowerCase());
-                                    if (avatar != null && !avatar.isEmpty()) {
-                                        c.getDeveloperReply().setUserAvatarUrl(avatar);
-                                    }
+                                    String avatar = null;
+                                    if (c.getDeveloperReply().getUserId() != null) avatar = avatarMapById.get(c.getDeveloperReply().getUserId());
+                                    else if (c.getDeveloperReply().getUser() != null) avatar = avatarMapByName.get(c.getDeveloperReply().getUser().toLowerCase());
+
+                                    if (avatar != null && !avatar.isEmpty()) c.getDeveloperReply().setUserAvatarUrl(avatar);
                                 }
                             }
                         }
@@ -959,17 +976,16 @@ public class ModService {
         modRepository.deleteByStatusAndExpiresAtBefore("DRAFT", today);
     }
 
-    public void requestTransfer(String modId, String targetUsername, User requester) {
+    public void requestTransfer(String modId, String targetUserId, User requester) {
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (!isOwner(mod, requester)) throw new SecurityException("Only the owner can transfer ownership.");
         ensureEditable(mod);
 
-        User target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new IllegalArgumentException("Target user/org not found"));
+        User target = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("Target user/org not found"));
         if (mod.getAuthorId() != null && target.getId().equals(mod.getAuthorId())) throw new IllegalArgumentException("Project is already owned by this user.");
-        if (mod.getAuthor() != null && target.getUsername().equalsIgnoreCase(mod.getAuthor())) throw new IllegalArgumentException("Project is already owned by this user.");
 
-        mod.setPendingTransferTo(targetUsername);
+        mod.setPendingTransferTo(target.getUsername());
         modRepository.save(mod);
         evictProjectDetails(mod);
 
@@ -1520,8 +1536,8 @@ public class ModService {
         }
     }
 
-    public void deleteVersion(String modId, String versionId, String username) {
-        User user = userService.getCurrentUser();
+    public void deleteVersion(String modId, String versionId, String userId) {
+        User user = userRepository.findById(userId).orElse(null);
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         ensureEditable(mod);
@@ -1550,9 +1566,9 @@ public class ModService {
         }
     }
 
-    public void deleteMod(String id, String username) {
+    public void deleteMod(String id, String userId) {
         Mod mod = getRawModById(id);
-        User user = userService.getCurrentUser();
+        User user = userRepository.findById(userId).orElse(null);
 
         if (mod == null || !isOwner(mod, user)) {
             throw new SecurityException("Permission denied or Project not found.");
@@ -1875,8 +1891,8 @@ public class ModService {
         }
     }
 
-    public void toggleFavorite(String modId, String username) {
-        User user = userRepository.findByUsername(username).orElse(null);
+    public void toggleFavorite(String modId, String userId) {
+        User user = userRepository.findById(userId).orElse(null);
         if (user != null) {
             List<String> likes = user.getLikedModIds();
             if (likes == null) { likes = new ArrayList<>(); user.setLikedModIds(likes); }
@@ -2036,35 +2052,14 @@ public class ModService {
         }
     }
 
-    public void inviteContributor(String modId, String usernameToInvite) {
+    public void inviteContributor(String modId, String targetUserId) {
         User currentUser = userService.getCurrentUser();
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
         if (!isOwner(mod, currentUser)) throw new SecurityException("Only the owner can manage contributors.");
         ensureEditable(mod);
 
-        User invitee = userRepository.findByUsername(usernameToInvite).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        mod.getPendingInvites().add(usernameToInvite);
-        modRepository.save(mod);
-        evictProjectDetails(mod);
-        Map<String, String> metadata = new HashMap<>();
-        metadata.put("modId", mod.getId());
-        metadata.put("action", "CONTRIBUTOR_INVITE");
-        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", URI.create("/dashboard/projects"), mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
-    }
-
-    public void inviteContributor(String modId, String userId, boolean isId) {
-        if (!isId) {
-            inviteContributor(modId, userId);
-            return;
-        }
-        User currentUser = userService.getCurrentUser();
-        Mod mod = getRawModById(modId);
-        if (mod == null) throw new IllegalArgumentException("Project not found");
-        if (!isOwner(mod, currentUser)) throw new SecurityException("Only the owner can manage contributors.");
-        ensureEditable(mod);
-
-        User invitee = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User invitee = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         mod.getPendingInvites().add(invitee.getUsername());
         modRepository.save(mod);
         evictProjectDetails(mod);
@@ -2074,14 +2069,15 @@ public class ModService {
         notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", URI.create("/dashboard/projects"), mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
     }
 
-    public void removeContributor(String modId, String usernameToRemove) {
+    public void removeContributor(String modId, String targetUserId) {
         User currentUser = userService.getCurrentUser();
         Mod mod = getRawModById(modId);
-        if (mod != null && isOwner(mod, currentUser)) {
+        User targetUser = userRepository.findById(targetUserId).orElse(null);
+        if (mod != null && isOwner(mod, currentUser) && targetUser != null) {
             ensureEditable(mod);
-            mod.getContributors().remove(usernameToRemove);
+            mod.getContributors().remove(targetUser.getUsername());
             if (mod.getPendingInvites() != null) {
-                mod.getPendingInvites().remove(usernameToRemove);
+                mod.getPendingInvites().remove(targetUser.getUsername());
             }
             modRepository.save(mod);
             evictProjectDetails(mod);
@@ -2117,21 +2113,17 @@ public class ModService {
         }
     }
 
-    public void addComment(String modId, String username, String content) {
+    public void addComment(String modId, String userId, String content) {
         Mod mod = getRawModById(modId);
         if (mod != null) {
             if (!mod.isAllowComments()) {
                 throw new IllegalStateException("Comments are disabled for this project.");
             }
 
-            Comment comment = new Comment();
-            comment.setId(UUID.randomUUID().toString());
-            comment.setUser(username);
+            User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-            userRepository.findByUsername(username).ifPresent(u -> comment.setUserAvatarUrl(u.getAvatarUrl()));
-
-            comment.setContent(sanitizer.sanitizePlainText(content));
-            comment.setDate(LocalDate.now().toString());
+            Comment comment = new Comment(user.getId(), user.getAvatarUrl(), sanitizer.sanitizePlainText(content));
+            comment.setUser(user.getUsername()); // legacy format
 
             if (mod.getComments() == null) mod.setComments(new ArrayList<>());
             mod.getComments().add(0, comment);
@@ -2140,11 +2132,11 @@ public class ModService {
             evictProjectDetails(mod);
 
             User author = getAuthorUser(mod);
-            if (author != null && !author.getUsername().equals(username) && author.getNotificationPreferences().getNewComments() != User.NotificationLevel.OFF) {
+            if (author != null && !author.getId().equals(userId) && author.getNotificationPreferences().getNewComments() != User.NotificationLevel.OFF) {
                 notificationService.sendNotification(
                         List.of(author.getId()),
                         "New Comment",
-                        username + " commented on " + mod.getTitle(),
+                        user.getUsername() + " commented on " + mod.getTitle(),
                         URI.create(getProjectLink(mod)),
                         mod.getImageUrl()
                 );
@@ -2152,7 +2144,7 @@ public class ModService {
         }
     }
 
-    public void editComment(String modId, String commentId, String username, String newContent) {
+    public void editComment(String modId, String commentId, String userId, String newContent) {
         Mod mod = getRawModById(modId);
         if (mod != null) {
             Comment comment = mod.getComments().stream()
@@ -2160,7 +2152,17 @@ public class ModService {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
-            if (!comment.getUser().equalsIgnoreCase(username)) {
+            boolean isOwner = false;
+            if (comment.getUserId() != null) {
+                isOwner = comment.getUserId().equals(userId);
+            } else if (comment.getUser() != null) {
+                User u = userRepository.findById(userId).orElse(null);
+                if (u != null) {
+                    isOwner = comment.getUser().equalsIgnoreCase(u.getUsername());
+                }
+            }
+
+            if (!isOwner) {
                 throw new SecurityException("You can only edit your own comments.");
             }
 
@@ -2172,15 +2174,21 @@ public class ModService {
         }
     }
 
-    public void deleteComment(String modId, String commentId, String username) {
+    public void deleteComment(String modId, String commentId, String userId) {
         Mod mod = getRawModById(modId);
-        User user = userRepository.findByUsername(username).orElse(null);
+        User user = userRepository.findById(userId).orElse(null);
         if (mod != null && user != null) {
             boolean isModOwner = hasEditPermission(mod, user);
 
             mod.getComments().removeIf(c -> {
                 if(c.getId().equals(commentId)) {
-                    if(!c.getUser().equalsIgnoreCase(username) && !isModOwner) {
+                    boolean isCommentOwner = false;
+                    if (c.getUserId() != null) {
+                        isCommentOwner = c.getUserId().equals(userId);
+                    } else if (c.getUser() != null) {
+                        isCommentOwner = c.getUser().equalsIgnoreCase(user.getUsername());
+                    }
+                    if(!isCommentOwner && !isModOwner) {
                         throw new SecurityException("Permission denied.");
                     }
                     return true;
@@ -2192,8 +2200,8 @@ public class ModService {
         }
     }
 
-    public void replyToComment(String modId, String commentId, String replyContent, String username) {
-        User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    public void replyToComment(String modId, String commentId, String replyContent, String userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         Mod mod = getRawModById(modId);
 
         if (mod != null) {
@@ -2206,18 +2214,21 @@ public class ModService {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
-            Comment.Reply reply = new Comment.Reply();
-            reply.setUser(user.getUsername());
-            reply.setUserAvatarUrl(user.getAvatarUrl());
-            reply.setContent(sanitizer.sanitizePlainText(replyContent));
-            reply.setDate(LocalDateTime.now().toString());
+            Comment.Reply reply = new Comment.Reply(user.getId(), user.getAvatarUrl(), sanitizer.sanitizePlainText(replyContent));
+            reply.setUser(user.getUsername()); // legacy format
 
             comment.setDeveloperReply(reply);
 
             modRepository.save(mod);
             evictProjectDetails(mod);
 
-            User commenter = userRepository.findByUsername(comment.getUser()).orElse(null);
+            User commenter = null;
+            if (comment.getUserId() != null) {
+                commenter = userRepository.findById(comment.getUserId()).orElse(null);
+            } else if (comment.getUser() != null) {
+                commenter = userRepository.findByUsernameIgnoreCase(comment.getUser()).orElse(null);
+            }
+
             if (commenter != null) {
                 notificationService.sendNotification(
                         List.of(commenter.getId()),
@@ -2243,8 +2254,8 @@ public class ModService {
         }
     }
 
-    public void removeGalleryImage(String modId, String imageUrl, String username) {
-        User user = userService.getCurrentUser();
+    public void removeGalleryImage(String modId, String imageUrl, String userId) {
+        User user = userRepository.findById(userId).orElse(null);
         Mod mod = getRawModById(modId);
         if (mod != null && hasEditPermission(mod, user)) {
             ensureEditable(mod);
