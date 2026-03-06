@@ -48,9 +48,9 @@ export const ReportQueue: React.FC<ReportQueueProps> = ({ reports: initialReport
                 return next;
             });
             if (statusFilter === 'OPEN') {
-                onRefresh(); // Refresh parent if we're looking at open queue
+                onRefresh();
             } else {
-                fetchFilteredReports(); // Otherwise refresh current view
+                fetchFilteredReports();
             }
         } catch (e) {
             console.error(e);

@@ -141,7 +141,6 @@ public class ModService {
     private final Map<String, Bucket> modpackGenBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> rescanBuckets = new ConcurrentHashMap<>();
 
-    // Batch metrics handling
     private final ConcurrentHashMap<String, Integer> pendingDownloadIncrements = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> pendingFavoriteIncrements = new ConcurrentHashMap<>();
 

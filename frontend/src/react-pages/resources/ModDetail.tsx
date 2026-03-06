@@ -357,6 +357,27 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
+    const [userProfiles, setUserProfiles] = useState<Record<string, {username: string, avatarUrl: string}>>({});
+
+    useEffect(() => {
+        const userIds = new Set<string>();
+        comments.forEach(c => {
+            if ((c as any).userId && !userProfiles[(c as any).userId]) userIds.add((c as any).userId);
+            if (c.developerReply && (c.developerReply as any).userId && !userProfiles[(c.developerReply as any).userId]) userIds.add((c.developerReply as any).userId);
+        });
+
+        if (userIds.size > 0) {
+            api.post('/users/batch', { userIds: Array.from(userIds) })
+                .then(res => {
+                    const profiles: Record<string, {username: string, avatarUrl: string}> = {};
+                    res.data.forEach((u: User) => {
+                        profiles[u.id] = { username: u.username, avatarUrl: u.avatarUrl };
+                    });
+                    setUserProfiles(prev => ({...prev, ...profiles}));
+                })
+                .catch(() => {});
+        }
+    }, [comments]);
 
     const startEditing = useCallback((comment: Comment) => {
         setText(comment.content);
@@ -443,95 +464,107 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
             ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-600 dark:text-slate-400 font-bold border border-slate-200 dark:border-white/5">Log in to post a comment.</div>}
 
             <div className="space-y-4">
-                {comments?.length > 0 ? comments.map((comment) => (
-                    <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group">
-                        <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden shrink-0">
-                                    {comment.userAvatarUrl ? (
-                                        <img src={comment.userAvatarUrl} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        comment.user.charAt(0)
-                                    )}
-                                </div>
-                                <div><Link to={`/creator/${comment.user}`} className="font-bold text-slate-900 dark:text-white block hover:text-modtale-accent transition-colors">{comment.user}</Link></div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                                <div suppressHydrationWarning className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                                </div>
-                                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
-                                    {currentUser && (
-                                        <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
-                                            <Flag className="w-3 h-3" aria-hidden="true"/> Report
-                                        </button>
-                                    )}
-                                    {(currentUser && currentUser.username === comment.user) && (
-                                        <button aria-label="Edit comment" onClick={() => startEditing(comment)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-modtale-accent font-bold flex items-center gap-1">
-                                            <Edit className="w-3 h-3" aria-hidden="true"/> Edit
-                                        </button>
-                                    )}
-                                    {(isCreator || (currentUser && currentUser.username === comment.user)) && (
-                                        <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
-                                            <Trash className="w-3 h-3" aria-hidden="true"/> Delete
-                                        </button>
-                                    )}
-                                    {isCreator && (
-                                        <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs text-modtale-accent font-bold hover:underline">
-                                            {comment.developerReply ? 'Edit Reply' : 'Reply'}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{comment.content}</p>
+                {comments?.length > 0 ? comments.map((comment) => {
+                    const authorId = (comment as any).userId;
+                    const authorUsername = authorId && userProfiles[authorId] ? userProfiles[authorId].username : (comment.user || 'Unknown');
+                    const authorAvatar = authorId && userProfiles[authorId] ? userProfiles[authorId].avatarUrl : comment.userAvatarUrl;
+                    const profileLink = `/creator/${authorId || comment.user}`;
+                    const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === comment.user);
 
-                        {replyingCommentId === comment.id ? (
-                            <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
-                                <textarea
-                                    aria-label="Developer reply content"
-                                    value={replyText}
-                                    onChange={e => setReplyText(e.target.value)}
-                                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-2 text-sm mb-2 focus:outline-none focus:border-modtale-accent text-slate-900 dark:text-white"
-                                    placeholder="Write a reply..."
-                                    rows={3}
-                                />
-                                <div className="flex justify-end gap-2">
-                                    <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Cancel</button>
-                                    <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-modtale-accentHover transition-colors">
-                                        <CornerDownRight className="w-3 h-3" aria-hidden="true"/> Post Reply
-                                    </button>
+                    return (
+                        <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden shrink-0">
+                                        {authorAvatar ? (
+                                            <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            authorUsername.charAt(0).toUpperCase()
+                                        )}
+                                    </div>
+                                    <div><Link to={profileLink} className="font-bold text-slate-900 dark:text-white block hover:text-modtale-accent transition-colors">{authorUsername}</Link></div>
                                 </div>
-                            </form>
-                        ) : comment.developerReply && (
-                            <div className="mt-6 ml-14 relative">
-                                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-modtale-accent to-transparent rounded-full opacity-50"></div>
-                                <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/5">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-6 h-6 rounded-full bg-modtale-accent text-white flex items-center justify-center text-xs font-bold overflow-hidden">
-                                                {comment.developerReply.userAvatarUrl ? (
-                                                    <img src={comment.developerReply.userAvatarUrl} alt="" className="w-full h-full object-cover"/>
-                                                ) : (
-                                                    <Crown className="w-3 h-3" aria-hidden="true" />
-                                                )}
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                                                    <Link to={`/creator/${comment.developerReply.user}`} className="hover:text-modtale-accent transition-colors">{comment.developerReply.user}</Link> <Crown className="w-3 h-3 text-modtale-accent" aria-hidden="true" />
-                                                </span>
-                                                <span suppressHydrationWarning className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
-                                                    Developer Response • {new Date(comment.developerReply.date).toLocaleDateString()}
-                                                </span>
+                                <div className="flex flex-col items-end gap-1">
+                                    <div suppressHydrationWarning className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    </div>
+                                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                                        {currentUser && (
+                                            <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
+                                                <Flag className="w-3 h-3" aria-hidden="true"/> Report
+                                            </button>
+                                        )}
+                                        {isCommentOwner && (
+                                            <button aria-label="Edit comment" onClick={() => startEditing(comment)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-modtale-accent font-bold flex items-center gap-1">
+                                                <Edit className="w-3 h-3" aria-hidden="true"/> Edit
+                                            </button>
+                                        )}
+                                        {(isCreator || isCommentOwner) && (
+                                            <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
+                                                <Trash className="w-3 h-3" aria-hidden="true"/> Delete
+                                            </button>
+                                        )}
+                                        {isCreator && (
+                                            <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs text-modtale-accent font-bold hover:underline">
+                                                {comment.developerReply ? 'Edit Reply' : 'Reply'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{comment.content}</p>
+
+                            {replyingCommentId === comment.id ? (
+                                <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
+                                    <textarea
+                                        aria-label="Developer reply content"
+                                        value={replyText}
+                                        onChange={e => setReplyText(e.target.value)}
+                                        className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-2 text-sm mb-2 focus:outline-none focus:border-modtale-accent text-slate-900 dark:text-white"
+                                        placeholder="Write a reply..."
+                                        rows={3}
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                        <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Cancel</button>
+                                        <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-modtale-accentHover transition-colors">
+                                            <CornerDownRight className="w-3 h-3" aria-hidden="true"/> Post Reply
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : comment.developerReply && (() => {
+                                const replyId = (comment.developerReply as any).userId;
+                                const replyUsername = replyId && userProfiles[replyId] ? userProfiles[replyId].username : (comment.developerReply.user || 'Developer');
+                                const replyAvatar = replyId && userProfiles[replyId] ? userProfiles[replyId].avatarUrl : comment.developerReply.userAvatarUrl;
+                                const replyProfileLink = `/creator/${replyId || comment.developerReply.user}`;
+
+                                return (
+                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5 relative">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0">
+                                                    {replyAvatar ? (
+                                                        <img src={replyAvatar} alt="" className="w-full h-full object-cover"/>
+                                                    ) : (
+                                                        <Crown className="w-5 h-5" aria-hidden="true" />
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                                                        <Link to={replyProfileLink} className="hover:text-modtale-accent transition-colors">{replyUsername}</Link> <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
+                                                    </span>
+                                                    <span suppressHydrationWarning className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
+                                                        Developer Response • {new Date(comment.developerReply.date).toLocaleDateString()}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
+                                        <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{comment.developerReply.content}</p>
                                     </div>
-                                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{comment.developerReply.content}</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )) : <div className="text-center py-12 text-slate-600 dark:text-slate-400 italic">No comments yet.</div>}
+                                );
+                            })()}
+                        </div>
+                    );
+                }) : <div className="text-center py-12 text-slate-600 dark:text-slate-400 italic">No comments yet.</div>}
             </div>
         </div>
     );
@@ -747,6 +780,11 @@ export const ModDetail: React.FC<{
             }
         }
     }, [mod, loading, location.pathname, location.hash, navigate]);
+
+    useEffect(() => {
+        if (location.pathname.endsWith('/download')) setShowDownloadModal(true);
+        if (location.pathname.endsWith('/changelog')) setShowAllVersionsModal(true);
+    }, [location.pathname]);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
@@ -1073,8 +1111,8 @@ export const ModDetail: React.FC<{
 
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
-                                <span>by <Link to={`/creator/${mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
-                                {currentUser && currentUser.username !== mod.author && (
+                                <span>by <Link to={`/creator/${mod.authorId || mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
+                                {currentUser && currentUser.id !== mod.authorId && (
                                     <button
                                         onClick={handleFollowToggle}
                                         className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}

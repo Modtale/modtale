@@ -41,7 +41,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
         }
         return () => {
             document.body.style.overflow = '';
-            // Reset state when closed
             if (!isOpen) {
                 setSubmitted(false);
                 setReportId(null);
