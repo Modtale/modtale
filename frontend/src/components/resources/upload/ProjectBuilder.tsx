@@ -129,6 +129,23 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const hasGitlab = currentUser?.connectedAccounts?.some(a => a.provider === 'gitlab') || false;
     const [provider, setProvider] = useState<'github' | 'gitlab'>(hasGithub ? 'github' : (hasGitlab ? 'gitlab' : 'github'));
 
+    useEffect(() => {
+        let isMounted = true;
+        if (modData?.id && modData.id !== 'new-project' && !readOnly) {
+            api.get(`/projects/${modData.id}`).then(res => {
+                if (isMounted && res.data) {
+                    setModData(prev => {
+                        if (prev && res.data.versions && prev.versions?.length !== res.data.versions.length) {
+                            return { ...prev, versions: res.data.versions };
+                        }
+                        return prev;
+                    });
+                }
+            }).catch(() => {});
+        }
+        return () => { isMounted = false; };
+    }, [modData?.id, readOnly, setModData]);
+
     const fetchRepos = useCallback(() => {
         if (readOnly || manualRepo) return;
         if ((provider === 'github' && !hasGithub) || (provider === 'gitlab' && !hasGitlab)) return;
@@ -168,8 +185,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 setRepoDropdownOpen(false);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
     useEffect(() => {

@@ -364,7 +364,7 @@ public class ModController {
             } else {
                 cacheControl = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
             }
-            return ResponseEntity.ok().cacheControl(cacheControl).body(data.map(ModDTO::fromEntity));
+            return ResponseEntity.ok().cacheControl(cacheControl).body(data.map(m -> ModDTO.fromEntity(m, true)));
         } catch (Exception e) {
             logger.error("Error in getProjects", e);
             return ResponseEntity.ok(Page.empty());
@@ -391,7 +391,7 @@ public class ModController {
             mod.setIsOwner(modService.isOwner(mod, user));
         }
 
-        return ResponseEntity.ok(ModDTO.fromEntity(mod));
+        return ResponseEntity.ok(ModDTO.fromEntity(mod, false));
     }
 
     @GetMapping("/projects/{id}/meta")
@@ -485,7 +485,7 @@ public class ModController {
             });
         }
 
-        return ResponseEntity.ok(pageResult.map(ModDTO::fromEntity));
+        return ResponseEntity.ok(pageResult.map(m -> ModDTO.fromEntity(m, true)));
     }
 
     @GetMapping("/projects/user/contributed")
@@ -503,7 +503,7 @@ public class ModController {
             m.setIsOwner(modService.isOwner(m, user));
         });
 
-        return ResponseEntity.ok(pageResult.map(ModDTO::fromEntity));
+        return ResponseEntity.ok(pageResult.map(m -> ModDTO.fromEntity(m, true)));
     }
 
     @PostMapping("/projects/{id}/favorite")

@@ -95,12 +95,22 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
         }
     };
 
-    const selectProject = (mod: Mod) => {
+    const selectProject = async (mod: Mod) => {
         setFoundProject(mod);
         setQuery(mod.title);
         setIdQuery(mod.id);
         setShowResults(false);
         setConfirmAction(null);
+
+        setLoading(true);
+        try {
+            const res = await api.get(`/admin/projects/${mod.id}`);
+            setFoundProject(res.data);
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch full project details.' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const openRawEdit = () => {
