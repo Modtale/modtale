@@ -501,7 +501,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         {manageError && <ErrorBanner message={manageError} />}
 
                         {isAdmin && (
-                            <div className="bg-gradient-to-br from-white to-slate-50 dark:from-modtale-card dark:to-white/[0.02] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                            <div className="bg-gradient-to-br from-white to-slate-50 dark:from-white/5 dark:to-white/[0.02] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
                                 <div className="flex items-center gap-3 mb-6">
                                     <div className="w-10 h-10 rounded-full bg-modtale-accent/10 flex items-center justify-center text-modtale-accent">
                                         <UserPlus className="w-5 h-5" />
@@ -524,7 +524,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                         />
 
                                         {userSearchResults.length > 0 && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
                                                 {userSearchResults.map(res => (
                                                     <button
                                                         key={res.id}
@@ -555,7 +555,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                         </button>
 
                                         {roleDropdownOpen && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
                                                 <button
                                                     type="button"
                                                     onClick={() => { setInviteRole('MEMBER'); setRoleDropdownOpen(false); }}
@@ -593,7 +593,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             </div>
                         )}
 
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md">
                             <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
                                 <h3 className="font-bold text-slate-900 dark:text-white">Active Members</h3>
                                 <span className="text-xs font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-500">{members.length}</span>
@@ -663,19 +663,22 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         {orgProjects.length > 0 ? (
                             <div className="grid grid-cols-1 gap-4">
                                 {orgProjects.map(project => (
-                                    <ProjectListItem
-                                        key={project.id}
-                                        project={project}
-                                        canManage={isAdmin}
-                                        isOwner={false}
-                                        showAuthor={false}
-                                        onTransfer={setTransferModal}
-                                        onDelete={setDeleteProjectModal}
-                                    />
+                                    <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                                        <ProjectListItem
+                                            project={project}
+                                            canManage={isAdmin}
+                                            isOwner={false}
+                                            showAuthor={false}
+                                            onTransfer={setTransferModal}
+                                            onDelete={setDeleteProjectModal}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-12 text-slate-400">No projects found.</div>
+                            <div className="text-center py-12 text-slate-400 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl backdrop-blur-md">
+                                No projects found.
+                            </div>
                         )}
                     </div>
                 )}
@@ -683,7 +686,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                 {activeTab === 'SETTINGS' && isAdmin && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                            <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <h3 className="font-bold mb-4">Organization Icon</h3>
                                 <div className="flex items-center gap-4">
                                     <img src={selectedOrg.avatarUrl} alt="" className="w-16 h-16 rounded-xl object-cover bg-slate-100" />
@@ -693,7 +696,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                            <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <h3 className="font-bold mb-4">Profile Banner</h3>
                                 <div className="flex items-center gap-4">
                                     <div className="w-32 h-16 rounded-xl overflow-hidden bg-slate-100 relative">
@@ -706,7 +709,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                        <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                             <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-slate-400" /> General Settings</h3>
                             <form onSubmit={handleUpdateProfile} className="space-y-4">
                                 <div>
@@ -724,7 +727,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             </form>
                         </div>
 
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                        <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                             <div className="flex items-center gap-3 mb-4">
                                 <LinkIcon className="w-5 h-5 text-modtale-accent" />
                                 <div>
@@ -741,7 +744,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             </div>
                         </div>
 
-                        <div className="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 p-6 rounded-2xl">
+                        <div className="border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 p-6 rounded-2xl backdrop-blur-md">
                             <h3 className="font-bold text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
                             <p className="text-sm text-red-500/80 mb-4">Deleting this organization will permanently remove it and unlist all associated projects.</p>
                             <button onClick={() => setDeleteModalOpen(true)} className="bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/30 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">Delete Organization</button>
@@ -757,12 +760,12 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">Organizations</h1>
                 <button onClick={() => setIsCreating(true)} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20"><Plus className="w-4 h-4" /> New Org</button>
             </div>
             {isCreating && (
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm animate-in slide-in-from-top-2">
+                <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm animate-in slide-in-from-top-2 backdrop-blur-md">
                     <h3 className="font-bold text-lg mb-4">Create Organization</h3>
                     {createError && <ErrorBanner message={createError} className="mb-4" />}
                     <form onSubmit={handleCreateOrg} className="flex gap-4">
@@ -774,7 +777,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {orgs.map(org => (
-                    <div key={org.id} onClick={() => setSelectedOrg(org)} className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group">
+                    <div key={org.id} onClick={() => setSelectedOrg(org)} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group backdrop-blur-md">
                         <div className="flex items-center justify-between mb-4">
                             <div className="w-12 h-12 bg-slate-100 dark:bg-white/5 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors">
                                 {org.avatarUrl ? <img src={org.avatarUrl} className="w-full h-full object-cover rounded-xl" /> : <Building2 className="w-6 h-6" />}

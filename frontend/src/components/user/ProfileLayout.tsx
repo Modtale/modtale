@@ -128,12 +128,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                     href={finalUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className={`${compact ? 'p-1.5' : 'p-2.5 md:p-2.5 p-2'} rounded-lg md:rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative flex-shrink-0 inline-flex items-center justify-center text-slate-400 ${activeClass}`}
+                    className={`${compact ? 'p-1.5' : 'p-2.5 md:p-2.5 p-2'} rounded-lg md:rounded-xl bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/5 transition-all relative flex-shrink-0 inline-flex items-center justify-center text-slate-400 backdrop-blur-md ${activeClass}`}
                 >
                     <Icon className={compact ? "w-3.5 h-3.5" : "w-4 h-4 md:w-5 md:h-5"} />
                 </a>
 
-                <div className={`absolute bottom-full mb-3 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-[110] text-left cursor-default opacity-0 invisible group-hover/social:visible group-hover/social:opacity-100 transition-all duration-200 ${popupPositionClasses}`}>
+                <div className={`absolute bottom-full mb-3 w-64 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-4 z-[110] text-left cursor-default opacity-0 invisible group-hover/social:visible group-hover/social:opacity-100 transition-all duration-200 ${popupPositionClasses}`}>
                     <div className="absolute top-full left-0 w-full h-4 bg-transparent"></div>
 
                     <div className="flex justify-between items-start mb-3">
@@ -154,7 +154,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             <ExternalLink className="w-3 h-3" /> Profile
                         </a>
                     </div>
-                    <div className={`absolute top-full -mt-[1px] border-[6px] border-transparent border-t-white dark:border-t-slate-800 pointer-events-none ${trianglePositionClasses}`}></div>
+                    <div className={`absolute top-full -mt-[1px] border-[6px] border-transparent border-t-white/90 dark:border-t-slate-800/90 pointer-events-none ${trianglePositionClasses}`}></div>
                 </div>
             </div>
         );
@@ -162,7 +162,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const Avatar = ({ className, forceSizeClass }: { className?: string, forceSizeClass?: string }) => (
         <div className={`relative group ${className}`}>
-            <div className={`w-full h-full ${forceSizeClass} rounded-[1.25rem] md:rounded-[2rem] border-4 md:border-[6px] border-slate-50 dark:border-slate-950 md:dark:border-slate-800 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20`}>
+            <div className={`w-full h-full ${forceSizeClass} rounded-[1.25rem] md:rounded-[2rem] border-4 md:border-[6px] border-white/50 dark:border-slate-950 md:dark:border-slate-900/50 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20 backdrop-blur-md`}>
                 {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -205,13 +205,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
 
-            <div className="relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group md:rounded-b-3xl shadow-sm">
-                {user.bannerUrl ? (
-                    <img src={user.bannerUrl} alt="" className="w-full h-full object-cover opacity-100" />
-                ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-modtale-accent/20 via-slate-900 to-black" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-900/90 to-transparent md:to-black/30" />
+            <div className="relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group md:rounded-b-3xl shadow-sm z-10">
+                <div className="absolute inset-0 z-0">
+                    {user.bannerUrl ? (
+                        <img src={user.bannerUrl} alt="" className="w-full h-full object-cover opacity-100" />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-modtale-accent/20 via-slate-900 to-black" />
+                    )}
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 via-slate-50/60 dark:via-slate-950/60 to-transparent md:to-black/30 z-10" />
 
                 {onBack && (
                     <div className={`absolute top-0 left-0 right-0 z-40 mx-auto w-full ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
@@ -252,8 +254,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 )}
             </div>
 
-            <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300`}>
-                <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start md:-mt-32">
+            <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300 -mt-2 md:-mt-32`}>
+                <div className="bg-transparent md:bg-white/90 md:dark:bg-slate-900/90 md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:p-10 md:pb-6 md:shadow-2xl flex flex-col md:flex-row gap-4 md:gap-10 items-start">
 
                     <div className="hidden md:block flex-shrink-0 self-start md:-mt-24">
                         <Avatar className="w-48 h-48" />
@@ -261,11 +263,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
                     <div className="flex-1 w-full min-w-0 md:pt-0">
 
-                        <div className="md:hidden -mt-10 mb-3 flex justify-start">
-                            <Avatar className="w-24 h-24" forceSizeClass="rounded-[1.2rem]" />
+                        <div className="md:hidden -mt-16 mb-3 flex justify-start relative z-50">
+                            <Avatar className="w-28 h-28" forceSizeClass="rounded-2xl" />
                         </div>
 
-                        <div className="mb-4">
+                        <div className="mb-4 relative z-10">
                             <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                                 <div className="w-full flex-1 min-w-0">
                                     {headerInput ? headerInput : <HeaderInfo />}
@@ -274,19 +276,19 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     {actionInput ? actionInput : (
                                         <>
                                             {isSelf ? (
-                                                <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5">
+                                                <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 backdrop-blur-md">
                                                     <Settings className="w-5 h-5" /> Manage Profile
                                                 </a>
                                             ) : (
-                                                <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
+                                                <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
                                                     {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
                                                 </button>
                                             )}
-                                            <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all" title="Copy ID">
+                                            <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
                                                 {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
                                             </button>
                                             {onReport && (
-                                                <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-red-500 hover:border-red-500/20 transition-all" title="Report User">
+                                                <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-500 hover:border-red-500/20 transition-all backdrop-blur-md" title="Report User">
                                                     <Flag className="w-5 h-5" />
                                                 </button>
                                             )}
@@ -297,18 +299,18 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         </div>
 
                         {!isEditing && stats && (
-                            <div className="md:hidden grid grid-cols-3 gap-3 mb-5">
-                                <div className="bg-slate-200 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 dark:border-white/5">
-                                    <span className="text-white font-black text-lg leading-none mb-1">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Downloads</span>
+                            <div className="md:hidden grid grid-cols-3 gap-3 mb-5 relative z-10">
+                                <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
+                                    <span className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</span>
+                                    <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Downloads</span>
                                 </div>
-                                <div className="bg-slate-200 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 dark:border-white/5">
-                                    <span className="text-white font-black text-lg leading-none mb-1">{stats.favorites.toLocaleString()}</span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Likes</span>
+                                <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
+                                    <span className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1">{stats.favorites.toLocaleString()}</span>
+                                    <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Likes</span>
                                 </div>
-                                <div className="bg-slate-200 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-100 dark:border-white/5">
-                                    <span className="text-white font-black text-lg leading-none mb-1">{stats.projects}</span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Projects</span>
+                                <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
+                                    <span className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1">{stats.projects}</span>
+                                    <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Projects</span>
                                 </div>
                             </div>
                         )}
@@ -317,19 +319,19 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             {actionInput ? actionInput : (
                                 <>
                                     {isSelf ? (
-                                        <a href="/dashboard/profile" className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10">
+                                        <a href="/dashboard/profile" className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 backdrop-blur-md">
                                             <Settings className="w-4 h-4" /> Manage Profile
                                         </a>
                                     ) : (
-                                        <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                                        <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
                                             {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : "Sign in to Follow"}
                                         </button>
                                     )}
-                                    <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-200 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0" title="Copy ID">
+                                    <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0 backdrop-blur-md" title="Copy ID">
                                         {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
                                     </button>
                                     {onReport && (
-                                        <button onClick={onReport} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-200 dark:bg-white/5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0" title="Report User">
+                                        <button onClick={onReport} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0 backdrop-blur-md" title="Report User">
                                             <Flag className="w-5 h-5" />
                                         </button>
                                     )}
@@ -337,12 +339,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             )}
                         </div>
 
-                        <div className="mb-4 md:mb-6">
+                        <div className="mb-4 md:mb-6 relative z-10">
                             {bioInput ? bioInput : (user.bio && <p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p>)}
                         </div>
 
                         {!isEditing && stats && (
-                            <div className="hidden pt-4 md:pt-6 border-t border-slate-200 dark:border-white/5 md:flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6">
+                            <div className="hidden pt-4 md:pt-6 border-t border-slate-200 dark:border-white/5 md:flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 relative z-10">
                                 <div className="flex justify-between w-full md:w-auto md:flex md:gap-8 text-left">
                                     <div className="text-center md:text-left">
                                         <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</div>

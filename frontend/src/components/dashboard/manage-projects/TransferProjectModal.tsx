@@ -15,7 +15,7 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [selectedUsername, setSelectedUsername] = useState('');
+    const [selectedUserId, setSelectedUserId] = useState('');
 
     useEffect(() => {
         if (!searchQuery) {
@@ -37,10 +37,10 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
     }, [searchQuery]);
 
     const handleTransferRequest = async () => {
-        if (!selectedUsername) return;
+        if (!selectedUserId) return;
         try {
-            await api.post(`/projects/${project.id}/transfer`, { username: selectedUsername });
-            onSuccess(`Transfer request sent to ${selectedUsername}`);
+            await api.post(`/projects/${project.id}/transfer`, { userId: selectedUserId });
+            onSuccess(`Transfer request sent.`);
             onClose();
         } catch (e: any) {
             onError(e.response?.data || "Failed to send request.");
@@ -48,14 +48,14 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 p-6 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90dvh]">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90dvh]">
                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Transfer Ownership</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                     Select a target to transfer <strong>{project.title}</strong> to. They must accept the request.
                 </p>
 
-                <div className="flex-1 overflow-y-auto mb-4 space-y-6 pr-2">
+                <div className="flex-1 overflow-y-auto mb-4 space-y-6 pr-2 custom-scrollbar">
                     {myOrgs.length > 0 && (
                         <div>
                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Your Organizations</h4>
@@ -63,8 +63,8 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
                                 {myOrgs.map(org => (
                                     <button
                                         key={org.id}
-                                        onClick={() => setSelectedUsername(org.username)}
-                                        className={`flex items-center gap-2 p-3 rounded-xl border text-left transition-all ${selectedUsername === org.username ? 'border-modtale-accent bg-modtale-accent/10 text-modtale-accent' : 'border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                                        onClick={() => setSelectedUserId(org.id)}
+                                        className={`flex items-center gap-2 p-3 rounded-xl border text-left transition-all ${selectedUserId === org.id ? 'border-modtale-accent bg-modtale-accent/10 text-modtale-accent' : 'border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'}`}
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
                                             {org.avatarUrl ? <img src={org.avatarUrl} className="w-full h-full object-cover" /> : <span className="text-xs">ORG</span>}
@@ -93,13 +93,13 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
                             <div className="mt-2 bg-slate-50 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden">
                                 {isSearching ? <div className="p-4 text-center text-xs text-slate-400">Searching...</div> : (
                                     searchResults.length > 0 ? searchResults.map(res => (
-                                        <button key={res.id} onClick={() => setSelectedUsername(res.username)} className={`w-full flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors ${selectedUsername === res.username ? 'bg-modtale-accent/10' : ''}`}>
+                                        <button key={res.id} onClick={() => setSelectedUserId(res.id)} className={`w-full flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors ${selectedUserId === res.id ? 'bg-modtale-accent/10' : ''}`}>
                                             <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
                                             <div className="text-left">
                                                 <div className="font-bold text-sm dark:text-white">{res.username}</div>
                                                 <div className="text-[10px] text-slate-500 uppercase font-bold">{res.accountType || 'USER'}</div>
                                             </div>
-                                            {selectedUsername === res.username && <div className="ml-auto w-2 h-2 bg-modtale-accent rounded-full"/>}
+                                            {selectedUserId === res.id && <div className="ml-auto w-2 h-2 bg-modtale-accent rounded-full"/>}
                                         </button>
                                     )) : <div className="p-4 text-center text-xs text-slate-400">No results found.</div>
                                 )}
@@ -108,15 +108,15 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
                     </div>
                 </div>
 
-                {selectedUsername && (
-                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 rounded-lg text-sm font-bold flex items-center justify-between">
-                        <span>Transferring to: {selectedUsername}</span>
+                {selectedUserId && (
+                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 rounded-lg text-sm font-bold flex items-center justify-between border border-blue-100 dark:border-blue-800">
+                        <span>Transferring to selected user</span>
                     </div>
                 )}
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-white/10 mt-auto">
-                    <button onClick={onClose} className="px-4 py-2 font-bold text-slate-500">Cancel</button>
-                    <button onClick={handleTransferRequest} disabled={!selectedUsername} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold disabled:opacity-50 transition-opacity">Send Request</button>
+                    <button onClick={onClose} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">Cancel</button>
+                    <button onClick={handleTransferRequest} disabled={!selectedUserId} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-6 py-2 rounded-xl font-bold disabled:opacity-50 transition-all shadow-lg shadow-modtale-accent/20">Send Request</button>
                 </div>
             </div>
         </div>

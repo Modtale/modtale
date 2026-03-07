@@ -15,7 +15,7 @@ import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW } from '../../ut
 import type { Mod, User } from '../../types.ts';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
-    <div className="bg-white dark:bg-modtale-card p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+    <div className="bg-white/50 dark:bg-black/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md">
         <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity ${color}`}>
             <Icon className="w-24 h-24 transform translate-x-4 -translate-y-4" />
         </div>
@@ -69,7 +69,7 @@ export const Analytics: React.FC = () => {
                 const me = await api.get('/user/me');
                 setCurrentUser(me.data);
 
-                setSelectedContext(prev => prev || me.data.username);
+                setSelectedContext(prev => prev || me.data.id);
 
                 const orgs = await api.get('/user/orgs');
                 const adminOrgs = orgs.data.filter((o: User) =>
@@ -115,11 +115,13 @@ export const Analytics: React.FC = () => {
                         setHasProjects(false); setLoading(false); return;
                     }
 
-                    const res = await api.get(`/user/analytics?range=${range}&username=${selectedContext}`);
+                    const res = await api.get(`/user/analytics?range=${range}&userId=${selectedContext}`);
                     const data = res.data;
 
+                    const contextName = selectedContext === currentUser?.id ? currentUser?.username : (myOrgs.find(o => o.id === selectedContext)?.displayName || myOrgs.find(o => o.id === selectedContext)?.username || selectedContext);
+
                     setMeta({
-                        title: selectedContext === currentUser?.username ? "Your Analytics" : `${selectedContext}`,
+                        title: selectedContext === currentUser?.id ? "Your Analytics" : `${contextName}`,
                         subtitle: "Performance Overview"
                     });
 
@@ -231,12 +233,12 @@ export const Analytics: React.FC = () => {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setContextDropdownOpen(!contextDropdownOpen)}
-                className="flex items-center gap-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-sm"
+                className="flex items-center gap-2 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-white/5 transition-colors shadow-sm backdrop-blur-md"
             >
-                {selectedContext === currentUser?.username ? (
+                {selectedContext === currentUser?.id ? (
                     <><UserIcon className="w-4 h-4 text-blue-500" /> Personal</>
                 ) : (
-                    <><Building2 className="w-4 h-4 text-purple-500" /> {myOrgs.find(o => o.username === selectedContext)?.displayName || selectedContext}</>
+                    <><Building2 className="w-4 h-4 text-purple-500" /> {myOrgs.find(o => o.id === selectedContext)?.displayName || myOrgs.find(o => o.id === selectedContext)?.username || selectedContext}</>
                 )}
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${contextDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -244,19 +246,19 @@ export const Analytics: React.FC = () => {
             {contextDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                     <div className="p-2">
-                        <button onClick={() => { setSelectedContext(currentUser?.username || ''); setContextDropdownOpen(false); }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left rounded-lg group">
+                        <button onClick={() => { setSelectedContext(currentUser?.id || ''); setContextDropdownOpen(false); }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left rounded-lg group">
                             <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-900/40 transition-colors"><UserIcon className="w-4 h-4"/></div>
                             <div className="flex-1">
                                 <div className="font-bold text-sm text-slate-900 dark:text-white">Personal</div>
                                 <div className="text-[10px] text-slate-500 uppercase">{currentUser?.username}</div>
                             </div>
-                            {selectedContext === currentUser?.username && <Check className="w-4 h-4 text-modtale-accent" />}
+                            {selectedContext === currentUser?.id && <Check className="w-4 h-4 text-modtale-accent" />}
                         </button>
 
                         {myOrgs.length > 0 && <div className="h-px bg-slate-100 dark:bg-white/5 my-2 mx-2" />}
 
                         {myOrgs.map(org => (
-                            <button key={org.id} onClick={() => { setSelectedContext(org.username); setContextDropdownOpen(false); }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left rounded-lg group">
+                            <button key={org.id} onClick={() => { setSelectedContext(org.id); setContextDropdownOpen(false); }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left rounded-lg group">
                                 <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center group-hover:bg-purple-200 dark:group-hover:bg-purple-900/40 transition-colors">
                                     {org.avatarUrl ? <img src={org.avatarUrl} className="w-full h-full rounded-lg object-cover" /> : <Building2 className="w-4 h-4"/>}
                                 </div>
@@ -264,7 +266,7 @@ export const Analytics: React.FC = () => {
                                     <div className="font-bold text-sm text-slate-900 dark:text-white truncate">{org.displayName || org.username}</div>
                                     <div className="text-[10px] text-slate-500 uppercase">Organization</div>
                                 </div>
-                                {selectedContext === org.username && <Check className="w-4 h-4 text-modtale-accent" />}
+                                {selectedContext === org.id && <Check className="w-4 h-4 text-modtale-accent" />}
                             </button>
                         ))}
                     </div>
@@ -331,7 +333,7 @@ export const Analytics: React.FC = () => {
                         {meta.subtitle && <p className="text-slate-500 text-sm">{meta.subtitle}</p>}
                     </div>
 
-                    <div className="flex bg-slate-100 dark:bg-black/20 p-1 rounded-lg shrink-0">
+                    <div className="flex bg-white/50 dark:bg-black/20 p-1 rounded-lg shrink-0 border border-slate-200 dark:border-white/5 backdrop-blur-md">
                         {['7d', '30d', '90d'].map(r => (
                             <button key={r} onClick={() => setRange(r)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${range === r ? 'bg-white dark:bg-modtale-card text-modtale-accent shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>{r}</button>
                         ))}
@@ -349,19 +351,19 @@ export const Analytics: React.FC = () => {
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white dark:bg-modtale-card p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col">
+                        <div className="bg-white/50 dark:bg-black/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col backdrop-blur-md">
                             <h3 className="font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white shrink-0"><Download className="w-4 h-4 text-blue-500" /> Downloads</h3>
                             <div className="flex-1 min-h-0">
                                 <LineChart datasets={chartDatasets.downloads} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-modtale-card p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col">
+                        <div className="bg-white/50 dark:bg-black/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col backdrop-blur-md">
                             <h3 className="font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white shrink-0"><Eye className="w-4 h-4 text-purple-500" /> Views</h3>
                             <div className="flex-1 min-h-0">
                                 <LineChart datasets={chartDatasets.views} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-modtale-card p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col">
+                        <div className="bg-white/50 dark:bg-black/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col backdrop-blur-md">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
                                 <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><TrendingUp className="w-4 h-4 text-emerald-500" /> Momentum (WoW %)</h3>
                             </div>
@@ -370,7 +372,7 @@ export const Analytics: React.FC = () => {
                             </div>
                         </div>
                         {chartDatasets.fourthMetric && (
-                            <div className="bg-white dark:bg-modtale-card p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col">
+                            <div className="bg-white/50 dark:bg-black/20 p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm h-[500px] flex flex-col backdrop-blur-md">
                                 <h3 className="font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white shrink-0">
                                     {chartDatasets.fourthMetric.icon} {chartDatasets.fourthMetric.title}
                                 </h3>
@@ -384,13 +386,13 @@ export const Analytics: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="bg-white dark:bg-modtale-card rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm">
+                    <div className="bg-white/50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm backdrop-blur-md">
                         <div className="p-6 border-b border-slate-200 dark:border-white/5">
                             <h3 className="font-bold text-lg text-slate-900 dark:text-white">{id ? "Version Breakdown" : "Project Breakdown"}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold uppercase text-xs">
+                                <thead className="text-slate-500 dark:text-slate-400 font-bold uppercase text-xs border-b border-slate-200 dark:border-white/5">
                                 <tr>
                                     {(tableConfig?.headers || []).map((h, i) => (
                                         <th key={i} className={`p-4 ${i === 0 ? 'pl-6' : ''} ${i === (tableConfig?.headers.length || 0) - 1 ? 'text-right pr-6' : ''}`}>{h}</th>
@@ -401,7 +403,7 @@ export const Analytics: React.FC = () => {
                                 {items.map(key => {
                                     const sum = (seriesData[key] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
                                     return (
-                                        <tr key={key} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                                        <tr key={key} className="hover:bg-white dark:hover:bg-white/[0.02] transition-colors">
                                             {tableConfig?.rowRenderer(key, sum)}
                                         </tr>
                                     );

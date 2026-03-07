@@ -31,7 +31,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
     }
 
     return (
-        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-4 group relative overflow-hidden">
+        <div className="p-4 flex flex-col sm:flex-row items-center gap-4 group relative w-full h-full">
             <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden flex-shrink-0">
                 <img src={project.imageUrl} alt="" className="w-full h-full object-cover" />
             </div>

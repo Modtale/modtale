@@ -82,10 +82,10 @@ export const DeveloperSettings: React.FC = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
+        <div className="w-full space-y-8">
             {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} onAction={status.onAction} actionLabel={status.actionLabel} secondaryLabel={status.secondaryLabel} />}
 
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white">Developer Settings</h2>
                     <p className="text-slate-500 text-sm">Manage API keys for automation and CI/CD.</p>
@@ -106,15 +106,15 @@ export const DeveloperSettings: React.FC = () => {
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 <div className="xl:col-span-2 flex flex-col">
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm flex flex-col h-full">
-                        <div className="p-4 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 flex justify-between items-center shrink-0">
+                    <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm flex flex-col h-full backdrop-blur-md">
+                        <div className="p-4 border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 flex justify-between items-center shrink-0">
                             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><Shield className="w-4 h-4 text-modtale-accent" /> Active API Keys</h3>
                         </div>
                         <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1">
                             {keys.length === 0 ? (
                                 <div className="p-8 text-center text-slate-500 text-sm">No active keys found.</div>
                             ) : keys.map(k => (
-                                <div key={k.id} className="p-4 flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                                <div key={k.id} className="p-4 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
                                     <div>
                                         <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">{k.name}<span className={`text-[10px] px-2 py-0.5 rounded uppercase border font-mono ${k.tier === 'ENTERPRISE' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : 'bg-slate-100 dark:bg-white/10 text-slate-500 border-slate-200 dark:border-white/10'}`}>{k.tier || 'USER'}</span></div>
                                         <div className="text-xs text-slate-500 font-mono mt-1 flex items-center gap-2"><span>Prefix: <span className="bg-slate-100 dark:bg-black/30 px-1 rounded text-slate-600 dark:text-slate-400">{k.prefix}••••••••</span></span></div>
@@ -124,7 +124,7 @@ export const DeveloperSettings: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        <div className="p-4 bg-slate-50 dark:bg-white/5 border-t border-slate-200 dark:border-white/10 mt-auto shrink-0">
+                        <div className="p-4 bg-slate-50/50 dark:bg-white/5 border-t border-slate-200 dark:border-white/10 mt-auto shrink-0">
                             <form onSubmit={handleCreate} className="flex gap-4">
                                 <input type="text" value={keyName} onChange={e => setKeyName(e.target.value)} placeholder="Key Name (e.g. CI/CD Pipeline)" className="flex-1 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm dark:text-white focus:ring-2 focus:ring-modtale-accent focus:outline-none transition-all" required />
                                 <button disabled={isCreating} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 text-sm transition-all shadow-md active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"><Plus className="w-4 h-4" /> Generate</button>
@@ -134,7 +134,7 @@ export const DeveloperSettings: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl p-6 shadow-sm hover:border-modtale-accent/50 transition-colors group">
+                    <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-6 shadow-sm hover:border-modtale-accent/50 transition-colors group backdrop-blur-md">
                         <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4 group-hover:scale-110 transition-transform">
                             <Info className="w-6 h-6" />
                         </div>
@@ -143,7 +143,7 @@ export const DeveloperSettings: React.FC = () => {
                         <Link to="/api-docs" className="text-modtale-accent font-bold text-sm flex items-center gap-2 hover:underline">View Documentation <ArrowRight className="w-4 h-4" /></Link>
                     </div>
 
-                    <div className="bg-slate-900 dark:bg-white/[0.03] text-white rounded-xl p-6 shadow-lg border border-slate-700 dark:border-white/10 relative overflow-hidden group">
+                    <div className="bg-slate-900/90 dark:bg-white/[0.03] text-white rounded-xl p-6 shadow-lg border border-slate-700 dark:border-white/10 relative overflow-hidden group backdrop-blur-md">
                         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Github className="w-20 h-20 transform rotate-12" /></div>
                         <div className="relative z-10">
                             <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-white"><Code className="w-5 h-5 text-modtale-accent" /> Examples</h3>

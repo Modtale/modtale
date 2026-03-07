@@ -293,186 +293,180 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
         </div>
     );
 
-    const containerClasses = "w-full mx-auto px-4 sm:px-8 md:px-12 lg:px-16";
-
     return (
-        <div className="relative pb-16 space-y-6">
+        <div className="relative space-y-6">
             {error && <ErrorBanner message={error} />}
             {showDeleteModal && <StatusModal type="error" title="Delete Account?" message="This action is permanent and cannot be undone. All your data, including preferences and API keys, will be removed." actionLabel="Yes, Delete My Account" onAction={handleDeleteAccount} onClose={() => setShowDeleteModal(false)} secondaryLabel="Cancel" />}
             {showUnlinkModal && <StatusModal type="warning" title={`Unlink ${showUnlinkModal.label}?`} message={`Are you sure you want to unlink your ${showUnlinkModal.label} account? You will no longer be able to sign in with it.`} actionLabel="Yes, Unlink" onAction={handleUnlink} onClose={() => setShowUnlinkModal(null)} secondaryLabel="Cancel" />}
 
-            <ProfileLayout
-                user={user}
-                isEditing={true}
-                onBannerUpload={handleBannerUpload}
-                onAvatarUpload={handleAvatarUpload}
-                headerInput={headerInput}
-                actionInput={actionContent}
-                bioInput={bioInput}
-            />
+            <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-3xl overflow-hidden backdrop-blur-md">
+                <ProfileLayout
+                    user={user}
+                    isEditing={true}
+                    onBannerUpload={handleBannerUpload}
+                    onAvatarUpload={handleAvatarUpload}
+                    headerInput={headerInput}
+                    actionInput={actionContent}
+                    bioInput={bioInput}
+                />
+            </div>
 
-            <div className={containerClasses}>
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-white/5 pb-4">
-                        <Lock className="w-4 h-4 text-modtale-accent" />
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Security</h3>
-                    </div>
+            <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-sm backdrop-blur-md">
+                <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-white/5 pb-4">
+                    <Lock className="w-4 h-4 text-modtale-accent" />
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Security</h3>
+                </div>
 
-                    <div className="space-y-8">
-                        <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2"><Mail className="w-4 h-4 text-slate-400" /> Email Address</h4>
-                            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm font-medium text-slate-900 dark:text-white">{user.email || 'No email associated'}</span>
-                                            {user.email && (
-                                                user.emailVerified
-                                                    ? <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Verified</span>
-                                                    : <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><ShieldAlert className="w-3 h-3"/> Unverified</span>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-slate-500">Used for login, notifications, and recovery.</p>
-                                    </div>
-                                </div>
-
-                                {!user.emailVerified && user.email && (
-                                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
-                                            <AlertTriangle className="w-4 h-4" />
-                                            <p className="text-xs font-medium">Your email is unverified. Please check your inbox.</p>
-                                        </div>
-                                        {emailSent ? (
-                                            <span className="text-xs font-bold text-green-600 dark:text-green-400 flex items-center gap-1.5">
-                                                <Check className="w-3.5 h-3.5" /> Sent!
-                                            </span>
-                                        ) : (
-                                            <button onClick={handleResendVerification} disabled={resendingEmail} className="text-xs font-bold text-slate-900 dark:text-white hover:underline disabled:opacity-50">
-                                                {resendingEmail ? 'Sending...' : 'Resend Verification Email'}
-                                            </button>
+                <div className="space-y-8">
+                    <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2"><Mail className="w-4 h-4 text-slate-400" /> Email Address</h4>
+                        <div className="p-4 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-medium text-slate-900 dark:text-white">{user.email || 'No email associated'}</span>
+                                        {user.email && (
+                                            user.emailVerified
+                                                ? <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Verified</span>
+                                                : <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><ShieldAlert className="w-3 h-3"/> Unverified</span>
                                         )}
                                     </div>
-                                )}
+                                    <p className="text-xs text-slate-500">Used for login, notifications, and recovery.</p>
+                                </div>
                             </div>
-                        </div>
 
-                        <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-slate-400" /> Two-Factor Authentication</h4>
-                            {(user as any).mfaEnabled ? (
-                                <div className="flex items-center justify-between p-4 rounded-2xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
-                                    <div className="flex items-center gap-3 text-green-700 dark:text-green-400"><Check className="w-5 h-5" /><span className="font-bold text-sm">2FA is enabled. Your account is secure.</span></div>
-                                    <button className="text-red-500 text-xs font-bold hover:underline opacity-50 cursor-not-allowed" title="Disabling 2FA is currently disabled for security.">Disable</button>
-                                </div>
-                            ) : (
-                                <div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Protect your account by requiring a code from an authenticator app (like Google Authenticator or Authy) when you log in.</p>
-                                    {!showMfaSetup && <button onClick={handleStartMfaSetup} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 transition-colors">Enable 2FA</button>}
+                            {!user.emailVerified && user.email && (
+                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                                        <AlertTriangle className="w-4 h-4" />
+                                        <p className="text-xs font-medium">Your email is unverified. Please check your inbox.</p>
+                                    </div>
+                                    {emailSent ? (
+                                        <span className="text-xs font-bold text-green-600 dark:text-green-400 flex items-center gap-1.5">
+                                            <Check className="w-3.5 h-3.5" /> Sent!
+                                        </span>
+                                    ) : (
+                                        <button onClick={handleResendVerification} disabled={resendingEmail} className="text-xs font-bold text-slate-900 dark:text-white hover:underline disabled:opacity-50">
+                                            {resendingEmail ? 'Sending...' : 'Resend Verification Email'}
+                                        </button>
+                                    )}
                                 </div>
                             )}
+                        </div>
+                    </div>
 
-                            {showMfaSetup && (
-                                <div className="mt-4 p-6 bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-white/10 animate-in fade-in slide-in-from-top-2">
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-4">Scan QR Code</h4>
-                                    <div className="flex flex-col md:flex-row gap-6">
-                                        <div className="bg-white p-2 rounded-xl w-fit h-fit shadow-sm"><img src={mfaQr} alt="2FA QR Code" className="w-40 h-40" /></div>
-                                        <div className="space-y-4 flex-1">
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">1. Open Google Authenticator or Authy on your phone.<br/>2. Scan the QR code to the left.<br/>3. Enter the 6-digit code below to verify.</p>
-                                            <div className="relative max-w-xs">
-                                                <input type="text" placeholder="000 000" value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full px-4 py-2 pl-10 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 font-mono tracking-widest text-lg focus:ring-2 focus:ring-modtale-accent outline-none transition-all" maxLength={6} />
-                                                <Smartphone className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
-                                            </div>
-                                            <div className="flex gap-2 max-w-xs">
-                                                <button onClick={handleVerifyMfa} disabled={mfaLoading || mfaCode.length !== 6} className="flex-1 bg-modtale-accent text-white py-2 rounded-xl font-bold text-xs hover:bg-modtale-accentHover transition-colors disabled:opacity-50 flex items-center justify-center gap-2">{mfaLoading ? <Spinner className="w-3 h-3" /> : 'Verify & Enable'}</button>
-                                                <button onClick={() => { setShowMfaSetup(false); setMfaCode(''); }} className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Cancel</button>
-                                            </div>
+                    <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-slate-400" /> Two-Factor Authentication</h4>
+                        {(user as any).mfaEnabled ? (
+                            <div className="flex items-center justify-between p-4 rounded-2xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
+                                <div className="flex items-center gap-3 text-green-700 dark:text-green-400"><Check className="w-5 h-5" /><span className="font-bold text-sm">2FA is enabled. Your account is secure.</span></div>
+                                <button className="text-red-500 text-xs font-bold hover:underline opacity-50 cursor-not-allowed" title="Disabling 2FA is currently disabled for security.">Disable</button>
+                            </div>
+                        ) : (
+                            <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Protect your account by requiring a code from an authenticator app (like Google Authenticator or Authy) when you log in.</p>
+                                {!showMfaSetup && <button onClick={handleStartMfaSetup} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 transition-colors">Enable 2FA</button>}
+                            </div>
+                        )}
+
+                        {showMfaSetup && (
+                            <div className="mt-4 p-6 bg-white dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm animate-in fade-in slide-in-from-top-2">
+                                <h4 className="font-bold text-slate-900 dark:text-white mb-4">Scan QR Code</h4>
+                                <div className="flex flex-col md:flex-row gap-6">
+                                    <div className="bg-white p-2 rounded-xl w-fit h-fit shadow-sm"><img src={mfaQr} alt="2FA QR Code" className="w-40 h-40" /></div>
+                                    <div className="space-y-4 flex-1">
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">1. Open Google Authenticator or Authy on your phone.<br/>2. Scan the QR code to the left.<br/>3. Enter the 6-digit code below to verify.</p>
+                                        <div className="relative max-w-xs">
+                                            <input type="text" placeholder="000 000" value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full px-4 py-2 pl-10 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 font-mono tracking-widest text-lg focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner" maxLength={6} />
+                                            <Smartphone className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+                                        </div>
+                                        <div className="flex gap-2 max-w-xs">
+                                            <button onClick={handleVerifyMfa} disabled={mfaLoading || mfaCode.length !== 6} className="flex-1 bg-modtale-accent text-white py-2 rounded-xl font-bold text-xs hover:bg-modtale-accentHover transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg">{mfaLoading ? <Spinner className="w-3 h-3" /> : 'Verify & Enable'}</button>
+                                            <button onClick={() => { setShowMfaSetup(false); setMfaCode(''); }} className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Cancel</button>
                                         </div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
+                    </div>
 
-                        <div className="border-t border-slate-100 dark:border-white/5 pt-6">
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2">
-                                <Key className="w-4 h-4 text-slate-400" />
-                                {(user as any).hasPassword ? 'Change Password' : 'Set Password'}
-                            </h4>
+                    <div className="border-t border-slate-100 dark:border-white/5 pt-6">
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-2 flex items-center gap-2">
+                            <Key className="w-4 h-4 text-slate-400" />
+                            {(user as any).hasPassword ? 'Change Password' : 'Set Password'}
+                        </h4>
 
-                            {(user as any).hasPassword ? (
-                                <div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Change your current login password.</p>
-                                    <form onSubmit={handleChangePassword} className="max-w-md space-y-3">
+                        {(user as any).hasPassword ? (
+                            <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Change your current login password.</p>
+                                <form onSubmit={handleChangePassword} className="max-w-md space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Current Password</label>
+                                        <input type="password" required value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner" placeholder="••••••••" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
+                                        <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner" placeholder="••••••••" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Confirm New Password</label>
+                                        <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner" placeholder="••••••••" />
+                                    </div>
+                                    <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10 mt-2 shadow-lg">
+                                        {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Update Password'}
+                                    </button>
+                                </form>
+                            </div>
+                        ) : (
+                            <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Set a password to log in with your email address instead of a social provider.</p>
+                                <form onSubmit={handleSaveCredentials} className="max-w-md space-y-3">
+                                    {!user.email && (
                                         <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Current Password</label>
-                                            <input type="password" required value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Email Address</label>
+                                            <input type="email" required value={credEmail} onChange={e => setCredEmail(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner" placeholder="your@email.com" />
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
-                                            <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Confirm New Password</label>
-                                            <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
-                                        </div>
-                                        <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10 mt-2">
-                                            {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Update Password'}
-                                        </button>
-                                    </form>
-                                </div>
-                            ) : (
-                                <div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-xl">Set a password to log in with your email address instead of a social provider.</p>
-                                    <form onSubmit={handleSaveCredentials} className="max-w-md space-y-3">
-                                        {!user.email && (
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Email Address</label>
-                                                <input type="email" required value={credEmail} onChange={e => setCredEmail(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="your@email.com" />
-                                            </div>
-                                        )}
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
-                                            <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Confirm Password</label>
-                                            <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm" placeholder="••••••••" />
-                                        </div>
-                                        <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10 mt-2">
-                                            {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Set Password'}
-                                        </button>
-                                    </form>
-                                </div>
-                            )}
-                        </div>
+                                    )}
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">New Password</label>
+                                        <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner" placeholder="••••••••" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Confirm Password</label>
+                                        <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner" placeholder="••••••••" />
+                                    </div>
+                                    <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors flex items-center gap-2 h-10 mt-2 shadow-lg">
+                                        {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Set Password'}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            <div className={containerClasses}>
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-                    <div className="flex items-center gap-3 mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
-                        <Link className="w-4 h-4 text-modtale-accent" />
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Connected Accounts</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        <AccountRow provider="github" icon={Github} label="GitHub" />
-                        <AccountRow provider="gitlab" icon={GitLabIcon} label="GitLab" />
-                        <AccountRow provider="discord" icon={DiscordIcon} label="Discord" />
-                        <AccountRow provider="twitter" icon={Twitter} label="X / Twitter" />
-                        <AccountRow provider="bluesky" icon={BlueskyIcon} label="Bluesky" />
-                        <AccountRow provider="google" icon={GoogleIcon} label="Google" />
-                    </div>
+            <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-sm backdrop-blur-md">
+                <div className="flex items-center gap-3 mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
+                    <Link className="w-4 h-4 text-modtale-accent" />
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Connected Accounts</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <AccountRow provider="github" icon={Github} label="GitHub" />
+                    <AccountRow provider="gitlab" icon={GitLabIcon} label="GitLab" />
+                    <AccountRow provider="discord" icon={DiscordIcon} label="Discord" />
+                    <AccountRow provider="twitter" icon={Twitter} label="X / Twitter" />
+                    <AccountRow provider="bluesky" icon={BlueskyIcon} label="Bluesky" />
+                    <AccountRow provider="google" icon={GoogleIcon} label="Google" />
                 </div>
             </div>
 
-            <div className={containerClasses}>
-                <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-3xl p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="flex items-center gap-3 mb-1"><AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" /><h3 className="text-sm font-black text-red-900 dark:text-red-200 uppercase tracking-wide">Danger Zone</h3></div>
-                            <p className="text-xs text-red-700 dark:text-red-300/70 max-w-md">Permanently delete your account and all associated data. This action cannot be undone.</p>
-                        </div>
-                        <button onClick={() => setShowDeleteModal(true)} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-colors shadow-lg shadow-red-600/20 flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete Account</button>
+            <div className="bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-3xl p-6 shadow-sm backdrop-blur-md">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="flex items-center gap-3 mb-1"><AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" /><h3 className="text-sm font-black text-red-900 dark:text-red-200 uppercase tracking-wide">Danger Zone</h3></div>
+                        <p className="text-xs text-red-700 dark:text-red-300/70 max-w-md">Permanently delete your account and all associated data. This action cannot be undone.</p>
                     </div>
+                    <button onClick={() => setShowDeleteModal(true)} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-colors shadow-lg shadow-red-600/20 flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete Account</button>
                 </div>
             </div>
         </div>

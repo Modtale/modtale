@@ -90,7 +90,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">Your Projects</h1>
                 <Link to="/upload" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20">
                     <Plus className="w-4 h-4" /> New Project
@@ -124,15 +124,16 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
             <div className="space-y-8">
                 <div className="grid grid-cols-1 gap-4">
                     {projects.map(project => (
-                        <ProjectListItem
-                            key={project.id}
-                            project={project}
-                            canManage={true}
-                            isOwner={true}
-                            showAuthor={true}
-                            onTransfer={setTransferModal}
-                            onDelete={setDeleteModal}
-                        />
+                        <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                            <ProjectListItem
+                                project={project}
+                                canManage={true}
+                                isOwner={true}
+                                showAuthor={true}
+                                onTransfer={setTransferModal}
+                                onDelete={setDeleteModal}
+                            />
+                        </div>
                     ))}
                 </div>
 
@@ -149,14 +150,15 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                                 {pList.map(project => {
                                     const isOrgAdmin = myOrgs.some(o => o.id === orgId && o.organizationMembers?.some(m => m.userId === user.id && m.role === 'ADMIN'));
                                     return (
-                                        <ProjectListItem
-                                            key={project.id}
-                                            project={project}
-                                            canManage={isOrgAdmin}
-                                            showAuthor={false}
-                                            onTransfer={setTransferModal}
-                                            onDelete={setDeleteModal}
-                                        />
+                                        <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                                            <ProjectListItem
+                                                project={project}
+                                                canManage={isOrgAdmin}
+                                                showAuthor={false}
+                                                onTransfer={setTransferModal}
+                                                onDelete={setDeleteModal}
+                                            />
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -174,14 +176,15 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                             {contributedProjects.map(project => {
                                 const isOwner = project.authorId === user.id;
                                 return (
-                                    <ProjectListItem
-                                        key={project.id}
-                                        project={project}
-                                        canManage={isOwner}
-                                        showAuthor={true}
-                                        onTransfer={setTransferModal}
-                                        onDelete={setDeleteModal}
-                                    />
+                                    <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                                        <ProjectListItem
+                                            project={project}
+                                            canManage={isOwner}
+                                            showAuthor={true}
+                                            onTransfer={setTransferModal}
+                                            onDelete={setDeleteModal}
+                                        />
+                                    </div>
                                 );
                             })}
                         </div>
@@ -189,7 +192,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 )}
 
                 {projects.length === 0 && Object.keys(orgProjects).length === 0 && contributedProjects.length === 0 && (
-                    <div className="text-center py-12 text-slate-400">
+                    <div className="text-center py-12 text-slate-400 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl backdrop-blur-md">
                         <p>No projects found.</p>
                     </div>
                 )}
