@@ -163,7 +163,7 @@ const Endpoint = ({
 
 export const ApiDocs: React.FC = () => {
     return (
-        <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 mx-auto max-w-[1920px] py-16 overflow-x-hidden">
+        <div className="w-full max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto py-16 overflow-x-hidden">
             <ScrollbarStyles />
 
             <div className="text-center mb-16 w-full">
