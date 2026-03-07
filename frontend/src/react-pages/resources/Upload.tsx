@@ -355,11 +355,11 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                                 <button
                                     key={type.id}
                                     onClick={() => handleClassificationSelect(type.id as string)}
-                                    className="relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden flex flex-col justify-center aspect-[4/3] w-full md:w-[46%] lg:w-[30%] border-slate-200 dark:border-white/5 bg-white dark:bg-modtale-card hover:border-modtale-accent dark:hover:border-modtale-accent hover:shadow-xl hover:-translate-y-1"
+                                    className="relative p-8 rounded-3xl border border-slate-200 dark:border-white/5 text-left transition-all duration-300 group overflow-hidden flex flex-col justify-center aspect-[4/3] w-full md:w-[46%] lg:w-[30%] bg-white/50 dark:bg-black/20 backdrop-blur-md hover:border-modtale-accent dark:hover:border-modtale-accent hover:shadow-xl hover:-translate-y-1"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-br from-modtale-accent/0 to-modtale-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-8 transition-colors bg-slate-100 dark:bg-black/20 text-slate-500 dark:text-slate-400 group-hover:bg-modtale-accent group-hover:text-white transform duration-200 group-hover:scale-110 shadow-sm relative z-10">
+                                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-8 transition-colors bg-white/80 dark:bg-white/5 text-slate-500 dark:text-slate-400 group-hover:bg-modtale-accent group-hover:text-white transform duration-200 group-hover:scale-110 shadow-sm relative z-10">
                                         <Icon className="w-10 h-10" />
                                     </div>
 
@@ -389,13 +389,13 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-8">Let's give it a name.</h1>
                     {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-2 text-sm"><AlertCircle className="w-4 h-4"/> {error}</div>}
 
-                    <div className="space-y-6 bg-white dark:bg-modtale-card p-8 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+                    <div className="space-y-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl p-8 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
                         {myOrgs.length > 0 && (
                             <div className="relative z-50" ref={ownerDropdownRef}>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Owner</label>
                                 <button
                                     onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
-                                    className="w-full flex items-center justify-between bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-left transition-all hover:bg-slate-100 dark:hover:bg-white/5"
+                                    className="w-full flex items-center justify-between bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-left transition-all hover:bg-white dark:hover:bg-white/5 shadow-inner"
                                 >
                                     <div className="flex items-center gap-3">
                                         {owner === currentUser?.username ? (
@@ -412,7 +412,7 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                                 </button>
 
                                 {ownerDropdownOpen && (
-                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                                         <button onClick={() => { setOwner(currentUser?.username || ''); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                                             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><UserIcon className="w-5 h-5"/></div>
                                             <div className="text-left flex-1">
@@ -439,11 +439,11 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Project Title</label>
-                            <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 font-bold text-lg dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all" placeholder="My Awesome Project"/>
+                            <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 font-bold text-lg dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner" placeholder="My Awesome Project"/>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Short Summary</label>
-                            <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all" placeholder="A brief description..."/>
+                            <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner" placeholder="A brief description..."/>
                             <p className="text-[10px] text-slate-500 mt-1 text-right">{summary.length}/250 (Min 10)</p>
                         </div>
 

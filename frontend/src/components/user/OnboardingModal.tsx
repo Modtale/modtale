@@ -43,8 +43,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[200] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 relative overflow-hidden">
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl w-full max-w-md p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 relative overflow-hidden">
 
                 <div className="absolute top-0 right-0 w-64 h-64 bg-modtale-accent/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
@@ -90,7 +90,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none"
+                                className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none shadow-inner"
                             />
                             {suggestedUsername && username !== suggestedUsername && (
                                 <button

@@ -198,7 +198,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         return item.classification === 'MODPACK' ? `/modpack/${slug}` : (item.classification === 'SAVE' ? `/world/${slug}` : `/mod/${slug}`);
     };
 
-    if (loadingCreator) return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark"><Spinner fullScreen /></div>;
+    if (loadingCreator) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950"><Spinner fullScreen /></div>;
     if (notFound) return <NotFound />;
     if (!creator) return <div className="min-h-screen flex flex-col items-center justify-center"><h2 className="text-2xl font-bold">Creator not found</h2><button onClick={onBack}>Go Back</button></div>;
 
@@ -210,7 +210,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-20">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
             <ReportModal
                 isOpen={showReportModal}
                 onClose={() => setShowReportModal(false)}
@@ -241,7 +241,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                     <Link
                                         key={member.id}
                                         to={`/creator/${member.id}`}
-                                        className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
+                                        className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
                                             {member.avatarUrl ? (
@@ -273,7 +273,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                     <Link
                                         key={org.id}
                                         to={`/creator/${org.id}`}
-                                        className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
+                                        className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
                                             {org.avatarUrl ? (
@@ -303,7 +303,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
 
                     {loadingProjects && page === 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                            {[...Array(itemsPerPage)].map((_, i) => <div key={i} className="h-[280px] bg-white dark:bg-white/5 rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />)}
+                            {[...Array(itemsPerPage)].map((_, i) => <div key={i} className="h-[280px] bg-white/50 dark:bg-white/5 rounded-xl animate-pulse border border-slate-200 dark:border-white/5 backdrop-blur-md" />)}
                         </div>
                     ) : projects.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 gap-y-8">
@@ -343,8 +343,8 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                             <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-white/10"></div>
                             <form onSubmit={handleJump} className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-slate-500 uppercase">Go to</span>
-                                <input type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-12 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-1 text-sm font-bold text-center dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent transition-all" placeholder="#" />
-                                <button type="submit" disabled={!jumpPage} className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white dark:hover:bg-modtale-accent text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-50"><CornerDownLeft className="w-4 h-4" /></button>
+                                <input type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-12 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 px-1 text-sm font-bold text-center dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent transition-all backdrop-blur-md" placeholder="#" />
+                                <button type="submit" disabled={!jumpPage} className="w-10 h-10 flex items-center justify-center rounded-lg bg-white/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white dark:hover:bg-modtale-accent text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-50 backdrop-blur-md"><CornerDownLeft className="w-4 h-4" /></button>
                             </form>
                         </div>
                     )}

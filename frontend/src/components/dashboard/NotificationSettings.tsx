@@ -66,14 +66,14 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user
     return (
         <div className="space-y-8">
             <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-6">
                     <div>
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white">Notification Preferences</h2>
                         <p className="text-slate-500 text-sm">Control what alerts you receive.</p>
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-xl shadow-sm overflow-hidden">
+                <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl shadow-sm overflow-hidden backdrop-blur-md">
                     <Toggle label="Favorite Project Updates" desc="Notify me when projects I've favorited release new versions." value={projectUpdates} onChange={setProjectUpdates} />
                     <Toggle label="New Creator Uploads" desc="Notify me when creators I follow upload new projects." value={creatorUploads} onChange={setCreatorUploads} />
                     <Toggle label="New Comments" desc="Get notified when someone comments on your project." value={newComments} onChange={setNewComments} />
@@ -111,12 +111,12 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user
                 {loadingNotifications ? (
                     <div className="py-12"><Spinner fullScreen={false} /></div>
                 ) : notifications.length === 0 ? (
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-xl p-8 text-center text-slate-500">
+                    <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl p-8 text-center text-slate-500 backdrop-blur-md">
                         <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
                         <p className="text-sm font-bold">No notifications yet.</p>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-white/5">
+                    <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-white/5 backdrop-blur-md">
                         {notifications.map(n => (
                             <div key={n.id} className="p-4 flex items-start gap-4 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors group relative">
                                 {n.iconUrl ? (

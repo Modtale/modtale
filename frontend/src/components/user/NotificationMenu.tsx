@@ -78,12 +78,12 @@ export const NotificationMenu: React.FC = () => {
                 title={isIdle ? "Notifications paused (Idle)" : "Notifications"}
             >
                 <Bell className="w-5 h-5" />
-                {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-modtale-card animate-pulse"></span>}
+                {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>}
             </button>
 
             {isOpen && (
-                <div className="fixed left-4 right-4 top-16 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-96 max-h-[80vh] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                    <div className="p-3 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-black/20">
+                <div className="fixed left-4 right-4 top-16 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-96 max-h-[80vh] bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                    <div className="p-3 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-black/20 shrink-0">
                         <div className="flex items-center gap-2">
                             <h3 className="font-bold text-sm text-slate-900 dark:text-white">Notifications</h3>
                             <button
@@ -102,7 +102,7 @@ export const NotificationMenu: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-white/10 scrollbar-track-transparent custom-scrollbar">
+                    <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-white/10 scrollbar-track-transparent custom-scrollbar flex-1">
                         {notifications.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs"><Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />No notifications</div>
                         ) : (
@@ -111,7 +111,7 @@ export const NotificationMenu: React.FC = () => {
                                     <a
                                         href={n.link}
                                         key={n.id}
-                                        className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-white/10 ${n.read ? 'bg-white dark:bg-modtale-card' : 'bg-slate-50 dark:bg-white/5'}`}
+                                        className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-50 dark:hover:bg-white/10 ${n.read ? 'bg-transparent' : 'bg-slate-50/50 dark:bg-white/5'}`}
                                     >
                                         <img
                                             src={n.iconUrl ? (n.iconUrl.startsWith('/api') ? `${BACKEND_URL}${n.iconUrl}` : n.iconUrl) : "https://modtale.net/assets/favicon.svg"}

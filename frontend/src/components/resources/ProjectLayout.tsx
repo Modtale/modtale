@@ -129,7 +129,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                         <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900" />
                     )}
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-950/90 to-transparent z-10" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 via-slate-50/60 dark:via-slate-950/60 to-transparent z-10" />
 
                 {onBack && (
                     <div className={`absolute top-0 left-0 right-0 z-40 mx-auto ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>

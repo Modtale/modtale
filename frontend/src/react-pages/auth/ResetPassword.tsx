@@ -16,8 +16,8 @@ export const ResetPassword = () => {
 
     if (!token) {
         return (
-            <div className="flex-1 flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-xl text-center">
+            <div className="flex-1 flex items-center justify-center p-4 min-h-[60vh]">
+                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
                     <h1 className="text-xl font-bold text-red-500 mb-2">Invalid Request</h1>
                     <p className="text-slate-500 dark:text-slate-400">Missing reset token.</p>
                 </div>
@@ -47,8 +47,8 @@ export const ResetPassword = () => {
 
     if (success) {
         return (
-            <div className="flex-1 flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-xl text-center">
+            <div className="flex-1 flex items-center justify-center p-4 min-h-[60vh]">
+                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
                     <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Lock className="w-8 h-8" />
                     </div>
@@ -58,7 +58,7 @@ export const ResetPassword = () => {
                     </p>
                     <button
                         onClick={() => { window.location.href = '/'; }}
-                        className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold hover:bg-modtale-accentHover transition-colors"
+                        className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold hover:bg-modtale-accentHover transition-colors shadow-lg shadow-modtale-accent/20"
                     >
                         Go to Sign In
                     </button>
@@ -68,42 +68,45 @@ export const ResetPassword = () => {
     }
 
     return (
-        <div className="flex-1 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-xl">
+        <div className="flex-1 flex items-center justify-center p-4 min-h-[80vh]">
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl">
                 <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-modtale-accent/10 text-modtale-accent rounded-2xl flex items-center justify-center mx-auto mb-4 border border-modtale-accent/20 shadow-inner">
+                        <Lock className="w-8 h-8" />
+                    </div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Reset Password</h1>
                     <p className="text-slate-500 dark:text-slate-400 text-sm">Enter a new password for your account.</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     {error && (
-                        <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+                        <div className="p-3 text-sm font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 rounded-xl text-center">
                             {error}
                         </div>
                     )}
 
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">New Password</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">New Password</label>
                         <input
                             type="password"
                             required
                             minLength={6}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                            className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white"
                             placeholder="••••••••"
                         />
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Confirm Password</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Confirm Password</label>
                         <input
                             type="password"
                             required
                             minLength={6}
                             value={confirmPassword}
                             onChange={e => setConfirmPassword(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm"
+                            className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white"
                             placeholder="••••••••"
                         />
                     </div>
@@ -111,11 +114,11 @@ export const ResetPassword = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-modtale-accent/90 transition-colors active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20"
+                        className="w-full bg-modtale-accent text-white py-3.5 px-4 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-modtale-accentHover transition-all active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20 mt-2"
                     >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                             <>
-                                Reset Password <ArrowRight className="w-4 h-4" />
+                                Update Password <ArrowRight className="w-5 h-5" />
                             </>
                         )}
                     </button>
