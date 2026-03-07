@@ -1,5 +1,6 @@
 package net.modtale.model.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import net.modtale.model.resources.Comment;
 import net.modtale.model.resources.Mod;
 import java.util.ArrayList;
@@ -7,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ModDTO {
     private String id;
     private String slug;
@@ -47,13 +49,13 @@ public class ModDTO {
     private boolean canEdit;
     private boolean isOwner;
 
-    public static ModDTO fromEntity(Mod mod) {
+    public static ModDTO fromEntity(Mod mod, boolean isSummary) {
         if (mod == null) return null;
         ModDTO dto = new ModDTO();
+
         dto.setId(mod.getId());
         dto.setSlug(mod.getSlug());
         dto.setTitle(mod.getTitle());
-        dto.setAbout(mod.getAbout());
         dto.setDescription(mod.getDescription());
         dto.setAuthorId(mod.getAuthorId());
         dto.setAuthor(mod.getAuthor());
@@ -74,28 +76,31 @@ public class ModDTO {
         dto.setLastTrendingNotification(mod.getLastTrendingNotification());
         dto.setLinks(mod.getLinks());
         dto.setTypes(mod.getTypes());
-        dto.setChildProjectIds(mod.getChildProjectIds());
-        dto.setModIds(mod.getModIds());
         dto.setAllowModpacks(mod.isAllowModpacks());
         dto.setAllowComments(mod.isAllowComments());
         dto.setHmWikiEnabled(mod.isHmWikiEnabled());
         dto.setHmWikiSlug(mod.getHmWikiSlug());
         dto.setStatus(mod.getStatus());
         dto.setExpiresAt(mod.getExpiresAt());
-        dto.setContributors(mod.getContributors());
-        dto.setGalleryImages(mod.getGalleryImages());
-        dto.setComments(mod.getComments() != null ? mod.getComments() : new ArrayList<>());
-
-        if (mod.getVersions() != null) {
-            dto.setVersions(mod.getVersions().stream()
-                    .map(ModVersionDTO::fromEntity)
-                    .collect(Collectors.toList()));
-        } else {
-            dto.setVersions(new ArrayList<>());
-        }
-
         dto.setCanEdit(mod.isCanEdit());
         dto.setIsOwner(mod.isOwner());
+
+        if (!isSummary) {
+            dto.setAbout(mod.getAbout());
+            dto.setChildProjectIds(mod.getChildProjectIds());
+            dto.setModIds(mod.getModIds());
+            dto.setContributors(mod.getContributors());
+            dto.setGalleryImages(mod.getGalleryImages());
+            dto.setComments(mod.getComments() != null ? mod.getComments() : new ArrayList<>());
+
+            if (mod.getVersions() != null) {
+                dto.setVersions(mod.getVersions().stream()
+                        .map(ModVersionDTO::fromEntity)
+                        .collect(Collectors.toList()));
+            } else {
+                dto.setVersions(new ArrayList<>());
+            }
+        }
 
         return dto;
     }
