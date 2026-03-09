@@ -32,7 +32,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
 
     return (
         <div className="p-4 flex flex-col sm:flex-row items-center gap-4 group relative w-full h-full">
-            <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden flex-shrink-0">
+            <div className="w-16 h-16 rounded-xl bg-slate-200/50 dark:bg-white/5 overflow-hidden flex-shrink-0 border border-slate-200 dark:border-white/10 shadow-sm">
                 <img src={project.imageUrl} alt="" className="w-full h-full object-cover" />
             </div>
 
@@ -43,27 +43,27 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
                         <ExternalLink className="w-3.5 h-3.5 opacity-50" />
                     </Link>
 
-                    {project.status === 'DRAFT' && <span className="text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 px-2 py-0.5 rounded font-bold uppercase">Draft</span>}
-                    {project.status === 'PENDING' && <span className="text-[10px] bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200 px-2 py-0.5 rounded font-bold uppercase">Pending Approval</span>}
-                    {project.status === 'UNLISTED' && <span className="text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded font-bold uppercase">Unlisted</span>}
+                    {project.status === 'DRAFT' && <span className="text-[10px] bg-yellow-50 text-yellow-800 border border-yellow-200 dark:border-yellow-900/50 dark:bg-yellow-900/30 dark:text-yellow-200 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Draft</span>}
+                    {project.status === 'PENDING' && <span className="text-[10px] bg-orange-50 text-orange-800 border border-orange-200 dark:border-orange-900/50 dark:bg-orange-900/30 dark:text-orange-200 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Pending Approval</span>}
+                    {project.status === 'UNLISTED' && <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Unlisted</span>}
 
                     {project.status === 'PUBLISHED' && pendingVersion && (
-                        <div className="flex items-center gap-1 bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-blue-500/20">
+                        <div className="flex items-center gap-1 bg-blue-50/50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border border-blue-200 dark:border-blue-500/20 tracking-wider">
                             <Clock className="w-3 h-3" /> v{pendingVersion.versionNumber} Pending
                         </div>
                     )}
                     {rejectedVersion && (
-                        <div className="flex items-center gap-1 bg-red-500/10 text-red-500 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-red-500/20" title={rejectedVersion.rejectionReason}>
+                        <div className="flex items-center gap-1 bg-red-50/50 dark:bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border border-red-200 dark:border-red-500/20 tracking-wider" title={rejectedVersion.rejectionReason}>
                             <AlertCircle className="w-3 h-3" /> v{rejectedVersion.versionNumber} Rejected
                         </div>
                     )}
                 </div>
 
-                <div className="text-sm text-slate-500 flex items-center justify-center sm:justify-start gap-4 mt-1 flex-wrap">
-                    <span className="flex items-center gap-1"><Download className="w-3 h-3" /> {project.downloadCount}</span>
-                    <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {project.status === 'PUBLISHED' ? 'Public' : 'Private'}</span>
+                <div className="text-sm text-slate-500 flex items-center justify-center sm:justify-start gap-4 mt-1.5 flex-wrap font-medium">
+                    <span className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> {project.downloadCount}</span>
+                    <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" /> {project.status === 'PUBLISHED' ? 'Public' : 'Private'}</span>
                     {showAuthor && !isOwner && (
-                        <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-bold bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 rounded text-[10px] uppercase">
+                        <span className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800/30 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider">
                             <Building2 className="w-3 h-3" /> {project.author}
                         </span>
                     )}
@@ -74,15 +74,15 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
                 {canManage ? (
                     <>
                         {project.status === 'PENDING' && onRevert && (
-                            <button onClick={() => onRevert(project)} className="p-2 bg-slate-100 dark:bg-white/5 hover:bg-orange-500 hover:text-white rounded-lg transition-colors" title="Revert to Draft"><Undo2 className="w-4 h-4" /></button>
+                            <button onClick={() => onRevert(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-orange-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Revert to Draft"><Undo2 className="w-4 h-4" /></button>
                         )}
-                        <Link to={`/dashboard/analytics/project/${project.id}`} className="p-2 bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-lg transition-colors" title="Analytics"><BarChart2 className="w-4 h-4" /></Link>
-                        <Link to={`/mod/${project.id}/edit`} className="p-2 bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-lg transition-colors" title="Edit"><Edit className="w-4 h-4" /></Link>
-                        <button onClick={() => onTransfer(project)} className="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 rounded-lg transition-colors" title="Transfer"><ArrowRightLeft className="w-4 h-4" /></button>
-                        <button onClick={() => onDelete(project)} className="p-2 bg-slate-100 dark:bg-white/5 hover:bg-red-500 hover:text-white rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                        <Link to={`/dashboard/analytics/project/${project.id}`} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Analytics"><BarChart2 className="w-4 h-4" /></Link>
+                        <Link to={`/mod/${project.id}/edit`} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Edit"><Edit className="w-4 h-4" /></Link>
+                        <button onClick={() => onTransfer(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 rounded-xl transition-colors shadow-sm" title="Transfer"><ArrowRightLeft className="w-4 h-4" /></button>
+                        <button onClick={() => onDelete(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Delete"><Trash2 className="w-4 h-4" /></button>
                     </>
                 ) : (
-                    <span className="text-xs text-slate-400 italic pr-2">Read Only</span>
+                    <span className="text-xs text-slate-400 italic pr-2 font-medium">Read Only</span>
                 )}
             </div>
         </div>

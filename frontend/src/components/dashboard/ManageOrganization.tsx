@@ -330,9 +330,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         const canBeVisible = true;
 
         return (
-            <div className={`flex items-center justify-between p-3 rounded-xl border transition-all h-full ${isLinked ? 'bg-white dark:bg-white/5 border-modtale-accent/30' : 'bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/5'}`}>
+            <div className={`flex items-center justify-between p-3 rounded-xl border transition-all h-full ${isLinked ? 'bg-white/60 dark:bg-white/5 border-modtale-accent/30 shadow-sm' : 'bg-white/40 dark:bg-white/[0.02] border-slate-200 dark:border-white/5'}`}>
                 <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${isLinked ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-400 bg-white dark:bg-white/5'}`}>
+                    <div className={`p-2 rounded-lg ${isLinked ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-400 bg-slate-200/50 dark:bg-white/5'}`}>
                         <Icon className="w-4 h-4" />
                     </div>
                     <div>
@@ -351,7 +351,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         {canBeVisible ? (
                             <button
                                 onClick={() => handleToggleOrgVisibility(provider)}
-                                className={`p-1.5 rounded-lg transition-colors ${account.visible ? 'text-modtale-accent bg-modtale-accent/10 hover:bg-modtale-accent/20' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                                className={`p-1.5 rounded-lg transition-colors ${account.visible ? 'text-modtale-accent bg-modtale-accent/10 hover:bg-modtale-accent/20' : 'text-slate-400 hover:bg-slate-200/50 dark:hover:bg-white/10'}`}
                                 title={account.visible ? "Publicly Visible" : "Hidden from profile"}
                             >
                                 {account.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
@@ -372,7 +372,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                 ) : (
                     <button
                         onClick={() => handleOrgLink(provider)}
-                        className="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:border-modtale-accent hover:text-modtale-accent transition-all flex items-center gap-1.5 shadow-sm"
+                        className="bg-white/60 dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:border-modtale-accent hover:text-modtale-accent transition-all flex items-center gap-1.5 shadow-sm"
                     >
                         <Plus className="w-3 h-3" /> Link
                     </button>
@@ -472,19 +472,19 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                 )}
 
                 <div className="flex items-center gap-4 mb-4">
-                    <button onClick={() => setSelectedOrg(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
+                    <button onClick={() => setSelectedOrg(null)} className="p-2 hover:bg-slate-200/50 dark:hover:bg-white/5 rounded-xl transition-colors">
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                             {selectedOrg.username}
-                            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded uppercase tracking-wider font-bold">Organization</span>
+                            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded uppercase tracking-wider font-bold border border-purple-200 dark:border-purple-800/30">Organization</span>
                         </h2>
                         <p className="text-slate-500">Manage organization settings and members</p>
                     </div>
                 </div>
 
-                <div className="flex gap-4 border-b border-slate-200 dark:border-white/5">
+                <div className="flex gap-4 border-b border-slate-200 dark:border-white/10">
                     {['MEMBERS', 'PROJECTS', 'SETTINGS'].map(tab => (
                         <button
                             key={tab}
@@ -501,9 +501,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         {manageError && <ErrorBanner message={manageError} />}
 
                         {isAdmin && (
-                            <div className="bg-gradient-to-br from-white to-slate-50 dark:from-white/5 dark:to-white/[0.02] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                            <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-10 h-10 rounded-full bg-modtale-accent/10 flex items-center justify-center text-modtale-accent">
+                                    <div className="w-10 h-10 rounded-xl bg-modtale-accent/10 flex items-center justify-center text-modtale-accent">
                                         <UserPlus className="w-5 h-5" />
                                     </div>
                                     <div>
@@ -520,17 +520,17 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                             placeholder="Search username..."
                                             value={inviteUsername}
                                             onChange={e => { setInviteUsername(e.target.value); setInviteUserId(''); }}
-                                            className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white font-medium"
+                                            className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white font-medium shadow-inner"
                                         />
 
                                         {userSearchResults.length > 0 && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
                                                 {userSearchResults.map(res => (
                                                     <button
                                                         key={res.id}
                                                         type="button"
                                                         onClick={() => { setInviteUsername(res.username); setInviteUserId(res.id); setUserSearchResults([]); }}
-                                                        className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                                                        className="w-full flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
                                                     >
                                                         <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
                                                         <span className="font-bold text-sm text-slate-900 dark:text-white">{res.username}</span>
@@ -545,7 +545,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                         <button
                                             type="button"
                                             onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                                            className="w-full flex items-center justify-between bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-medium"
+                                            className="w-full flex items-center justify-between bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-medium shadow-inner"
                                         >
                                             <div className="flex items-center gap-2">
                                                 {inviteRole === 'ADMIN' ? <ShieldCheck className="w-4 h-4 text-amber-500"/> : <Shield className="w-4 h-4 text-blue-500"/>}
@@ -555,11 +555,11 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                         </button>
 
                                         {roleDropdownOpen && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
                                                 <button
                                                     type="button"
                                                     onClick={() => { setInviteRole('MEMBER'); setRoleDropdownOpen(false); }}
-                                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
                                                 >
                                                     <Shield className="w-5 h-5 text-blue-500" />
                                                     <div>
@@ -570,7 +570,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                 <button
                                                     type="button"
                                                     onClick={() => { setInviteRole('ADMIN'); setRoleDropdownOpen(false); }}
-                                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
                                                 >
                                                     <ShieldCheck className="w-5 h-5 text-amber-500" />
                                                     <div>
@@ -585,7 +585,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                     <button
                                         type="submit"
                                         disabled={!inviteUserId}
-                                        className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                                        className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
                                     >
                                         <Plus className="w-4 h-4" /> Invite
                                     </button>
@@ -593,12 +593,12 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             </div>
                         )}
 
-                        <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md">
-                            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+                        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md">
+                            <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
                                 <h3 className="font-bold text-slate-900 dark:text-white">Active Members</h3>
-                                <span className="text-xs font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-500">{members.length}</span>
+                                <span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400">{members.length}</span>
                             </div>
-                            <div className="divide-y divide-slate-100 dark:divide-white/5">
+                            <div className="divide-y divide-slate-200 dark:divide-white/10">
                                 {members.map(member => {
                                     const role = selectedOrg.organizationMembers?.find(m => m.userId === member.id)?.role || 'MEMBER';
                                     const isMe = member.id === user.id;
@@ -606,7 +606,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                     const preventSelfRemoval = isMe && isLastMember;
 
                                     return (
-                                        <div key={member.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors group">
+                                        <div key={member.id} className="p-5 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors group">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
                                                     <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -614,7 +614,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                 <div>
                                                     <div className="font-bold text-slate-900 dark:text-white text-sm">{member.username}</div>
                                                     <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${role === 'ADMIN' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400'}`}>{role}</span>
+                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${role === 'ADMIN' ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400' : 'bg-slate-100 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/10 dark:text-slate-400'}`}>{role}</span>
                                                         {isMe && <span className="text-[10px] text-slate-400 font-medium italic">(You)</span>}
                                                     </div>
                                                 </div>
@@ -624,7 +624,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                 {isAdmin && !isMe && (
                                                     <button
                                                         onClick={() => handleRoleUpdate(member.id, role)}
-                                                        className={`p-2 rounded-lg transition-all ${role === 'ADMIN' ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                                                        className={`p-2 rounded-xl transition-all ${role === 'ADMIN' ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
                                                         title={role === 'ADMIN' ? "Demote to Member" : "Promote to Admin"}
                                                     >
                                                         {role === 'ADMIN' ? <ShieldOff className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
@@ -636,14 +636,14 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                         <button
                                                             onClick={() => !preventSelfRemoval && handleRemoveMember(member.id)}
                                                             disabled={preventSelfRemoval}
-                                                            className={`p-2 rounded-lg transition-all ${preventSelfRemoval ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
+                                                            className={`p-2 rounded-xl transition-all ${preventSelfRemoval ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
                                                             title={isMe ? "Leave Organization" : "Remove Member"}
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
 
                                                         {preventSelfRemoval && (
-                                                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 text-white text-xs p-2 rounded shadow-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity text-center z-10">
+                                                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 text-white text-xs p-2 rounded-xl shadow-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity text-center z-10">
                                                                 You cannot leave as the only member. Delete the organization instead.
                                                             </div>
                                                         )}
@@ -663,7 +663,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         {orgProjects.length > 0 ? (
                             <div className="grid grid-cols-1 gap-4">
                                 {orgProjects.map(project => (
-                                    <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                                    <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
                                         <ProjectListItem
                                             project={project}
                                             canManage={isAdmin}
@@ -676,7 +676,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-12 text-slate-400 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl backdrop-blur-md">
+                            <div className="text-center py-12 text-slate-400 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-md shadow-sm">
                                 No projects found.
                             </div>
                         )}
@@ -686,48 +686,52 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                 {activeTab === 'SETTINGS' && isAdmin && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
+                            <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <h3 className="font-bold mb-4">Organization Icon</h3>
                                 <div className="flex items-center gap-4">
-                                    <img src={selectedOrg.avatarUrl} alt="" className="w-16 h-16 rounded-xl object-cover bg-slate-100" />
+                                    <img src={selectedOrg.avatarUrl} alt="" className="w-16 h-16 rounded-2xl object-cover bg-slate-100 border border-slate-200 dark:border-white/10 shadow-sm" />
                                     <div>
                                         <input type="file" ref={avatarInputRef} onChange={e => handleFileSelect(e, 'avatar')} className="hidden" accept="image/*" />
-                                        <button onClick={() => avatarInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-lg text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"><Upload className="w-4 h-4" /> Upload</button>
+                                        <button onClick={() => avatarInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-200/50 dark:bg-white/5 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors border border-slate-200 dark:border-white/5 shadow-sm">
+                                            <Upload className="w-4 h-4" /> Upload
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
+                            <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <h3 className="font-bold mb-4">Profile Banner</h3>
                                 <div className="flex items-center gap-4">
-                                    <div className="w-32 h-16 rounded-xl overflow-hidden bg-slate-100 relative">
+                                    <div className="w-32 h-16 rounded-xl overflow-hidden bg-slate-100 relative border border-slate-200 dark:border-white/10 shadow-sm">
                                         {selectedOrg.bannerUrl && <img src={selectedOrg.bannerUrl} alt="" className="w-full h-full object-cover" />}
                                     </div>
                                     <div>
                                         <input type="file" ref={bannerInputRef} onChange={e => handleFileSelect(e, 'banner')} className="hidden" accept="image/*" />
-                                        <button onClick={() => bannerInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-lg text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"><ImageIcon className="w-4 h-4" /> Upload</button>
+                                        <button onClick={() => bannerInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-200/50 dark:bg-white/5 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors border border-slate-200 dark:border-white/5 shadow-sm">
+                                            <ImageIcon className="w-4 h-4" /> Upload
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
+                        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                             <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-slate-400" /> General Settings</h3>
                             <form onSubmit={handleUpdateProfile} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Organization Name (Username)</label>
-                                    <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white" />
+                                    <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white shadow-inner" />
                                     <p className="text-[10px] text-slate-400 mt-1">This is your unique organization identifier.</p>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Bio</label>
-                                    <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white" />
+                                    <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white shadow-inner" />
                                 </div>
                                 <div className="flex justify-end">
-                                    <button type="submit" disabled={savingSettings} className="bg-modtale-accent text-white font-bold px-6 py-2.5 rounded-xl hover:bg-modtale-accentHover transition-colors disabled:opacity-50">{savingSettings ? 'Saving...' : 'Save Changes'}</button>
+                                    <button type="submit" disabled={savingSettings} className="bg-modtale-accent text-white font-bold px-6 py-2.5 rounded-xl hover:bg-modtale-accentHover transition-colors disabled:opacity-50 shadow-lg shadow-modtale-accent/20">{savingSettings ? 'Saving...' : 'Save Changes'}</button>
                                 </div>
                             </form>
                         </div>
 
-                        <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm backdrop-blur-md">
+                        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                             <div className="flex items-center gap-3 mb-4">
                                 <LinkIcon className="w-5 h-5 text-modtale-accent" />
                                 <div>
@@ -744,10 +748,10 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             </div>
                         </div>
 
-                        <div className="border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 p-6 rounded-2xl backdrop-blur-md">
+                        <div className="border border-red-200 dark:border-red-900/30 bg-red-50/40 dark:bg-red-900/10 p-6 rounded-2xl backdrop-blur-md shadow-sm">
                             <h3 className="font-bold text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
                             <p className="text-sm text-red-500/80 mb-4">Deleting this organization will permanently remove it and unlist all associated projects.</p>
-                            <button onClick={() => setDeleteModalOpen(true)} className="bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/30 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">Delete Organization</button>
+                            <button onClick={() => setDeleteModalOpen(true)} className="bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/30 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shadow-sm">Delete Organization</button>
                         </div>
                     </div>
                 )}
@@ -762,27 +766,27 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         <div className="space-y-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">Organizations</h1>
-                <button onClick={() => setIsCreating(true)} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20"><Plus className="w-4 h-4" /> New Org</button>
+                <button onClick={() => setIsCreating(true)} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20"><Plus className="w-4 h-4" /> New Org</button>
             </div>
             {isCreating && (
-                <div className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm animate-in slide-in-from-top-2 backdrop-blur-md">
-                    <h3 className="font-bold text-lg mb-4">Create Organization</h3>
+                <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm animate-in slide-in-from-top-2 backdrop-blur-md">
+                    <h3 className="font-bold text-lg mb-4 text-slate-900 dark:text-white">Create Organization</h3>
                     {createError && <ErrorBanner message={createError} className="mb-4" />}
                     <form onSubmit={handleCreateOrg} className="flex gap-4">
-                        <input type="text" placeholder="Organization Name" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white" autoFocus />
-                        <button type="submit" disabled={!newOrgName} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-6 py-2 rounded-xl">Create</button>
-                        <button type="button" onClick={() => setIsCreating(false)} className="px-4 font-bold text-slate-500">Cancel</button>
+                        <input type="text" placeholder="Organization Name" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} className="flex-1 bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white shadow-inner" autoFocus />
+                        <button type="submit" disabled={!newOrgName} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-6 py-2.5 rounded-xl shadow-lg active:scale-95 transition-all">Create</button>
+                        <button type="button" onClick={() => setIsCreating(false)} className="px-4 font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">Cancel</button>
                     </form>
                 </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {orgs.map(org => (
-                    <div key={org.id} onClick={() => setSelectedOrg(org)} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group backdrop-blur-md">
+                    <div key={org.id} onClick={() => setSelectedOrg(org)} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group backdrop-blur-md">
                         <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-slate-100 dark:bg-white/5 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors">
+                            <div className="w-12 h-12 bg-slate-200/50 dark:bg-white/5 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-modtale-accent border border-slate-200 dark:border-white/10 transition-colors">
                                 {org.avatarUrl ? <img src={org.avatarUrl} className="w-full h-full object-cover rounded-xl" /> : <Building2 className="w-6 h-6" />}
                             </div>
-                            <span className="text-xs font-bold uppercase tracking-wider bg-slate-100 dark:bg-white/5 text-slate-500 px-2 py-1 rounded">{org.organizationMembers?.find(m => m.userId === user.id)?.role || 'MEMBER'}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200/50 dark:bg-white/10 border border-slate-200 dark:border-white/5 text-slate-500 px-2 py-1 rounded-md">{org.organizationMembers?.find(m => m.userId === user.id)?.role || 'MEMBER'}</span>
                         </div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{org.username}</h3>
                     </div>

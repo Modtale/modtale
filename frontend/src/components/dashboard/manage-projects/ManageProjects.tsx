@@ -92,7 +92,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
         <div className="space-y-8">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">Your Projects</h1>
-                <Link to="/upload" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20">
+                <Link to="/upload" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20">
                     <Plus className="w-4 h-4" /> New Project
                 </Link>
             </div>
@@ -124,7 +124,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
             <div className="space-y-8">
                 <div className="grid grid-cols-1 gap-4">
                     {projects.map(project => (
-                        <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                        <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
                             <ProjectListItem
                                 project={project}
                                 canManage={true}
@@ -141,7 +141,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                     const orgUser = myOrgs.find(o => o.id === orgId);
                     const orgDisplayName = orgUser?.displayName || orgUser?.username || orgId;
                     return (
-                        <div key={orgId} className="border-t border-slate-200 dark:border-white/5 pt-8">
+                        <div key={orgId} className="border-t border-slate-200 dark:border-white/10 pt-8 mt-8">
                             <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                                 <Building2 className="w-5 h-5 text-purple-500" />
                                 {orgDisplayName}
@@ -150,7 +150,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                                 {pList.map(project => {
                                     const isOrgAdmin = myOrgs.some(o => o.id === orgId && o.organizationMembers?.some(m => m.userId === user.id && m.role === 'ADMIN'));
                                     return (
-                                        <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                                        <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
                                             <ProjectListItem
                                                 project={project}
                                                 canManage={isOrgAdmin}
@@ -167,7 +167,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 })}
 
                 {contributedProjects.length > 0 && (
-                    <div className="border-t border-slate-200 dark:border-white/5 pt-8">
+                    <div className="border-t border-slate-200 dark:border-white/10 pt-8 mt-8">
                         <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                             <Users className="w-5 h-5 text-blue-500" />
                             Contributed Projects
@@ -176,7 +176,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                             {contributedProjects.map(project => {
                                 const isOwner = project.authorId === user.id;
                                 return (
-                                    <div key={project.id} className="bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden backdrop-blur-md">
+                                    <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
                                         <ProjectListItem
                                             project={project}
                                             canManage={isOwner}
@@ -192,7 +192,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 )}
 
                 {projects.length === 0 && Object.keys(orgProjects).length === 0 && contributedProjects.length === 0 && (
-                    <div className="text-center py-12 text-slate-400 bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl backdrop-blur-md">
+                    <div className="text-center py-12 text-slate-400 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-md shadow-sm">
                         <p>No projects found.</p>
                     </div>
                 )}

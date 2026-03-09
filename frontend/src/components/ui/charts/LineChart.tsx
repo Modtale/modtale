@@ -60,7 +60,19 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
 
     const makePath = (data: DataPoint[]) => {
         if (data.length === 0) return '';
-        return data.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(p.value)}`).join(' ');
+        if (data.length === 1) return `M ${getX(0)} ${getY(data[0].value)}`;
+
+        let path = `M ${getX(0)} ${getY(data[0].value)}`;
+        for (let i = 0; i < data.length - 1; i++) {
+            const x0 = getX(i);
+            const y0 = getY(data[i].value);
+            const x1 = getX(i + 1);
+            const y1 = getY(data[i + 1].value);
+            const cpX1 = x0 + (x1 - x0) / 2.5;
+            const cpX2 = x1 - (x1 - x0) / 2.5;
+            path += ` C ${cpX1} ${y0}, ${cpX2} ${y1}, ${x1} ${y1}`;
+        }
+        return path;
     };
 
     const formatY = (val: number) => {
@@ -75,30 +87,30 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
 
     return (
         <div className="w-full select-none h-full flex flex-col relative">
-            <div className="flex flex-wrap gap-1.5 mb-2 pl-[50px] flex-shrink-0">
+            <div className="flex flex-wrap gap-2 mb-6 flex-shrink-0">
                 {datasets.map(d => (
                     <button
                         key={d.id}
                         onClick={() => onToggle && onToggle(d.id)}
-                        className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-2 py-0.5 rounded-md transition-all border ${
+                        className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-full transition-all border ${
                             d.hidden
-                                ? 'bg-slate-50 dark:bg-white/5 text-slate-400 border-slate-200 dark:border-white/5'
-                                : 'bg-white dark:bg-modtale-card border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 shadow-sm hover:border-modtale-accent'
+                                ? 'bg-transparent text-slate-400 border-slate-300 dark:border-white/10 border-dashed hover:border-slate-400 dark:hover:border-white/20'
+                                : 'bg-white dark:bg-white/10 border-slate-200 dark:border-white/5 text-slate-700 dark:text-slate-200 shadow-sm hover:border-modtale-accent'
                         }`}
                     >
-                        <span className={`w-2 h-2 rounded-full ${d.hidden ? 'bg-slate-300' : ''}`} style={{ backgroundColor: d.hidden ? undefined : d.color }} />
+                        <span className={`w-2 h-2 rounded-full ${d.hidden ? 'bg-slate-200 dark:bg-slate-700' : 'shadow-sm'}`} style={{ backgroundColor: d.hidden ? undefined : d.color }} />
                         {d.label}
                     </button>
                 ))}
             </div>
 
             {!hasData ? (
-                <div className="flex-1 flex items-center justify-center text-slate-400 font-medium bg-slate-50/50 dark:bg-white/[0.02] rounded-xl border border-dashed border-slate-200 dark:border-white/10 ml-[50px]">
+                <div className="flex-1 flex items-center justify-center text-slate-400 font-medium bg-slate-50/50 dark:bg-white/[0.02] rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
                     No data selected. Toggle items above.
                 </div>
             ) : (
                 <div className="flex flex-1 min-h-0 relative">
-                    <div className="w-[50px] relative h-full shrink-0 mr-2">
+                    <div className="w-9 relative h-full shrink-0 mr-3">
                         {[0, 0.25, 0.5, 0.75, 1].map(t => {
                             const val = displayMin + t * (displayMax - displayMin);
                             const topPerc = 100 - (((t * chartHeight) + paddingBottom) / height) * 100;
@@ -106,7 +118,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                             return (
                                 <div
                                     key={t}
-                                    className="absolute right-0 w-full text-right pr-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 transform -translate-y-1/2 leading-none"
+                                    className="absolute left-0 w-full text-left text-[11px] font-bold text-slate-400 dark:text-slate-500 transform -translate-y-1/2 leading-none"
                                     style={{ top: `${topPerc}%` }}
                                 >
                                     {formatY(val)}
@@ -124,6 +136,12 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                                 <clipPath id={`grid-clip-${chartId}`}>
                                     <rect x={paddingX} y={paddingTop} width={chartWidth} height={chartHeight} />
                                 </clipPath>
+                                {activeDatasets.map(d => (
+                                    <linearGradient key={`area-grad-${d.id}`} id={`area-grad-${d.id}`} x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor={d.color} stopOpacity="0.25" />
+                                        <stop offset="100%" stopColor={d.color} stopOpacity="0.0" />
+                                    </linearGradient>
+                                ))}
                             </defs>
 
                             <g>
@@ -135,9 +153,9 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                                             x1={0} y1={y}
                                             x2={width} y2={y}
                                             stroke="currentColor"
-                                            className="text-slate-100 dark:text-white/5"
+                                            className="text-slate-200 dark:text-white/5"
                                             strokeWidth="1"
-                                            strokeDasharray={t === 0 ? "" : "4 4"}
+                                            strokeDasharray={t === 0 ? "" : "3 5"}
                                             vectorEffect="non-scaling-stroke"
                                         />
                                     );
@@ -157,6 +175,17 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                             <g clipPath={`url(#grid-clip-${chartId})`}>
                                 {activeDatasets.map(d => (
                                     <path
+                                        key={`area-${d.id}`}
+                                        d={`${makePath(d.data)} L ${getX(d.data.length - 1)} ${height - paddingBottom} L ${getX(0)} ${height - paddingBottom} Z`}
+                                        fill={`url(#area-grad-${d.id})`}
+                                        className="transition-opacity duration-300 ease-in-out"
+                                        style={{ opacity: hoverIndex !== null ? 0.05 : 1 }}
+                                        vectorEffect="non-scaling-stroke"
+                                    />
+                                ))}
+
+                                {activeDatasets.map(d => (
+                                    <path
                                         key={d.id}
                                         d={makePath(d.data)}
                                         fill="none"
@@ -164,8 +193,8 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                                         strokeWidth={d.id === 'overall' || d.id === 'growth' ? "4" : "3"}
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
-                                        className="transition-all duration-300 ease-in-out"
-                                        style={{ opacity: hoverIndex !== null ? 0.3 : 1 }}
+                                        className="transition-opacity duration-300 ease-in-out"
+                                        style={{ opacity: hoverIndex !== null ? 0.2 : 1 }}
                                         vectorEffect="non-scaling-stroke"
                                     />
                                 ))}
@@ -184,6 +213,21 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                                         vectorEffect="non-scaling-stroke"
                                     />
                                 ))}
+
+                                {hoverIndex !== null && activeDatasets.map(d => {
+                                    if (!d.data[hoverIndex]) return null;
+                                    return (
+                                        <circle
+                                            key={`dot-${d.id}`}
+                                            cx={getX(hoverIndex)}
+                                            cy={getY(d.data[hoverIndex].value)}
+                                            r="5"
+                                            fill={d.color}
+                                            strokeWidth="2.5"
+                                            className="stroke-white dark:stroke-slate-900 transition-all duration-200"
+                                        />
+                                    );
+                                })}
                             </g>
 
                             {hoverIndex !== null && (
@@ -212,29 +256,29 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
 
                         {hoverIndex !== null && (
                             <div
-                                className="absolute top-0 bg-white/95 dark:bg-slate-800/95 border border-slate-200 dark:border-white/10 p-4 rounded-xl shadow-2xl pointer-events-none z-20 text-xs backdrop-blur-md min-w-[180px]"
+                                className="absolute top-0 bg-white/95 dark:bg-slate-800/95 border border-slate-200 dark:border-white/10 p-4 rounded-2xl shadow-2xl pointer-events-none z-20 text-xs backdrop-blur-xl min-w-[200px]"
                                 style={{
                                     left: hoverIndex > (dataLength / 2) ? 'auto' : `${((getX(hoverIndex) / width) * 100)}%`,
                                     right: hoverIndex > (dataLength / 2) ? `${100 - ((getX(hoverIndex) / width) * 100)}%` : 'auto',
-                                    transform: hoverIndex > (dataLength / 2) ? 'translateX(-15px)' : 'translateX(15px)',
+                                    transform: hoverIndex > (dataLength / 2) ? 'translateX(-20px)' : 'translateX(20px)',
                                     marginTop: '20px'
                                 }}
                             >
                                 <div className="text-slate-500 dark:text-slate-400 mb-3 pb-2 border-b border-slate-100 dark:border-white/5 font-bold uppercase tracking-wider text-[10px]">
                                     {dates[hoverIndex] || 'Unknown Date'}
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-2.5">
                                     {activeDatasets
                                         .sort((a, b) => (b.data[hoverIndex]?.value || 0) - (a.data[hoverIndex]?.value || 0))
                                         .map(d => (
                                             <div key={d.id} className="flex items-center justify-between gap-6">
-                                            <span className="flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full" style={{backgroundColor: d.color}}/>
-                                                <span className={`font-bold ${d.id === 'overall' || d.id === 'growth' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>{d.label}</span>
-                                            </span>
+                                                <span className="flex items-center gap-2.5">
+                                                    <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: d.color}}/>
+                                                    <span className={`font-bold ${d.id === 'overall' || d.id === 'growth' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>{d.label}</span>
+                                                </span>
                                                 <span className={`font-mono font-bold ${d.id === 'overall' || d.id === 'growth' ? 'text-lg text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-200'}`}>
-                                                {yAxisFormatter ? yAxisFormatter(d.data[hoverIndex]?.value || 0) : (d.data[hoverIndex]?.value.toLocaleString() || 0)}
-                                            </span>
+                                                    {yAxisFormatter ? yAxisFormatter(d.data[hoverIndex]?.value || 0) : (d.data[hoverIndex]?.value.toLocaleString() || 0)}
+                                                </span>
                                             </div>
                                         ))}
                                 </div>
