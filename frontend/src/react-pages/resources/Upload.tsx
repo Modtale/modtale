@@ -359,7 +359,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         const topRow = filteredTypes.slice(0, topRowCount);
         const bottomRow = filteredTypes.slice(topRowCount);
 
-        // Calculate exactly how wide each card should be to fill the container perfectly minus gaps
         const cardFlexStyle = { flex: `0 0 calc((100% - ${(topRowCount - 1) * 24}px) / ${topRowCount})` };
 
         return (
@@ -380,7 +379,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                             <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400">Select a project type to get started.</p>
                         </div>
 
-                        {/* Desktop Layout: Split rows to guarantee matching widths and centering */}
                         <div className="hidden lg:flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
                             <div className="flex w-full gap-6">
                                 {topRow.map(type => (
@@ -396,7 +394,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                             )}
                         </div>
 
-                        {/* Mobile/Tablet Layout: Simple wrapping grid */}
                         <div className="grid lg:hidden grid-cols-1 sm:grid-cols-2 gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
                             {filteredTypes.map(type => (
                                 <ProjectTypeCard key={type.id} type={type} className="w-full" />
