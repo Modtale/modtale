@@ -415,7 +415,6 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors duration-300">
                     <div className={`${containerClasses} mx-auto w-full flex flex-col pt-12 md:pt-20 pb-16 flex-1`}>
-                        {/* Perfect left-aligned Back Button matching Step 0 anchor point */}
                         <button onClick={() => setStep(0)} className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors group w-fit mb-12 md:mb-16">
                             <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Back
                         </button>

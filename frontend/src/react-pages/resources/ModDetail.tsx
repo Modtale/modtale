@@ -12,7 +12,7 @@ import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive
+    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Reply
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -472,7 +472,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === comment.user);
 
                     return (
-                        <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group">
+                        <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group relative overflow-hidden">
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden shrink-0">
@@ -512,59 +512,69 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                     </div>
                                 </div>
                             </div>
-                            <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{comment.content}</p>
+                            <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
 
-                            {replyingCommentId === comment.id ? (
+                            {replyingCommentId === comment.id && (
                                 <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
                                     <textarea
                                         aria-label="Developer reply content"
                                         value={replyText}
                                         onChange={e => setReplyText(e.target.value)}
-                                        className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-2 text-sm mb-2 focus:outline-none focus:border-modtale-accent text-slate-900 dark:text-white"
+                                        className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-modtale-accent text-slate-900 dark:text-white transition-all shadow-inner"
                                         placeholder="Write a reply..."
                                         rows={3}
                                     />
                                     <div className="flex justify-end gap-2">
-                                        <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Cancel</button>
-                                        <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-modtale-accentHover transition-colors">
+                                        <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Cancel</button>
+                                        <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-4 py-2 rounded-lg flex items-center gap-1.5 hover:bg-modtale-accentHover transition-colors shadow-md">
                                             <CornerDownRight className="w-3 h-3" aria-hidden="true"/> Post Reply
                                         </button>
                                     </div>
                                 </form>
-                            ) : comment.developerReply && (() => {
+                            )}
+
+                            {comment.developerReply && !replyingCommentId && (() => {
                                 const replyId = (comment.developerReply as any).userId;
                                 const replyUsername = replyId && userProfiles[replyId] ? userProfiles[replyId].username : (comment.developerReply.user || 'Developer');
                                 const replyAvatar = replyId && userProfiles[replyId] ? userProfiles[replyId].avatarUrl : comment.developerReply.userAvatarUrl;
                                 const replyProfileLink = `/creator/${replyId || comment.developerReply.user}`;
 
                                 return (
-                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5 relative">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0">
-                                                    {replyAvatar ? (
-                                                        <img src={replyAvatar} alt="" className="w-full h-full object-cover"/>
-                                                    ) : (
-                                                        <Crown className="w-5 h-5" aria-hidden="true" />
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                                                        <Link to={replyProfileLink} className="hover:text-modtale-accent transition-colors">{replyUsername}</Link> <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
-                                                    </span>
-                                                    <span suppressHydrationWarning className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
-                                                        Developer Response • {new Date(comment.developerReply.date).toLocaleDateString()}
-                                                    </span>
+                                    <div className="mt-6 ml-6 md:ml-12 pl-6 border-l-2 border-slate-200 dark:border-white/10 relative">
+                                        <div className="absolute -left-3.5 top-0 bg-slate-100 dark:bg-slate-800 p-1 rounded-full text-slate-400 dark:text-slate-500">
+                                            <Reply className="w-4 h-4 transform rotate-180" />
+                                        </div>
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-white/5">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0 shadow-sm">
+                                                        {replyAvatar ? (
+                                                            <img src={replyAvatar} alt="" className="w-full h-full object-cover"/>
+                                                        ) : (
+                                                            <Crown className="w-4 h-4" aria-hidden="true" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1">
+                                                            <Link to={replyProfileLink} className="hover:text-modtale-accent transition-colors">{replyUsername}</Link>
+                                                            <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-widest ml-1 flex items-center gap-1">
+                                                                <Crown className="w-2.5 h-2.5" /> Creator
+                                                            </span>
+                                                        </span>
+                                                        <span suppressHydrationWarning className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                                                            {new Date(comment.developerReply.date).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">{comment.developerReply.content}</p>
                                         </div>
-                                        <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{comment.developerReply.content}</p>
                                     </div>
                                 );
                             })()}
                         </div>
                     );
-                }) : <div className="text-center py-12 text-slate-600 dark:text-slate-400 italic">No comments yet.</div>}
+                }) : <div className="text-center py-12 text-slate-600 dark:text-slate-400 font-medium bg-white/50 dark:bg-white/[0.02] rounded-2xl border border-slate-200 dark:border-white/5 border-dashed">No comments yet. Be the first to share your thoughts!</div>}
             </div>
         </div>
     );
