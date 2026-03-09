@@ -59,7 +59,10 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const displayTitle = user.username;
     const linkedAccounts = (user.connectedAccounts || []).filter(a => a.visible);
 
-    const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+    // DYNAMIC CONTAINER CLASSES: Aligns with the m-6 (24px) margin of the empty banner dashed box in edit mode
+    const containerClasses = isEditing
+        ? "max-w-[112rem] px-6"
+        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
