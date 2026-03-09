@@ -339,14 +339,14 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             >
                 <div className="absolute inset-0 bg-gradient-to-br from-modtale-accent/0 to-modtale-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-8 transition-colors bg-white/50 dark:bg-black/30 text-slate-500 dark:text-slate-400 group-hover:bg-modtale-accent group-hover:text-white transform duration-200 group-hover:scale-110 shadow-inner relative z-10 backdrop-blur-md border border-slate-200/50 dark:border-white/5">
-                    <Icon className="w-10 h-10" />
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-colors bg-white/50 dark:bg-black/30 text-slate-500 dark:text-slate-400 group-hover:bg-modtale-accent group-hover:text-white transform duration-200 group-hover:scale-110 shadow-inner relative z-10 backdrop-blur-md border border-slate-200/50 dark:border-white/5">
+                    <Icon className="w-8 h-8" />
                 </div>
 
-                <h3 className="font-black text-3xl mb-3 text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors relative z-10">
+                <h3 className="font-black text-2xl mb-2 text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors relative z-10">
                     {type.label}
                 </h3>
-                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 leading-relaxed font-medium group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors relative z-10">
+                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors relative z-10">
                     {type.id === 'MODPACK' ? 'Bundle multiple mods into a pack.' : type.id === 'SAVE' ? 'Share worlds, schematics, or lobbies.' : type.id === 'PLUGIN' ? 'Server-side logic, tools, and scripts.' : 'Custom models, textures, and art.'}
                 </p>
             </button>
@@ -369,37 +369,38 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
                         <button
                             onClick={() => navigate(-1)}
-                            className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors group w-fit mb-4 md:mb-8"
+                            className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors group w-fit mb-12 md:mb-16"
                         >
                             <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Cancel
                         </button>
 
-                        <div className="text-center pb-12 md:pb-20">
-                            <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight mb-4">What are you creating?</h1>
-                            <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400">Select a project type to get started.</p>
-                        </div>
-
-                        <div className="hidden lg:flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
-                            <div className="flex w-full gap-6">
-                                {topRow.map(type => (
-                                    <ProjectTypeCard key={type.id} type={type} style={cardFlexStyle} />
-                                ))}
+                        <div className="text-center pb-8 md:pb-16">
+                            <div className="mb-12">
+                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight mb-4 leading-none">What are you creating?</h1>
+                                <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium">Select a project type to get started.</p>
                             </div>
-                            {bottomRow.length > 0 && (
+
+                            <div className="hidden lg:flex flex-col gap-6 w-full max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
                                 <div className="flex w-full justify-center gap-6">
-                                    {bottomRow.map(type => (
+                                    {topRow.map(type => (
                                         <ProjectTypeCard key={type.id} type={type} style={cardFlexStyle} />
                                     ))}
                                 </div>
-                            )}
-                        </div>
+                                {bottomRow.length > 0 && (
+                                    <div className="flex w-full justify-center gap-6">
+                                        {bottomRow.map(type => (
+                                            <ProjectTypeCard key={type.id} type={type} style={cardFlexStyle} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
-                        <div className="grid lg:hidden grid-cols-1 sm:grid-cols-2 gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
-                            {filteredTypes.map(type => (
-                                <ProjectTypeCard key={type.id} type={type} className="w-full" />
-                            ))}
+                            <div className="grid lg:hidden grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                {filteredTypes.map(type => (
+                                    <ProjectTypeCard key={type.id} type={type} className="w-full" />
+                                ))}
+                            </div>
                         </div>
-
                     </div>
                 </div>
             </>
@@ -413,78 +414,85 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             <>
                 {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors duration-300">
-                    <div className={`${containerClasses} mx-auto w-full pt-12 md:pt-20 pb-16 flex-1`}>
+                    <div className={`${containerClasses} mx-auto w-full flex flex-col pt-12 md:pt-20 pb-16 flex-1`}>
+                        {/* Perfect left-aligned Back Button matching Step 0 anchor point */}
                         <button onClick={() => setStep(0)} className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors group w-fit mb-12 md:mb-16">
                             <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Back
                         </button>
 
-                        <div className="w-full max-w-3xl">
-                            <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mb-10">Let's give it a name.</h1>
-                            {error && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl flex items-center gap-2 text-sm font-bold"><AlertCircle className="w-5 h-5"/> {error}</div>}
+                        <div className="flex flex-col items-center">
+                            <div className="w-full max-w-2xl flex flex-col">
+                                <div className="text-center mb-10">
+                                    <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Let's give it a name.</h1>
+                                    <p className="text-slate-500 dark:text-slate-400 font-bold mt-10 uppercase tracking-widest text-xs">You can always change this later.</p>
+                                </div>
 
-                            <div className="space-y-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl p-8 md:p-10 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
-                                {myOrgs.length > 0 && (
-                                    <div className="relative z-50" ref={ownerDropdownRef}>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Project Owner</label>
-                                        <button
-                                            onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
-                                            className="w-full flex items-center justify-between bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-5 py-4 text-left transition-all hover:bg-white dark:hover:bg-white/5 shadow-inner backdrop-blur-md"
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                {owner === currentUser?.username ? (
-                                                    <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><UserIcon className="w-5 h-5"/></div>
-                                                ) : (
-                                                    <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><Building2 className="w-5 h-5"/></div>
-                                                )}
-                                                <div>
-                                                    <div className="font-bold text-slate-900 dark:text-white text-base">{selectedOwner?.displayName || selectedOwner?.username}</div>
-                                                    <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-0.5">{owner === currentUser?.username ? 'Personal' : 'Organization'}</div>
-                                                </div>
-                                            </div>
-                                            <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${ownerDropdownOpen ? 'rotate-180' : ''}`} />
-                                        </button>
+                                {error && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl flex items-center gap-2 text-sm font-bold animate-in shake duration-300"><AlertCircle className="w-5 h-5"/> {error}</div>}
 
-                                        {ownerDropdownOpen && (
-                                            <div className="absolute top-full left-0 right-0 mt-3 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 p-2">
-                                                <button onClick={() => { setOwner(currentUser?.username || ''); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
-                                                    <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform"><UserIcon className="w-5 h-5"/></div>
-                                                    <div className="text-left flex-1">
-                                                        <div className="font-bold text-slate-900 dark:text-white text-sm">{currentUser?.username}</div>
-                                                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Personal Account</div>
+                                <div className="space-y-6 bg-white/60 dark:bg-slate-900/60 backdrop-blur-3xl p-8 md:p-12 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl shadow-modtale-accent/5 animate-in fade-in zoom-in-95 duration-500">
+                                    {myOrgs.length > 0 && (
+                                        <div className="relative z-50" ref={ownerDropdownRef}>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Project Owner</label>
+                                            <button
+                                                onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
+                                                className="w-full flex items-center justify-between bg-white/90 dark:bg-black/50 border border-slate-300 dark:border-white/20 rounded-2xl px-5 py-4 text-left transition-all hover:bg-white dark:hover:bg-white/5 shadow-inner backdrop-blur-md"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    {owner === currentUser?.username ? (
+                                                        <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-800/30 shadow-sm"><UserIcon className="w-5 h-5"/></div>
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200 dark:border-purple-800/30 shadow-sm"><Building2 className="w-5 h-5"/></div>
+                                                    )}
+                                                    <div>
+                                                        <div className="font-bold text-slate-900 dark:text-white text-base leading-none">{selectedOwner?.displayName || selectedOwner?.username}</div>
+                                                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1.5">{owner === currentUser?.username ? 'Personal' : 'Organization'}</div>
                                                     </div>
-                                                    {owner === currentUser?.username && <Check className="w-5 h-5 text-modtale-accent" />}
-                                                </button>
-                                                <div className="h-px bg-slate-100 dark:bg-white/5 mx-3 my-2" />
-                                                {myOrgs.map(org => (
-                                                    <button key={org.id} onClick={() => { setOwner(org.username); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
-                                                        <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform"><Building2 className="w-5 h-5"/></div>
+                                                </div>
+                                                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${ownerDropdownOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                            {ownerDropdownOpen && (
+                                                <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-2 shadow-modtale-accent/10">
+                                                    <button onClick={() => { setOwner(currentUser?.username || ''); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
+                                                        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform"><UserIcon className="w-5 h-5"/></div>
                                                         <div className="text-left flex-1">
-                                                            <div className="font-bold text-slate-900 dark:text-white text-sm">{org.displayName || org.username}</div>
-                                                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Organization</div>
+                                                            <div className="font-bold text-slate-900 dark:text-white text-sm">{currentUser?.username}</div>
+                                                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Personal Account</div>
                                                         </div>
-                                                        {owner === org.username && <Check className="w-4 h-4 text-modtale-accent" />}
+                                                        {owner === currentUser?.username && <Check className="w-5 h-5 text-modtale-accent" />}
                                                     </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                                    <div className="h-px bg-slate-100 dark:bg-white/5 mx-3 my-2" />
+                                                    {myOrgs.map(org => (
+                                                        <button key={org.id} onClick={() => { setOwner(org.username); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
+                                                            <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform"><Building2 className="w-5 h-5"/></div>
+                                                            <div className="text-left flex-1">
+                                                                <div className="font-bold text-slate-900 dark:text-white text-sm">{org.displayName || org.username}</div>
+                                                                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Organization</div>
+                                                            </div>
+                                                            {owner === org.username && <Check className="w-4 h-4 text-modtale-accent" />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Project Title</label>
-                                    <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-5 py-4 font-black text-xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md" placeholder="My Awesome Project"/>
-                                </div>
-                                <div>
-                                    <div className="flex justify-between items-end mb-2 ml-1 pr-1">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase">Short Summary</label>
-                                        <p className="text-[10px] text-slate-400 font-bold">{summary.length}/250 (Min 10)</p>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Project Title</label>
+                                        <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 font-black text-2xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md placeholder:text-slate-300 dark:placeholder:text-white/10" placeholder="My Awesome Project"/>
                                     </div>
-                                    <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-5 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm" placeholder="A brief description of what this does..."/>
-                                </div>
+                                    <div>
+                                        <div className="flex justify-between items-end mb-2 ml-1 pr-1">
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Short Summary</label>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{summary.length}/250</p>
+                                        </div>
+                                        <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-300 dark:placeholder:text-white/10" placeholder="A brief description of what this does..."/>
+                                    </div>
 
-                                <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary} className="w-full h-16 mt-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-lg flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-modtale-accent/20 active:scale-95">
-                                    {isLoading ? <Spinner className="w-6 h-6 text-white" fullScreen={false} /> : <>Start Building <ArrowRight className="w-5 h-5"/></>}
-                                </button>
+                                    <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary || summary.length < 10} className="w-full h-16 mt-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-modtale-accent/20 active:scale-95 group">
+                                        {isLoading ? <Spinner className="w-6 h-6 text-white" fullScreen={false} /> : <>Start Building <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform"/></>}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
