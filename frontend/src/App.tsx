@@ -22,6 +22,7 @@ import { ToastProvider } from './components/ui/Toast';
 import { MobileProvider } from './context/MobileContext';
 
 const Home = lazy(() => import('./react-pages/Home').then(module => ({ default: module.Home })));
+const Browse = lazy(() => import('./react-pages/Browse').then(module => ({ default: module.Browse })));
 const Upload = lazy(() => import('./react-pages/resources/Upload').then(module => ({ default: module.Upload })));
 const CreatorProfile = lazy(() => import('./react-pages/user/CreatorProfile.tsx').then(module => ({ default: module.CreatorProfile })));
 const ModDetail = lazy(() => import('./react-pages/resources/ModDetail').then(module => ({ default: module.ModDetail })));
@@ -130,8 +131,8 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
 
-    const renderHome = (classification?: Classification) => (
-        <Home
+    const renderBrowse = (classification?: Classification) => (
+        <Browse
             onModClick={handleModClick}
             onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
             onWorldClick={handleWorldClick}
@@ -193,13 +194,15 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                 <div className="flex-1">
                     <Suspense fallback={<div className="p-20 flex justify-center"><Spinner /></div>}>
                         <Routes>
-                            <Route path="/" element={renderHome()} />
-                            <Route path="/mods" element={<Navigate to="/" replace />} />
-                            <Route path="/plugins" element={renderHome('PLUGIN')} />
-                            <Route path="/modpacks" element={renderHome('MODPACK')} />
-                            <Route path="/worlds" element={renderHome('SAVE')} />
-                            <Route path="/art" element={renderHome('ART')} />
-                            <Route path="/data" element={renderHome('DATA')} />
+                            <Route path="/" element={<Home />} />
+
+                            <Route path="/mods" element={renderBrowse()} />
+                            <Route path="/projects" element={<Navigate to="/mods" replace />} />
+                            <Route path="/plugins" element={renderBrowse('PLUGIN')} />
+                            <Route path="/modpacks" element={renderBrowse('MODPACK')} />
+                            <Route path="/worlds" element={renderBrowse('SAVE')} />
+                            <Route path="/art" element={renderBrowse('ART')} />
+                            <Route path="/data" element={renderBrowse('DATA')} />
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
