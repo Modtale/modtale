@@ -9,8 +9,11 @@ import net.modtale.service.AnalyticsService;
 import net.modtale.service.user.UserService;
 import net.modtale.service.resources.ModService;
 import net.modtale.repository.user.UserRepository;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.CacheControl;
@@ -18,7 +21,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -38,6 +43,33 @@ public class AnalyticsController {
             return request.getRemoteAddr();
         }
         return xfHeader.split(",")[0];
+    }
+
+    @GetMapping("/analytics/stats")
+    public ResponseEntity<Map<String, Long>> getPublicStats() {
+        long totalProjects = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED")), Mod.class);
+        long totalUsers = mongoTemplate.count(new Query(), User.class);
+
+        Aggregation agg = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("status").is("PUBLISHED")),
+                Aggregation.group().sum("downloadCount").as("totalDownloads")
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(agg, Mod.class, Document.class);
+        long totalDownloads = 0;
+        Document mappedResult = results.getUniqueMappedResult();
+        if (mappedResult != null && mappedResult.get("totalDownloads") != null) {
+            totalDownloads = ((Number) mappedResult.get("totalDownloads")).longValue();
+        }
+
+        Map<String, Long> stats = new HashMap<>();
+        stats.put("totalProjects", totalProjects);
+        stats.put("totalUsers", totalUsers);
+        stats.put("totalDownloads", totalDownloads);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                .body(stats);
     }
 
     @GetMapping("/user/analytics")
