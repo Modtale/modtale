@@ -76,6 +76,7 @@ const FilterDropdown = ({ label, value, options, onChange }: { label: string, va
 };
 
 interface HomeFiltersProps {
+    categoryPills?: React.ReactNode;
     pageTitle: string;
     totalItems: number;
     loading: boolean;
@@ -99,15 +100,15 @@ interface HomeFiltersProps {
     filterDate: string | null;
     setFilterDate: (d: string | null) => void;
     setPage: (p: number) => void;
-    showMiniSearch: boolean;
     isMobile: boolean;
 }
 
 export const HomeFilters: React.FC<HomeFiltersProps> = React.memo(({
+                                                                       categoryPills,
                                                                        pageTitle, totalItems, loading, sortBy, onSortChange,
                                                                        selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
                                                                        isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
-                                                                       selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage, showMiniSearch,
+                                                                       selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage,
                                                                        isMobile
                                                                    }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
@@ -193,13 +194,13 @@ export const HomeFilters: React.FC<HomeFiltersProps> = React.memo(({
     ].filter(Boolean).length;
 
     return (
-        <div className="w-full">
-            <div className={`md:hidden w-full transition-all duration-300 ease-in-out overflow-hidden ${showMiniSearch ? 'max-h-14 opacity-100 mb-3' : 'max-h-0 opacity-0 mb-0 pointer-events-none'}`}>
+        <div className="w-full flex flex-col gap-3 relative z-40">
+            <div className="md:hidden w-full">
                 <div className="relative group w-full">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-300 group-focus-within:text-modtale-accent transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-300 group-focus-within:text-modtale-accent transition-colors" />
                     <input
                         type="text"
-                        className="block w-full pl-9 pr-3 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent text-slate-900 dark:text-white"
+                        className="block w-full pl-9 pr-3 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent outline-none text-slate-900 dark:text-white"
                         placeholder="Search projects..."
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
@@ -208,20 +209,28 @@ export const HomeFilters: React.FC<HomeFiltersProps> = React.memo(({
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="hidden md:block">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">{pageTitle}</h2>
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mt-0.5 block">{loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}</span>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
+                <div className="flex items-center gap-4 w-full md:w-auto min-w-0 flex-1">
+                    {categoryPills ? categoryPills : (
+                        <div className="hidden md:block shrink-0">
+                            <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">{pageTitle}</h2>
+                        </div>
+                    )}
+                    <div className="hidden lg:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide block">
+                            {loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}
+                        </span>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:flex-none" ref={tagRef}>
+                <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 w-full md:w-auto shrink-0">
+                    <div className="relative flex-1 md:flex-none shrink-0" ref={tagRef}>
                         <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-10 flex items-center justify-between md:justify-start gap-2 border rounded-lg px-3 md:px-4 text-xs md:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-modtale-accent shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-modtale-accent'}`}>
                             <div className="flex items-center gap-2"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
                             {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px]">{selectedTags.length}</span>}
                         </button>
                         {isTagsOpen && (
-                            <div className="absolute left-0 top-12 w-[calc(100vw-2rem)] md:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute right-0 md:left-0 top-full mt-2 w-[calc(100vw-2rem)] md:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
                                 <div className="flex justify-between items-center mb-3">
                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</h3>
                                     {selectedTags.length > 0 && <button onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
@@ -238,14 +247,14 @@ export const HomeFilters: React.FC<HomeFiltersProps> = React.memo(({
                         )}
                     </div>
 
-                    <div className="relative flex-1 md:flex-none" ref={filterRef}>
+                    <div className="relative flex-1 md:flex-none shrink-0" ref={filterRef}>
                         <button onClick={onToggleFilterMenu} className={`w-full md:w-auto h-10 flex items-center justify-between md:justify-start gap-2 border rounded-lg px-3 md:px-4 text-xs md:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-modtale-accent shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-modtale-accent'}`}>
                             <div className="flex items-center gap-2"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
                             {displayFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px]">{displayFilterCount}</span>}
                         </button>
 
                         {isFilterOpen && (
-                            <div className="absolute left-1/2 -translate-x-1/2 md:left-auto md:right-0 md:translate-x-0 top-12 w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute right-0 md:right-0 md:translate-x-0 top-full mt-2 w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] animate-in fade-in slide-in-from-top-2">
                                 <div className="p-4 border-b border-slate-100 dark:border-white/5">
                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</h3>
                                 </div>
@@ -324,7 +333,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = React.memo(({
                     </div>
 
                     {isDownloadSort && (
-                        <div className="hidden md:flex bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200">
+                        <div className="hidden md:flex bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0">
                             {[
                                 { label: '7d', val: 7 },
                                 { label: '30d', val: 30 },
@@ -342,7 +351,7 @@ export const HomeFilters: React.FC<HomeFiltersProps> = React.memo(({
                         </div>
                     )}
 
-                    <div className="flex-1 md:flex-none">
+                    <div className="flex-1 md:flex-none shrink-0">
                         <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
                 </div>
