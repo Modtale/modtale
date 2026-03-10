@@ -31,11 +31,26 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
     const rawMin = Math.min(...allValues, 0);
 
     const hasNegative = allValues.some(v => v < 0);
-    const range = rawMax - rawMin;
-    const buffer = range === 0 ? 1 : range * 0.1;
+    const valRange = Math.max(rawMax - (hasNegative ? rawMin : 0), 1);
 
-    const displayMax = rawMax + buffer;
-    const displayMin = hasNegative ? rawMin - buffer : 0;
+    const roughStep = Math.max(valRange / 4, 1);
+    const stepMagnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const normalizedStep = roughStep / stepMagnitude;
+    let niceStep = 10;
+    if (normalizedStep <= 1) niceStep = 1;
+    else if (normalizedStep <= 2) niceStep = 2;
+    else if (normalizedStep <= 2.5) niceStep = 2.5;
+    else if (normalizedStep <= 5) niceStep = 5;
+    const finalStep = niceStep * stepMagnitude;
+
+    const displayMin = hasNegative ? Math.floor(rawMin / finalStep) * finalStep : 0;
+    const displayMax = Math.ceil(rawMax / finalStep) * finalStep;
+    const displayRange = Math.max(displayMax - displayMin, 1);
+
+    const ticks = [];
+    for (let i = displayMin; i <= displayMax; i += finalStep) {
+        ticks.push(i);
+    }
 
     const dataLength = Math.max(...activeDatasets.map(d => d.data.length), 0);
 
@@ -54,7 +69,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
     const getX = (index: number) => index * xStep + paddingX;
 
     const getY = (value: number) => {
-        const rawY = height - paddingBottom - ((value - displayMin) / (displayMax - displayMin)) * chartHeight;
+        const rawY = height - paddingBottom - ((value - displayMin) / displayRange) * chartHeight;
         return Math.max(paddingTop, Math.min(height - paddingBottom, rawY));
     };
 
@@ -111,13 +126,11 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
             ) : (
                 <div className="flex flex-1 min-h-0 relative">
                     <div className="w-9 relative h-full shrink-0 mr-3">
-                        {[0, 0.25, 0.5, 0.75, 1].map(t => {
-                            const val = displayMin + t * (displayMax - displayMin);
-                            const topPerc = 100 - (((t * chartHeight) + paddingBottom) / height) * 100;
-
+                        {ticks.map(val => {
+                            const topPerc = (getY(val) / height) * 100;
                             return (
                                 <div
-                                    key={t}
+                                    key={val}
                                     className="absolute left-0 w-full text-left text-[11px] font-bold text-slate-400 dark:text-slate-500 transform -translate-y-1/2 leading-none"
                                     style={{ top: `${topPerc}%` }}
                                 >
@@ -145,17 +158,17 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                             </defs>
 
                             <g>
-                                {[0, 0.25, 0.5, 0.75, 1].map(t => {
-                                    const y = height - paddingBottom - (t * chartHeight);
+                                {ticks.map(val => {
+                                    const y = getY(val);
                                     return (
                                         <line
-                                            key={t}
+                                            key={val}
                                             x1={0} y1={y}
                                             x2={width} y2={y}
                                             stroke="currentColor"
                                             className="text-slate-200 dark:text-white/5"
                                             strokeWidth="1"
-                                            strokeDasharray={t === 0 ? "" : "3 5"}
+                                            strokeDasharray={val === 0 ? "" : "3 5"}
                                             vectorEffect="non-scaling-stroke"
                                         />
                                     );

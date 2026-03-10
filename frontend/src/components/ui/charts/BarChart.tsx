@@ -32,7 +32,21 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
     const chartHeight = height - paddingTop - paddingBottom;
 
     const rawMax = Math.max(...activeData.map(d => d.value), 1);
-    const maxValue = rawMax * 1.1;
+    const roughStep = Math.max(rawMax / 4, 1);
+    const stepMagnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const normalizedStep = roughStep / stepMagnitude;
+    let niceStep = 10;
+    if (normalizedStep <= 1) niceStep = 1;
+    else if (normalizedStep <= 2) niceStep = 2;
+    else if (normalizedStep <= 2.5) niceStep = 2.5;
+    else if (normalizedStep <= 5) niceStep = 5;
+    const finalStep = niceStep * stepMagnitude;
+
+    const displayMax = Math.ceil(rawMax / finalStep) * finalStep;
+    const ticks = [];
+    for (let i = 0; i <= displayMax; i += finalStep) {
+        ticks.push(i);
+    }
 
     const count = activeData.length;
     const barWidth = count > 0 ? Math.min(100, (chartWidth / count) * 0.7) : 0;
@@ -41,7 +55,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
     const startX = count === 1 ? paddingX + (chartWidth - barWidth) / 2 : paddingX;
 
     const getY = (val: number) => {
-        const rawY = height - paddingBottom - ((val / maxValue) * chartHeight);
+        const rawY = height - paddingBottom - ((val / displayMax) * chartHeight);
         return Math.max(paddingTop, Math.min(height - paddingBottom, rawY));
     };
 
@@ -77,12 +91,11 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
             ) : (
                 <div className="flex flex-1 min-h-0 relative">
                     <div className="w-9 relative h-full shrink-0 mr-3">
-                        {[0, 0.25, 0.5, 0.75, 1].map(t => {
-                            const val = t * maxValue;
-                            const topPerc = 100 - (((t * chartHeight) + paddingBottom) / height) * 100;
+                        {ticks.map(val => {
+                            const topPerc = (getY(val) / height) * 100;
                             return (
                                 <div
-                                    key={t}
+                                    key={val}
                                     className="absolute left-0 w-full text-left text-[11px] font-bold text-slate-400 dark:text-slate-500 transform -translate-y-1/2 leading-none"
                                     style={{ top: `${topPerc}%` }}
                                 >
@@ -107,11 +120,11 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
                             </defs>
 
                             <g>
-                                {[0, 0.25, 0.5, 0.75, 1].map(t => {
-                                    const y = height - paddingBottom - (t * chartHeight);
+                                {ticks.map(val => {
+                                    const y = getY(val);
                                     return (
                                         <line
-                                            key={t}
+                                            key={val}
                                             x1={0} y1={y}
                                             x2={width} y2={y}
                                             stroke="currentColor"
