@@ -169,7 +169,6 @@ export const PlatformAnalytics: React.FC = () => {
                     <SummaryCard
                         title="API Traffic"
                         value={apiPercentage} isPercent
-                        subValue={`${data.apiDownloads.toLocaleString()} requests`}
                         trend={calcTrend(data.apiDownloads, data.previousApiDownloads)}
                         icon={Server} color="text-emerald-500"
                     />
