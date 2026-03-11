@@ -616,10 +616,14 @@ public class AnalyticsService {
         LocalDate end = LocalDate.now();
         LocalDate start = calculateStartDate(range);
 
-        LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
+        LocalDate comparisonEnd = start.minusDays(1);
+        LocalDate comparisonStart = start.minusDays(java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1);
 
-        int startY = chartStart.getYear();
-        int startM = chartStart.getMonthValue();
+        LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
+        LocalDate fetchStart = comparisonStart.isBefore(chartStart) ? comparisonStart : chartStart;
+
+        int startY = fetchStart.getYear();
+        int startM = fetchStart.getMonthValue();
 
         Criteria criteria = new Criteria().orOperator(
                 Criteria.where("year").gt(startY),
@@ -630,13 +634,13 @@ public class AnalyticsService {
 
         PlatformAnalyticsSummary summary = new PlatformAnalyticsSummary();
 
-        long totalDownloads = 0;
-        long totalViews = 0;
-        long totalApi = 0;
-        long totalFrontend = 0;
-        long totalNewProjects = 0;
-        long totalNewUsers = 0;
-        long totalNewOrgs = 0;
+        long currentDownloads = 0, prevDownloads = 0;
+        long currentViews = 0, prevViews = 0;
+        long currentApi = 0, prevApi = 0;
+        long currentFrontend = 0, prevFrontend = 0;
+        long currentNewProjects = 0, prevNewProjects = 0;
+        long currentNewUsers = 0, prevNewUsers = 0;
+        long currentNewOrgs = 0, prevNewOrgs = 0;
 
         Map<LocalDate, Integer> downloadSeries = new HashMap<>();
         Map<LocalDate, Integer> apiDownloadSeries = new HashMap<>();
@@ -653,6 +657,7 @@ public class AnalyticsService {
                     try {
                         int day = Integer.parseInt(entry.getKey());
                         LocalDate date = ym.atDay(day);
+
                         if (!date.isBefore(chartStart) && !date.isAfter(end)) {
                             downloadSeries.put(date, entry.getValue().getD());
                             apiDownloadSeries.put(date, entry.getValue().getA());
@@ -660,30 +665,44 @@ public class AnalyticsService {
                             newProjectsSeries.put(date, entry.getValue().getN());
                             newUsersSeries.put(date, entry.getValue().getU());
                             newOrgsSeries.put(date, entry.getValue().getO());
+                        }
 
-                            if (!date.isBefore(start)) {
-                                totalDownloads += entry.getValue().getD();
-                                totalViews += entry.getValue().getV();
-                                totalNewProjects += entry.getValue().getN();
-                                totalNewUsers += entry.getValue().getU();
-                                totalNewOrgs += entry.getValue().getO();
-                            }
+                        if (!date.isBefore(start) && !date.isAfter(end)) {
+                            currentDownloads += entry.getValue().getD();
+                            currentViews += entry.getValue().getV();
+                            currentApi += entry.getValue().getA();
+                            currentFrontend += entry.getValue().getF();
+                            currentNewProjects += entry.getValue().getN();
+                            currentNewUsers += entry.getValue().getU();
+                            currentNewOrgs += entry.getValue().getO();
+                        } else if (!date.isBefore(comparisonStart) && !date.isAfter(comparisonEnd)) {
+                            prevDownloads += entry.getValue().getD();
+                            prevViews += entry.getValue().getV();
+                            prevApi += entry.getValue().getA();
+                            prevFrontend += entry.getValue().getF();
+                            prevNewProjects += entry.getValue().getN();
+                            prevNewUsers += entry.getValue().getU();
+                            prevNewOrgs += entry.getValue().getO();
                         }
                     } catch (Exception ignored) {}
                 }
             }
-
-            totalApi += stat.getApiDownloads();
-            totalFrontend += stat.getFrontendDownloads();
         }
 
-        summary.setTotalDownloads(totalDownloads);
-        summary.setTotalViews(totalViews);
-        summary.setApiDownloads(totalApi);
-        summary.setFrontendDownloads(totalFrontend);
-        summary.setTotalNewProjects(totalNewProjects);
-        summary.setTotalNewUsers(totalNewUsers);
-        summary.setTotalNewOrgs(totalNewOrgs);
+        summary.setTotalDownloads(currentDownloads);
+        summary.setPreviousTotalDownloads(prevDownloads);
+        summary.setTotalViews(currentViews);
+        summary.setPreviousTotalViews(prevViews);
+        summary.setApiDownloads(currentApi);
+        summary.setPreviousApiDownloads(prevApi);
+        summary.setFrontendDownloads(currentFrontend);
+        summary.setPreviousFrontendDownloads(prevFrontend);
+        summary.setTotalNewProjects(currentNewProjects);
+        summary.setPreviousTotalNewProjects(prevNewProjects);
+        summary.setTotalNewUsers(currentNewUsers);
+        summary.setPreviousTotalNewUsers(prevNewUsers);
+        summary.setTotalNewOrgs(currentNewOrgs);
+        summary.setPreviousTotalNewOrgs(prevNewOrgs);
 
         summary.setDownloadsChart(fillDates(chartStart, end, downloadSeries));
         summary.setApiDownloadsChart(fillDates(chartStart, end, apiDownloadSeries));
