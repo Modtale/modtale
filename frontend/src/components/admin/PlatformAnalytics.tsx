@@ -84,20 +84,24 @@ export const PlatformAnalytics: React.FC = () => {
     };
 
     const downloadsData = formatData(data.downloadsChart);
+    const apiDownloadsData = formatData(data.apiDownloadsChart);
     const viewsData = formatData(data.viewsChart);
     const newProjectsData = formatData(data.newProjectsChart);
     const newUsersData = formatData(data.newUsersChart);
+    const newOrgsData = formatData(data.newOrgsChart);
 
     const chartDatasets = {
         downloads: [
-            { id: 'downloads', label: 'Platform Downloads', color: '#3b82f6', data: sliceData(downloadsData), hidden: !!hiddenSeries['downloads'] }
+            { id: 'downloads', label: 'Platform Downloads', color: '#3b82f6', data: sliceData(downloadsData), hidden: !!hiddenSeries['downloads'] },
+            { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: !!hiddenSeries['apiDownloads'] }
         ],
         views: [
             { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: !!hiddenSeries['views'] }
         ],
         newProjects: [
             { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: !!hiddenSeries['newProjects'] },
-            { id: 'newUsers', label: 'New Users', color: '#f59e0b', data: sliceData(newUsersData), hidden: !!hiddenSeries['newUsers'] }
+            { id: 'newUsers', label: 'New Users', color: '#f59e0b', data: sliceData(newUsersData), hidden: !!hiddenSeries['newUsers'] },
+            { id: 'newOrgs', label: 'New Organizations', color: '#8b5cf6', data: sliceData(newOrgsData), hidden: !!hiddenSeries['newOrgs'] }
         ],
         growth: [
             { id: 'downloadsGrowth', label: 'Downloads Momentum', color: '#3b82f6', data: sliceData(calculateWoW(downloadsData)), hidden: !!hiddenSeries['downloadsGrowth'] },
@@ -151,7 +155,7 @@ export const PlatformAnalytics: React.FC = () => {
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-blue-500"><Download className="w-5 h-5" /></div>
                             <div>
                                 <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Downloads over Time</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform-wide daily downloads.</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform vs API daily downloads.</p>
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
@@ -177,7 +181,7 @@ export const PlatformAnalytics: React.FC = () => {
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-emerald-500"><PackagePlus className="w-5 h-5" /></div>
                             <div>
                                 <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">New Creations</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily new users and projects.</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily new users, orgs, and projects.</p>
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">

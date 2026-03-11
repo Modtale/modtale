@@ -22,6 +22,7 @@ public class PlatformMonthlyStats {
     private long frontendDownloads;
     private long newProjects;
     private long newUsers;
+    private long newOrgs;
 
     private Map<String, DayStats> days = new HashMap<>();
 
@@ -54,22 +55,34 @@ public class PlatformMonthlyStats {
     public long getNewUsers() { return newUsers; }
     public void setNewUsers(long newUsers) { this.newUsers = newUsers; }
 
+    public long getNewOrgs() { return newOrgs; }
+    public void setNewOrgs(long newOrgs) { this.newOrgs = newOrgs; }
+
     public Map<String, DayStats> getDays() { return days; }
     public void setDays(Map<String, DayStats> days) { this.days = days; }
 
     public static class DayStats {
         private int v;
         private int d;
-        private int n;
-        private int u;
+        private int a; // api downloads
+        private int f; // frontend downloads
+        private int n; // new projects
+        private int u; // new users
+        private int o; // new orgs
 
         public int getV() { return v; }
         public void setV(int v) { this.v = v; }
         public int getD() { return d; }
         public void setD(int d) { this.d = d; }
+        public int getA() { return a; }
+        public void setA(int a) { this.a = a; }
+        public int getF() { return f; }
+        public void setF(int f) { this.f = f; }
         public int getN() { return n; }
         public void setN(int n) { this.n = n; }
         public int getU() { return u; }
         public void setU(int u) { this.u = u; }
+        public int getO() { return o; }
+        public void setO(int o) { this.o = o; }
     }
 }
