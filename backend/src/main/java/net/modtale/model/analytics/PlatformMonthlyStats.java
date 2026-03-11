@@ -21,6 +21,7 @@ public class PlatformMonthlyStats {
     private long apiDownloads;
     private long frontendDownloads;
     private long newProjects;
+    private long newUsers;
 
     private Map<String, DayStats> days = new HashMap<>();
 
@@ -50,6 +51,9 @@ public class PlatformMonthlyStats {
     public long getNewProjects() { return newProjects; }
     public void setNewProjects(long newProjects) { this.newProjects = newProjects; }
 
+    public long getNewUsers() { return newUsers; }
+    public void setNewUsers(long newUsers) { this.newUsers = newUsers; }
+
     public Map<String, DayStats> getDays() { return days; }
     public void setDays(Map<String, DayStats> days) { this.days = days; }
 
@@ -57,6 +61,7 @@ public class PlatformMonthlyStats {
         private int v;
         private int d;
         private int n;
+        private int u;
 
         public int getV() { return v; }
         public void setV(int v) { this.v = v; }
@@ -64,5 +69,7 @@ public class PlatformMonthlyStats {
         public void setD(int d) { this.d = d; }
         public int getN() { return n; }
         public void setN(int n) { this.n = n; }
+        public int getU() { return u; }
+        public void setU(int u) { this.u = u; }
     }
 }

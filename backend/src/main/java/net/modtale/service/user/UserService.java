@@ -110,6 +110,8 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
+        analyticsService.logNewUser(savedUser.getId());
+
         try {
             emailService.sendVerificationEmail(email, username, savedUser.getVerificationToken());
         } catch (Exception e) {
@@ -455,7 +457,11 @@ public class UserService {
         members.add(new User.OrganizationMember(owner.getId(), "ADMIN"));
         org.setOrganizationMembers(members);
 
-        return userRepository.save(org);
+        User savedOrg = userRepository.save(org);
+
+        analyticsService.logNewUser(savedOrg.getId());
+
+        return savedOrg;
     }
 
     public User updateOrganization(String orgId, String newName, String bio, User requester) {
@@ -804,7 +810,10 @@ public class UserService {
             if ("gitlab".equals(provider)) user.setGitlabAccessToken(accessToken);
 
             updateConnectedAccount(user, provider, providerId, oauthUsername, profileUrl, isVisible);
-            userRepository.save(user);
+            User savedUser = userRepository.save(user);
+
+            analyticsService.logNewUser(savedUser.getId());
+            user = savedUser;
         }
 
         Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());

@@ -48,7 +48,8 @@ public class AnalyticsService {
 
     private final ConcurrentLinkedQueue<DownloadEvent> downloadBuffer = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<String, AtomicInteger> viewBuffer = new ConcurrentHashMap<>();
-    private final ConcurrentLinkedQueue<String> newProjectBuffer = new ConcurrentLinkedQueue<>(); // Added buffer
+    private final ConcurrentLinkedQueue<String> newProjectBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> newUserBuffer = new ConcurrentLinkedQueue<>();
 
     private final Cache<String, Boolean> debounceCache = Caffeine.newBuilder()
             .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -408,9 +409,13 @@ public class AnalyticsService {
         newProjectBuffer.add(projectId);
     }
 
+    public void logNewUser(String userId) {
+        newUserBuffer.add(userId);
+    }
+
     @Scheduled(fixedRate = 10000)
     public void flushAnalyticsBuffer() {
-        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty()) return;
+        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty() && newUserBuffer.isEmpty()) return;
 
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
@@ -541,6 +546,23 @@ public class AnalyticsService {
                 logger.error("Failed to flush new project stats", e);
             }
         }
+
+        int newUserCount = 0;
+        while(newUserBuffer.poll() != null) {
+            newUserCount++;
+        }
+
+        if (newUserCount > 0) {
+            try {
+                Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+                Update pu = new Update()
+                        .inc("newUsers", newUserCount)
+                        .inc("days." + day + ".u", newUserCount);
+                mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+            } catch (Exception e) {
+                logger.error("Failed to flush new user stats", e);
+            }
+        }
     }
 
     private static class ProjectDownloadAggregate {
@@ -568,8 +590,10 @@ public class AnalyticsService {
         LocalDate end = LocalDate.now();
         LocalDate start = calculateStartDate(range);
 
-        int startY = start.getYear();
-        int startM = start.getMonthValue();
+        LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
+
+        int startY = chartStart.getYear();
+        int startM = chartStart.getMonthValue();
 
         Criteria criteria = new Criteria().orOperator(
                 Criteria.where("year").gt(startY),
@@ -585,10 +609,12 @@ public class AnalyticsService {
         long totalApi = 0;
         long totalFrontend = 0;
         long totalNewProjects = 0;
+        long totalNewUsers = 0;
 
         Map<LocalDate, Integer> downloadSeries = new HashMap<>();
         Map<LocalDate, Integer> viewSeries = new HashMap<>();
         Map<LocalDate, Integer> newProjectsSeries = new HashMap<>();
+        Map<LocalDate, Integer> newUsersSeries = new HashMap<>();
 
         for (PlatformMonthlyStats stat : stats) {
             YearMonth ym = YearMonth.of(stat.getYear(), stat.getMonth());
@@ -598,14 +624,18 @@ public class AnalyticsService {
                     try {
                         int day = Integer.parseInt(entry.getKey());
                         LocalDate date = ym.atDay(day);
-                        if (!date.isBefore(start) && !date.isAfter(end)) {
+                        if (!date.isBefore(chartStart) && !date.isAfter(end)) {
                             downloadSeries.put(date, entry.getValue().getD());
                             viewSeries.put(date, entry.getValue().getV());
                             newProjectsSeries.put(date, entry.getValue().getN());
+                            newUsersSeries.put(date, entry.getValue().getU());
 
-                            totalDownloads += entry.getValue().getD();
-                            totalViews += entry.getValue().getV();
-                            totalNewProjects += entry.getValue().getN();
+                            if (!date.isBefore(start)) {
+                                totalDownloads += entry.getValue().getD();
+                                totalViews += entry.getValue().getV();
+                                totalNewProjects += entry.getValue().getN();
+                                totalNewUsers += entry.getValue().getU();
+                            }
                         }
                     } catch (Exception ignored) {}
                 }
@@ -620,10 +650,12 @@ public class AnalyticsService {
         summary.setApiDownloads(totalApi);
         summary.setFrontendDownloads(totalFrontend);
         summary.setTotalNewProjects(totalNewProjects);
+        summary.setTotalNewUsers(totalNewUsers);
 
-        summary.setDownloadsChart(fillDates(start, end, downloadSeries));
-        summary.setViewsChart(fillDates(start, end, viewSeries));
-        summary.setNewProjectsChart(fillDates(start, end, newProjectsSeries));
+        summary.setDownloadsChart(fillDates(chartStart, end, downloadSeries));
+        summary.setViewsChart(fillDates(chartStart, end, viewSeries));
+        summary.setNewProjectsChart(fillDates(chartStart, end, newProjectsSeries));
+        summary.setNewUsersChart(fillDates(chartStart, end, newUsersSeries));
 
         return summary;
     }
