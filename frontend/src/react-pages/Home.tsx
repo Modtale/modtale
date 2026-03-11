@@ -56,10 +56,7 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
     const projectUrl = `/${mod.classification === 'MODPACK' ? 'modpack' : mod.classification === 'SAVE' ? 'world' : 'mod'}/${createSlug(mod.title, mod.id)}`;
 
     return (
-        <Link
-            to={projectUrl}
-            className="flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl overflow-hidden group hover:border-modtale-accent/50 dark:hover:border-modtale-accent/40 hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02]"
-        >
+        <div className="flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl overflow-hidden group hover:border-modtale-accent/50 dark:hover:border-modtale-accent/40 hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] relative">
             <div className="w-full aspect-[21/9] relative bg-slate-800 border-b border-slate-100 dark:border-white/5 overflow-hidden">
                 {bannerUrl && (
                     <img
@@ -69,10 +66,11 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
                         loading="lazy"
                     />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 dark:from-slate-900 dark:via-slate-900/40 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent" />
             </div>
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 shadow-xl border-4 border-white dark:border-slate-900 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 z-10 ring-1 ring-black/5 dark:ring-white/10">
+
+                <div className="w-16 h-16 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white/10 dark:border-white/5 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 z-10 ring-1 ring-black/5 dark:ring-white/10">
                     <img
                         src={iconUrl}
                         alt=""
@@ -80,15 +78,30 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
                         onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
                     />
                 </div>
-                <div className="mt-8 flex-1">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight">{mod.title}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">By {mod.author}</p>
+
+                <div className="mt-8 flex-1 relative">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight">
+                        <Link to={projectUrl} className="before:content-[''] before:absolute before:inset-0 before:z-10 focus:outline-none">
+                            {mod.title}
+                        </Link>
+                    </h3>
+                    <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1 relative z-20">
+                        <span>By</span>
+                        <Link
+                            to={`/creator/${mod.author}`}
+                            className="hover:text-modtale-accent hover:underline focus:outline-none relative z-20"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {mod.author}
+                        </Link>
+                    </div>
                 </div>
-                <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+
+                <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest relative z-20">
                     <Download className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" /> {mod.downloadCount?.toLocaleString() || 0}
                 </div>
             </div>
-        </Link>
+        </div>
     );
 };
 
