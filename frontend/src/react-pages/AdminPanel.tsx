@@ -217,10 +217,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
 
                         {activeTab === 'analytics' && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="mb-8">
-                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Platform Analytics</h1>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Monitor platform-wide statistics and growth.</p>
-                                </div>
                                 <PlatformAnalytics />
                             </div>
                         )}
