@@ -79,6 +79,11 @@ export const PlatformAnalytics: React.FC = () => {
 
     if (!data) return null;
 
+    const calcTrend = (current: number, previous: number) => {
+        if (!previous) return current > 0 ? 100 : 0;
+        return ((current - previous) / previous) * 100;
+    };
+
     const formatData = (chartData: any[]) => {
         return chartData?.map((d: any) => ({ date: d.date, value: d.count })) || [];
     };
@@ -143,10 +148,31 @@ export const PlatformAnalytics: React.FC = () => {
 
             <div className="w-full space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <SummaryCard title="Total Downloads" value={data.totalDownloads.toLocaleString()} icon={Download} color="text-blue-500" />
-                    <SummaryCard title="Total Views" value={data.totalViews.toLocaleString()} icon={Eye} color="text-purple-500" />
-                    <SummaryCard title="New Signups" value={data.totalNewUsers.toLocaleString()} icon={UserPlus} color="text-orange-500" />
-                    <SummaryCard title="API Traffic" value={apiPercentage} isPercent subValue={`${data.apiDownloads.toLocaleString()} downloads`} icon={Server} color="text-emerald-500" />
+                    <SummaryCard
+                        title="Downloads"
+                        value={data.totalDownloads.toLocaleString()}
+                        trend={calcTrend(data.totalDownloads, data.previousTotalDownloads)}
+                        icon={Download} color="text-blue-500"
+                    />
+                    <SummaryCard
+                        title="Views"
+                        value={data.totalViews.toLocaleString()}
+                        trend={calcTrend(data.totalViews, data.previousTotalViews)}
+                        icon={Eye} color="text-purple-500"
+                    />
+                    <SummaryCard
+                        title="New Signups"
+                        value={data.totalNewUsers.toLocaleString()}
+                        trend={calcTrend(data.totalNewUsers, data.previousTotalNewUsers)}
+                        icon={UserPlus} color="text-orange-500"
+                    />
+                    <SummaryCard
+                        title="API Traffic"
+                        value={apiPercentage} isPercent
+                        subValue={`${data.apiDownloads.toLocaleString()} requests`}
+                        trend={calcTrend(data.apiDownloads, data.previousApiDownloads)}
+                        icon={Server} color="text-emerald-500"
+                    />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
