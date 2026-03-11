@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Mod } from '../../types';
-import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe } from 'lucide-react';
+import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe, ChevronRight } from 'lucide-react';
 import { BACKEND_URL } from '../../utils/api';
 import { Link } from 'react-router-dom';
 import { getProjectUrl } from '../../utils/slug';
@@ -14,6 +14,7 @@ interface ModCardProps {
     isLoggedIn: boolean;
     onClick?: () => void;
     priority?: boolean;
+    viewStyle?: 'grid' | 'list' | 'compact';
 }
 
 const getClassificationIcon = (cls: string) => {
@@ -52,7 +53,7 @@ const formatTimeAgo = (dateString: string) => {
     return "Just now";
 };
 
-export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, onClick }) => {
+export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, onClick, viewStyle = 'grid' }) => {
     const title = mod.title || 'Untitled Project';
     const author = mod.author || 'Unknown';
     const canonicalPath = path || getProjectUrl(mod);
@@ -79,6 +80,72 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         prefetchProject(mod.id);
     };
 
+    if (viewStyle === 'compact') {
+        return (
+            <div
+                onMouseEnter={handleMouseEnter}
+                className="group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 hover:border-modtale-accent transition-all shadow-sm"
+            >
+                <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
+                <img src={resolvedImage} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">{title}</h3>
+                    <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
+                        <span>by</span>
+                        <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 font-bold hover:text-modtale-accent hover:underline truncate">
+                            {author}
+                        </Link>
+                    </div>
+                </div>
+                <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                    <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1"><Download className="w-3 h-3" /> {downloads}</span>
+                        <span className="flex items-center gap-1"><Heart className={`w-3 h-3 ${isFavorite ? 'text-red-500 fill-current' : ''}`} /> {favorites}</span>
+                    </div>
+                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {timeAgo}</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-modtale-accent transition-colors shrink-0" />
+            </div>
+        );
+    }
+
+    if (viewStyle === 'list') {
+        return (
+            <div
+                onMouseEnter={handleMouseEnter}
+                className="group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:border-modtale-accent/50 transition-all shadow-md p-4"
+            >
+                <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
+                <div className="w-full sm:w-32 h-32 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800">
+                    <img src={resolvedImage} alt={title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col">
+                    <div className="flex justify-between items-start gap-4">
+                        <div>
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate">{title}</h3>
+                            <div className="flex items-center gap-1 text-xs font-bold text-slate-500">
+                                <span>by</span>
+                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 hover:text-modtale-accent hover:underline">
+                                    {author}
+                                </Link>
+                            </div>
+                        </div>
+                        <div className="bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                            <span className="text-modtale-accent">{getClassificationIcon(classification)}</span>
+                            {displayClassification}
+                        </div>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1">{desc}</p>
+                    <div className="mt-4 flex items-center gap-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span className="flex items-center gap-1.5"><Download className="w-4 h-4" /> {downloads}</span>
+                        <span className="flex items-center gap-1.5"><Heart className={`w-4 h-4 ${isFavorite ? 'text-red-500 fill-current' : ''}`} /> {favorites}</span>
+                        <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {timeAgo}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             onMouseEnter={handleMouseEnter}
@@ -89,7 +156,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
             <Link
                 to={canonicalPath}
                 onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
-                className="absolute inset-0 z-30 focus:outline-none"
+                className="absolute inset-0 z-10 focus:outline-none"
                 aria-hidden="true"
                 tabIndex={-1}
             />
@@ -111,7 +178,6 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 )}
 
                 <div className="absolute top-3 right-3 z-40">
-                    {/* Opaque category indicator */}
                     <div className="bg-white/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-800 dark:text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center border border-slate-200 dark:border-white/10 shadow-sm relative">
                         <span className="mr-1.5 text-modtale-accent">{getClassificationIcon(classification)}</span>
                         <span>{displayClassification}</span>
@@ -139,7 +205,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         <Link
                             to={canonicalPath}
                             onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
-                            className="relative z-40 focus:outline-none"
+                            className="relative z-10 focus:outline-none"
                         >
                             {title}
                         </Link>
@@ -150,7 +216,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         <Link
                             to={`/creator/${author}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="hover:text-modtale-accent hover:underline focus:outline-none relative z-40"
+                            className="hover:text-modtale-accent hover:underline focus:outline-none relative z-20"
                         >
                             {author}
                         </Link>
@@ -174,7 +240,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                                 e.stopPropagation();
                                 if(isLoggedIn) onToggleFavorite(mod.id);
                             }}
-                            className={`flex items-center gap-1.5 transition-colors relative z-40 ${
+                            className={`flex items-center gap-1.5 transition-colors relative z-20 ${
                                 !isLoggedIn
                                     ? 'text-slate-300 dark:text-white/10 cursor-not-allowed'
                                     : isFavorite
@@ -201,7 +267,8 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         prevProps.mod.favoriteCount === nextProps.mod.favoriteCount &&
         prevProps.isFavorite === nextProps.isFavorite &&
         prevProps.isLoggedIn === nextProps.isLoggedIn &&
-        prevProps.priority === nextProps.priority
+        prevProps.priority === nextProps.priority &&
+        prevProps.viewStyle === nextProps.viewStyle
     );
 });
 
