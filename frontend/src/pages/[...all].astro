@@ -13,10 +13,6 @@ const cleanPath = path.replace(/\/$/, "");
 
 const API_URL = import.meta.env.PUBLIC_API_URL;
 
-if (cleanPath === '/mods') {
-    return Astro.redirect('/', 301);
-}
-
 let title = DEFAULT_SEO.title;
 let description = DEFAULT_SEO.description;
 let keywords = DEFAULT_SEO.keywords;
