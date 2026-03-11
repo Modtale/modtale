@@ -227,7 +227,7 @@ const InlineDownloadUI = () => {
                                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                                         <span>{ver.date}</span>
                                         <span className="w-1 h-1 rounded-full bg-slate-400/50 dark:bg-slate-600/50"></span>
-                                        <span>2026.01.13-dcad8778f</span>
+                                        <span>2026.03.11-dcad8778f</span>
                                     </div>
                                 </div>
                                 <button className="p-2 bg-white/50 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-700 dark:text-slate-300 rounded-lg transition-all shrink-0 shadow-sm border border-white/30 dark:border-white/5">
@@ -265,7 +265,7 @@ const InlineDownloadUI = () => {
                 <div className="mb-5 relative z-0 shrink-0">
                     <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
                     <div className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-sm cursor-pointer ${GLASS_ITEM}`}>
-                        <span>2026.01.13-dcad8778f</span>
+                        <span>2026.03.11-dcad8778f</span>
                         <ChevronDown className="w-4 h-4 text-slate-500" />
                     </div>
                 </div>
@@ -344,8 +344,25 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
     useEffect(() => {
         const fetchMods = async () => {
             try {
-                const res = await api.get('/projects', { params: { size: 50, sort: 'trending' } });
-                setAllMods(res.data?.content || []);
+                const [trending, popular, gems, relevance] = await Promise.all([
+                    api.get('/projects', { params: { size: 20, sort: 'trending' } }),
+                    api.get('/projects', { params: { size: 20, sort: 'popular' } }),
+                    api.get('/projects', { params: { size: 20, category: 'hidden_gems', sort: 'favorites' } }),
+                    api.get('/projects', { params: { size: 20, sort: 'relevance' } })
+                ]);
+
+                const combined = [
+                    ...(trending.data?.content || []),
+                    ...(popular.data?.content || []),
+                    ...(gems.data?.content || []),
+                    ...(relevance.data?.content || [])
+                ];
+
+                // De-duplicate by ID and shuffle
+                const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
+                const mixed = unique.sort(() => Math.random() - 0.5);
+
+                setAllMods(mixed);
             } catch (err) {
                 console.error("Failed to fetch mods", err);
             }
@@ -404,7 +421,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
         return withIcons[Math.floor(Math.random() * withIcons.length)];
     }, [allMods]);
 
-    const displayFeaturedMods = validFeaturedMods.slice(0, 10);
+    const displayFeaturedMods = validFeaturedMods.slice(0, 16);
     const col1Mods = displayFeaturedMods.filter((_, i) => i % 2 === 0);
     const col2Mods = displayFeaturedMods.filter((_, i) => i % 2 === 1);
 
