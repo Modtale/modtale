@@ -459,7 +459,7 @@ public class UserService {
 
         User savedOrg = userRepository.save(org);
 
-        analyticsService.logNewUser(savedOrg.getId());
+        analyticsService.logNewOrg(savedOrg.getId());
 
         return savedOrg;
     }
@@ -1101,11 +1101,6 @@ public class UserService {
         Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id");
         return mongoTemplate.find(query, User.class);
-    }
-
-    public CreatorAnalytics getCreatorAnalytics(String userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        return analyticsService.getCreatorDashboard(user.getUsername(), "30d", null);
     }
 
     public void setUserTier(String userId, ApiKey.Tier newTier) {

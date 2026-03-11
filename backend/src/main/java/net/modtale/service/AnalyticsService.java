@@ -50,6 +50,7 @@ public class AnalyticsService {
     private final ConcurrentHashMap<String, AtomicInteger> viewBuffer = new ConcurrentHashMap<>();
     private final ConcurrentLinkedQueue<String> newProjectBuffer = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<String> newUserBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> newOrgBuffer = new ConcurrentLinkedQueue<>();
 
     private final Cache<String, Boolean> debounceCache = Caffeine.newBuilder()
             .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -413,9 +414,13 @@ public class AnalyticsService {
         newUserBuffer.add(userId);
     }
 
+    public void logNewOrg(String orgId) {
+        newOrgBuffer.add(orgId);
+    }
+
     @Scheduled(fixedRate = 10000)
     public void flushAnalyticsBuffer() {
-        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty() && newUserBuffer.isEmpty()) return;
+        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty() && newUserBuffer.isEmpty() && newOrgBuffer.isEmpty()) return;
 
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
@@ -455,7 +460,9 @@ public class AnalyticsService {
                     .inc("totalDownloads", agg.total)
                     .inc("apiDownloads", agg.api)
                     .inc("frontendDownloads", agg.frontend)
-                    .inc("days." + day + ".d", agg.total);
+                    .inc("days." + day + ".d", agg.total)
+                    .inc("days." + day + ".a", agg.api)
+                    .inc("days." + day + ".f", agg.frontend);
 
             for (Map.Entry<String, Integer> vEntry : agg.versions.entrySet()) {
                 String safeVersion = vEntry.getKey().replace(".", "_");
@@ -476,7 +483,9 @@ public class AnalyticsService {
                         .inc("totalDownloads", platformAggregate.total)
                         .inc("apiDownloads", platformAggregate.api)
                         .inc("frontendDownloads", platformAggregate.frontend)
-                        .inc("days." + day + ".d", platformAggregate.total);
+                        .inc("days." + day + ".d", platformAggregate.total)
+                        .inc("days." + day + ".a", platformAggregate.api)
+                        .inc("days." + day + ".f", platformAggregate.frontend);
                 mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
             } catch (Exception e) {
                 logger.error("Failed to flush platform download stats", e);
@@ -563,6 +572,23 @@ public class AnalyticsService {
                 logger.error("Failed to flush new user stats", e);
             }
         }
+
+        int newOrgCount = 0;
+        while(newOrgBuffer.poll() != null) {
+            newOrgCount++;
+        }
+
+        if (newOrgCount > 0) {
+            try {
+                Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+                Update pu = new Update()
+                        .inc("newOrgs", newOrgCount)
+                        .inc("days." + day + ".o", newOrgCount);
+                mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+            } catch (Exception e) {
+                logger.error("Failed to flush new org stats", e);
+            }
+        }
     }
 
     private static class ProjectDownloadAggregate {
@@ -610,11 +636,14 @@ public class AnalyticsService {
         long totalFrontend = 0;
         long totalNewProjects = 0;
         long totalNewUsers = 0;
+        long totalNewOrgs = 0;
 
         Map<LocalDate, Integer> downloadSeries = new HashMap<>();
+        Map<LocalDate, Integer> apiDownloadSeries = new HashMap<>();
         Map<LocalDate, Integer> viewSeries = new HashMap<>();
         Map<LocalDate, Integer> newProjectsSeries = new HashMap<>();
         Map<LocalDate, Integer> newUsersSeries = new HashMap<>();
+        Map<LocalDate, Integer> newOrgsSeries = new HashMap<>();
 
         for (PlatformMonthlyStats stat : stats) {
             YearMonth ym = YearMonth.of(stat.getYear(), stat.getMonth());
@@ -626,15 +655,18 @@ public class AnalyticsService {
                         LocalDate date = ym.atDay(day);
                         if (!date.isBefore(chartStart) && !date.isAfter(end)) {
                             downloadSeries.put(date, entry.getValue().getD());
+                            apiDownloadSeries.put(date, entry.getValue().getA());
                             viewSeries.put(date, entry.getValue().getV());
                             newProjectsSeries.put(date, entry.getValue().getN());
                             newUsersSeries.put(date, entry.getValue().getU());
+                            newOrgsSeries.put(date, entry.getValue().getO());
 
                             if (!date.isBefore(start)) {
                                 totalDownloads += entry.getValue().getD();
                                 totalViews += entry.getValue().getV();
                                 totalNewProjects += entry.getValue().getN();
                                 totalNewUsers += entry.getValue().getU();
+                                totalNewOrgs += entry.getValue().getO();
                             }
                         }
                     } catch (Exception ignored) {}
@@ -651,11 +683,14 @@ public class AnalyticsService {
         summary.setFrontendDownloads(totalFrontend);
         summary.setTotalNewProjects(totalNewProjects);
         summary.setTotalNewUsers(totalNewUsers);
+        summary.setTotalNewOrgs(totalNewOrgs);
 
         summary.setDownloadsChart(fillDates(chartStart, end, downloadSeries));
+        summary.setApiDownloadsChart(fillDates(chartStart, end, apiDownloadSeries));
         summary.setViewsChart(fillDates(chartStart, end, viewSeries));
         summary.setNewProjectsChart(fillDates(chartStart, end, newProjectsSeries));
         summary.setNewUsersChart(fillDates(chartStart, end, newUsersSeries));
+        summary.setNewOrgsChart(fillDates(chartStart, end, newOrgsSeries));
 
         return summary;
     }
