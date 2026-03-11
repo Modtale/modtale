@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Heart, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight, Clock, CornerDownLeft, PackageSearch } from 'lucide-react';
+import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Heart, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight, Clock, CornerDownLeft, PackageSearch, LayoutGrid, List, AlignJustify } from 'lucide-react';
 
 import type { Mod, Modpack, World } from '../types';
 import { ModCard } from '../components/resources/ModCard';
@@ -151,6 +151,8 @@ interface HomeFiltersProps {
     setFilterDate: (d: string | null) => void;
     setPage: (p: number) => void;
     isMobile: boolean;
+    viewStyle: 'grid' | 'list' | 'compact';
+    onViewStyleChange: (style: 'grid' | 'list' | 'compact') => void;
 }
 
 export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
@@ -159,7 +161,7 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                                                                          selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
                                                                          isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
                                                                          selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage,
-                                                                         isMobile
+                                                                         isMobile, viewStyle, onViewStyleChange
                                                                      }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
@@ -274,6 +276,30 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 w-full md:w-auto shrink-0">
+                    <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm">
+                        <button
+                            onClick={() => onViewStyleChange('grid')}
+                            className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                            title="Grid View"
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => onViewStyleChange('list')}
+                            className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'list' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                            title="List View"
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => onViewStyleChange('compact')}
+                            className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'compact' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                            title="Compact View"
+                        >
+                            <AlignJustify className="w-4 h-4" />
+                        </button>
+                    </div>
+
                     <div className="relative flex-1 md:flex-none shrink-0 h-10" ref={tagRef}>
                         <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-between md:justify-start gap-2 border rounded-xl px-3 md:px-4 text-xs md:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
                             <div className="flex items-center gap-2 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
@@ -556,6 +582,7 @@ export const Browse: React.FC<BrowseProps> = ({
     const rawTags = searchParams.get('tags');
     const selectedTags = useMemo(() => rawTags ? rawTags.split(',').filter(Boolean) : [], [rawTags]);
     const urlSearchTerm = searchParams.get('q') || '';
+    const viewStyle = (searchParams.get('style') as 'grid' | 'list' | 'compact') || 'grid';
 
     const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
 
@@ -620,8 +647,21 @@ export const Browse: React.FC<BrowseProps> = ({
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
-            const isWide = width >= 1800;
-            const targetSize = isWide ? 18 : 12;
+            let cols = 1;
+            let rows = 12;
+
+            if (viewStyle === 'grid') {
+                cols = width >= 1800 ? 3 : (width >= 768 ? 2 : 1);
+                rows = 6; // 6 rows of cards
+            } else if (viewStyle === 'compact') {
+                cols = width >= 1280 ? 3 : (width >= 768 ? 2 : 1);
+                rows = 20; // 20 rows of projects
+            } else {
+                cols = 1;
+                rows = 12;
+            }
+
+            const targetSize = cols * rows;
 
             setItemsPerPage(prev => {
                 if (prev !== targetSize) {
@@ -637,13 +677,9 @@ export const Browse: React.FC<BrowseProps> = ({
         };
 
         handleResize();
-        window.addEventListener('scroll', handleResize);
         window.addEventListener('resize', handleResize);
-        return () => {
-            window.removeEventListener('scroll', handleResize);
-            window.removeEventListener('resize', handleResize);
-        };
-    }, [setSearchParams]);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [setSearchParams, viewStyle]);
 
     useEffect(() => {
         if (cardsSectionRef.current && page === 0) {
@@ -906,22 +942,24 @@ export const Browse: React.FC<BrowseProps> = ({
                                 setFilterDate={useCallback((v: string | null) => updateParams({ date: v }), [updateParams])}
                                 setPage={handlePageChange}
                                 isMobile={isMobile}
+                                viewStyle={viewStyle}
+                                onViewStyleChange={useCallback((style: string) => updateParams({ style }), [updateParams])}
                             />
                         </div>
 
                         {loading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-5 mt-4">
+                            <div className={viewStyle === 'grid' ? "grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-5 mt-4" : viewStyle === 'compact' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4" : "space-y-4 mt-4"}>
                                 {[...Array(itemsPerPage)].map((_, i) => (
                                     <div
                                         key={i}
-                                        className="h-[154px] bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-2xl animate-pulse border border-slate-200 dark:border-white/10 relative overflow-hidden"
+                                        className={`${viewStyle === 'grid' ? 'h-[154px]' : viewStyle === 'list' ? 'h-32' : 'h-16'} bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-2xl animate-pulse border border-slate-200 dark:border-white/10 relative overflow-hidden`}
                                     >
                                         <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
                                     </div>
                                 ))}
                             </div>
                         ) : items.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-6 mt-4">
+                            <div className={viewStyle === 'grid' ? "grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-6 mt-4" : viewStyle === 'compact' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4" : "space-y-4 mt-4"}>
                                 {items.map((item, index) => {
                                     const isPriority = index < 6;
                                     return (
@@ -938,6 +976,7 @@ export const Browse: React.FC<BrowseProps> = ({
                                                 isLoggedIn={isLoggedIn}
                                                 onClick={() => { if(item.classification === 'MODPACK') onModpackClick(item as Modpack); else if (item.classification === 'SAVE') onWorldClick(item as World); else onModClick(item as Mod); }}
                                                 priority={isPriority}
+                                                viewStyle={viewStyle}
                                             />
                                         </div>
                                     );
