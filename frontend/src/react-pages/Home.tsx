@@ -4,10 +4,11 @@ import { Helmet } from 'react-helmet-async';
 import {
     Search, Upload, ChevronRight, Check,
     AlertCircle, Download, Link as LinkIcon, Bell,
-    Zap, BarChart3, Box, ChevronDown, Github, Code, X, List
+    BarChart3, Box, ChevronDown, Github, Code, X, List
 } from 'lucide-react';
 import { LineChart } from '../components/ui/charts/LineChart';
-import type { Mod } from '../types';
+import { SignInModal } from '../components/user/SignInModal';
+import type { Mod, User } from '../types';
 import { api, BACKEND_URL } from '../utils/api';
 import { createSlug } from '../utils/slug';
 
@@ -315,10 +316,12 @@ const InlineNotificationUI = () => (
     </div>
 );
 
-export const Home: React.FC = () => {
+export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
+    const navigate = useNavigate();
     const [allMods, setAllMods] = useState<Mod[]>([]);
     const [stats, setStats] = useState({ totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const [chartConfig, setChartConfig] = useState({ viewsHidden: false, downloadsHidden: false });
+    const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchMods = async () => {
@@ -362,6 +365,15 @@ export const Home: React.FC = () => {
         }));
     };
 
+    const handlePublishClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (user) {
+            navigate('/upload');
+        } else {
+            setIsSignInModalOpen(true);
+        }
+    };
+
     const validFeaturedMods = allMods.filter(mod => {
         const hasBanner = Boolean(mod.bannerUrl);
         const hasCustomIcon = Boolean(mod.imageUrl) && !mod.imageUrl.includes('favicon.svg') && !mod.imageUrl.includes('favicon.png');
@@ -394,6 +406,8 @@ export const Home: React.FC = () => {
                     }
                 `}</style>
             </Helmet>
+
+            <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
 
             <main className="relative z-10">
                 <section className="relative w-full min-h-[90vh] flex flex-col items-center justify-center pt-28 lg:pt-36 pb-20 border-b border-slate-200 dark:border-white/5 overflow-hidden">
@@ -435,13 +449,14 @@ export const Home: React.FC = () => {
                                     <Search className="w-5 h-5 mr-3" />
                                     Discover Projects
                                 </Link>
-                                <Link
-                                    to="/upload"
-                                    className="flex items-center justify-center px-10 h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                <a
+                                    href="/upload"
+                                    onClick={handlePublishClick}
+                                    className="flex items-center justify-center px-10 h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
                                 >
                                     <Upload className="w-5 h-5 mr-3 text-slate-400 dark:text-slate-500" />
                                     Publish Work
-                                </Link>
+                                </a>
                             </div>
 
                             <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-10 sm:gap-14 w-fit p-8 shadow-sm`}>
@@ -535,9 +550,9 @@ export const Home: React.FC = () => {
                             <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                                 Creators get access to powerful, privacy-respecting analytics. Track your daily downloads, page views, and week-over-week growth metrics instantly from your dashboard.
                             </p>
-                            <Link to="/upload" className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-lg">
+                            <a href="/upload" onClick={handlePublishClick} className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-lg cursor-pointer">
                                 Publish your project <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" />
-                            </Link>
+                            </a>
                         </div>
                         <div className="flex-1 w-full relative">
                             <div className="absolute -inset-10 bg-gradient-to-tr from-purple-400/20 to-transparent dark:from-purple-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
