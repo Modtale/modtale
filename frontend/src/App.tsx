@@ -194,7 +194,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                 <div className="flex-1">
                     <Suspense fallback={<div className="p-20 flex justify-center"><Spinner /></div>}>
                         <Routes>
-                            <Route path="/" element={<Home />} />
+                            <Route path="/" element={<Home user={user} />} />
 
                             <Route path="/mods" element={renderBrowse()} />
                             <Route path="/projects" element={<Navigate to="/mods" replace />} />
