@@ -86,11 +86,11 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
     return (
         <div
             onMouseEnter={handleMouseEnter}
-            className="group relative flex flex-col h-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-modtale-accent dark:hover:border-modtale-accent transition-colors overflow-hidden"
+            className="group relative flex flex-col h-full bg-white/40 dark:bg-slate-800/40 backdrop-blur-xl rounded-lg border border-slate-200/60 dark:border-white/10 hover:border-modtale-accent dark:hover:border-modtale-accent transition-all duration-300 overflow-hidden"
             role="article"
             aria-label={`Project: ${title} by ${author}`}
         >
-            <div className="relative h-24 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-200/50 dark:border-white/5">
+            <div className="relative h-24 w-full shrink-0 overflow-hidden bg-slate-100/20 dark:bg-slate-900/30 border-b border-slate-200/50 dark:border-white/5">
                 {resolvedBanner ? (
                     <img
                         src={resolvedBanner}
@@ -100,14 +100,14 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         fetchPriority={priority ? "high" : "auto"}
                         width={600}
                         height={96}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                     />
                 ) : (
-                    <div className="w-full h-full bg-slate-200 dark:bg-slate-700" />
+                    <div className="w-full h-full bg-slate-200/30 dark:bg-slate-700/30" />
                 )}
 
                 <div className="absolute top-2 right-2 z-20">
-                    <div className="bg-slate-900/80 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center">
+                    <div className="bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded flex items-center border border-white/10 shadow-sm">
                         <span className="mr-1 text-modtale-accent">{getClassificationIcon(classification)}</span>
                         <span>{displayClassification}</span>
                     </div>
@@ -116,7 +116,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
 
             <div className="flex px-4 flex-1">
                 <div className="flex-shrink-0 -mt-8 mb-2 relative z-10">
-                    <div className="w-20 h-20 rounded-lg bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative">
+                    <div className="w-20 h-20 rounded-lg bg-transparent shadow-md border-4 border-white/80 dark:border-slate-800/80 overflow-hidden relative">
                         <img
                             src={resolvedImage}
                             onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
@@ -126,10 +126,10 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                             decoding={priority ? "sync" : "async"}
                             loading={priority ? "eager" : "lazy"}
                             fetchPriority={priority ? "high" : "auto"}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                         />
                         {classification === 'MODPACK' && modCount > 0 && (
-                            <div className="absolute bottom-0 right-0 bg-slate-900/75 text-white text-[10px] font-bold px-1 py-0.5 rounded-tl flex items-center">
+                            <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl flex items-center">
                                 <Box className="w-2.5 h-2.5 mr-0.5" /> {modCount}
                             </div>
                         )}
@@ -139,7 +139,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 <div className="flex-1 min-w-0 flex flex-col pt-1 pl-3">
                     <div className="flex justify-between items-start gap-2 mb-0.5">
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-200 truncate group-hover:text-modtale-accent transition-colors" title={title}>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 truncate group-hover:text-modtale-accent transition-colors" title={title}>
                                 <Link
                                     to={canonicalPath}
                                     onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
@@ -169,7 +169,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 </p>
             </div>
 
-            <div className="mt-auto bg-slate-50 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-white/5">
+            <div className="mt-auto bg-white/10 dark:bg-white/[0.02] px-4 py-3 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 border-t border-slate-200/30 dark:border-white/5">
                 <div className="flex items-center gap-3">
                     <span className="flex items-center"><Download className="w-3 h-3 mr-1" /> {downloads}</span>
 
