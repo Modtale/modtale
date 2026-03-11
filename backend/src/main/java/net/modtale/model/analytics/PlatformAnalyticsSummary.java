@@ -8,10 +8,12 @@ public class PlatformAnalyticsSummary {
     private long apiDownloads;
     private long frontendDownloads;
     private long totalNewProjects;
+    private long totalNewUsers;
 
     private List<AnalyticsDataPoint> downloadsChart;
     private List<AnalyticsDataPoint> viewsChart;
     private List<AnalyticsDataPoint> newProjectsChart;
+    private List<AnalyticsDataPoint> newUsersChart;
 
     public PlatformAnalyticsSummary() {}
 
@@ -30,6 +32,9 @@ public class PlatformAnalyticsSummary {
     public long getTotalNewProjects() { return totalNewProjects; }
     public void setTotalNewProjects(long totalNewProjects) { this.totalNewProjects = totalNewProjects; }
 
+    public long getTotalNewUsers() { return totalNewUsers; }
+    public void setTotalNewUsers(long totalNewUsers) { this.totalNewUsers = totalNewUsers; }
+
     public List<AnalyticsDataPoint> getDownloadsChart() { return downloadsChart; }
     public void setDownloadsChart(List<AnalyticsDataPoint> downloadsChart) { this.downloadsChart = downloadsChart; }
 
@@ -38,4 +43,7 @@ public class PlatformAnalyticsSummary {
 
     public List<AnalyticsDataPoint> getNewProjectsChart() { return newProjectsChart; }
     public void setNewProjectsChart(List<AnalyticsDataPoint> newProjectsChart) { this.newProjectsChart = newProjectsChart; }
+
+    public List<AnalyticsDataPoint> getNewUsersChart() { return newUsersChart; }
+    public void setNewUsersChart(List<AnalyticsDataPoint> newUsersChart) { this.newUsersChart = newUsersChart; }
 }

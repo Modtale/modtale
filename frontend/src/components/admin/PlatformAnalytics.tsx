@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
     Eye, Download, TrendingUp, TrendingDown,
-    PackagePlus, Server
+    PackagePlus, Server, UserPlus, Activity
 } from 'lucide-react';
 
 import { api } from '../../utils/api.ts';
 import { LineChart } from '../ui/charts/LineChart.tsx';
-import { sliceData } from '../../utils/analytics.ts';
+import { sliceData, calculateWoW } from '../../utils/analytics.ts';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
@@ -58,7 +58,10 @@ export const PlatformAnalytics: React.FC = () => {
     if (loading) return (
         <div className="w-full space-y-8 animate-pulse">
             <div className="flex justify-between items-end mb-8">
-                <div className="h-10 w-72 bg-slate-200 dark:bg-white/10 rounded-xl mb-3"></div>
+                <div>
+                    <div className="h-10 w-72 bg-slate-200 dark:bg-white/10 rounded-xl mb-3"></div>
+                    <div className="h-4 w-48 bg-slate-200 dark:bg-white/10 rounded-lg"></div>
+                </div>
                 <div className="h-12 w-48 bg-slate-200 dark:bg-white/10 rounded-2xl"></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -67,8 +70,8 @@ export const PlatformAnalytics: React.FC = () => {
                 ))}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {[...Array(3)].map((_, i) => (
-                    <div key={i} className={`h-[500px] bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 ${i === 2 ? 'lg:col-span-2' : ''}`}></div>
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-[500px] bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10"></div>
                 ))}
             </div>
         </div>
@@ -83,6 +86,7 @@ export const PlatformAnalytics: React.FC = () => {
     const downloadsData = formatData(data.downloadsChart);
     const viewsData = formatData(data.viewsChart);
     const newProjectsData = formatData(data.newProjectsChart);
+    const newUsersData = formatData(data.newUsersChart);
 
     const chartDatasets = {
         downloads: [
@@ -92,7 +96,13 @@ export const PlatformAnalytics: React.FC = () => {
             { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: !!hiddenSeries['views'] }
         ],
         newProjects: [
-            { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: !!hiddenSeries['newProjects'] }
+            { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: !!hiddenSeries['newProjects'] },
+            { id: 'newUsers', label: 'New Users', color: '#f59e0b', data: sliceData(newUsersData), hidden: !!hiddenSeries['newUsers'] }
+        ],
+        growth: [
+            { id: 'downloadsGrowth', label: 'Downloads Momentum', color: '#3b82f6', data: sliceData(calculateWoW(downloadsData)), hidden: !!hiddenSeries['downloadsGrowth'] },
+            { id: 'viewsGrowth', label: 'Views Momentum', color: '#a855f7', data: sliceData(calculateWoW(viewsData)), hidden: !!hiddenSeries['viewsGrowth'] },
+            { id: 'usersGrowth', label: 'Users Momentum', color: '#f59e0b', data: sliceData(calculateWoW(newUsersData)), hidden: !!hiddenSeries['usersGrowth'] }
         ]
     };
 
@@ -104,7 +114,11 @@ export const PlatformAnalytics: React.FC = () => {
     return (
         <div className="relative animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
-                <div className="relative flex bg-white/60 dark:bg-black/20 p-1 rounded-xl shadow-inner border border-slate-200 dark:border-white/10 shrink-0 w-fit ml-auto">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Platform Analytics</h1>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Monitor platform-wide statistics and growth.</p>
+                </div>
+                <div className="relative flex bg-white/60 dark:bg-black/20 p-1 rounded-xl shadow-inner border border-slate-200 dark:border-white/10 shrink-0 w-fit">
                     <div
                         className="absolute top-1 bottom-1 w-14 rounded-lg transition-transform duration-300 ease-out bg-modtale-accent shadow-sm shadow-modtale-accent/30 border border-transparent"
                         style={{ transform: `translateX(${activeRangeIndex * 100}%)` }}
@@ -127,8 +141,8 @@ export const PlatformAnalytics: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <SummaryCard title="Total Downloads" value={data.totalDownloads.toLocaleString()} icon={Download} color="text-blue-500" />
                     <SummaryCard title="Total Views" value={data.totalViews.toLocaleString()} icon={Eye} color="text-purple-500" />
-                    <SummaryCard title="New Projects" value={data.totalNewProjects.toLocaleString()} icon={PackagePlus} color="text-emerald-500" />
-                    <SummaryCard title="API Downloads" value={apiPercentage} isPercent subValue={`${data.apiDownloads.toLocaleString()} requests`} icon={Server} color="text-orange-500" />
+                    <SummaryCard title="New Signups" value={data.totalNewUsers.toLocaleString()} icon={UserPlus} color="text-orange-500" />
+                    <SummaryCard title="API Traffic" value={apiPercentage} isPercent subValue={`${data.apiDownloads.toLocaleString()} downloads`} icon={Server} color="text-emerald-500" />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -158,16 +172,29 @@ export const PlatformAnalytics: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md lg:col-span-2">
+                    <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
                         <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-emerald-500"><PackagePlus className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">New Projects</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily new project creations.</p>
+                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">New Creations</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily new users and projects.</p>
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.newProjects} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
+                        </div>
+                    </div>
+
+                    <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
+                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                            <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-modtale-accent"><Activity className="w-5 h-5" /></div>
+                            <div>
+                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Momentum (WoW %)</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform week-over-week growth.</p>
+                            </div>
+                        </div>
+                        <div className="flex-1 min-h-0 px-6 pb-6">
+                            <LineChart datasets={chartDatasets.growth} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} yAxisFormatter={(val) => `${val > 0 ? '+' : ''}${Math.round(val)}%`} />
                         </div>
                     </div>
                 </div>
