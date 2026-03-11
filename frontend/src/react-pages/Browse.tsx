@@ -582,7 +582,10 @@ export const Browse: React.FC<BrowseProps> = ({
     const rawTags = searchParams.get('tags');
     const selectedTags = useMemo(() => rawTags ? rawTags.split(',').filter(Boolean) : [], [rawTags]);
     const urlSearchTerm = searchParams.get('q') || '';
-    const viewStyle = (searchParams.get('style') as 'grid' | 'list' | 'compact') || 'grid';
+
+    const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>(() => {
+        return (localStorage.getItem('modtale_view_style') as any) || (searchParams.get('style') as any) || 'grid';
+    });
 
     const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
 
@@ -652,10 +655,10 @@ export const Browse: React.FC<BrowseProps> = ({
 
             if (viewStyle === 'grid') {
                 cols = width >= 1800 ? 3 : (width >= 768 ? 2 : 1);
-                rows = 6; // 6 rows of cards
+                rows = 6;
             } else if (viewStyle === 'compact') {
                 cols = width >= 1280 ? 3 : (width >= 768 ? 2 : 1);
-                rows = 20; // 20 rows of projects
+                rows = 20;
             } else {
                 cols = 1;
                 rows = 12;
@@ -821,6 +824,17 @@ export const Browse: React.FC<BrowseProps> = ({
         setItems(prev => prev.map(i => i.id === id ? { ...i, favoriteCount: (likedModIds.includes(id) ? Math.max(0, i.favoriteCount - 1) : i.favoriteCount + 1)} : i));
     }, [isLoggedIn, onToggleFavoriteMod, likedModIds]);
 
+    const handleViewStyleChange = useCallback((style: 'grid' | 'list' | 'compact') => {
+        setViewStyle(style);
+        localStorage.setItem('modtale_view_style', style);
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('style', style);
+            next.set('page', '0');
+            return next;
+        });
+    }, [setSearchParams]);
+
     const getProjectPath = (item: Mod | Modpack | World) => {
         return getProjectUrl(item);
     };
@@ -943,7 +957,7 @@ export const Browse: React.FC<BrowseProps> = ({
                                 setPage={handlePageChange}
                                 isMobile={isMobile}
                                 viewStyle={viewStyle}
-                                onViewStyleChange={useCallback((style: string) => updateParams({ style }), [updateParams])}
+                                onViewStyleChange={handleViewStyleChange}
                             />
                         </div>
 
