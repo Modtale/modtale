@@ -186,7 +186,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-20">
+                <div className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none">
                     <img
                         src={resolvedImage}
                         onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
@@ -205,7 +205,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         <Link
                             to={canonicalPath}
                             onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
-                            className="relative z-10 focus:outline-none"
+                            className="relative z-20 focus:outline-none"
                         >
                             {title}
                         </Link>
