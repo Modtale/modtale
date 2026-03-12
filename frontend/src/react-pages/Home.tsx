@@ -127,7 +127,7 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
 };
 
 const MarqueeColumn = ({ mods, duration }: { mods: Mod[], duration: string }) => (
-    <div className="flex flex-col w-full max-w-[320px]">
+    <div className="flex flex-col w-[320px] shrink-0">
         <div className="flex flex-col gap-6 animate-marquee-up will-change-transform" style={{ '--marquee-duration': duration } as any}>
             {[...mods, ...mods].map((mod, index) => (
                 <FeaturedModCard key={`${mod.id}-${index}`} mod={mod} priority={index < 2} />
@@ -475,9 +475,9 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
 
-                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-stretch">
 
-                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-4xl animate-in fade-in duration-1000">
+                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-4xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center">
                             <img
                                 src="/assets/logo_light.svg"
                                 alt="Modtale Logo"
@@ -545,12 +545,12 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
 
                         {displayFeaturedMods.length > 0 && (
-                            <div className="relative h-[600px] lg:h-[750px] hidden md:flex gap-6 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300">
+                            <div className="relative hidden md:block w-full min-h-[600px] lg:min-h-[750px]">
                                 <aside
-                                    className="flex gap-6 h-full"
+                                    className="absolute inset-0 flex gap-10 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
                                     style={{
-                                        maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)',
-                                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)'
+                                        maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
+                                        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
                                     }}
                                     aria-label="Trending Hytale Mods Showcase"
                                 >
