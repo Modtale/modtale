@@ -81,15 +81,18 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         prefetchProject(mod.id);
     };
 
+    const HOVER_BORDER = "hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300";
+    const COMPACT_HOVER_BORDER = "hover:ring-2 hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300";
+
     if (viewStyle === 'compact') {
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className="group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:ring-2 hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300"
+                className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md hover:shadow-modtale-accent/5 ${COMPACT_HOVER_BORDER}`}
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <div className="w-12 h-12 rounded-lg bg-transparent shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
-                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full" />
+                <div className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
@@ -118,11 +121,11 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className="group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300 p-5"
+                className={`group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-5 ${HOVER_BORDER}`}
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <div className="w-full sm:w-32 h-32 rounded-xl bg-transparent shadow-xl border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
-                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full" />
+                <div className="w-full sm:w-32 h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent group-hover:scale-105 transition-transform duration-700" />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col">
                     <div className="flex justify-between items-start gap-4">
@@ -154,7 +157,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
     return (
         <div
             onMouseEnter={handleMouseEnter}
-            className="group relative flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300"
+            className={`group relative flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] ${HOVER_BORDER}`}
             role="article"
             aria-label={`Project: ${title} by ${author}`}
         >
@@ -166,17 +169,17 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 tabIndex={-1}
             />
 
-            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0 ${!resolvedBanner ? 'bg-slate-800' : ''}`}>
+            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0 ${resolvedBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {resolvedBanner ? (
                     <OptimizedImage
                         src={resolvedBanner}
                         alt=""
                         priority={priority}
                         baseWidth={640}
-                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
+                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent"
                     />
                 ) : (
-                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent pointer-events-none" />
                 )}
 
                 <div className="absolute top-3 right-3 z-40">
@@ -188,12 +191,12 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none">
+                <div className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none">
                     <OptimizedImage
                         src={resolvedImage}
                         alt={title}
                         baseWidth={80}
-                        className="w-full h-full"
+                        className="w-full h-full bg-transparent"
                     />
                     {classification === 'MODPACK' && modCount > 0 && (
                         <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">

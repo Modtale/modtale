@@ -67,7 +67,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
     return (
         <div
-            className={`relative overflow-hidden bg-slate-200 dark:bg-slate-800 ${className}`}
+            className={`relative overflow-hidden ${className || ''}`}
             style={{ aspectRatio }}
         >
             <img
