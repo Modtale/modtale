@@ -85,22 +85,19 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className="group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 hover:border-modtale-accent transition-all shadow-sm hover:shadow-md hover:shadow-modtale-accent/5"
+                className="group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:ring-2 hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300"
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <OptimizedImage
-                    src={resolvedImage}
-                    alt={title}
-                    baseWidth={48}
-                    className="w-12 h-12 rounded-lg shrink-0 border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 shadow-sm"
-                />
+                <div className="w-12 h-12 rounded-lg bg-transparent shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full" />
+                </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-modtale-accent group-hover:drop-shadow-[0_0_8px_rgba(59,130,246,0.4)] transition-all">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
                         {title}
                     </h3>
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
-                        <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 font-bold hover:text-modtale-accent hover:underline truncate">
+                        <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate">
                             {author}
                         </Link>
                     </div>
@@ -112,7 +109,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                     </div>
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {timeAgo}</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-modtale-accent transition-colors shrink-0" />
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0" />
             </div>
         );
     }
@@ -121,28 +118,25 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className="group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:border-modtale-accent hover:-translate-y-1 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-5"
+                className="group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300 p-5"
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <OptimizedImage
-                    src={resolvedImage}
-                    alt={title}
-                    baseWidth={128}
-                    className="w-full sm:w-32 h-32 rounded-xl shrink-0 border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 shadow-xl"
-                />
+                <div className="w-full sm:w-32 h-32 rounded-xl bg-transparent shadow-xl border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full" />
+                </div>
                 <div className="flex-1 min-w-0 flex flex-col">
                     <div className="flex justify-between items-start gap-4">
                         <div>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight">{title}</h3>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">{title}</h3>
                             <div className="flex items-center gap-1 text-sm font-bold text-slate-500 mt-1">
                                 <span>by</span>
-                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 hover:text-modtale-accent hover:underline">
+                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
                                     {author}
                                 </Link>
                             </div>
                         </div>
                         <div className="bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5">
-                            <span className="text-modtale-accent">{getClassificationIcon(classification)}</span>
+                            <span className="text-blue-600 dark:text-blue-400">{getClassificationIcon(classification)}</span>
                             {displayClassification}
                         </div>
                     </div>
@@ -160,7 +154,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
     return (
         <div
             onMouseEnter={handleMouseEnter}
-            className="group relative flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:border-modtale-accent/50 dark:hover:border-modtale-accent/40 hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02]"
+            className="group relative flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent transition-all duration-300"
             role="article"
             aria-label={`Project: ${title} by ${author}`}
         >
@@ -172,40 +166,44 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 tabIndex={-1}
             />
 
-            <div className={`w-full aspect-[3/1] relative ${resolvedBanner ? 'bg-white dark:bg-slate-900' : 'bg-slate-800'} border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0`}>
+            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0 ${!resolvedBanner ? 'bg-slate-800' : ''}`}>
                 {resolvedBanner ? (
                     <OptimizedImage
                         src={resolvedBanner}
                         alt=""
-                        baseWidth={600}
                         priority={priority}
+                        baseWidth={640}
                         className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
                     />
                 ) : (
-                    <>
-                        <div className="w-full h-full bg-slate-200/30 dark:bg-slate-700/30" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent" />
-                    </>
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent" />
                 )}
 
                 <div className="absolute top-3 right-3 z-40">
                     <div className="bg-white/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-800 dark:text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center border border-slate-200 dark:border-white/10 shadow-sm relative">
-                        <span className="mr-1.5 text-modtale-accent">{getClassificationIcon(classification)}</span>
+                        <span className="mr-1.5 text-blue-600 dark:text-blue-400">{getClassificationIcon(classification)}</span>
                         <span>{displayClassification}</span>
                     </div>
                 </div>
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <OptimizedImage
-                    src={resolvedImage}
-                    alt={title}
-                    baseWidth={80}
-                    className="w-20 h-20 rounded-2xl absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none border-4 border-white dark:border-slate-800 shadow-xl"
-                />
+                <div className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none">
+                    <OptimizedImage
+                        src={resolvedImage}
+                        alt={title}
+                        baseWidth={80}
+                        className="w-full h-full"
+                    />
+                    {classification === 'MODPACK' && modCount > 0 && (
+                        <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
+                            <Box className="w-3 h-3 mr-0.5" /> {modCount}
+                        </div>
+                    )}
+                </div>
 
                 <div className="mt-12">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight" title={title}>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
                         <Link
                             to={canonicalPath}
                             onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
@@ -220,7 +218,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         <Link
                             to={`/creator/${author}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="hover:text-modtale-accent hover:underline focus:outline-none relative z-20"
+                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-20"
                         >
                             {author}
                         </Link>
