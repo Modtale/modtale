@@ -45,6 +45,8 @@ const AnimatedCounter = ({ value }: { value: number }) => {
 
         if (value > 0) {
             window.requestAnimationFrame(step);
+        } else {
+            setCount(0);
         }
     }, [value]);
 
@@ -357,7 +359,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
 
     useEffect(() => {
-        if (!ssrData?.homeMods) {
+        if (!ssrData || !ssrData.homeMods || ssrData.homeMods.length === 0) {
             const fetchMods = async () => {
                 try {
                     const [trending, popular, gems, relevance] = await Promise.all([
@@ -383,11 +385,11 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                 }
             };
             fetchMods();
-        } else {
+        } else if (allMods.length > 0) {
             setAllMods(prev => [...prev].sort(() => Math.random() - 0.5));
         }
 
-        if (!ssrData?.stats) {
+        if (!ssrData || !ssrData.stats || (ssrData.stats.totalProjects === 0 && ssrData.stats.totalDownloads === 0)) {
             const fetchStats = async () => {
                 try {
                     const res = await api.get('/analytics/platform/stats');
@@ -398,7 +400,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
             };
             fetchStats();
         }
-    }, [ssrData]);
+    }, []);
 
     const chartDatasets = [
         {
@@ -466,9 +468,9 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
 
-                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-stretch">
 
-                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-4xl animate-in fade-in duration-1000">
+                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-4xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center">
                             <img
                                 src="/assets/logo_light.svg"
                                 alt="Modtale Logo"
@@ -536,17 +538,19 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
 
                         {displayFeaturedMods.length > 0 && (
-                            <aside
-                                className="relative h-[600px] lg:h-[750px] hidden md:flex gap-6 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
-                                style={{
-                                    maskImage: 'linear-gradient(to bottom, transparent, black 5%, black 95%, transparent)',
-                                    WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 5%, black 95%, transparent)'
-                                }}
-                                aria-label="Trending Hytale Mods Showcase"
-                            >
-                                <MarqueeColumn mods={col1Mods} duration="35s" />
-                                <MarqueeColumn mods={col2Mods} duration="45s" />
-                            </aside>
+                            <div className="relative hidden md:block w-full min-h-[600px] lg:min-h-[750px]">
+                                <aside
+                                    className="absolute inset-0 flex gap-6 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
+                                    style={{
+                                        maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
+                                        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
+                                    }}
+                                    aria-label="Trending Hytale Mods Showcase"
+                                >
+                                    <MarqueeColumn mods={col1Mods} duration="35s" />
+                                    <MarqueeColumn mods={col2Mods} duration="45s" />
+                                </aside>
+                            </div>
                         )}
 
                         {displayFeaturedMods.length > 0 && (
@@ -653,7 +657,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         <div className="w-20 h-20 bg-slate-200 dark:bg-slate-800 rounded-3xl mx-auto mb-8 flex items-center justify-center shadow-inner border border-slate-300/50 dark:border-white/5">
                             <Code className="w-10 h-10 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         </div>
-                        <h2 className="text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tight">The Open-Source Hytale Modding Platform.</h2>
+                        <h2 className="text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tight">Built by the community, for the community.</h2>
                         <p className="text-xl text-slate-600 dark:text-slate-300 mb-12 font-medium max-w-3xl mx-auto leading-relaxed">
                             Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests. Explore our source code or utilize our public API to build your own tools.
                         </p>
