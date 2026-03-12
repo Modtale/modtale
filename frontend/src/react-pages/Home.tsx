@@ -66,14 +66,14 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
     const projectUrl = `/${mod.classification === 'MODPACK' ? 'modpack' : mod.classification === 'SAVE' ? 'world' : 'mod'}/${createSlug(mod.title, mod.id)}`;
 
     return (
-        <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:border-modtale-accent/50 dark:hover:border-modtale-accent/40 hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02]">
+        <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent ring-1 ring-black/[0.02] dark:ring-white/[0.02]">
             <Link
                 to={projectUrl}
                 className="absolute inset-0 z-30 focus:outline-none"
                 aria-label={`Download ${mod.title} Hytale Mod`}
             />
 
-            <div className="w-full aspect-[3/1] relative bg-slate-800 border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0">
+            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0 ${!bannerUrl ? 'bg-slate-800' : 'bg-white dark:bg-slate-900'}`}>
                 {bannerUrl ? (
                     <OptimizedImage
                         src={bannerUrl}
@@ -91,7 +91,7 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-16 h-16 rounded-2xl absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10">
+                <div className="w-16 h-16 rounded-2xl absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 bg-transparent">
                     <OptimizedImage
                         src={iconUrl}
                         alt={`${mod.title} Icon`}
@@ -102,14 +102,14 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
                 </div>
 
                 <div className="mt-10 flex-1 relative z-20">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
                         {mod.title}
                     </h3>
                     <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
                         <Link
                             to={`/creator/${mod.author}`}
-                            className="hover:text-modtale-accent hover:underline focus:outline-none relative z-40"
+                            className="relative z-40 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate"
                             aria-label={`View profile for ${mod.author}`}
                             onClick={(e) => e.stopPropagation()}
                         >
