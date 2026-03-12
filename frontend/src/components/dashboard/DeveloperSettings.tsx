@@ -85,7 +85,15 @@ const PERMISSION_GROUPS = [
             { id: 'PROFILE_FOLLOW', label: 'Follow Users' },
             { id: 'PROFILE_UNFOLLOW', label: 'Unfollow Users' },
             { id: 'PROFILE_CONNECTION_MANAGE', label: 'Manage Connections' },
-            { id: 'PROFILE_NOTIFICATION_MANAGE', label: 'Manage Notifications' }
+            { id: 'PROFILE_NOTIFICATION_MANAGE', label: 'Manage Notification Settings' }
+        ]
+    },
+    {
+        group: 'Notifications',
+        permissions: [
+            { id: 'NOTIFICATION_READ', label: 'Read Notifications' },
+            { id: 'NOTIFICATION_UPDATE', label: 'Update Notification State' },
+            { id: 'NOTIFICATION_DELETE', label: 'Delete Notifications' }
         ]
     },
     {
@@ -118,7 +126,7 @@ const getPermissionLabel = (id: string) => {
     return id;
 };
 
-const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ'];
+const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ', 'NOTIFICATION_READ'];
 
 export const DeveloperSettings: React.FC = () => {
     const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -128,7 +136,6 @@ export const DeveloperSettings: React.FC = () => {
     const [newKey, setNewKey] = useState<string | null>(null);
     const [keyName, setKeyName] = useState('');
 
-    // Maps contextId (e.g. 'PERSONAL' or 'orgId') to string[] of selected perms
     const [contextPerms, setContextPerms] = useState<Record<string, string[]>>({ PERSONAL: DEFAULT_PERMISSIONS });
     const [activeTab, setActiveTab] = useState<string>('PERSONAL');
 
@@ -167,7 +174,6 @@ export const DeveloperSettings: React.FC = () => {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Remove empty contexts to clean up payload
         const cleanContexts: Record<string, string[]> = {};
         let hasAnyPerms = false;
 
