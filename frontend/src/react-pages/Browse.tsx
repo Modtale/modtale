@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link, useLocation } from 'react-router-dom';
 import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Heart, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight, Clock, CornerDownLeft, PackageSearch, LayoutGrid, List, AlignJustify } from 'lucide-react';
 
 import type { Mod, Modpack, World } from '../types';
@@ -480,7 +480,7 @@ const getResolvedImageUrl = (url?: string) => {
     return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
 };
 
-const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All', onClassificationChange: (cls: Classification | 'All') => void }> = ({ selectedClassification, onClassificationChange }) => {
+const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All', onClassificationChange: (cls: Classification | 'All') => void, currentSearchParams: URLSearchParams }> = ({ selectedClassification, onClassificationChange, currentSearchParams }) => {
     const tabsRef = useRef<(HTMLElement | null)[]>([]);
     const navContainerRef = useRef<HTMLDivElement>(null);
     const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
@@ -535,10 +535,13 @@ const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All'
                     {PROJECT_TYPES.map((type, index) => {
                         const Icon = type.icon;
                         const isSelected = selectedClassification === type.id;
+                        const searchString = currentSearchParams.toString();
+                        const toPath = getRouteForClassification(type.id as Classification | 'All') + (searchString ? `?${searchString}` : '');
+
                         return (
                             <Link
                                 key={type.id}
-                                to={getRouteForClassification(type.id as Classification | 'All')}
+                                to={toPath}
                                 onClick={() => onClassificationChange(type.id as Classification | 'All')}
                                 ref={(el) => { tabsRef.current[index] = el; }}
                                 className={`px-3 md:px-4 h-full rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 transition-colors duration-200 whitespace-nowrap snap-center ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
@@ -791,11 +794,8 @@ export const Browse: React.FC<BrowseProps> = ({
     }, [setSearchParams]);
 
     const handleClassificationChange = useCallback((cls: Classification | 'All') => {
-        if (cls !== selectedClassification) {
-            const route = getRouteForClassification(cls);
-            navigate(route);
-        }
-    }, [selectedClassification, navigate]);
+        setSelectedClassification(cls);
+    }, []);
 
     const handleSortChange = useCallback((newSort: any) => {
         const sortOption = newSort as SortOption;
@@ -911,7 +911,7 @@ export const Browse: React.FC<BrowseProps> = ({
     const seoContent = getCategorySEO(selectedClassification);
     const dynamicSEO = generateDynamicSEO({ title: seoContent.title, description: seoContent.description }, page, sortBy, activeViewId, urlSearchTerm);
 
-    const categoryPills = <CategoryPillNav selectedClassification={selectedClassification} onClassificationChange={handleClassificationChange} />;
+    const categoryPills = <CategoryPillNav selectedClassification={selectedClassification} onClassificationChange={handleClassificationChange} currentSearchParams={searchParams} />;
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative transition-colors duration-300">
