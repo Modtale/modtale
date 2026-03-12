@@ -20,26 +20,31 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
     const [isLoaded, setIsLoaded] = useState(false);
     const [currentSrc, setCurrentSrc] = useState<string>('');
 
-    const getResUrl = (width: number, quality: number = 85) => {
-        if (!src || src.includes('favicon') || src.startsWith('blob:')) return src;
-        const separator = src.includes('?') ? '&' : '?';
-        return `${src}${separator}w=${width}&q=${quality}`;
+    const getCloudflareUrl = (url: string, width: number, quality: number = 85) => {
+        if (!url || url.includes('.svg') || url.startsWith('blob:') || url.includes('localhost')) {
+            return url;
+        }
+
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const absoluteUrl = url.startsWith('http') ? url : `${origin}${url}`;
+
+        return `${origin}/cdn-cgi/image/width=${width},quality=${quality},format=auto/${absoluteUrl}`;
     };
 
     useEffect(() => {
-        const lowRes = getResUrl(20, 30);
+        const lowRes = getCloudflareUrl(src, 32, 20);
         setCurrentSrc(lowRes);
 
         if (priority) {
             const img = new Image();
-            img.src = getResUrl(baseWidth * 2);
+            img.src = getCloudflareUrl(src, baseWidth * 2);
             img.onload = () => setIsLoaded(true);
         }
     }, [src, baseWidth, priority]);
 
-    const highResUrl = getResUrl(baseWidth);
-    const retinaUrl = getResUrl(baseWidth * 2);
-    const superRetinaUrl = getResUrl(baseWidth * 3);
+    const res1x = getCloudflareUrl(src, baseWidth);
+    const res2x = getCloudflareUrl(src, baseWidth * 2);
+    const res3x = getCloudflareUrl(src, baseWidth * 3);
 
     return (
         <div
@@ -47,8 +52,8 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
             style={{ aspectRatio }}
         >
             <img
-                src={isLoaded ? highResUrl : currentSrc}
-                srcSet={isLoaded ? `${highResUrl} 1x, ${retinaUrl} 2x, ${superRetinaUrl} 3x` : undefined}
+                src={isLoaded ? res2x : currentSrc}
+                srcSet={isLoaded ? `${res1x} 1x, ${res2x} 2x, ${res3x} 3x` : undefined}
                 alt={alt}
                 loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
