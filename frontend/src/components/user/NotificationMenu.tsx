@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, Trash2, Check, X as XIcon, RefreshCw, Circle } from 'lucide-react';
+import { Bell, Trash2, Check, X as XIcon, RefreshCw, Circle } from 'lucide-react';
 import { api, BACKEND_URL } from '../../utils/api';
 import { useNotifications, type Notification } from '../../context/NotificationsContext.tsx';
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 export const NotificationMenu: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -70,6 +71,11 @@ export const NotificationMenu: React.FC = () => {
         markAsRead(id, currentReadStatus);
     };
 
+    const resolveUrl = (url?: string) => {
+        if (!url) return "https://modtale.net/assets/favicon.svg";
+        return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
+    };
+
     return (
         <div className="relative" ref={menuRef}>
             <button
@@ -113,15 +119,11 @@ export const NotificationMenu: React.FC = () => {
                                         key={n.id}
                                         className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 ${n.read ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}`}
                                     >
-                                        <img
-                                            src={n.iconUrl ? (n.iconUrl.startsWith('/api') ? `${BACKEND_URL}${n.iconUrl}` : n.iconUrl) : "https://modtale.net/assets/favicon.svg"}
+                                        <OptimizedImage
+                                            src={resolveUrl(n.iconUrl)}
                                             alt=""
-                                            className="w-10 h-10 rounded-md object-cover bg-slate-200 dark:bg-slate-800 flex-shrink-0"
-                                            onError={(e) => {
-                                                const target = e.currentTarget;
-                                                target.onerror = null;
-                                                target.src = "https://modtale.net/assets/favicon.svg";
-                                            }}
+                                            baseWidth={40}
+                                            className="w-10 h-10 rounded-md shrink-0 border border-slate-200 dark:border-white/5 shadow-sm"
                                         />
                                         <div className="flex-1 min-w-0 pr-12">
                                             <div className={`font-bold text-sm text-slate-800 dark:text-slate-200 mb-0.5 truncate ${!n.read ? 'text-modtale-accent' : ''}`}>

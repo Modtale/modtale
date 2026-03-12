@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { LineChart } from '../components/ui/charts/LineChart';
 import { SignInModal } from '../components/user/SignInModal';
+import { OptimizedImage } from '../components/ui/OptimizedImage';
 import type { Mod, User } from '../types';
 import { api, BACKEND_URL } from '../utils/api';
 import { createSlug } from '../utils/slug';
@@ -74,12 +75,12 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
 
             <div className="w-full aspect-[3/1] relative bg-slate-800 border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0">
                 {bannerUrl ? (
-                    <img
+                    <OptimizedImage
                         src={bannerUrl}
-                        alt={`${mod.title} - Hytale Mod Banner`}
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
-                        loading={priority ? undefined : "lazy"}
-                        fetchPriority={priority ? "high" : "auto"}
+                        alt={`${mod.title} Banner`}
+                        baseWidth={320}
+                        priority={priority}
+                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
                     />
                 ) : (
                     <>
@@ -90,14 +91,13 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-16 h-16 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 ring-1 ring-black/5 dark:ring-white/10">
-                    <img
+                <div className="w-16 h-16 rounded-2xl absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10">
+                    <OptimizedImage
                         src={iconUrl}
-                        alt={`${mod.title} - Hytale Mod Icon`}
-                        className="w-full h-full object-cover"
-                        loading={priority ? undefined : "lazy"}
-                        fetchPriority={priority ? "high" : "auto"}
-                        onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
+                        alt={`${mod.title} Icon`}
+                        baseWidth={64}
+                        priority={priority}
+                        className="w-full h-full"
                     />
                 </div>
 
@@ -171,8 +171,15 @@ const InlineDependencyUI = ({ randomMod }: { randomMod?: Mod }) => {
                     <div className={`flex items-center justify-between p-4 rounded-2xl ${GLASS_ITEM}`}>
                         <div className="flex items-center gap-4">
                             <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 shrink-0" />
-                            <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                                {randomIconUrl ? <img src={randomIconUrl} alt={`${randomMod.title} Icon`} className="w-full h-full object-cover" loading="lazy" /> : <Box className="w-6 h-6 text-slate-400" />}
+                            <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/10 shrink-0">
+                                {randomIconUrl ? (
+                                    <OptimizedImage
+                                        src={randomIconUrl}
+                                        alt={`${randomMod.title} Icon`}
+                                        baseWidth={48}
+                                        className="w-full h-full"
+                                    />
+                                ) : <Box className="w-6 h-6 text-slate-400" />}
                             </div>
                             <div className="min-w-0">
                                 <div className="font-bold text-slate-900 dark:text-white truncate">{randomMod.title}</div>
@@ -468,9 +475,9 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
 
-                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-stretch">
+                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
 
-                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-4xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center">
+                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-4xl animate-in fade-in duration-1000">
                             <img
                                 src="/assets/logo_light.svg"
                                 alt="Modtale Logo"
@@ -538,12 +545,12 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
 
                         {displayFeaturedMods.length > 0 && (
-                            <div className="relative hidden md:block w-full min-h-[600px] lg:min-h-[750px]">
+                            <div className="relative h-[600px] lg:h-[750px] hidden md:flex gap-6 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300">
                                 <aside
-                                    className="absolute inset-0 flex gap-6 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
+                                    className="flex gap-6 h-full"
                                     style={{
-                                        maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
-                                        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
+                                        maskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)',
+                                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)'
                                     }}
                                     aria-label="Trending Hytale Mods Showcase"
                                 >

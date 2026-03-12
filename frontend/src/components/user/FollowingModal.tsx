@@ -4,6 +4,7 @@ import { X, User as UserIcon, Loader2, ExternalLink } from 'lucide-react';
 import { api } from '../../utils/api';
 import type {User} from '../../types';
 import { Link } from 'react-router-dom';
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 interface FollowingModalProps {
     userId: string;
@@ -62,15 +63,16 @@ export const FollowingModal: React.FC<FollowingModalProps> = ({ userId, onClose 
                             {users.map(u => (
                                 <Link
                                     key={u.id}
-                                    to={`/creator/${u.id}`}
+                                    to={`/creator/${u.username}`}
                                     onClick={onClose}
                                     className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <img
+                                        <OptimizedImage
                                             src={u.avatarUrl || '/assets/default-avatar.png'}
                                             alt={u.username}
-                                            className="w-10 h-10 rounded-full bg-slate-200 dark:bg-black/20 object-cover border border-slate-200 dark:border-white/10"
+                                            baseWidth={40}
+                                            className="w-10 h-10 rounded-full shrink-0 border border-slate-200 dark:border-white/10 shadow-sm"
                                         />
                                         <div>
                                             <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors">{u.username}</div>

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ImageCropperModal } from '../ui/ImageCropperModal';
 import { Spinner } from '../ui/Spinner';
+import { OptimizedImage } from '../ui/OptimizedImage';
 import type { User } from '../../types';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
@@ -166,14 +167,20 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         <div className={`relative group ${className}`}>
             <div className={`w-full h-full ${forceSizeClass || ''} rounded-[1.25rem] md:rounded-[2rem] border-[6px] ${isEditing ? 'border-white/80 dark:border-slate-800/80' : 'border-white/50 dark:border-slate-950 md:dark:border-slate-900/50'} shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20 backdrop-blur-md transition-colors`}>
                 {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    <OptimizedImage
+                        src={user.avatarUrl}
+                        alt={`${user.username} Avatar`}
+                        baseWidth={224}
+                        priority={true}
+                        className="w-full h-full"
+                    />
                 ) : (
                     <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
                         <Building2 className="w-10 h-10 md:w-20 md:h-20 text-slate-400" />
                     </div>
                 )}
                 {isEditing && (
-                    <label className="absolute inset-0 bg-white/60 dark:bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-sm cursor-pointer text-slate-900 dark:text-white">
+                    <label className="absolute inset-0 bg-white/60 dark:bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-sm cursor-pointer text-slate-900 dark:text-white z-30">
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'avatar')} disabled={uploadingAvatar} />
                         {uploadingAvatar ? <Spinner className="w-6 h-6" /> : <Upload className="w-6 h-6 mb-1 drop-shadow-sm" />}
                         <span className="text-[9px] font-bold uppercase text-center px-2 mt-1 drop-shadow-sm">Change</span>
@@ -184,24 +191,6 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         </div>
     );
 
-    const HeaderInfo = () => (
-        <>
-            <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
-                    <div className="flex gap-1.5 flex-wrap items-center">
-                        {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
-                        {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
-
-                        <div className="md:hidden flex items-center gap-1.5">
-                            {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} compact={true} />)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
-
     return (
         <div className={`relative ${isEditing ? '' : 'mb-6 md:mb-16'}`}>
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
@@ -210,7 +199,13 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             <div className={`relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group shadow-sm z-10 ${isEditing ? 'md:rounded-3xl' : 'md:rounded-b-3xl'}`}>
                 <div className="absolute inset-0 z-0">
                     {user.bannerUrl ? (
-                        <img src={user.bannerUrl} alt="" className="w-full h-full object-cover opacity-100" />
+                        <OptimizedImage
+                            src={user.bannerUrl}
+                            alt={`${user.username} Banner`}
+                            baseWidth={1920}
+                            priority={true}
+                            className="w-full h-full opacity-100"
+                        />
                     ) : (
                         <div className="w-full h-full bg-gradient-to-br from-modtale-accent/20 via-slate-900 to-black" />
                     )}
@@ -277,29 +272,37 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         <div className="mb-4 relative z-10">
                             <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                                 <div className="w-full flex-1 min-w-0">
-                                    {headerInput ? headerInput : <HeaderInfo />}
+                                    <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
+                                            <div className="flex gap-1.5 flex-wrap items-center">
+                                                {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
+                                                {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
+
+                                                <div className="md:hidden flex items-center gap-1.5">
+                                                    {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} compact={true} />)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className={`items-center gap-2 relative z-20 ${isEditing ? 'flex mt-2 md:mt-0' : 'hidden md:flex mt-1'}`}>
-                                    {actionInput ? actionInput : (
-                                        <>
-                                            {isSelf ? (
-                                                <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 backdrop-blur-md">
-                                                    <Settings className="w-5 h-5" /> Manage Profile
-                                                </a>
-                                            ) : (
-                                                <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
-                                                    {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
-                                                </button>
-                                            )}
-                                            <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
-                                                {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                                            </button>
-                                            {onReport && (
-                                                <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-500 hover:border-red-500/20 transition-all backdrop-blur-md" title="Report User">
-                                                    <Flag className="w-5 h-5" />
-                                                </button>
-                                            )}
-                                        </>
+                                    {isSelf ? (
+                                        <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 backdrop-blur-md">
+                                            <Settings className="w-5 h-5" /> Manage Profile
+                                        </a>
+                                    ) : (
+                                        <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
+                                            {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
+                                        </button>
+                                    )}
+                                    <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
+                                        {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                                    </button>
+                                    {onReport && (
+                                        <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-600 hover:border-red-500/20 transition-all backdrop-blur-md" title="Report User">
+                                            <Flag className="w-5 h-5" />
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -324,32 +327,28 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
                         {!isEditing && (
                             <div className="md:hidden flex items-center gap-3 w-full mb-6 h-12 relative z-20">
-                                {actionInput ? actionInput : (
-                                    <>
-                                        {isSelf ? (
-                                            <a href="/dashboard/profile" className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 backdrop-blur-md">
-                                                <Settings className="w-4 h-4" /> Manage Profile
-                                            </a>
-                                        ) : (
-                                            <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
-                                                {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : "Sign in to Follow"}
-                                            </button>
-                                        )}
-                                        <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0 backdrop-blur-md" title="Copy ID">
-                                            {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                                        </button>
-                                        {onReport && (
-                                            <button onClick={onReport} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0 backdrop-blur-md" title="Report User">
-                                                <Flag className="w-5 h-5" />
-                                            </button>
-                                        )}
-                                    </>
+                                {isSelf ? (
+                                    <a href="/dashboard/profile" className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 backdrop-blur-md">
+                                        <Settings className="w-4 h-4" /> Manage Profile
+                                    </a>
+                                ) : (
+                                    <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
+                                        {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : "Sign in to Follow"}
+                                    </button>
+                                )}
+                                <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0 backdrop-blur-md" title="Copy ID">
+                                    {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                                </button>
+                                {onReport && (
+                                    <button onClick={onReport} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0 backdrop-blur-md" title="Report User">
+                                        <Flag className="w-5 h-5" />
+                                    </button>
                                 )}
                             </div>
                         )}
 
                         <div className="mb-4 md:mb-6 relative z-10">
-                            {bioInput ? bioInput : (user.bio && <p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p>)}
+                            {user.bio && <p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p>}
                         </div>
 
                         {!isEditing && stats && (

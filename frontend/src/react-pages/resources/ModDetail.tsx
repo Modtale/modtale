@@ -11,11 +11,12 @@ import type { Mod, User, ProjectVersion, Comment, ModDependency } from '../../ty
 import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
-    Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Reply
+    Download, Image, List, Globe, Bug, BookOpen, ExternalLink, Calendar, ChevronDown, Hash,
+    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Reply, Github
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
+import { OptimizedImage } from '../../components/ui/OptimizedImage';
 import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
 import { extractId, createSlug, getProjectUrl } from '../../utils/slug';
 import { useSSRData } from '../../context/SSRContext';
@@ -234,13 +235,12 @@ const ProjectSidebar: React.FC<{
                                 to={`/creator/${member.username}`}
                                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                             >
-                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
-                                    {member.avatarUrl ? (
-                                        <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="font-bold text-slate-500 dark:text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
-                                    )}
-                                </div>
+                                <OptimizedImage
+                                    src={member.avatarUrl}
+                                    alt={`${member.username} Avatar`}
+                                    baseWidth={32}
+                                    className="w-8 h-8 rounded-lg"
+                                />
                                 <div>
                                     <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{member.username}</div>
                                     <div className="text-[10px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">
@@ -262,13 +262,12 @@ const ProjectSidebar: React.FC<{
                                 to={`/creator/${contributor.username}`}
                                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                             >
-                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
-                                    {contributor.avatarUrl ? (
-                                        <img src={contributor.avatarUrl} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="font-bold text-slate-500 dark:text-slate-400 text-xs">{contributor.username.charAt(0).toUpperCase()}</span>
-                                    )}
-                                </div>
+                                <OptimizedImage
+                                    src={contributor.avatarUrl}
+                                    alt={`${contributor.username} Avatar`}
+                                    baseWidth={32}
+                                    className="w-8 h-8 rounded-lg"
+                                />
                                 <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{contributor.username}</div>
                             </Link>
                         ))}
@@ -292,8 +291,15 @@ const ProjectSidebar: React.FC<{
                                     onClick={() => navigate(path)}
                                     className="w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left"
                                 >
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden">
-                                        {iconUrl ? <img src={iconUrl} alt="" className="w-full h-full object-cover" /> : <Box className="w-4 h-4" aria-hidden="true" />}
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden shrink-0">
+                                        {iconUrl ? (
+                                            <OptimizedImage
+                                                src={iconUrl}
+                                                alt={`${title} Icon`}
+                                                baseWidth={32}
+                                                className="w-full h-full"
+                                            />
+                                        ) : <Box className="w-4 h-4" aria-hidden="true" />}
                                     </div>
                                     <div className="min-w-0">
                                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{title}</div>
@@ -477,7 +483,12 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden shrink-0">
                                         {authorAvatar ? (
-                                            <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
+                                            <OptimizedImage
+                                                src={authorAvatar}
+                                                alt={`${authorUsername} Avatar`}
+                                                baseWidth={40}
+                                                className="w-full h-full"
+                                            />
                                         ) : (
                                             authorUsername.charAt(0).toUpperCase()
                                         )}
@@ -549,7 +560,12 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0 shadow-sm">
                                                         {replyAvatar ? (
-                                                            <img src={replyAvatar} alt="" className="w-full h-full object-cover"/>
+                                                            <OptimizedImage
+                                                                src={replyAvatar}
+                                                                alt={`${replyUsername} Avatar`}
+                                                                baseWidth={32}
+                                                                className="w-full h-full"
+                                                            />
                                                         ) : (
                                                             <Crown className="w-4 h-4" aria-hidden="true" />
                                                         )}
@@ -927,7 +943,6 @@ export const ModDetail: React.FC<{
     if (isGalleryRoute && (!mod.galleryImages || mod.galleryImages.length === 0)) return <NotFound />;
 
     const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
-    const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
 
     const links = [
         mod.repositoryUrl && { type: 'SOURCE', url: mod.repositoryUrl, icon: Github, label: 'Source Code' },
@@ -960,8 +975,6 @@ export const ModDetail: React.FC<{
                     <meta name="description" content={projectMeta.description} />
                     {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
                     {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
-
-                    {resolvedBannerUrl && <link rel="preload" as="image" href={resolvedBannerUrl} fetchPriority="high" />}
 
                     <meta property="og:title" content={mod.title} />
                     <meta property="og:site_name" content="Modtale" />
@@ -1062,7 +1075,12 @@ export const ModDetail: React.FC<{
                                     </button>
                                 </>
                             )}
-                            <img src={resolveUrl(mod.galleryImages[galleryIndex])} className="max-w-full max-h-full object-contain shadow-lg" alt="" />
+                            <OptimizedImage
+                                src={resolveUrl(mod.galleryImages[galleryIndex])}
+                                alt={`${mod.title} Gallery Image ${galleryIndex + 1}`}
+                                baseWidth={1200}
+                                className="max-w-full max-h-full shadow-lg"
+                            />
                         </div>
                     </div>
                 </div>
@@ -1208,7 +1226,14 @@ export const ModDetail: React.FC<{
                                                         className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white text-left"
                                                     >
                                                         <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center border border-white/5 shrink-0 overflow-hidden">
-                                                            {meta?.icon ? <img src={resolveUrl(meta.icon)} className="w-full h-full object-cover" alt="" /> : <Box className="w-4 h-4 text-slate-500" aria-hidden="true" />}
+                                                            {meta?.icon ? (
+                                                                <OptimizedImage
+                                                                    src={resolveUrl(meta.icon)}
+                                                                    alt={`${title} Icon`}
+                                                                    baseWidth={32}
+                                                                    className="w-full h-full"
+                                                                />
+                                                            ) : <Box className="w-4 h-4 text-slate-500" aria-hidden="true" />}
                                                         </div>
                                                         <div className="min-w-0 flex-1">
                                                             <div className="text-sm font-bold truncate">{title}</div>
@@ -1248,7 +1273,7 @@ export const ModDetail: React.FC<{
                                         <LinkIcon className="w-4 h-4" aria-hidden="true" /> External Links <ChevronDown className={`w-4 h-4 transition-transform ${showMobileLinks ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileLinks && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
                                             {links.map((link, idx) => (
                                                 <a
                                                     key={idx}

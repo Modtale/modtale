@@ -5,6 +5,7 @@ import { BACKEND_URL } from '../../utils/api';
 import { Link } from 'react-router-dom';
 import { getProjectUrl } from '../../utils/slug';
 import { prefetchProject } from '../../utils/prefetch';
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 interface ModCardProps {
     mod: Mod;
@@ -87,9 +88,12 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 className="group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 hover:border-modtale-accent transition-all shadow-sm hover:shadow-md hover:shadow-modtale-accent/5"
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <div className="w-12 h-12 rounded-lg bg-transparent shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
-                    <img src={resolvedImage} alt="" className="w-full h-full object-cover" />
-                </div>
+                <OptimizedImage
+                    src={resolvedImage}
+                    alt={title}
+                    baseWidth={48}
+                    className="w-12 h-12 rounded-lg shrink-0 border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 shadow-sm"
+                />
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-modtale-accent group-hover:drop-shadow-[0_0_8px_rgba(59,130,246,0.4)] transition-all">
                         {title}
@@ -120,9 +124,12 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 className="group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:border-modtale-accent hover:-translate-y-1 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-5"
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <div className="w-full sm:w-32 h-32 rounded-xl bg-transparent shadow-xl border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
-                    <img src={resolvedImage} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                </div>
+                <OptimizedImage
+                    src={resolvedImage}
+                    alt={title}
+                    baseWidth={128}
+                    className="w-full sm:w-32 h-32 rounded-xl shrink-0 border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 shadow-xl"
+                />
                 <div className="flex-1 min-w-0 flex flex-col">
                     <div className="flex justify-between items-start gap-4">
                         <div>
@@ -167,12 +174,12 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
 
             <div className={`w-full aspect-[3/1] relative ${resolvedBanner ? 'bg-white dark:bg-slate-900' : 'bg-slate-800'} border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0`}>
                 {resolvedBanner ? (
-                    <img
+                    <OptimizedImage
                         src={resolvedBanner}
                         alt=""
-                        decoding={priority ? "sync" : "async"}
-                        loading={priority ? "eager" : "lazy"}
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
+                        baseWidth={600}
+                        priority={priority}
+                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
                     />
                 ) : (
                     <>
@@ -190,19 +197,12 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none">
-                    <img
-                        src={resolvedImage}
-                        onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
-                        alt={title}
-                        className="w-full h-full object-cover"
-                    />
-                    {classification === 'MODPACK' && modCount > 0 && (
-                        <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
-                            <Box className="w-3 h-3 mr-0.5" /> {modCount}
-                        </div>
-                    )}
-                </div>
+                <OptimizedImage
+                    src={resolvedImage}
+                    alt={title}
+                    baseWidth={80}
+                    className="w-20 h-20 rounded-2xl absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none border-4 border-white dark:border-slate-800 shadow-xl"
+                />
 
                 <div className="mt-12">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight" title={title}>

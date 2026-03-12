@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { BACKEND_URL } from '../../utils/api.ts';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal.tsx';
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 export const SidebarSection = React.memo(({
                                               title,
@@ -117,13 +118,12 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             <div className="relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group z-10">
                 <div className="absolute inset-0 z-0">
                     {finalBanner ? (
-                        <img
+                        <OptimizedImage
                             src={finalBanner}
-                            alt=""
-                            fetchPriority="high"
-                            loading="eager"
-                            decoding="sync"
-                            className="w-full h-full object-cover transition-opacity duration-300 opacity-100"
+                            alt="Project Banner"
+                            baseWidth={1920}
+                            priority={true}
+                            className="w-full h-full opacity-100"
                         />
                     ) : (
                         <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900" />
@@ -172,7 +172,12 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                 <label className={`block w-32 h-32 rounded-2xl bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
-                                        <img src={finalIcon} alt="Icon" width={128} height={128} className="w-full h-full object-cover" />
+                                        <OptimizedImage
+                                            src={finalIcon}
+                                            alt="Icon"
+                                            baseWidth={128}
+                                            className="w-full h-full"
+                                        />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
                                             <ImageIcon className="w-8 h-8 opacity-50" aria-hidden="true" />
@@ -190,7 +195,13 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                 <label className={`block w-56 h-56 rounded-[2.5rem] bg-slate-200 dark:bg-black/20 shadow-xl border-[8px] border-white dark:border-slate-800 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
-                                        <img src={finalIcon} alt="Icon" width={224} height={224} className="w-full h-full object-cover" />
+                                        <OptimizedImage
+                                            src={finalIcon}
+                                            alt="Icon"
+                                            baseWidth={224}
+                                            priority={true}
+                                            className="w-full h-full"
+                                        />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
                                             <ImageIcon className="w-10 h-10 opacity-50" aria-hidden="true" />
@@ -198,7 +209,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                         </div>
                                     )}
                                     {isEditing && (
-                                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px]">
+                                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30">
                                             <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
                                             <span className="text-xs font-bold text-white">Change Icon</span>
                                             <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
