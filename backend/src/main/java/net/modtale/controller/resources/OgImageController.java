@@ -250,12 +250,12 @@ public class OgImageController {
         clipArea.intersect(new Area(new Rectangle2D.Float(x, y, w, headerH)));
         g2d.setClip(clipArea);
 
-        g2d.setColor(BANNER_BG);
+        g2d.setColor(banner != null ? CARD_BG : BANNER_BG);
         g2d.fillRect(x, y, w, headerH);
 
         try {
             if (banner != null) {
-                AlphaComposite alpha = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f);
+                AlphaComposite alpha = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f);
                 g2d.setComposite(alpha);
                 double scale = Math.max((double) w / banner.getWidth(), (double) headerH / banner.getHeight());
                 int scaledW = (int) (banner.getWidth() * scale);
@@ -282,42 +282,42 @@ public class OgImageController {
 
     private void drawProjectContent(Graphics2D g2d, Mod mod, BufferedImage icon, int cardX, int cardY, int cardW, int cardH) {
         int headerH = cardW / 3;
-        int padding = 60;
-        int iconSize = 200;
+        int padding = 70;
+        int iconSize = 210;
 
         int iconX = cardX + padding;
         int iconY = cardY + headerH - (iconSize / 2);
         drawIcon(g2d, mod, icon, iconX, iconY, iconSize);
 
         int textX = iconX;
-        int titleY = iconY + iconSize + 65;
+        int titleY = iconY + iconSize + 75;
 
         g2d.setFont(new Font("SansSerif", Font.BOLD, 64));
         g2d.setColor(TEXT_PRIMARY);
         String title = truncateText(g2d, mod.getTitle(), cardW - (padding * 2));
         g2d.drawString(title, textX, titleY);
 
-        int authorY = titleY + 55;
+        int authorY = titleY + 60;
         g2d.setFont(new Font("SansSerif", Font.PLAIN, 36));
         g2d.setColor(TEXT_SECONDARY);
         g2d.drawString("by " + mod.getAuthor(), textX, authorY);
 
-        int descY = authorY + 65;
+        int descY = authorY + 70;
         g2d.setFont(new Font("SansSerif", Font.PLAIN, 40));
         g2d.setColor(TEXT_DESC);
         String desc = mod.getDescription() != null ? mod.getDescription() : "";
         drawWrappedText(g2d, desc, textX, descY, cardW - (padding * 2), 2);
 
-        int statY = cardY + cardH - 60;
+        int statY = cardY + cardH - 50;
         int statX = textX;
 
         drawStatWithIcon(g2d, statX, statY, "download", formatNumber(mod.getDownloadCount()));
-        drawStatWithIcon(g2d, statX + 220, statY, "heart", formatNumber(mod.getFavoriteCount()));
+        drawStatWithIcon(g2d, statX + 240, statY, "heart", formatNumber(mod.getFavoriteCount()));
     }
 
     private void drawIcon(Graphics2D g2d, Mod mod, BufferedImage img, int x, int y, int size) {
-        g2d.setColor(new Color(0,0,0,80));
-        g2d.fillRoundRect(x + 10, y + 10, size, size, 40, 40);
+        g2d.setColor(new Color(0, 0, 0, 90));
+        g2d.fillRoundRect(x + 5, y + 5, size, size, 40, 40);
 
         Shape clip = new RoundRectangle2D.Float(x, y, size, size, 40, 40);
         g2d.setClip(clip);
@@ -444,8 +444,8 @@ public class OgImageController {
         float logoHeight = 44f;
         float logoWidth = (float) (logoHeight * (logoDocument.size().width / logoDocument.size().height));
 
-        float x = cardX + cardW - 60 - logoWidth;
-        float y = cardY + cardH - 50 - logoHeight;
+        float x = cardX + cardW - 70 - logoWidth;
+        float y = cardY + cardH - 40 - logoHeight;
 
         Graphics2D logoG = (Graphics2D) g2d.create();
         logoG.translate(x, y);
@@ -467,14 +467,14 @@ public class OgImageController {
         while (sb.length() > 0 && fm.stringWidth(sb.toString()) + ellipsisW > maxWidth) {
             sb.setLength(sb.length() - 1);
         }
-        return sb.toString() + ellipsis;
+        return sb + ellipsis;
     }
 
     private void drawWrappedText(Graphics2D g2d, String text, int x, int y, int maxWidth, int maxLines) {
         if (text == null || text.isEmpty()) return;
 
         FontMetrics fm = g2d.getFontMetrics();
-        int lineHeight = fm.getHeight() + 12;
+        int lineHeight = fm.getHeight() + 16;
         String[] words = text.split("\\s+");
         StringBuilder currentLine = new StringBuilder();
         int lineCount = 0;
