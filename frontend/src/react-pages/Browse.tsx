@@ -11,7 +11,7 @@ import { PROJECT_TYPES, BROWSE_VIEWS, GLOBAL_TAGS } from '../data/categories';
 import type { Classification } from '../data/categories';
 import { getProjectUrl } from '../utils/slug';
 import { EmptyState } from '../components/ui/EmptyState';
-import { getCategorySEO } from '../data/seo-constants';
+import { getCategorySEO, generateDynamicSEO } from '../data/seo-constants';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
 import { useMobile } from '../context/MobileContext';
 import { compareSemVer } from '../utils/modHelpers';
@@ -125,7 +125,7 @@ const FilterDropdown = ({ label, value, options, onChange }: { label: string, va
     );
 };
 
-interface HomeFiltersProps {
+export interface BrowseFiltersProps {
     categoryPills?: React.ReactNode;
     pageTitle: string;
     totalItems: number;
@@ -155,14 +155,14 @@ interface HomeFiltersProps {
     onViewStyleChange: (style: 'grid' | 'list' | 'compact') => void;
 }
 
-export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
-                                                                         categoryPills,
-                                                                         pageTitle, totalItems, loading, sortBy, onSortChange,
-                                                                         selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
-                                                                         isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
-                                                                         selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage,
-                                                                         isMobile, viewStyle, onViewStyleChange
-                                                                     }) => {
+export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
+                                                                           categoryPills,
+                                                                           pageTitle, totalItems, loading, sortBy, onSortChange,
+                                                                           selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
+                                                                           isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
+                                                                           selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage,
+                                                                           isMobile, viewStyle, onViewStyleChange
+                                                                       }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
@@ -265,7 +265,7 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                 <div className="flex items-center gap-4 w-full md:w-auto min-w-0 flex-1">
                     {categoryPills ? categoryPills : (
                         <div className="hidden md:block shrink-0">
-                            <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm">{pageTitle}</h2>
+                            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm">{pageTitle}</h1>
                         </div>
                     )}
                     <div className="hidden lg:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
@@ -281,6 +281,7 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                             onClick={() => onViewStyleChange('grid')}
                             className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
                             title="Grid View"
+                            aria-label="Grid View"
                         >
                             <LayoutGrid className="w-4 h-4" />
                         </button>
@@ -288,6 +289,7 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                             onClick={() => onViewStyleChange('list')}
                             className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'list' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
                             title="List View"
+                            aria-label="List View"
                         >
                             <List className="w-4 h-4" />
                         </button>
@@ -295,6 +297,7 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                             onClick={() => onViewStyleChange('compact')}
                             className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'compact' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
                             title="Compact View"
+                            aria-label="Compact View"
                         >
                             <AlignJustify className="w-4 h-4" />
                         </button>
@@ -308,7 +311,7 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                         {isTagsOpen && (
                             <div className="absolute right-0 md:left-0 top-full mt-2 w-[calc(100vw-2rem)] md:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
                                 <div className="flex justify-between items-center mb-3">
-                                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</h3>
+                                    <span className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</span>
                                     {selectedTags.length > 0 && <button onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
                                 </div>
                                 <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
@@ -332,7 +335,7 @@ export const BrowseFilters: React.FC<HomeFiltersProps> = React.memo(({
                         {isFilterOpen && (
                             <div className="absolute right-0 md:right-0 md:translate-x-0 top-full mt-2 w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
                                 <div className="p-4 border-b border-slate-200 dark:border-white/10">
-                                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</h3>
+                                    <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
                                 </div>
                                 <div className="p-4 space-y-5">
                                     <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
@@ -535,9 +538,9 @@ const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All'
                         return (
                             <Link
                                 key={type.id}
-                                to={getRouteForClassification(type.id)}
-                                onClick={() => onClassificationChange(type.id as any)}
-                                ref={el => tabsRef.current[index] = el}
+                                to={getRouteForClassification(type.id as Classification | 'All')}
+                                onClick={() => onClassificationChange(type.id as Classification | 'All')}
+                                ref={(el) => { tabsRef.current[index] = el; }}
                                 className={`px-3 md:px-4 h-full rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 transition-colors duration-200 whitespace-nowrap snap-center ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
                             >
                                 <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 pointer-events-none`} />
@@ -551,7 +554,7 @@ const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All'
     );
 };
 
-interface BrowseProps {
+export interface BrowseProps {
     onModClick: (mod: Mod) => void;
     onModpackClick: (modpack: Modpack) => void;
     onWorldClick: (world: World) => void;
@@ -863,7 +866,7 @@ export const Browse: React.FC<BrowseProps> = ({
 
     const getPageTitle = useCallback(() => {
         if (selectedTags.length > 0) return `Tagged: ${selectedTags[0]}${selectedTags.length > 1 ? ` (+${selectedTags.length - 1})` : ''}`;
-        if (activeViewId === 'all') return selectedClassification === 'All' ? 'All Projects' : `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
+        if (activeViewId === 'all') return selectedClassification === 'All' ? 'All Projects' : getCategorySEO(selectedClassification).h1 || `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
         const view = BROWSE_VIEWS.find(v => v.id === activeViewId);
         if (view) return view.label;
         return 'Projects';
@@ -906,14 +909,15 @@ export const Browse: React.FC<BrowseProps> = ({
 
     const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (minFavorites > 0 ? 1 : 0) + (filterDate ? 1 : 0);
     const seoContent = getCategorySEO(selectedClassification);
+    const dynamicSEO = generateDynamicSEO({ title: seoContent.title, description: seoContent.description }, page, sortBy, activeViewId, urlSearchTerm);
 
     const categoryPills = <CategoryPillNav selectedClassification={selectedClassification} onClassificationChange={handleClassificationChange} />;
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative transition-colors duration-300">
             <Helmet>
-                <title>{seoContent.title}</title>
-                <meta name="description" content={seoContent.description} />
+                <title>{dynamicSEO.title}</title>
+                <meta name="description" content={dynamicSEO.description} />
                 <meta name="keywords" content={seoContent.keywords} />
                 {lcpBannerUrl && <link rel="preload" as="image" href={lcpBannerUrl} fetchPriority="high" />}
                 {itemListSchema && <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>}
@@ -930,7 +934,7 @@ export const Browse: React.FC<BrowseProps> = ({
                             </div>
                         </div>
                         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
-                            <h2 className="text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-3 tracking-widest px-2 drop-shadow-sm">Browse</h2>
+                            <span className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-3 tracking-widest px-2 drop-shadow-sm">Browse</span>
                             <div className="space-y-1.5">
                                 {BROWSE_VIEWS.map(v => (
                                     <Link
@@ -1029,12 +1033,12 @@ export const Browse: React.FC<BrowseProps> = ({
                         )}
 
                         {totalPages > 1 && (
-                            <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-12 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+                            <nav aria-label="Pagination" className="mt-12 flex flex-col md:flex-row justify-center items-center gap-12 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                 <div className="flex items-center gap-2">
                                     {page === 0 ? (
-                                        <button disabled className="text-slate-400 opacity-20 cursor-not-allowed p-2"><ChevronLeft className="w-5 h-5" /></button>
+                                        <span aria-disabled="true" className="text-slate-400 opacity-20 cursor-not-allowed p-2"><ChevronLeft className="w-5 h-5" /></span>
                                     ) : (
-                                        <Link to={createPageUrl(page - 1)} onClick={handleScrollTop} className="text-slate-500 hover:text-modtale-accent transition-all p-2"><ChevronLeft className="w-5 h-5" /></Link>
+                                        <Link to={createPageUrl(page - 1)} rel="prev" aria-label="Previous Page" onClick={handleScrollTop} className="text-slate-500 hover:text-modtale-accent transition-all p-2"><ChevronLeft className="w-5 h-5" /></Link>
                                     )}
 
                                     <div className="hidden sm:flex items-center gap-1">
@@ -1044,6 +1048,8 @@ export const Browse: React.FC<BrowseProps> = ({
                                                     key={p}
                                                     to={createPageUrl(p - 1)}
                                                     onClick={handleScrollTop}
+                                                    aria-label={`Page ${p}`}
+                                                    aria-current={page === p - 1 ? 'page' : undefined}
                                                     className={`w-9 h-9 flex items-center justify-center text-sm font-bold transition-all ${page === p - 1 ? 'text-modtale-accent' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
                                                 >
                                                     {p}
@@ -1055,16 +1061,17 @@ export const Browse: React.FC<BrowseProps> = ({
                                     </div>
 
                                     {page === totalPages - 1 ? (
-                                        <button disabled className="text-slate-400 opacity-20 cursor-not-allowed p-2"><ChevronRight className="w-5 h-5" /></button>
+                                        <span aria-disabled="true" className="text-slate-400 opacity-20 cursor-not-allowed p-2"><ChevronRight className="w-5 h-5" /></span>
                                     ) : (
-                                        <Link to={createPageUrl(page + 1)} onClick={handleScrollTop} className="text-slate-500 hover:text-modtale-accent transition-all p-2"><ChevronRight className="w-5 h-5" /></Link>
+                                        <Link to={createPageUrl(page + 1)} rel="next" aria-label="Next Page" onClick={handleScrollTop} className="text-slate-500 hover:text-modtale-accent transition-all p-2"><ChevronRight className="w-5 h-5" /></Link>
                                     )}
                                 </div>
 
                                 <form onSubmit={handleJump} className="flex items-center gap-4 group">
-                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest pointer-events-none group-focus-within:text-modtale-accent transition-colors">Go to page</span>
+                                    <label htmlFor="jump-page" className="text-[10px] font-black uppercase text-slate-400 tracking-widest pointer-events-none group-focus-within:text-modtale-accent transition-colors">Go to page</label>
                                     <div className="relative">
                                         <input
+                                            id="jump-page"
                                             type="number"
                                             min={1}
                                             max={totalPages}
@@ -1076,13 +1083,14 @@ export const Browse: React.FC<BrowseProps> = ({
                                         <button
                                             type="submit"
                                             disabled={!jumpPage}
+                                            aria-label="Go"
                                             className="absolute -right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-modtale-accent disabled:opacity-0 transition-all active:scale-90"
                                         >
                                             <CornerDownLeft className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
                                 </form>
-                            </div>
+                            </nav>
                         )}
                     </div>
                 </div>

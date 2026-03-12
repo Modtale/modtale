@@ -1,6 +1,7 @@
 ---
 import '../index.css';
 import { DEFAULT_SEO } from '../data/seo-constants';
+import {BACKEND_URL} from "@/utils/api.ts";
 
 interface Props {
     title?: string;
@@ -32,7 +33,7 @@ if (initialData && initialData.id && initialData.classification) {
 const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
 
-const rawApiUrl = import.meta.env.PUBLIC_API_URL || "https://modtale-backend-dev-ptpi2wdeva-uc.a.run.app";
+const rawApiUrl = BACKEND_URL;
 let apiOrigin = rawApiUrl;
 try {
     apiOrigin = new URL(rawApiUrl).origin;
