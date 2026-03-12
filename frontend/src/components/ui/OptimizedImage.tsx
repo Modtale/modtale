@@ -33,24 +33,24 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         if (!url || url.includes('.svg') || url.startsWith('blob:') || url.includes('localhost')) {
             return url;
         }
-
         const steppedWidth = getSteppedWidth(width);
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
         const absoluteUrl = url.startsWith('http') ? url : `${origin}${url}`;
-
         return `${origin}/cdn-cgi/image/width=${steppedWidth},quality=${quality},format=auto,onerror=redirect/${absoluteUrl}`;
     };
 
     useEffect(() => {
+        const conn = (navigator as any).connection;
+        const isFast = !conn || (conn.effectiveType === '4g' && conn.rtt < 150);
+
+        if (isFast || priority) {
+            setIsLoaded(true);
+            return;
+        }
+
         const lowRes = getCloudflareUrl(src, 64, 10);
         setCurrentSrc(lowRes);
-
-        if (priority) {
-            const img = new Image();
-            img.src = getCloudflareUrl(src, baseWidth * 2);
-            img.onload = () => setIsLoaded(true);
-        }
-    }, [src, baseWidth, priority]);
+    }, [src, priority]);
 
     const res1x = getCloudflareUrl(src, baseWidth);
     const res2x = getCloudflareUrl(src, baseWidth * 2);
@@ -68,7 +68,9 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
                 fetchPriority={priority ? 'high' : 'auto'}
                 decoding={priority ? 'sync' : 'async'}
                 onLoad={() => setIsLoaded(true)}
-                className={`w-full h-full object-cover transition-all duration-700 ${isLoaded ? 'blur-0 scale-100' : 'blur-md scale-110'}`}
+                className={`w-full h-full object-cover transition-all duration-500 ${
+                    isLoaded ? 'blur-0 scale-100' : 'blur-md scale-110'
+                }`}
                 onError={(e) => {
                     if (!src.includes('favicon')) {
                         e.currentTarget.src = '/assets/favicon.svg';
