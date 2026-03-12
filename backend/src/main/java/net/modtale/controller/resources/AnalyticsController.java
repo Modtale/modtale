@@ -21,6 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,12 @@ public class AnalyticsController {
             return request.getRemoteAddr();
         }
         return xfHeader.split(",")[0];
+    }
+
+    private long getSecondsUntilMidnight() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime midnight = now.toLocalDate().plusDays(1).atStartOfDay();
+        return Duration.between(now, midnight).getSeconds();
     }
 
     @GetMapping("/analytics/stats")
@@ -68,7 +76,7 @@ public class AnalyticsController {
         stats.put("totalDownloads", totalDownloads);
 
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePublic())
                 .body(stats);
     }
 
@@ -106,7 +114,7 @@ public class AnalyticsController {
         CreatorAnalytics data = analyticsService.getCreatorDashboard(resolvedTargetUsername, range, include);
 
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate())
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
                 .body(data);
     }
 
@@ -128,7 +136,7 @@ public class AnalyticsController {
         ProjectAnalyticsDetail data = analyticsService.getProjectAnalytics(projectId, user != null ? user.getUsername() : "anon", range);
 
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate())
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
                 .body(data);
     }
 

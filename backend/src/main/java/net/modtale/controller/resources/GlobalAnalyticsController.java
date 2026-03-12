@@ -5,9 +5,14 @@ import net.modtale.model.user.User;
 import net.modtale.service.AnalyticsService;
 import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/v1/admin/analytics")
@@ -17,6 +22,12 @@ public class GlobalAnalyticsController {
 
     @Autowired private AnalyticsService analyticsService;
     @Autowired private UserService userService;
+
+    private long getSecondsUntilMidnight() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime midnight = now.toLocalDate().plusDays(1).atStartOfDay();
+        return Duration.between(now, midnight).getSeconds();
+    }
 
     @GetMapping("/platform")
     public ResponseEntity<PlatformAnalyticsSummary> getPlatformAnalytics(@RequestParam(defaultValue = "30d") String range) {
@@ -29,6 +40,8 @@ public class GlobalAnalyticsController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        return ResponseEntity.ok(analyticsService.getPlatformAnalytics(range));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
+                .body(analyticsService.getPlatformAnalytics(range));
     }
 }
