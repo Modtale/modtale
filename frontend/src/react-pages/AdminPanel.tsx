@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api.ts';
 import { StatusModal } from '../components/ui/StatusModal.tsx';
-import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText } from 'lucide-react';
 import type { Mod } from '../types.ts';
 import { VerificationQueue } from '../components/admin/VerificationQueue';
 import { UserManagement } from '../components/admin/UserManagement';
@@ -9,13 +9,14 @@ import { ReviewInterface } from '../components/admin/ReviewInterface';
 import { ReportQueue } from '../components/admin/ReportQueue';
 import { ProjectManagement } from '../components/admin/ProjectManagement';
 import { PlatformAnalytics } from '../components/admin/PlatformAnalytics.tsx';
+import { AdminLogViewer } from '../components/admin/AdminLogViewer.tsx';
 
 interface AdminPanelProps {
     currentUser: any;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
-    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects' | 'analytics'>('verification');
+    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs'>('verification');
     const [status, setStatus] = useState<any>(null);
 
     const [pendingProjects, setPendingProjects] = useState<Mod[]>([]);
@@ -105,7 +106,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
         );
     }
 
-    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects' | 'analytics', icon: any, label: string, badge?: number }) => (
+    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs', icon: any, label: string, badge?: number }) => (
         <button
             onClick={() => setActiveTab(tab)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${
@@ -182,6 +183,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                                             icon={Users}
                                             label="User Management"
                                         />
+                                        <SidebarButton
+                                            tab="logs"
+                                            icon={FileText}
+                                            label="Audit Logs"
+                                        />
                                     </>
                                 )}
                             </nav>
@@ -238,6 +244,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ currentUser }) => {
                                     <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage roles, tiers, and user statuses.</p>
                                 </div>
                                 <UserManagement setStatus={setStatus} />
+                            </div>
+                        )}
+
+                        {activeTab === 'logs' && isSuperAdmin && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="mb-8">
+                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Audit Logs</h1>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review all administrative actions.</p>
+                                </div>
+                                <AdminLogViewer />
                             </div>
                         )}
                     </div>
