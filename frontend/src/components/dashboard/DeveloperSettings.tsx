@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../utils/api.ts';
-import { Trash2, Plus, Copy, Key, Check, Shield, Info, ExternalLink, Github, ArrowRight, Code } from 'lucide-react';
+import { Trash2, Plus, Copy, Key, Check, Shield, Info, ExternalLink, Github, ArrowRight, Code, CheckSquare, Square } from 'lucide-react';
 import { StatusModal } from '../ui/StatusModal.tsx';
 import { Link } from 'react-router-dom';
 
@@ -9,15 +9,118 @@ interface ApiKey {
     name: string;
     prefix: string;
     tier: 'USER' | 'ENTERPRISE';
+    permissions: string[];
     createdAt: string;
     lastUsed: string | null;
 }
+
+const PERMISSION_GROUPS = [
+    {
+        group: 'Projects',
+        permissions: [
+            { id: 'PROJECT_READ', label: 'Read Projects' },
+            { id: 'PROJECT_CREATE', label: 'Create Projects' },
+            { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
+            { id: 'PROJECT_EDIT_ICON', label: 'Update Project Icon' },
+            { id: 'PROJECT_EDIT_BANNER', label: 'Update Project Banner' },
+            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' },
+            { id: 'PROJECT_TRANSFER_RESOLVE', label: 'Resolve Transfer' },
+            { id: 'PROJECT_DELETE', label: 'Delete Projects' },
+            { id: 'PROJECT_FAVORITE', label: 'Favorite Projects' }
+        ]
+    },
+    {
+        group: 'Project Status & Publishing',
+        permissions: [
+            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
+            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
+            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Projects' },
+            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Projects' },
+            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
+        ]
+    },
+    {
+        group: 'Project Gallery & Team',
+        permissions: [
+            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
+            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
+            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
+            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' }
+        ]
+    },
+    {
+        group: 'Versions & Releases',
+        permissions: [
+            { id: 'VERSION_READ', label: 'Read Versions' },
+            { id: 'VERSION_CREATE', label: 'Create Versions' },
+            { id: 'VERSION_EDIT', label: 'Edit Versions' },
+            { id: 'VERSION_DELETE', label: 'Delete Versions' },
+            { id: 'VERSION_DOWNLOAD', label: 'Download Files' }
+        ]
+    },
+    {
+        group: 'Reviews & Comments',
+        permissions: [
+            { id: 'COMMENT_READ', label: 'Read Comments' },
+            { id: 'COMMENT_CREATE', label: 'Create Comments' },
+            { id: 'COMMENT_EDIT', label: 'Edit Comments' },
+            { id: 'COMMENT_DELETE', label: 'Delete Comments' },
+            { id: 'COMMENT_REPLY', label: 'Reply to Comments' }
+        ]
+    },
+    {
+        group: 'Profile Settings',
+        permissions: [
+            { id: 'PROFILE_READ', label: 'Read Profile' },
+            { id: 'PROFILE_EDIT_BASIC', label: 'Edit Basic Info' },
+            { id: 'PROFILE_EDIT_AVATAR', label: 'Update Avatar' },
+            { id: 'PROFILE_EDIT_BANNER', label: 'Update Banner' },
+            { id: 'PROFILE_DELETE', label: 'Delete Account' },
+            { id: 'PROFILE_FOLLOW', label: 'Follow Users' },
+            { id: 'PROFILE_UNFOLLOW', label: 'Unfollow Users' },
+            { id: 'PROFILE_CONNECTION_MANAGE', label: 'Manage Connections' },
+            { id: 'PROFILE_NOTIFICATION_MANAGE', label: 'Manage Notifications' }
+        ]
+    },
+    {
+        group: 'Organizations',
+        permissions: [
+            { id: 'ORG_READ', label: 'Read Organizations' },
+            { id: 'ORG_CREATE', label: 'Create Organizations' },
+            { id: 'ORG_EDIT_METADATA', label: 'Edit Org Profile' },
+            { id: 'ORG_EDIT_AVATAR', label: 'Update Org Avatar' },
+            { id: 'ORG_EDIT_BANNER', label: 'Update Org Banner' },
+            { id: 'ORG_DELETE', label: 'Delete Organizations' },
+            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
+            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
+            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
+            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Edit Member Roles' },
+            { id: 'ORG_INVITE_ACCEPT', label: 'Accept Org Invites' },
+            { id: 'ORG_INVITE_DECLINE', label: 'Decline Org Invites' },
+            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Org Connections' }
+        ]
+    }
+];
+
+const TOTAL_PERMISSIONS = PERMISSION_GROUPS.reduce((acc, group) => acc + group.permissions.length, 0);
+
+const getPermissionLabel = (id: string) => {
+    for (const group of PERMISSION_GROUPS) {
+        const p = group.permissions.find(p => p.id === id);
+        if (p) return p.label;
+    }
+    return id;
+};
+
+// Sensible defaults for read-heavy integrations
+const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ'];
 
 export const DeveloperSettings: React.FC = () => {
     const [keys, setKeys] = useState<ApiKey[]>([]);
     const [loading, setLoading] = useState(true);
     const [newKey, setNewKey] = useState<string | null>(null);
     const [keyName, setKeyName] = useState('');
+    const [selectedPerms, setSelectedPerms] = useState<string[]>(DEFAULT_PERMISSIONS);
     const [isCreating, setIsCreating] = useState(false);
     const [status, setStatus] = useState<any>(null);
     const [isCopied, setIsCopied] = useState(false);
@@ -34,11 +137,16 @@ export const DeveloperSettings: React.FC = () => {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (selectedPerms.length === 0) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Please select at least one permission.' });
+            return;
+        }
         setIsCreating(true);
         try {
-            const res = await api.post('/user/api-keys', { name: keyName });
+            const res = await api.post('/user/api-keys', { name: keyName, permissions: selectedPerms });
             setNewKey(res.data.key);
             setKeyName('');
+            setSelectedPerms(DEFAULT_PERMISSIONS);
             fetchKeys();
         } catch (e: any) {
             if (e.response?.status === 403 && e.response?.data?.error === "Email verification required.") {
@@ -79,6 +187,30 @@ export const DeveloperSettings: React.FC = () => {
         navigator.clipboard.writeText(newKey);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
+    };
+
+    const togglePerm = (id: string) => {
+        setSelectedPerms(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+    };
+
+    const toggleAllInGroup = (groupPermissions: {id: string}[]) => {
+        const groupIds = groupPermissions.map(p => p.id);
+        const allSelected = groupIds.every(id => selectedPerms.includes(id));
+
+        if (allSelected) {
+            setSelectedPerms(prev => prev.filter(id => !groupIds.includes(id)));
+        } else {
+            setSelectedPerms(prev => Array.from(new Set([...prev, ...groupIds])));
+        }
+    };
+
+    const toggleAllPerms = () => {
+        if (selectedPerms.length === TOTAL_PERMISSIONS) {
+            setSelectedPerms([]);
+        } else {
+            const allIds = PERMISSION_GROUPS.flatMap(g => g.permissions.map(p => p.id));
+            setSelectedPerms(allIds);
+        }
     };
 
     return (
@@ -123,45 +255,119 @@ export const DeveloperSettings: React.FC = () => {
                             </h3>
                         </div>
 
-                        <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1">
+                        <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1 max-h-[400px] overflow-y-auto custom-scrollbar">
                             {keys.length === 0 ? (
                                 <div className="p-8 text-center text-slate-500 text-sm">No active keys found.</div>
                             ) : keys.map(k => (
-                                <div key={k.id} className="p-5 flex items-center justify-between group hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
-                                    <div>
-                                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                            {k.name}
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-md uppercase border font-mono font-bold tracking-wider ${k.tier === 'ENTERPRISE' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' : 'bg-slate-200/50 dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10'}`}>
-                                                {k.tier || 'USER'}
-                                            </span>
+                                <div key={k.id} className="p-5 flex items-start justify-between group hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
+                                    <div className="w-full">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                    {k.name}
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-md uppercase border font-mono font-bold tracking-wider ${k.tier === 'ENTERPRISE' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' : 'bg-slate-200/50 dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10'}`}>
+                                                        {k.tier || 'USER'}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 font-mono mt-1.5 flex items-center gap-2">
+                                                    <span>Prefix: <span className="bg-white/60 dark:bg-black/30 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/5">{k.prefix}••••••••</span></span>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => confirmRevoke(k.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-2.5 rounded-xl transition-colors mt-1" title="Revoke Key">
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
                                         </div>
-                                        <div className="text-xs text-slate-500 font-mono mt-1.5 flex items-center gap-2">
-                                            <span>Prefix: <span className="bg-white/60 dark:bg-black/30 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/5">{k.prefix}••••••••</span></span>
+
+                                        <div className="mt-3 flex flex-wrap gap-1.5">
+                                            {k.permissions && k.permissions.length === TOTAL_PERMISSIONS ? (
+                                                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">All Permissions ({TOTAL_PERMISSIONS})</span>
+                                            ) : k.permissions && k.permissions.length > 0 ? (
+                                                <>
+                                                    {k.permissions.slice(0, 5).map(p => (
+                                                        <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-medium whitespace-nowrap">
+                                                            {getPermissionLabel(p)}
+                                                        </span>
+                                                    ))}
+                                                    {k.permissions.length > 5 && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 font-medium">
+                                                            +{k.permissions.length - 5} more
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 font-medium">No Permissions</span>
+                                            )}
                                         </div>
-                                        <div className="text-xs text-slate-400 mt-2 font-medium">
+
+                                        <div className="text-xs text-slate-400 mt-3 font-medium">
                                             Created: {new Date(k.createdAt).toLocaleDateString()} • Last Used: {k.lastUsed ? new Date(k.lastUsed).toLocaleDateString() : 'Never'}
                                         </div>
                                     </div>
-                                    <button onClick={() => confirmRevoke(k.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-2.5 rounded-xl transition-colors" title="Revoke Key">
-                                        <Trash2 className="w-5 h-5" />
-                                    </button>
                                 </div>
                             ))}
                         </div>
 
-                        <div className="p-5 border-t border-slate-200 dark:border-white/10 mt-auto shrink-0">
-                            <form onSubmit={handleCreate} className="flex gap-3">
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 mt-auto shrink-0 bg-slate-50/50 dark:bg-white/[0.01]">
+                            <form onSubmit={handleCreate} className="flex flex-col gap-5">
                                 <input
                                     type="text"
                                     value={keyName}
                                     onChange={e => setKeyName(e.target.value)}
                                     placeholder="Key Name (e.g. CI/CD Pipeline)"
-                                    className="flex-1 bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm dark:text-white focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all shadow-inner"
+                                    className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm dark:text-white focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all shadow-inner"
                                     required
                                 />
-                                <button disabled={isCreating} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all shadow-lg active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed">
-                                    <Plus className="w-4 h-4" /> Generate
-                                </button>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-2">
+                                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Configure Permissions</label>
+                                        <button
+                                            type="button"
+                                            onClick={toggleAllPerms}
+                                            className="text-xs font-bold text-modtale-accent hover:text-modtale-accentHover transition-colors flex items-center gap-1"
+                                        >
+                                            {selectedPerms.length === TOTAL_PERMISSIONS ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                                            {selectedPerms.length === TOTAL_PERMISSIONS ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-6 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {PERMISSION_GROUPS.map((group, idx) => (
+                                            <div key={idx} className="space-y-2.5">
+                                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-1.5">
+                                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{group.group}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleAllInGroup(group.permissions)}
+                                                        className="text-[10px] text-slate-400 hover:text-modtale-accent transition-colors font-medium bg-white/50 dark:bg-white/5 px-1.5 py-0.5 rounded"
+                                                    >
+                                                        Toggle
+                                                    </button>
+                                                </div>
+                                                <div className="flex flex-col gap-1.5">
+                                                    {group.permissions.map(perm => (
+                                                        <label key={perm.id} className="flex items-center gap-2.5 p-1.5 rounded-md border border-transparent hover:border-slate-200 dark:hover:border-white/5 hover:bg-white/40 dark:hover:bg-white/5 cursor-pointer transition-colors group/label">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedPerms.includes(perm.id)}
+                                                                onChange={() => togglePerm(perm.id)}
+                                                                className="w-3.5 h-3.5 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent bg-white dark:bg-black/20"
+                                                            />
+                                                            <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 group-hover/label:text-slate-900 dark:group-hover/label:text-white transition-colors">{perm.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-white/10">
+                                    <span className="text-xs text-slate-500 font-medium">
+                                        {selectedPerms.length} / {TOTAL_PERMISSIONS} selected
+                                    </span>
+                                    <button disabled={isCreating || selectedPerms.length === 0} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all shadow-lg active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed w-full sm:w-auto">
+                                        <Plus className="w-4 h-4" /> Generate Key
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>

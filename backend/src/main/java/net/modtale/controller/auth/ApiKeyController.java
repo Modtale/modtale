@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/user/api-keys")
@@ -21,6 +22,16 @@ public class ApiKeyController {
 
     @Autowired
     private UserService userService;
+
+    public static class CreateKeyRequest {
+        private String name;
+        private Set<ApiKey.ApiPermission> permissions;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public Set<ApiKey.ApiPermission> getPermissions() { return permissions; }
+        public void setPermissions(Set<ApiKey.ApiPermission> permissions) { this.permissions = permissions; }
+    }
 
     @GetMapping
     public ResponseEntity<List<ApiKey>> getMyKeys() {
@@ -35,7 +46,7 @@ public class ApiKeyController {
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, String>> createKey(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> createKey(@RequestBody CreateKeyRequest payload) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
@@ -44,12 +55,12 @@ public class ApiKeyController {
                     .body(Map.of("error", "Email verification required."));
         }
 
-        String name = payload.get("name");
+        String name = payload.getName();
         if (name == null || name.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
 
-        String rawKey = apiKeyService.createApiKey(user.getId(), name);
+        String rawKey = apiKeyService.createApiKey(user.getId(), name, payload.getPermissions());
 
         return ResponseEntity.ok(Map.of("key", rawKey));
     }

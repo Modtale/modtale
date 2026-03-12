@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
@@ -39,7 +41,7 @@ public class ApiKeyService {
             .maximumSize(1000)
             .build();
 
-    public String createApiKey(String userId, String name) {
+    public String createApiKey(String userId, String name, Set<ApiKey.ApiPermission> permissions) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -63,6 +65,7 @@ public class ApiKeyService {
         );
 
         apiKey.setTier(user.getTier());
+        apiKey.setPermissions(permissions != null ? permissions : EnumSet.noneOf(ApiKey.ApiPermission.class));
 
         apiKeyRepository.save(apiKey);
         return plainKey;

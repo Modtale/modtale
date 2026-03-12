@@ -24,6 +24,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -70,6 +71,7 @@ public class ModController {
     }
 
     @PutMapping("/projects/{id}/icon")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_EDIT_ICON')")
     public ResponseEntity<?> updateProjectIcon(@PathVariable String id, @RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -87,6 +89,7 @@ public class ModController {
     }
 
     @PutMapping("/projects/{id}/banner")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_EDIT_BANNER')")
     public ResponseEntity<?> updateProjectBanner(@PathVariable String id, @RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -104,6 +107,7 @@ public class ModController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-url")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_VERSION_DOWNLOAD')")
     public ResponseEntity<?> getDownloadUrl(@PathVariable String id, @PathVariable String version) {
         try {
             Mod mod = modService.getModById(id);
@@ -224,6 +228,7 @@ public class ModController {
 
     @Deprecated
     @GetMapping("/projects/{id}/versions/{version}/download")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_VERSION_DOWNLOAD')")
     public ResponseEntity<Resource> downloadVersion(@PathVariable String id, @PathVariable String version, HttpServletRequest request) {
         try {
             Mod mod = modService.getModById(id);
@@ -306,6 +311,7 @@ public class ModController {
     }
 
     @GetMapping("/projects")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_READ')")
     public ResponseEntity<Page<ModDTO>> getProjects(
             @RequestParam(required = false) String tags,
             @RequestParam(required = false) String search,
@@ -372,6 +378,7 @@ public class ModController {
     }
 
     @GetMapping("/projects/{id}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_READ')")
     public ResponseEntity<?> getProject(@PathVariable String id, HttpServletRequest request) {
         Mod mod = modService.getModById(id);
         if (mod == null) return ResponseEntity.notFound().build();
@@ -395,6 +402,7 @@ public class ModController {
     }
 
     @GetMapping("/projects/{id}/meta")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_READ')")
     public ResponseEntity<Map<String, Object>> getProjectMeta(@PathVariable String id) {
         Mod mod = modService.getModById(id);
         if (mod == null) return ResponseEntity.notFound().build();
@@ -411,6 +419,7 @@ public class ModController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/dependencies")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_VERSION_READ')")
     public ResponseEntity<List<ModDependency>> getProjectDependencies(@PathVariable String id, @PathVariable String version) {
         Mod mod = modService.getModById(id);
         if (mod == null) return ResponseEntity.notFound().build();
@@ -442,6 +451,7 @@ public class ModController {
     }
 
     @GetMapping("/creators/search")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROFILE_READ')")
     public ResponseEntity<List<User>> searchCreators(@RequestParam String query) {
         List<User> creators = modService.searchCreators(query);
         creators.forEach(u -> { u.setEmail(null); u.setGithubAccessToken(null); u.setLikedModIds(null); });
@@ -449,6 +459,7 @@ public class ModController {
     }
 
     @GetMapping("/creators/{userId}/projects")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_READ')")
     public ResponseEntity<Page<ModDTO>> getCreatorProjects(
             @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
@@ -489,6 +500,7 @@ public class ModController {
     }
 
     @GetMapping("/projects/user/contributed")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_READ')")
     public ResponseEntity<Page<ModDTO>> getContributedProjects(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
@@ -507,6 +519,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/favorite")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_FAVORITE')")
     public ResponseEntity<?> toggleFavorite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -515,6 +528,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/comments")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_COMMENT_CREATE')")
     public ResponseEntity<?> addComment(@PathVariable String id, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -530,6 +544,7 @@ public class ModController {
     }
 
     @PutMapping("/projects/{id}/comments/{commentId}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_COMMENT_EDIT')")
     public ResponseEntity<?> editComment(@PathVariable String id, @PathVariable String commentId, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -545,6 +560,7 @@ public class ModController {
     }
 
     @DeleteMapping("/projects/{id}/comments/{commentId}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_COMMENT_DELETE')")
     public ResponseEntity<?> deleteComment(@PathVariable String id, @PathVariable String commentId) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -557,6 +573,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/comments/{commentId}/reply")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_COMMENT_REPLY')")
     public ResponseEntity<?> replyToComment(@PathVariable String id, @PathVariable String commentId, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -572,6 +589,7 @@ public class ModController {
     }
 
     @PostMapping("/projects")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_CREATE')")
     public ResponseEntity<?> createProject(
             @RequestParam("title") String title,
             @RequestParam("classification") String classification,
@@ -591,6 +609,7 @@ public class ModController {
     }
 
     @PutMapping("/projects/{id}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_EDIT_METADATA')")
     public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody Mod updatedMod) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -615,6 +634,7 @@ public class ModController {
     }
 
     @PutMapping("/projects/{id}/versions/{versionId}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_VERSION_EDIT')")
     public ResponseEntity<?> updateVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody Map<String, Object> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -635,6 +655,7 @@ public class ModController {
     }
 
     @DeleteMapping("/projects/{id}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_DELETE')")
     public ResponseEntity<?> deleteProject(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -647,6 +668,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/submit")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_STATUS_SUBMIT')")
     public ResponseEntity<?> submitProject(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -661,6 +683,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/revert")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_STATUS_REVERT')")
     public ResponseEntity<?> revertProjectToDraft(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -675,6 +698,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/archive")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_STATUS_ARCHIVE')")
     public ResponseEntity<?> archiveProject(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -689,6 +713,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/unlist")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_STATUS_UNLIST')")
     public ResponseEntity<?> unlistProject(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -703,6 +728,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/publish")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_STATUS_PUBLISH')")
     public ResponseEntity<?> publishProject(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -715,6 +741,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/versions")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_VERSION_CREATE')")
     public ResponseEntity<?> addVersion(
             @PathVariable String id,
             @RequestParam("versionNumber") String versionNumber,
@@ -745,6 +772,7 @@ public class ModController {
     }
 
     @DeleteMapping("/projects/{id}/versions/{versionId}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_VERSION_DELETE')")
     public ResponseEntity<?> deleteVersion(@PathVariable String id, @PathVariable String versionId) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -757,6 +785,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/gallery")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_GALLERY_ADD')")
     public ResponseEntity<?> addGalleryImage(@PathVariable String id, @RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -769,6 +798,7 @@ public class ModController {
     }
 
     @DeleteMapping("/projects/{id}/gallery")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_GALLERY_REMOVE')")
     public ResponseEntity<?> removeGalleryImage(@PathVariable String id, @RequestParam("imageUrl") String imageUrl) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -777,6 +807,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/invite")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_TEAM_INVITE')")
     public ResponseEntity<?> inviteContributor(@PathVariable String id, @RequestParam String userId) {
         try {
             modService.inviteContributor(id, userId);
@@ -787,6 +818,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/invite/accept")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_TEAM_INVITE')")
     public ResponseEntity<?> acceptInvite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -799,6 +831,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/invite/decline")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_TEAM_INVITE')")
     public ResponseEntity<?> declineInvite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -808,6 +841,7 @@ public class ModController {
     }
 
     @DeleteMapping("/projects/{id}/contributors/{userId}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_TEAM_REMOVE')")
     public ResponseEntity<?> removeContributor(@PathVariable String id, @PathVariable String userId) {
         try {
             modService.removeContributor(id, userId);
@@ -817,6 +851,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/transfer")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_TRANSFER_REQUEST')")
     public ResponseEntity<?> requestTransfer(@PathVariable String id, @RequestBody Map<String, String> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -830,6 +865,7 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/transfer/resolve")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_PROJECT_TRANSFER_RESOLVE')")
     public ResponseEntity<?> resolveTransfer(@PathVariable String id, @RequestBody Map<String, Boolean> body) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -844,6 +880,7 @@ public class ModController {
     }
 
     @GetMapping("/version/{hash}")
+    @PreAuthorize("!hasAuthority('ROLE_API') or hasAuthority('SCOPE_VERSION_READ')")
     public ResponseEntity<?> getVersionByHash(@PathVariable String hash) {
         Optional<ModVersion> version = modService.getVersionByHash(hash);
         if (version.isEmpty()) return ResponseEntity.notFound().build();
