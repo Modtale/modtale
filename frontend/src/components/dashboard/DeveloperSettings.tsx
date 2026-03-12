@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../utils/api.ts';
-import { Trash2, Plus, Copy, Key, Check, Shield, Info, ExternalLink, Github, ArrowRight, Code, CheckSquare, Square } from 'lucide-react';
+import { Trash2, Plus, Copy, Key, Check, Shield, Info, ExternalLink, Github, ArrowRight, Code, CheckSquare, Square, Building2, User as UserIcon } from 'lucide-react';
 import { StatusModal } from '../ui/StatusModal.tsx';
 import { Link } from 'react-router-dom';
 
@@ -9,9 +9,15 @@ interface ApiKey {
     name: string;
     prefix: string;
     tier: 'USER' | 'ENTERPRISE';
-    permissions: string[];
+    contextPermissions: Record<string, string[]>;
     createdAt: string;
     lastUsed: string | null;
+}
+
+interface Organization {
+    id: string;
+    username: string;
+    avatarUrl?: string;
 }
 
 const PERMISSION_GROUPS = [
@@ -69,7 +75,7 @@ const PERMISSION_GROUPS = [
         ]
     },
     {
-        group: 'Profile Settings',
+        group: 'Profile & Account Settings',
         permissions: [
             { id: 'PROFILE_READ', label: 'Read Profile' },
             { id: 'PROFILE_EDIT_BASIC', label: 'Edit Basic Info' },
@@ -83,7 +89,7 @@ const PERMISSION_GROUPS = [
         ]
     },
     {
-        group: 'Organizations',
+        group: 'Organization Settings',
         permissions: [
             { id: 'ORG_READ', label: 'Read Organizations' },
             { id: 'ORG_CREATE', label: 'Create Organizations' },
@@ -112,20 +118,28 @@ const getPermissionLabel = (id: string) => {
     return id;
 };
 
-// Sensible defaults for read-heavy integrations
 const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ'];
 
 export const DeveloperSettings: React.FC = () => {
     const [keys, setKeys] = useState<ApiKey[]>([]);
+    const [orgs, setOrgs] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
+
     const [newKey, setNewKey] = useState<string | null>(null);
     const [keyName, setKeyName] = useState('');
-    const [selectedPerms, setSelectedPerms] = useState<string[]>(DEFAULT_PERMISSIONS);
+
+    // Maps contextId (e.g. 'PERSONAL' or 'orgId') to string[] of selected perms
+    const [contextPerms, setContextPerms] = useState<Record<string, string[]>>({ PERSONAL: DEFAULT_PERMISSIONS });
+    const [activeTab, setActiveTab] = useState<string>('PERSONAL');
+
     const [isCreating, setIsCreating] = useState(false);
     const [status, setStatus] = useState<any>(null);
     const [isCopied, setIsCopied] = useState(false);
 
-    useEffect(() => { fetchKeys(); }, []);
+    useEffect(() => {
+        fetchKeys();
+        fetchOrgs();
+    }, []);
 
     const fetchKeys = async () => {
         try {
@@ -135,26 +149,56 @@ export const DeveloperSettings: React.FC = () => {
         finally { setLoading(false); }
     };
 
+    const fetchOrgs = async () => {
+        try {
+            const res = await api.get('/user/orgs');
+            setOrgs(res.data);
+
+            setContextPerms(prev => {
+                const updated = { ...prev };
+                res.data.forEach((org: Organization) => {
+                    if (!updated[org.id]) updated[org.id] = [];
+                });
+                return updated;
+            });
+        } catch (e) { console.error(e); }
+    };
+
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (selectedPerms.length === 0) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Please select at least one permission.' });
+
+        // Remove empty contexts to clean up payload
+        const cleanContexts: Record<string, string[]> = {};
+        let hasAnyPerms = false;
+
+        Object.entries(contextPerms).forEach(([ctx, perms]) => {
+            if (perms && perms.length > 0) {
+                cleanContexts[ctx] = perms;
+                hasAnyPerms = true;
+            }
+        });
+
+        if (!hasAnyPerms) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Please select at least one permission across any profile or organization.' });
             return;
         }
+
         setIsCreating(true);
         try {
-            const res = await api.post('/user/api-keys', { name: keyName, permissions: selectedPerms });
+            const res = await api.post('/user/api-keys', {
+                name: keyName,
+                contextPermissions: cleanContexts
+            });
             setNewKey(res.data.key);
             setKeyName('');
-            setSelectedPerms(DEFAULT_PERMISSIONS);
+            setContextPerms({ PERSONAL: DEFAULT_PERMISSIONS });
+            setActiveTab('PERSONAL');
             fetchKeys();
         } catch (e: any) {
             if (e.response?.status === 403 && e.response?.data?.error === "Email verification required.") {
-                setStatus({
-                    type: 'error',
-                    title: 'Verification Required',
-                    msg: "You must verify your email address to generate API keys. Please check your inbox."
-                });
+                setStatus({ type: 'error', title: 'Verification Required', msg: "You must verify your email address to generate API keys." });
+            } else if (e.response?.data?.error) {
+                setStatus({ type: 'error', title: 'Permission Error', msg: e.response.data.error });
             } else {
                 setStatus({ type: 'error', title: 'Error', msg: 'Failed to create key.' });
             }
@@ -165,7 +209,7 @@ export const DeveloperSettings: React.FC = () => {
         setStatus({
             type: 'warning',
             title: 'Revoke API Key?',
-            message: 'Are you sure? This will break any CI/CD pipelines using this key.',
+            message: 'Are you sure? This will break any integrations using this key.',
             actionLabel: 'Revoke Key',
             secondaryLabel: 'Cancel',
             onAction: () => executeRevoke(id)
@@ -189,28 +233,38 @@ export const DeveloperSettings: React.FC = () => {
         setTimeout(() => setIsCopied(false), 2000);
     };
 
+    const activePerms = contextPerms[activeTab] || [];
+
     const togglePerm = (id: string) => {
-        setSelectedPerms(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+        setContextPerms(prev => {
+            const current = prev[activeTab] || [];
+            return {
+                ...prev,
+                [activeTab]: current.includes(id) ? current.filter(p => p !== id) : [...current, id]
+            };
+        });
     };
 
     const toggleAllInGroup = (groupPermissions: {id: string}[]) => {
         const groupIds = groupPermissions.map(p => p.id);
-        const allSelected = groupIds.every(id => selectedPerms.includes(id));
+        const allSelected = groupIds.every(id => activePerms.includes(id));
 
-        if (allSelected) {
-            setSelectedPerms(prev => prev.filter(id => !groupIds.includes(id)));
-        } else {
-            setSelectedPerms(prev => Array.from(new Set([...prev, ...groupIds])));
-        }
+        setContextPerms(prev => {
+            const current = prev[activeTab] || [];
+            return {
+                ...prev,
+                [activeTab]: allSelected
+                    ? current.filter(id => !groupIds.includes(id))
+                    : Array.from(new Set([...current, ...groupIds]))
+            };
+        });
     };
 
     const toggleAllPerms = () => {
-        if (selectedPerms.length === TOTAL_PERMISSIONS) {
-            setSelectedPerms([]);
-        } else {
-            const allIds = PERMISSION_GROUPS.flatMap(g => g.permissions.map(p => p.id));
-            setSelectedPerms(allIds);
-        }
+        setContextPerms(prev => ({
+            ...prev,
+            [activeTab]: activePerms.length === TOTAL_PERMISSIONS ? [] : PERMISSION_GROUPS.flatMap(g => g.permissions.map(p => p.id))
+        }));
     };
 
     return (
@@ -220,7 +274,7 @@ export const DeveloperSettings: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white">Developer Settings</h2>
-                    <p className="text-slate-500 text-sm">Manage API keys for automation and CI/CD.</p>
+                    <p className="text-slate-500 text-sm">Manage highly granular, context-aware API keys.</p>
                 </div>
             </div>
 
@@ -258,53 +312,70 @@ export const DeveloperSettings: React.FC = () => {
                         <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1 max-h-[400px] overflow-y-auto custom-scrollbar">
                             {keys.length === 0 ? (
                                 <div className="p-8 text-center text-slate-500 text-sm">No active keys found.</div>
-                            ) : keys.map(k => (
-                                <div key={k.id} className="p-5 flex items-start justify-between group hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
-                                    <div className="w-full">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                                    {k.name}
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-md uppercase border font-mono font-bold tracking-wider ${k.tier === 'ENTERPRISE' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' : 'bg-slate-200/50 dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10'}`}>
-                                                        {k.tier || 'USER'}
-                                                    </span>
+                            ) : keys.map(k => {
+                                const activeContexts = Object.keys(k.contextPermissions || {});
+                                return (
+                                    <div key={k.id} className="p-5 flex items-start justify-between group hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
+                                        <div className="w-full">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                        {k.name}
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-md uppercase border font-mono font-bold tracking-wider ${k.tier === 'ENTERPRISE' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' : 'bg-slate-200/50 dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10'}`}>
+                                                            {k.tier || 'USER'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 font-mono mt-1.5 flex items-center gap-2">
+                                                        <span>Prefix: <span className="bg-white/60 dark:bg-black/30 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/5">{k.prefix}••••••••</span></span>
+                                                    </div>
                                                 </div>
-                                                <div className="text-xs text-slate-500 font-mono mt-1.5 flex items-center gap-2">
-                                                    <span>Prefix: <span className="bg-white/60 dark:bg-black/30 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/5">{k.prefix}••••••••</span></span>
-                                                </div>
+                                                <button onClick={() => confirmRevoke(k.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-2.5 rounded-xl transition-colors mt-1" title="Revoke Key">
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
                                             </div>
-                                            <button onClick={() => confirmRevoke(k.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 p-2.5 rounded-xl transition-colors mt-1" title="Revoke Key">
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
-                                        </div>
 
-                                        <div className="mt-3 flex flex-wrap gap-1.5">
-                                            {k.permissions && k.permissions.length === TOTAL_PERMISSIONS ? (
-                                                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">All Permissions ({TOTAL_PERMISSIONS})</span>
-                                            ) : k.permissions && k.permissions.length > 0 ? (
-                                                <>
-                                                    {k.permissions.slice(0, 5).map(p => (
-                                                        <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-medium whitespace-nowrap">
-                                                            {getPermissionLabel(p)}
-                                                        </span>
-                                                    ))}
-                                                    {k.permissions.length > 5 && (
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 font-medium">
-                                                            +{k.permissions.length - 5} more
-                                                        </span>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 font-medium">No Permissions</span>
-                                            )}
-                                        </div>
+                                            <div className="mt-3 space-y-2">
+                                                {activeContexts.map(ctx => {
+                                                    const perms = k.contextPermissions[ctx] || [];
+                                                    const ctxName = ctx === 'PERSONAL' ? 'Personal Account' : (orgs.find(o => o.id === ctx)?.username || 'Organization');
+                                                    if (perms.length === 0) return null;
 
-                                        <div className="text-xs text-slate-400 mt-3 font-medium">
-                                            Created: {new Date(k.createdAt).toLocaleDateString()} • Last Used: {k.lastUsed ? new Date(k.lastUsed).toLocaleDateString() : 'Never'}
+                                                    return (
+                                                        <div key={ctx} className="flex flex-col gap-1">
+                                                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                                {ctx === 'PERSONAL' ? <UserIcon className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
+                                                                {ctxName}
+                                                            </span>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {perms.length === TOTAL_PERMISSIONS ? (
+                                                                    <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">All Permissions ({TOTAL_PERMISSIONS})</span>
+                                                                ) : (
+                                                                    <>
+                                                                        {perms.slice(0, 4).map(p => (
+                                                                            <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-medium whitespace-nowrap">
+                                                                                {getPermissionLabel(p)}
+                                                                            </span>
+                                                                        ))}
+                                                                        {perms.length > 4 && (
+                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 font-medium">
+                                                                                +{perms.length - 4} more
+                                                                            </span>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            <div className="text-xs text-slate-400 mt-4 font-medium border-t border-slate-100 dark:border-white/5 pt-2">
+                                                Created: {new Date(k.createdAt).toLocaleDateString()} • Last Used: {k.lastUsed ? new Date(k.lastUsed).toLocaleDateString() : 'Never'}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <div className="p-5 border-t border-slate-200 dark:border-white/10 mt-auto shrink-0 bg-slate-50/50 dark:bg-white/[0.01]">
@@ -313,20 +384,49 @@ export const DeveloperSettings: React.FC = () => {
                                     type="text"
                                     value={keyName}
                                     onChange={e => setKeyName(e.target.value)}
-                                    placeholder="Key Name (e.g. CI/CD Pipeline)"
+                                    placeholder="Key Name (e.g. GitHub Actions - Deploy)"
                                     className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm dark:text-white focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all shadow-inner"
                                     required
                                 />
+
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-2">
-                                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Configure Permissions</label>
+                                    <div className="flex flex-col gap-2 border-b border-slate-200 dark:border-white/10 pb-2">
+                                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Configure Contexts & Permissions</label>
+
+                                        <div className="flex overflow-x-auto gap-2 pb-1 custom-scrollbar">
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTab('PERSONAL')}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap ${activeTab === 'PERSONAL' ? 'bg-modtale-accent text-white' : 'bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                                            >
+                                                <UserIcon className="w-3.5 h-3.5" /> Personal Account
+                                                {contextPerms['PERSONAL']?.length > 0 && <span className="ml-1 bg-white/20 px-1.5 rounded-full text-[10px]">{contextPerms['PERSONAL'].length}</span>}
+                                            </button>
+                                            {orgs.map(org => (
+                                                <button
+                                                    key={org.id}
+                                                    type="button"
+                                                    onClick={() => setActiveTab(org.id)}
+                                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap ${activeTab === org.id ? 'bg-modtale-accent text-white' : 'bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                                                >
+                                                    <Building2 className="w-3.5 h-3.5" /> {org.username}
+                                                    {contextPerms[org.id]?.length > 0 && <span className="ml-1 bg-white/20 px-1.5 rounded-full text-[10px]">{contextPerms[org.id].length}</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                                            Editing <span className="text-slate-900 dark:text-white">{activeTab === 'PERSONAL' ? 'Personal' : orgs.find(o=>o.id === activeTab)?.username}</span> scopes
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={toggleAllPerms}
-                                            className="text-xs font-bold text-modtale-accent hover:text-modtale-accentHover transition-colors flex items-center gap-1"
+                                            className="text-[11px] font-bold text-modtale-accent hover:text-modtale-accentHover transition-colors flex items-center gap-1"
                                         >
-                                            {selectedPerms.length === TOTAL_PERMISSIONS ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-                                            {selectedPerms.length === TOTAL_PERMISSIONS ? 'Deselect All' : 'Select All'}
+                                            {activePerms.length === TOTAL_PERMISSIONS ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+                                            {activePerms.length === TOTAL_PERMISSIONS ? 'Deselect All' : 'Select All'}
                                         </button>
                                     </div>
 
@@ -348,7 +448,7 @@ export const DeveloperSettings: React.FC = () => {
                                                         <label key={perm.id} className="flex items-center gap-2.5 p-1.5 rounded-md border border-transparent hover:border-slate-200 dark:hover:border-white/5 hover:bg-white/40 dark:hover:bg-white/5 cursor-pointer transition-colors group/label">
                                                             <input
                                                                 type="checkbox"
-                                                                checked={selectedPerms.includes(perm.id)}
+                                                                checked={activePerms.includes(perm.id)}
                                                                 onChange={() => togglePerm(perm.id)}
                                                                 className="w-3.5 h-3.5 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent bg-white dark:bg-black/20"
                                                             />
@@ -360,11 +460,12 @@ export const DeveloperSettings: React.FC = () => {
                                         ))}
                                     </div>
                                 </div>
+
                                 <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-white/10">
                                     <span className="text-xs text-slate-500 font-medium">
-                                        {selectedPerms.length} / {TOTAL_PERMISSIONS} selected
+                                        Total Selected: {Object.values(contextPerms).reduce((sum, arr) => sum + (arr?.length || 0), 0)}
                                     </span>
-                                    <button disabled={isCreating || selectedPerms.length === 0} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all shadow-lg active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed w-full sm:w-auto">
+                                    <button disabled={isCreating} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all shadow-lg active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed w-full sm:w-auto">
                                         <Plus className="w-4 h-4" /> Generate Key
                                     </button>
                                 </div>
