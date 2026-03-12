@@ -84,12 +84,16 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className="group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 hover:border-modtale-accent transition-all shadow-sm"
+                className="group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 hover:border-modtale-accent transition-all shadow-sm hover:shadow-md hover:shadow-modtale-accent/5"
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <img src={resolvedImage} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                <div className="w-12 h-12 rounded-lg bg-transparent shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                    <img src={resolvedImage} alt="" className="w-full h-full object-cover" />
+                </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">{title}</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-modtale-accent group-hover:drop-shadow-[0_0_8px_rgba(59,130,246,0.4)] transition-all">
+                        {title}
+                    </h3>
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
                         <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 font-bold hover:text-modtale-accent hover:underline truncate">
@@ -113,30 +117,30 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className="group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:border-modtale-accent/50 transition-all shadow-md p-4"
+                className="group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:border-modtale-accent hover:-translate-y-1 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-5"
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <div className="w-full sm:w-32 h-32 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800">
-                    <img src={resolvedImage} alt={title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                <div className="w-full sm:w-32 h-32 rounded-xl bg-transparent shadow-xl border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                    <img src={resolvedImage} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col">
                     <div className="flex justify-between items-start gap-4">
                         <div>
-                            <h3 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate">{title}</h3>
-                            <div className="flex items-center gap-1 text-xs font-bold text-slate-500">
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight">{title}</h3>
+                            <div className="flex items-center gap-1 text-sm font-bold text-slate-500 mt-1">
                                 <span>by</span>
                                 <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 hover:text-modtale-accent hover:underline">
                                     {author}
                                 </Link>
                             </div>
                         </div>
-                        <div className="bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                        <div className="bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5">
                             <span className="text-modtale-accent">{getClassificationIcon(classification)}</span>
                             {displayClassification}
                         </div>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1">{desc}</p>
-                    <div className="mt-4 flex items-center gap-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                    <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1 leading-relaxed">{desc}</p>
+                    <div className="mt-5 flex items-center gap-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-1.5"><Download className="w-4 h-4" /> {downloads}</span>
                         <span className="flex items-center gap-1.5"><Heart className={`w-4 h-4 ${isFavorite ? 'text-red-500 fill-current' : ''}`} /> {favorites}</span>
                         <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {timeAgo}</span>
@@ -161,7 +165,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 tabIndex={-1}
             />
 
-            <div className="w-full aspect-[3/1] relative bg-slate-800 border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0">
+            <div className={`w-full aspect-[3/1] relative ${resolvedBanner ? 'bg-white dark:bg-slate-900' : 'bg-slate-800'} border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0`}>
                 {resolvedBanner ? (
                     <img
                         src={resolvedBanner}
