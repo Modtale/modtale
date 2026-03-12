@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import {
     Search, Upload, ChevronRight, Check,
     AlertCircle, Download, Link as LinkIcon, Bell,
-    BarChart3, Box, ChevronDown, Github, Code, X, List
+    BarChart3, Box, ChevronDown, Github, Code, X, List, Eye, TrendingUp
 } from 'lucide-react';
 import { LineChart } from '../components/ui/charts/LineChart';
 import { SignInModal } from '../components/user/SignInModal';
@@ -338,7 +338,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
     const navigate = useNavigate();
     const [allMods, setAllMods] = useState<Mod[]>([]);
     const [stats, setStats] = useState({ totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
-    const [chartConfig, setChartConfig] = useState({ viewsHidden: false, downloadsHidden: false });
+    const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
 
     useEffect(() => {
@@ -381,23 +381,19 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
         fetchStats();
     }, []);
 
-    const chartData = [
+    const chartDatasets = [
         {
-            id: 'views', label: 'Project Views', color: '#8b5cf6', hidden: chartConfig.viewsHidden,
+            id: 'views', label: 'Project Views', color: '#8b5cf6', hidden: !!hiddenSeries['views'],
             data: [{ date: 'Mon', value: 120 }, { date: 'Tue', value: 240 }, { date: 'Wed', value: 180 }, { date: 'Thu', value: 450 }, { date: 'Fri', value: 390 }, { date: 'Sat', value: 680 }, { date: 'Sun', value: 850 }]
         },
         {
-            id: 'downloads', label: 'Downloads', color: '#10b981', hidden: chartConfig.downloadsHidden,
+            id: 'downloads', label: 'Downloads', color: '#10b981', hidden: !!hiddenSeries['downloads'],
             data: [{ date: 'Mon', value: 50 }, { date: 'Tue', value: 80 }, { date: 'Wed', value: 110 }, { date: 'Thu', value: 320 }, { date: 'Fri', value: 210 }, { date: 'Sat', value: 450 }, { date: 'Sun', value: 600 }]
         }
     ];
 
     const toggleDataset = (id: string) => {
-        setChartConfig(prev => ({
-            ...prev,
-            viewsHidden: id === 'views' ? !prev.viewsHidden : prev.viewsHidden,
-            downloadsHidden: id === 'downloads' ? !prev.downloadsHidden : prev.downloadsHidden
-        }));
+        setHiddenSeries(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
     const handlePublishClick = (e: React.MouseEvent) => {
@@ -591,17 +587,22 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
                         <div className="flex-1 w-full relative">
                             <div className="absolute -inset-10 bg-gradient-to-tr from-purple-400/20 to-transparent dark:from-purple-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
-                            <div className={`relative z-10 w-full max-w-xl ml-auto ${GLASS_CARD} p-8 h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2.5 bg-purple-100 dark:bg-purple-500/20 rounded-xl">
-                                            <BarChart3 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                                        </div>
-                                        <span className="font-black text-xl text-slate-900 dark:text-white">Project Growth</span>
+
+                            <div className={`${GLASS_CARD} flex flex-col h-[500px] transform transition-transform hover:scale-[1.01] duration-500 ml-auto w-full max-w-xl relative z-10`}>
+                                <div className="flex items-center gap-4 shrink-0 px-6 pt-6 mb-4">
+                                    <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-purple-500">
+                                        <TrendingUp className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-lg text-slate-900 dark:text-white leading-tight">Project Growth</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform-wide reach and momentum.</p>
                                     </div>
                                 </div>
-                                <div className="h-[240px] pointer-events-none">
-                                    <LineChart datasets={chartData} onToggle={toggleDataset} />
+                                <div className="flex-1 min-h-0 px-6 pb-6">
+                                    <LineChart
+                                        datasets={chartDatasets}
+                                        onToggle={toggleDataset}
+                                    />
                                 </div>
                             </div>
                         </div>
