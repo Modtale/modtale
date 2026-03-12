@@ -6,13 +6,12 @@ import { isBotUserAgent } from '../../utils/seo';
 import { generateProjectMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
 import { generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../../utils/schema';
+import {BACKEND_URL} from "@/utils/api.ts";
 
 const { slug } = Astro.params;
 const id = extractId(slug || '');
 const path = Astro.url.pathname;
 const cleanPath = path.replace(/\/$/, "");
-
-const API_URL = import.meta.env.PUBLIC_API_URL;
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
@@ -26,7 +25,7 @@ let ssrSuccessfullyCompleted = false;
 
 if (isBot) {
     try {
-        const res = await fetch(`${API_URL}/projects/${id}`);
+        const res = await fetch(`${BACKEND_URL}/projects/${id}`);
         if (res.ok) {
             modData = await res.json();
             modData.classification = 'SAVE';
@@ -43,7 +42,7 @@ if (isBot) {
             }
 
             if (modData.imageUrl) {
-                image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
+                image = modData.imageUrl.startsWith('/api') ? `${BACKEND_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
             }
 
             const appSchema = {

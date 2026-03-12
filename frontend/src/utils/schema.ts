@@ -1,8 +1,6 @@
 import type { Mod, Modpack, World } from '../types';
 import { getProjectUrl } from './slug';
-
-const API_URL = import.meta.env.PUBLIC_API_URL?.trim() || 'http://localhost:8080/api/v1'
-const BACKEND_URL = new URL(API_URL).origin;
+import {BACKEND_URL} from "@/utils/api.ts";
 
 export const generateItemListSchema = (items: (Mod | Modpack | World)[]) => {
     if (!items || items.length === 0) return null;

@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import {
     Search, Upload, ChevronRight, Check,
     AlertCircle, Download, Link as LinkIcon, Bell,
-    BarChart3, Box, ChevronDown, Github, Code, X, List, Eye, TrendingUp
+    Box, ChevronDown, Github, Code, X, List, TrendingUp
 } from 'lucide-react';
 import { LineChart } from '../components/ui/charts/LineChart';
 import { SignInModal } from '../components/user/SignInModal';
@@ -51,7 +51,7 @@ const AnimatedCounter = ({ value }: { value: number }) => {
     return <>{count.toLocaleString()}</>;
 };
 
-const FeaturedModCard = ({ mod }: { mod: Mod }) => {
+const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boolean }) => {
     const iconUrl = mod.imageUrl
         ? (mod.imageUrl.startsWith('/api') ? `${BACKEND_URL}${mod.imageUrl}` : mod.imageUrl)
         : '/assets/favicon.svg';
@@ -63,20 +63,21 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
     const projectUrl = `/${mod.classification === 'MODPACK' ? 'modpack' : mod.classification === 'SAVE' ? 'world' : 'mod'}/${createSlug(mod.title, mod.id)}`;
 
     return (
-        <div className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:border-modtale-accent/50 dark:hover:border-modtale-accent/40 hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02]">
+        <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:border-modtale-accent/50 dark:hover:border-modtale-accent/40 hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02]">
             <Link
                 to={projectUrl}
                 className="absolute inset-0 z-30 focus:outline-none"
-                aria-hidden="true"
+                aria-label={`Download ${mod.title} Hytale Mod`}
             />
 
             <div className="w-full aspect-[3/1] relative bg-slate-800 border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0">
                 {bannerUrl ? (
                     <img
                         src={bannerUrl}
-                        alt=""
+                        alt={`${mod.title} - Hytale Mod Banner`}
                         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
-                        loading="lazy"
+                        loading={priority ? undefined : "lazy"}
+                        fetchPriority={priority ? "high" : "auto"}
                     />
                 ) : (
                     <>
@@ -90,13 +91,15 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
                 <div className="w-16 h-16 rounded-2xl bg-transparent backdrop-blur-sm shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 ring-1 ring-black/5 dark:ring-white/10">
                     <img
                         src={iconUrl}
-                        alt=""
+                        alt={`${mod.title} - Hytale Mod Icon`}
                         className="w-full h-full object-cover"
+                        loading={priority ? undefined : "lazy"}
+                        fetchPriority={priority ? "high" : "auto"}
                         onError={(e) => e.currentTarget.src = '/assets/favicon.svg'}
                     />
                 </div>
 
-                <div className="mt-10 flex-1 relative">
+                <div className="mt-10 flex-1 relative z-20">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors truncate tracking-tight">
                         {mod.title}
                     </h3>
@@ -105,6 +108,7 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
                         <Link
                             to={`/creator/${mod.author}`}
                             className="hover:text-modtale-accent hover:underline focus:outline-none relative z-40"
+                            aria-label={`View profile for ${mod.author}`}
                             onClick={(e) => e.stopPropagation()}
                         >
                             {mod.author}
@@ -113,10 +117,10 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
                 </div>
 
                 <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest relative z-20">
-                    <Download className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" /> {mod.downloadCount?.toLocaleString() || 0}
+                    <Download className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" aria-hidden="true" /> {mod.downloadCount?.toLocaleString() || 0}
                 </div>
             </div>
-        </div>
+        </article>
     );
 };
 
@@ -124,7 +128,7 @@ const MarqueeColumn = ({ mods, duration }: { mods: Mod[], duration: string }) =>
     <div className="flex flex-col w-full max-w-[320px]">
         <div className="flex flex-col gap-6 animate-marquee-up will-change-transform" style={{ '--marquee-duration': duration } as any}>
             {[...mods, ...mods].map((mod, index) => (
-                <FeaturedModCard key={`${mod.id}-${index}`} mod={mod} />
+                <FeaturedModCard key={`${mod.id}-${index}`} mod={mod} priority={index < 2} />
             ))}
         </div>
     </div>
@@ -141,17 +145,17 @@ const InlineDependencyUI = ({ randomMod }: { randomMod?: Mod }) => {
         <div className={`${GLASS_CARD} w-full flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
             <div className={`p-6 flex justify-between items-center ${GLASS_HEADER}`}>
                 <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2.5 text-lg">
-                    <LinkIcon className="w-5 h-5 text-emerald-500" /> Dependencies
+                    <LinkIcon className="w-5 h-5 text-emerald-500" aria-hidden="true" /> Dependencies
                 </h3>
             </div>
             <div className="p-6 space-y-4 overflow-hidden relative flex-1 flex flex-col">
                 <div className={`flex items-center justify-between p-4 rounded-2xl border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 border shadow-sm transition-all hover:bg-emerald-50 dark:hover:bg-emerald-500/20`}>
                     <div className="flex items-center gap-4">
                         <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-3.5 h-3.5" aria-hidden="true" />
                         </div>
                         <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                            <img src="/assets/favicon.svg" alt="" className="w-full h-full object-cover p-2" />
+                            <img src="/assets/favicon.svg" alt="Hytale Core Library Icon" className="w-full h-full object-cover p-2" loading="lazy" />
                         </div>
                         <div>
                             <div className="font-bold text-slate-900 dark:text-white">Hytale Core Library</div>
@@ -166,7 +170,7 @@ const InlineDependencyUI = ({ randomMod }: { randomMod?: Mod }) => {
                         <div className="flex items-center gap-4">
                             <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 shrink-0" />
                             <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                                {randomIconUrl ? <img src={randomIconUrl} alt="" className="w-full h-full object-cover" /> : <Box className="w-6 h-6 text-slate-400" />}
+                                {randomIconUrl ? <img src={randomIconUrl} alt={`${randomMod.title} Icon`} className="w-full h-full object-cover" loading="lazy" /> : <Box className="w-6 h-6 text-slate-400" />}
                             </div>
                             <div className="min-w-0">
                                 <div className="font-bold text-slate-900 dark:text-white truncate">{randomMod.title}</div>
@@ -180,7 +184,7 @@ const InlineDependencyUI = ({ randomMod }: { randomMod?: Mod }) => {
                 )}
 
                 <div className="mt-auto flex items-start gap-3 text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/20 shadow-sm">
-                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
                     <p className="font-medium">Some <span className="font-black">Required</span> dependencies are currently unselected.</p>
                 </div>
             </div>
@@ -214,7 +218,7 @@ const InlineDownloadUI = () => {
             <div className={`${GLASS_CARD} w-full overflow-hidden flex flex-col h-[350px] transform transition-transform hover:scale-[1.02] duration-500`}>
                 <div className={`p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
                     <div>
-                        <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2"><List className="w-5 h-5 text-modtale-accent" /> Changelog</h3>
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2"><List className="w-5 h-5 text-modtale-accent" aria-hidden="true" /> Changelog</h3>
                         <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowExperimental(!showExperimental)}>
                             <div className={`w-8 h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
                                 <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-4' : ''}`} />
@@ -222,7 +226,7 @@ const InlineDownloadUI = () => {
                             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
                         </div>
                     </div>
-                    <button onClick={() => setView('download')} className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors backdrop-blur-md"><X className="w-5 h-5" /></button>
+                    <button onClick={() => setView('download')} aria-label="Close Changelog" className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors backdrop-blur-md"><X className="w-5 h-5" /></button>
                 </div>
 
                 <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 relative">
@@ -240,7 +244,7 @@ const InlineDownloadUI = () => {
                                         <span>2026.03.11-dcad8778f</span>
                                     </div>
                                 </div>
-                                <button className="p-2 bg-white/50 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-700 dark:text-slate-300 rounded-lg transition-all shrink-0 shadow-sm border border-white/30 dark:border-white/5">
+                                <button aria-label={`Download version ${ver.versionNumber}`} className="p-2 bg-white/50 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-700 dark:text-slate-300 rounded-lg transition-all shrink-0 shadow-sm border border-white/30 dark:border-white/5">
                                     <Download className="w-4 h-4" />
                                 </button>
                             </div>
@@ -259,7 +263,7 @@ const InlineDownloadUI = () => {
             <div className={`p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
                 <div>
                     <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <Download className="w-5 h-5 text-modtale-accent" /> Download
+                        <Download className="w-5 h-5 text-modtale-accent" aria-hidden="true" /> Download
                     </h3>
                     <div className="mt-1 flex items-center gap-2 group cursor-pointer" onClick={() => setShowExperimental(!showExperimental)}>
                         <div className={`w-8 h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
@@ -268,7 +272,6 @@ const InlineDownloadUI = () => {
                         <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
                     </div>
                 </div>
-                <button className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors backdrop-blur-md"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="p-5 overflow-hidden relative flex-1 flex flex-col justify-center">
@@ -276,20 +279,20 @@ const InlineDownloadUI = () => {
                     <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
                     <div className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-sm cursor-pointer ${GLASS_ITEM}`}>
                         <span>2026.03.11-dcad8778f</span>
-                        <ChevronDown className="w-4 h-4 text-slate-500" />
+                        <ChevronDown className="w-4 h-4 text-slate-500" aria-hidden="true" />
                     </div>
                 </div>
 
                 {latestVer ? (
                     <button className="w-full bg-modtale-accent/90 backdrop-blur-xl hover:bg-modtale-accent text-white p-4 rounded-2xl shadow-[0_8px_24px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-2 relative z-0 group overflow-hidden shrink-0 border border-modtale-accent/50">
-                        <div className="font-black text-lg flex items-center gap-2 group-hover:scale-105 transition-transform"><Download className="w-5 h-5" /> Download Latest</div>
+                        <div className="font-black text-lg flex items-center gap-2 group-hover:scale-105 transition-transform"><Download className="w-5 h-5" aria-hidden="true" /> Download Latest</div>
                         <div className={`text-[10px] font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-1.5 z-10 backdrop-blur-md shadow-sm ${getVersionBadgeColor(latestVer.channel)}`}>
                             v{latestVer.versionNumber} {latestVer.channel !== 'RELEASE' && <span className="uppercase opacity-80">{latestVer.channel}</span>}
                         </div>
                     </button>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-                        <AlertCircle className="w-8 h-8 opacity-50 mb-2" />
+                        <AlertCircle className="w-8 h-8 opacity-50 mb-2" aria-hidden="true" />
                         <p className="font-medium text-sm">No compatible versions.</p>
                     </div>
                 )}
@@ -297,7 +300,7 @@ const InlineDownloadUI = () => {
 
             <div className="p-4 bg-white/20 dark:bg-black/10 border-t border-white/40 dark:border-white/10 shrink-0 z-20 backdrop-blur-md">
                 <button onClick={() => setView('changelog')} className="text-[11px] text-slate-500 dark:text-slate-500 hover:text-modtale-accent dark:hover:text-modtale-accent font-bold uppercase tracking-wider flex items-center justify-start gap-1 w-full transition-colors">
-                    View Full Changelog <ChevronRight className="w-3 h-3" />
+                    View Full Changelog <ChevronRight className="w-3 h-3" aria-hidden="true" />
                 </button>
             </div>
         </div>
@@ -308,7 +311,7 @@ const InlineNotificationUI = () => (
     <div className={`${GLASS_CARD} w-full flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
         <div className={`p-6 flex justify-between items-center ${GLASS_HEADER}`}>
             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2.5 text-lg">
-                <Bell className="w-5 h-5 text-amber-500" /> Notifications
+                <Bell className="w-5 h-5 text-amber-500" aria-hidden="true" /> Notifications
             </h3>
             <span className="text-xs text-amber-600 dark:text-amber-500 font-bold cursor-pointer hover:underline uppercase tracking-wider">Clear All</span>
         </div>
@@ -317,7 +320,7 @@ const InlineNotificationUI = () => (
 
             <div className="p-6 bg-blue-50/40 dark:bg-white/[0.02] flex items-start gap-4 hover:bg-blue-50/80 dark:hover:bg-white/[0.04] transition-colors">
                 <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm">
-                    <img src="https://cdn.modtale.net/images/d813b136-35aa-46c6-bb9e-359c20f7c146-cropped.png" alt="" className="w-full h-full object-cover" />
+                    <img src="https://cdn.modtale.net/images/d813b136-35aa-46c6-bb9e-359c20f7c146-cropped.png" alt="LevelingCore Update Icon" className="w-full h-full object-cover" loading="lazy" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="font-bold text-base text-slate-900 dark:text-white mb-1 flex items-center">
@@ -330,7 +333,7 @@ const InlineNotificationUI = () => (
 
             <div className="p-6 flex items-start gap-4 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
                 <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm p-1">
-                    <img src="https://cdn.modtale.net/avatars/AzureDoom/83c01443-6302-4aff-beb9-7d6f656f994c-cropped.png" alt="" className="w-full h-full object-cover rounded-lg" />
+                    <img src="https://cdn.modtale.net/avatars/AzureDoom/83c01443-6302-4aff-beb9-7d6f656f994c-cropped.png" alt="AzureDoom Profile Picture" className="w-full h-full object-cover rounded-lg" loading="lazy" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="font-bold text-base text-slate-800 dark:text-slate-200 mb-1">
@@ -470,11 +473,13 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 src="/assets/logo_light.svg"
                                 alt="Modtale Logo"
                                 className="h-16 md:h-20 lg:h-24 mb-10 object-contain drop-shadow-[0_0_30px_rgba(59,130,246,0.2)] hidden dark:block"
+                                fetchPriority="high"
                             />
                             <img
                                 src="/assets/logo.svg"
                                 alt="Modtale Logo"
                                 className="h-16 md:h-20 lg:h-24 mb-10 object-contain drop-shadow-sm block dark:hidden"
+                                fetchPriority="high"
                             />
 
                             <h1 className="text-5xl md:text-7xl xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-8">
@@ -488,12 +493,12 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 Discover, download, and seamlessly share Hytale mods, worlds, plugins, asset packs, and modpacks.
                             </p>
 
-                            <div className="flex flex-col sm:flex-row items-center gap-5 w-full sm:w-auto mb-14">
+                            <nav aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-5 w-full sm:w-auto mb-14">
                                 <Link
                                     to="/mods"
                                     className="flex items-center justify-center px-10 h-16 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto text-lg ring-1 ring-blue-500"
                                 >
-                                    <Search className="w-5 h-5 mr-3" />
+                                    <Search className="w-5 h-5 mr-3" aria-hidden="true" />
                                     Discover Projects
                                 </Link>
                                 <a
@@ -501,52 +506,53 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                     onClick={handlePublishClick}
                                     className="flex items-center justify-center px-10 h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
                                 >
-                                    <Upload className="w-5 h-5 mr-3 text-slate-400 dark:text-slate-500" />
+                                    <Upload className="w-5 h-5 mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                     Publish Work
                                 </a>
-                            </div>
+                            </nav>
 
                             <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-10 sm:gap-14 w-fit p-8 shadow-sm`}>
                                 <div className="flex flex-col items-center lg:items-start">
-                                    <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalProjects} />
-                                    </div>
-                                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Projects</div>
+                                    </span>
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Projects</span>
                                 </div>
-                                <div className="w-px h-12 bg-slate-200 dark:bg-white/10" />
+                                <div className="w-px h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start">
-                                    <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalDownloads} />
-                                    </div>
-                                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Downloads</div>
+                                    </span>
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Downloads</span>
                                 </div>
-                                <div className="w-px h-12 bg-slate-200 dark:bg-white/10 hidden sm:block" />
+                                <div className="w-px h-12 bg-slate-200 dark:bg-white/10 hidden sm:block" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start hidden sm:flex">
-                                    <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalUsers} />
-                                    </div>
-                                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Creators</div>
+                                    </span>
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Creators</span>
                                 </div>
                             </div>
                         </div>
 
                         {displayFeaturedMods.length > 0 && (
-                            <div
+                            <aside
                                 className="relative h-[600px] lg:h-[750px] hidden md:flex gap-6 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
                                 style={{
                                     maskImage: 'linear-gradient(to bottom, transparent, black 5%, black 95%, transparent)',
                                     WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 5%, black 95%, transparent)'
                                 }}
+                                aria-label="Trending Hytale Mods Showcase"
                             >
                                 <MarqueeColumn mods={col1Mods} duration="35s" />
                                 <MarqueeColumn mods={col2Mods} duration="45s" />
-                            </div>
+                            </aside>
                         )}
 
                         {displayFeaturedMods.length > 0 && (
                             <div className="w-full flex flex-col gap-6 md:hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 mt-10">
                                 {displayFeaturedMods.slice(0, 3).map((mod, index) => (
-                                    <FeaturedModCard key={`mobile-${mod.id}-${index}`} mod={mod} />
+                                    <FeaturedModCard key={`mobile-${mod.id}-${index}`} mod={mod} priority={index === 0} />
                                 ))}
                             </div>
                         )}
@@ -555,15 +561,15 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
 
                 <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 space-y-40 py-40 relative z-20">
 
-                    <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+                    <section className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
                         <div className="flex-1 space-y-8">
                             <span className="text-blue-600 dark:text-blue-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-blue-50 dark:bg-blue-500/10 w-fit px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20">Version Management</span>
-                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install with confidence.</h2>
+                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Mods with Confidence.</h2>
                             <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                                Finding the right file shouldn't be a puzzle. Modtale automatically matches projects to your game version and makes it easy to review changelogs before you hit download.
+                                Finding the right file shouldn't be a puzzle. Modtale automatically matches game servers and client projects to your game version and makes it easy to review changelogs before you hit download.
                             </p>
                             <Link to="/mods" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-lg">
-                                Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" />
+                                Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
                             </Link>
                         </div>
                         <div className="flex-1 w-full relative">
@@ -572,14 +578,14 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 <InlineDownloadUI />
                             </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="flex flex-col lg:flex-row-reverse items-center gap-16 lg:gap-24">
+                    <section className="flex flex-col lg:flex-row-reverse items-center gap-16 lg:gap-24">
                         <div className="flex-1 space-y-8">
                             <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-emerald-50 dark:bg-emerald-500/10 w-fit px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20">Library Resolution</span>
-                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated dependencies.</h2>
+                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Mod Dependencies.</h2>
                             <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                                Forget hunting down core libraries. Modtale analyzes requirements and allows you to seamlessly download required and optional additions in one swift action.
+                                Forget hunting down core libraries or confusing modpacks. Modtale analyzes scripting requirements and allows you to seamlessly download required plugins and optional maps in one swift action.
                             </p>
                         </div>
                         <div className="flex-1 w-full relative">
@@ -588,17 +594,17 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 <InlineDependencyUI randomMod={randomDisplayMod} />
                             </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+                    <section className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
                         <div className="flex-1 space-y-8">
                             <span className="text-purple-600 dark:text-purple-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-purple-50 dark:bg-purple-500/10 w-fit px-3 py-1 rounded-full border border-purple-100 dark:border-purple-500/20">Creator Tools</span>
-                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Measure your impact.</h2>
+                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Advanced Creator Analytics.</h2>
                             <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                                Creators get access to powerful, privacy-respecting analytics. Track your daily downloads, page views, and week-over-week growth metrics instantly from your dashboard.
+                                Creators get access to powerful, privacy-respecting analytics. Track your daily modpack downloads, world page views, and week-over-week asset growth metrics instantly from your dashboard.
                             </p>
                             <a href="/upload" onClick={handlePublishClick} className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-lg cursor-pointer">
-                                Publish your project <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" />
+                                Publish your project <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
                             </a>
                         </div>
                         <div className="flex-1 w-full relative">
@@ -607,7 +613,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             <div className={`${GLASS_CARD} flex flex-col h-[500px] transform transition-transform hover:scale-[1.01] duration-500 ml-auto w-full max-w-xl relative z-10`}>
                                 <div className="flex items-center gap-4 shrink-0 px-6 pt-6 mb-4">
                                     <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-purple-500">
-                                        <TrendingUp className="w-5 h-5" />
+                                        <TrendingUp className="w-5 h-5" aria-hidden="true" />
                                     </div>
                                     <div>
                                         <h3 className="font-black text-lg text-slate-900 dark:text-white leading-tight">Project Growth</h3>
@@ -622,14 +628,14 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="flex flex-col lg:flex-row-reverse items-center gap-16 lg:gap-24">
+                    <section className="flex flex-col lg:flex-row-reverse items-center gap-16 lg:gap-24">
                         <div className="flex-1 space-y-8">
                             <span className="text-amber-600 dark:text-amber-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-amber-50 dark:bg-amber-500/10 w-fit px-3 py-1 rounded-full border border-amber-100 dark:border-amber-500/20">Community Hub</span>
                             <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
                             <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                                Modtale keeps the community connected. Receive real-time alerts when tracked projects drop new updates, or when creators reply directly to your feedback.
+                                Modtale keeps the Hytale community connected. Receive real-time alerts when tracked texture packs drop new updates, or when plugin developers reply directly to your feedback.
                             </p>
                         </div>
                         <div className="flex-1 w-full relative">
@@ -638,27 +644,27 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 <InlineNotificationUI />
                             </div>
                         </div>
-                    </div>
+                    </section>
 
                 </div>
 
                 <section className="py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl relative z-20">
                     <div className="max-w-4xl mx-auto px-6 text-center">
                         <div className="w-20 h-20 bg-slate-200 dark:bg-slate-800 rounded-3xl mx-auto mb-8 flex items-center justify-center shadow-inner border border-slate-300/50 dark:border-white/5">
-                            <Code className="w-10 h-10 text-slate-500 dark:text-slate-400" />
+                            <Code className="w-10 h-10 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         </div>
-                        <h2 className="text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tight">Built by the community, for the community.</h2>
+                        <h2 className="text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tight">The Open-Source Hytale Modding Platform.</h2>
                         <p className="text-xl text-slate-600 dark:text-slate-300 mb-12 font-medium max-w-3xl mx-auto leading-relaxed">
-                            Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests.
+                            Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests. Explore our source code or utilize our public API to build your own tools.
                         </p>
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                        <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-6">
                             <a href="https://github.com/Modtale/modtale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-8 h-16 text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5">
-                                <Github className="w-6 h-6" /> View Source Code
+                                <Github className="w-6 h-6" aria-hidden="true" /> View Source Code
                             </a>
                             <Link to="/api-docs" className="inline-flex items-center justify-center px-8 h-16 text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/20 hover:-translate-y-0.5">
-                                <Code className="w-6 h-6" /> View API Docs
+                                <Code className="w-6 h-6" aria-hidden="true" /> View API Docs
                             </Link>
-                        </div>
+                        </nav>
                     </div>
                 </section>
 
