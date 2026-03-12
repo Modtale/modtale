@@ -16,6 +16,13 @@ const GLASS_CARD = "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border bor
 const GLASS_HEADER = "bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10";
 const GLASS_ITEM = "bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300";
 
+const getInitialData = () => {
+    if (typeof window !== 'undefined' && (window as any).INITIAL_DATA) {
+        return (window as any).INITIAL_DATA;
+    }
+    return null;
+};
+
 const AnimatedCounter = ({ value }: { value: number }) => {
     const [count, setCount] = useState(0);
 
@@ -339,49 +346,56 @@ const InlineNotificationUI = () => (
 
 export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
     const navigate = useNavigate();
-    const [allMods, setAllMods] = useState<Mod[]>([]);
-    const [stats, setStats] = useState({ totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
+    const ssrData = getInitialData();
+
+    const [allMods, setAllMods] = useState<Mod[]>(ssrData?.homeMods || []);
+    const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
 
     useEffect(() => {
-        const fetchMods = async () => {
-            try {
-                const [trending, popular, gems, relevance] = await Promise.all([
-                    api.get('/projects', { params: { size: 20, sort: 'trending' } }),
-                    api.get('/projects', { params: { size: 20, sort: 'popular' } }),
-                    api.get('/projects', { params: { size: 20, category: 'hidden_gems', sort: 'favorites' } }),
-                    api.get('/projects', { params: { size: 20, sort: 'relevance' } })
-                ]);
+        if (!ssrData?.homeMods) {
+            const fetchMods = async () => {
+                try {
+                    const [trending, popular, gems, relevance] = await Promise.all([
+                        api.get('/projects', { params: { size: 20, sort: 'trending' } }),
+                        api.get('/projects', { params: { size: 20, sort: 'popular' } }),
+                        api.get('/projects', { params: { size: 20, category: 'hidden_gems', sort: 'favorites' } }),
+                        api.get('/projects', { params: { size: 20, sort: 'relevance' } })
+                    ]);
 
-                const combined = [
-                    ...(trending.data?.content || []),
-                    ...(popular.data?.content || []),
-                    ...(gems.data?.content || []),
-                    ...(relevance.data?.content || [])
-                ];
+                    const combined = [
+                        ...(trending.data?.content || []),
+                        ...(popular.data?.content || []),
+                        ...(gems.data?.content || []),
+                        ...(relevance.data?.content || [])
+                    ];
 
-                const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
-                const mixed = unique.sort(() => Math.random() - 0.5);
+                    const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
+                    const mixed = unique.sort(() => Math.random() - 0.5);
 
-                setAllMods(mixed);
-            } catch (err) {
-                console.error("Failed to fetch mods", err);
-            }
-        };
+                    setAllMods(mixed);
+                } catch (err) {
+                    console.error("Failed to fetch mods", err);
+                }
+            };
+            fetchMods();
+        } else {
+            setAllMods(prev => [...prev].sort(() => Math.random() - 0.5));
+        }
 
-        const fetchStats = async () => {
-            try {
-                const res = await api.get('/analytics/platform/stats');
-                setStats(res.data);
-            } catch (err) {
-                console.error("Failed to fetch platform stats", err);
-            }
-        };
-
-        fetchMods();
-        fetchStats();
-    }, []);
+        if (!ssrData?.stats) {
+            const fetchStats = async () => {
+                try {
+                    const res = await api.get('/analytics/platform/stats');
+                    setStats(res.data);
+                } catch (err) {
+                    console.error("Failed to fetch platform stats", err);
+                }
+            };
+            fetchStats();
+        }
+    }, [ssrData]);
 
     const chartDatasets = [
         {

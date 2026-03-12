@@ -583,6 +583,21 @@ export const Browse: React.FC<BrowseProps> = ({
     const selectedTags = useMemo(() => rawTags ? rawTags.split(',').filter(Boolean) : [], [rawTags]);
     const urlSearchTerm = searchParams.get('q') || '';
 
+    const pageParam = searchParams.get('page');
+    const styleParam = searchParams.get('style');
+    const hasComplexParams =
+        searchParams.has('q') ||
+        searchParams.has('tags') ||
+        searchParams.has('version') ||
+        searchParams.has('minDl') ||
+        searchParams.has('minFav') ||
+        searchParams.has('date') ||
+        (pageParam !== null && parseInt(pageParam, 10) > 0) ||
+        (styleParam !== null && styleParam !== 'grid');
+
+    const initialData = typeof window !== 'undefined' ? (window as any).INITIAL_DATA : null;
+    const useSSRData = initialData?.browseData && !hasComplexParams;
+
     const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>(() => {
         return (localStorage.getItem('modtale_view_style') as any) || (searchParams.get('style') as any) || 'grid';
     });
@@ -590,16 +605,17 @@ export const Browse: React.FC<BrowseProps> = ({
     const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
 
     const [selectedClassification, setSelectedClassification] = useState<Classification | 'All'>(initialClassification || 'All');
-    const [totalPages, setTotalPages] = useState(0);
-    const [totalItems, setTotalItems] = useState(0);
-    const [loading, setLoading] = useState(false);
-    const [items, setItems] = useState<(Mod | Modpack | World)[]>([]);
+    const [totalPages, setTotalPages] = useState(useSSRData ? initialData.browseData.totalPages : 0);
+    const [totalItems, setTotalItems] = useState(useSSRData ? initialData.browseData.totalElements : 0);
+    const [loading, setLoading] = useState(!useSSRData);
+    const [items, setItems] = useState<(Mod | Modpack | World)[]>(useSSRData ? initialData.browseData.content : []);
     const [jumpPage, setJumpPage] = useState('');
     const [isTopFilterOpen, setIsTopFilterOpen] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(12);
 
     const abortControllerRef = useRef<AbortController | null>(null);
     const cardsSectionRef = useRef<HTMLDivElement>(null);
+    const isFirstRender = useRef(true);
 
     const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
 
@@ -685,7 +701,7 @@ export const Browse: React.FC<BrowseProps> = ({
     }, [setSearchParams, viewStyle]);
 
     useEffect(() => {
-        if (cardsSectionRef.current && page === 0) {
+        if (cardsSectionRef.current && page === 0 && !isFirstRender.current) {
             const offset = cardsSectionRef.current.offsetTop - 120;
             if (window.scrollY > offset) {
                 window.scrollTo({ top: offset, behavior: 'smooth' });
@@ -694,6 +710,12 @@ export const Browse: React.FC<BrowseProps> = ({
     }, [selectedClassification, selectedTags, urlSearchTerm, selectedVersion, minFavorites, minDownloads, filterDate, activeViewId, sortBy]);
 
     const fetchData = useCallback(async () => {
+        if (isFirstRender.current && useSSRData) {
+            isFirstRender.current = false;
+            return;
+        }
+        isFirstRender.current = false;
+
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
@@ -742,7 +764,7 @@ export const Browse: React.FC<BrowseProps> = ({
                 setLoading(false);
             }
         }
-    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
+    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId, useSSRData]);
 
     useEffect(() => {
         fetchData();
