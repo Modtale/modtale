@@ -1,14 +1,17 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
-import { extractId } from '../../utils/slug';
+import { extractId, getProjectUrl } from '../../utils/slug';
 import { isBotUserAgent } from '../../utils/seo';
 import { generateProjectMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
+import { generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../../utils/schema';
 
 const { slug } = Astro.params;
 const id = extractId(slug || '');
 const path = Astro.url.pathname;
+const cleanPath = path.replace(/\/$/, "");
+
 const API_URL = import.meta.env.PUBLIC_API_URL;
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
@@ -18,14 +21,20 @@ let modData = null;
 let title = ROUTE_SEO['/modpacks'].title;
 let description = ROUTE_SEO['/modpacks'].description;
 let image = undefined;
-let jsonLd = undefined;
+let jsonLd: any = undefined;
+let ssrSuccessfullyCompleted = false;
 
 if (isBot) {
     try {
-        const res = await fetch(`${API_URL}/modpacks/${id}`);
+        const res = await fetch(`${API_URL}/projects/${id}`);
         if (res.ok) {
             modData = await res.json();
             modData.classification = 'MODPACK';
+
+            const canonicalUrl = getProjectUrl(modData);
+            if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
+                return Astro.redirect(canonicalUrl, 301);
+            }
 
             const meta = generateProjectMeta(modData);
             if (meta) {
@@ -37,7 +46,7 @@ if (isBot) {
                 image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
             }
 
-            jsonLd = {
+            const appSchema = {
                 "@context": "https://schema.org",
                 "@type": "SoftwareApplication",
                 "name": modData.title,
@@ -52,8 +61,21 @@ if (isBot) {
                     "ratingValue": modData.rating,
                 } : undefined
             };
+
+            const crumbs = getBreadcrumbsForClassification('MODPACK');
+            const fullCrumbs = [...crumbs, { name: modData.title, url: canonicalUrl }];
+            const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
+
+            jsonLd = [appSchema, breadcrumbSchema];
+            ssrSuccessfullyCompleted = true;
         }
-    } catch (e) { console.error("[SSR] Fetch Error:", e); }
+    } catch (e) {}
+}
+
+if (ssrSuccessfullyCompleted) {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=86400');
+} else {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 ---
 

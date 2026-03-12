@@ -21,6 +21,7 @@ let keywords = DEFAULT_SEO.keywords;
 let image = "https://modtale.net/assets/favicon.svg";
 let jsonLd: any = undefined;
 let initialData: any = null;
+let ssrSuccessfullyCompleted = false;
 
 if (ROUTE_SEO[cleanPath]) {
     const seo = ROUTE_SEO[cleanPath];
@@ -60,8 +61,8 @@ else if (cleanPath === '' || cleanPath === '/') {
     isHome = true;
 }
 
-const pageParam = searchParams.get('page');
-const styleParam = searchParams.get('style');
+const pageParam = searchParams.get('page') || '0';
+const styleParam = searchParams.get('style') || 'grid';
 
 const isComplex =
     searchParams.has('q') ||
@@ -70,8 +71,8 @@ const isComplex =
     searchParams.has('minDl') ||
     searchParams.has('minFav') ||
     searchParams.has('date') ||
-    (pageParam !== null && parseInt(pageParam, 10) > 0) ||
-    (styleParam !== null && styleParam !== 'grid');
+    parseInt(pageParam, 10) > 0 ||
+    styleParam !== 'grid';
 
 function getSecondsUntilNextUpdate() {
     const now = new Date();
@@ -86,10 +87,7 @@ function getSecondsUntilNextUpdate() {
 }
 
 if (classification) {
-    const ttl = getSecondsUntilNextUpdate();
-    Astro.response.headers.set('Cache-Control', `public, max-age=60, s-maxage=${ttl}, stale-while-revalidate=86400`);
-
-    if (!isComplex) {
+    if (!isComplex || isBot) {
         try {
             if (isHome) {
                 const [trendingRes, popularRes, gemsRes, relevanceRes, statsRes] = await Promise.allSettled([
@@ -125,10 +123,12 @@ if (classification) {
                     stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }
                 };
                 jsonLd = websiteSchema;
+                ssrSuccessfullyCompleted = true;
 
             } else {
                 const sort = searchParams.get('sort') || 'relevance';
                 const view = searchParams.get('view');
+                const page = searchParams.get('page') || '0';
 
                 let categoryParam = '';
                 if (view === 'favorites') categoryParam = '&category=Favorites';
@@ -136,8 +136,14 @@ if (classification) {
                 else if (view === 'popular') categoryParam = '&category=popular';
                 else if (view === 'trending') categoryParam = '&category=trending';
 
+                const qVal = searchParams.get('q') || '';
+                const searchParamStr = qVal ? `&search=${encodeURIComponent(qVal)}` : '';
+
+                const tagsVal = searchParams.get('tags') || '';
+                const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
+
                 const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
-                const endpoint = `${API_URL}/projects?size=12${classParam}&sort=${sort}${categoryParam}`;
+                const endpoint = `${API_URL}/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
 
                 const res = await fetch(endpoint, {
                     headers: { "Cache-Control": "public, s-maxage=300" }
@@ -157,19 +163,13 @@ if (classification) {
                     if (breadcrumbSchema) schemas.push(breadcrumbSchema);
 
                     if (schemas.length > 0) jsonLd = schemas;
+                    ssrSuccessfullyCompleted = true;
                 }
             }
-        } catch (e) {
-            console.error("[SSR] List Fetch Error:", e);
-        }
+        } catch (e) {}
     }
 }
 else if (isBot && id && isProjectRoute) {
-    Astro.response.headers.set(
-        'Cache-Control',
-        'public, max-age=60, s-maxage=600, stale-while-revalidate=86400'
-    );
-
     try {
         const res = await fetch(`${API_URL}/projects/${id}`);
 
@@ -214,10 +214,16 @@ else if (isBot && id && isProjectRoute) {
             const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
 
             jsonLd = [appSchema, breadcrumbSchema];
+            ssrSuccessfullyCompleted = true;
         }
-    } catch (e) {
-        console.error("[SSR] Bot Fetch Error:", e);
-    }
+    } catch (e) {}
+}
+
+if (ssrSuccessfullyCompleted) {
+    const ttl = getSecondsUntilNextUpdate();
+    Astro.response.headers.set('Cache-Control', `public, max-age=60, s-maxage=${ttl}, stale-while-revalidate=86400`);
+} else {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 ---
 
