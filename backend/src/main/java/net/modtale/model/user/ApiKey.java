@@ -5,6 +5,8 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 @Document(collection = "api_keys")
@@ -20,7 +22,8 @@ public class ApiKey {
     private String prefix;
 
     private Tier tier;
-    private Set<ApiPermission> permissions;
+
+    private Map<String, Set<ApiPermission>> contextPermissions;
 
     private LocalDateTime lastUsed;
     private LocalDateTime createdAt;
@@ -31,59 +34,16 @@ public class ApiKey {
     }
 
     public enum ApiPermission {
-        PROJECT_READ,
-        PROJECT_CREATE,
-        PROJECT_EDIT_METADATA,
-        PROJECT_EDIT_ICON,
-        PROJECT_EDIT_BANNER,
-        PROJECT_DELETE,
-        PROJECT_TRANSFER_REQUEST,
-        PROJECT_TRANSFER_RESOLVE,
-        PROJECT_FAVORITE,
-        PROJECT_STATUS_SUBMIT,
-        PROJECT_STATUS_REVERT,
-        PROJECT_STATUS_ARCHIVE,
-        PROJECT_STATUS_UNLIST,
-        PROJECT_STATUS_PUBLISH,
-        PROJECT_GALLERY_ADD,
-        PROJECT_GALLERY_REMOVE,
-        PROJECT_TEAM_INVITE,
-        PROJECT_TEAM_REMOVE,
-
-        VERSION_READ,
-        VERSION_CREATE,
-        VERSION_EDIT,
-        VERSION_DELETE,
-        VERSION_DOWNLOAD,
-
-        COMMENT_READ,
-        COMMENT_CREATE,
-        COMMENT_EDIT,
-        COMMENT_DELETE,
-        COMMENT_REPLY,
-
-        ORG_READ,
-        ORG_CREATE,
-        ORG_EDIT_METADATA,
-        ORG_EDIT_AVATAR,
-        ORG_EDIT_BANNER,
-        ORG_DELETE,
-        ORG_MEMBER_READ,
-        ORG_MEMBER_INVITE,
-        ORG_MEMBER_REMOVE,
-        ORG_MEMBER_EDIT_ROLE,
-        ORG_INVITE_ACCEPT,
-        ORG_INVITE_DECLINE,
-        ORG_CONNECTION_MANAGE,
-
-        PROFILE_READ,
-        PROFILE_EDIT_BASIC,
-        PROFILE_EDIT_AVATAR,
-        PROFILE_EDIT_BANNER,
-        PROFILE_DELETE,
-        PROFILE_FOLLOW,
-        PROFILE_UNFOLLOW,
-        PROFILE_CONNECTION_MANAGE,
+        PROJECT_READ, PROJECT_CREATE, PROJECT_EDIT_METADATA, PROJECT_EDIT_ICON, PROJECT_EDIT_BANNER,
+        PROJECT_DELETE, PROJECT_TRANSFER_REQUEST, PROJECT_TRANSFER_RESOLVE, PROJECT_FAVORITE,
+        PROJECT_STATUS_SUBMIT, PROJECT_STATUS_REVERT, PROJECT_STATUS_ARCHIVE, PROJECT_STATUS_UNLIST,
+        PROJECT_STATUS_PUBLISH, PROJECT_GALLERY_ADD, PROJECT_GALLERY_REMOVE, PROJECT_TEAM_INVITE,
+        PROJECT_TEAM_REMOVE, VERSION_READ, VERSION_CREATE, VERSION_EDIT, VERSION_DELETE, VERSION_DOWNLOAD,
+        COMMENT_READ, COMMENT_CREATE, COMMENT_EDIT, COMMENT_DELETE, COMMENT_REPLY,
+        ORG_READ, ORG_CREATE, ORG_EDIT_METADATA, ORG_EDIT_AVATAR, ORG_EDIT_BANNER, ORG_DELETE,
+        ORG_MEMBER_READ, ORG_MEMBER_INVITE, ORG_MEMBER_REMOVE, ORG_MEMBER_EDIT_ROLE, ORG_INVITE_ACCEPT,
+        ORG_INVITE_DECLINE, ORG_CONNECTION_MANAGE, PROFILE_READ, PROFILE_EDIT_BASIC, PROFILE_EDIT_AVATAR,
+        PROFILE_EDIT_BANNER, PROFILE_DELETE, PROFILE_FOLLOW, PROFILE_UNFOLLOW, PROFILE_CONNECTION_MANAGE,
         PROFILE_NOTIFICATION_MANAGE
     }
 
@@ -112,15 +72,17 @@ public class ApiKey {
     public Tier getTier() { return tier != null ? tier : Tier.USER; }
     public void setTier(Tier tier) { this.tier = tier; }
 
-    public Set<ApiPermission> getPermissions() {
-        if (this.permissions == null) {
-            return EnumSet.allOf(ApiPermission.class);
+    public Map<String, Set<ApiPermission>> getContextPermissions() {
+        if (this.contextPermissions == null || this.contextPermissions.isEmpty()) {
+            Map<String, Set<ApiPermission>> legacy = new HashMap<>();
+            legacy.put("PERSONAL", EnumSet.allOf(ApiPermission.class));
+            return legacy;
         }
-        return this.permissions;
+        return this.contextPermissions;
     }
 
-    public void setPermissions(Set<ApiPermission> permissions) {
-        this.permissions = permissions;
+    public void setContextPermissions(Map<String, Set<ApiPermission>> contextPermissions) {
+        this.contextPermissions = contextPermissions;
     }
 
     public LocalDateTime getLastUsed() { return lastUsed; }

@@ -25,12 +25,12 @@ public class ApiKeyController {
 
     public static class CreateKeyRequest {
         private String name;
-        private Set<ApiKey.ApiPermission> permissions;
+        private Map<String, Set<ApiKey.ApiPermission>> contextPermissions;
 
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
-        public Set<ApiKey.ApiPermission> getPermissions() { return permissions; }
-        public void setPermissions(Set<ApiKey.ApiPermission> permissions) { this.permissions = permissions; }
+        public Map<String, Set<ApiKey.ApiPermission>> getContextPermissions() { return contextPermissions; }
+        public void setContextPermissions(Map<String, Set<ApiKey.ApiPermission>> contextPermissions) { this.contextPermissions = contextPermissions; }
     }
 
     @GetMapping
@@ -60,9 +60,14 @@ public class ApiKeyController {
             return ResponseEntity.badRequest().build();
         }
 
-        String rawKey = apiKeyService.createApiKey(user.getId(), name, payload.getPermissions());
-
-        return ResponseEntity.ok(Map.of("key", rawKey));
+        try {
+            String rawKey = apiKeyService.createApiKey(user.getId(), name, payload.getContextPermissions());
+            return ResponseEntity.ok(Map.of("key", rawKey));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/{id}")
