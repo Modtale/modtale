@@ -63,7 +63,7 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
                 aria-hidden="true"
             />
 
-            <div className="w-full aspect-[21/9] relative bg-slate-800 border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0">
+            <div className="w-full aspect-[3/1] relative bg-slate-800 border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0">
                 {bannerUrl ? (
                     <img
                         src={bannerUrl}
@@ -72,7 +72,10 @@ const FeaturedModCard = ({ mod }: { mod: Mod }) => {
                         loading="lazy"
                     />
                 ) : (
-                    <div className="w-full h-full bg-slate-200/30 dark:bg-slate-700/30" />
+                    <>
+                        <div className="w-full h-full bg-slate-200/30 dark:bg-slate-700/30" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent" />
+                    </>
                 )}
             </div>
 
