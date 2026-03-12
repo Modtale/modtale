@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../utils/api.ts';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, ChevronDown } from 'lucide-react';
 
 interface AdminLog {
     id: string;
@@ -11,6 +11,95 @@ interface AdminLog {
     details: string;
     timestamp: string;
 }
+
+const ACTION_OPTIONS = [
+    { value: "BAN_EMAIL", label: "BAN_EMAIL" },
+    { value: "UNBAN_EMAIL", label: "UNBAN_EMAIL" },
+    { value: "DELETE_USER", label: "DELETE_USER" },
+    { value: "UPDATE_TIER", label: "UPDATE_TIER" },
+    { value: "ADD_ROLE", label: "ADD_ROLE" },
+    { value: "REMOVE_ROLE", label: "REMOVE_ROLE" },
+    { value: "PUBLISH_PROJECT", label: "PUBLISH_PROJECT" },
+    { value: "APPROVE_VERSION", label: "APPROVE_VERSION" },
+    { value: "REJECT_VERSION", label: "REJECT_VERSION" },
+    { value: "REJECT_PROJECT", label: "REJECT_PROJECT" },
+    { value: "DELETE_PROJECT", label: "DELETE_PROJECT" },
+    { value: "HARD_DELETE_PROJECT", label: "HARD_DELETE_PROJECT" },
+    { value: "RESTORE_PROJECT", label: "RESTORE_PROJECT" },
+    { value: "UNLIST_PROJECT", label: "UNLIST_PROJECT" },
+    { value: "DELETE_VERSION", label: "DELETE_VERSION" },
+    { value: "RAW_UPDATE_PROJECT", label: "RAW_UPDATE_PROJECT" },
+    { value: "RAW_UPDATE_USER", label: "RAW_UPDATE_USER" },
+    { value: "RESCAN_VERSION", label: "RESCAN_VERSION" },
+];
+
+const TARGET_OPTIONS = [
+    { value: "USER", label: "USER" },
+    { value: "PROJECT", label: "PROJECT" },
+    { value: "VERSION", label: "VERSION" },
+    { value: "EMAIL", label: "EMAIL" },
+];
+
+const CustomSelect = ({
+                          value,
+                          onChange,
+                          options,
+                          placeholder
+                      }: {
+    value: string,
+    onChange: (val: string) => void,
+    options: {label: string, value: string}[],
+    placeholder: string
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (ref.current && !ref.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
+
+    return (
+        <div className="relative w-full sm:w-48" ref={ref}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center text-slate-700 dark:text-slate-300"
+            >
+                <span className="truncate">{selectedLabel}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg shadow-xl max-h-60 overflow-auto py-1">
+                    <button
+                        type="button"
+                        onClick={() => { onChange(''); setIsOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${value === '' ? 'text-modtale-accent font-medium' : 'text-slate-700 dark:text-slate-300'}`}
+                    >
+                        {placeholder}
+                    </button>
+                    {options.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${value === opt.value ? 'text-modtale-accent font-medium' : 'text-slate-700 dark:text-slate-300'}`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const AdminLogViewer: React.FC = () => {
     const [logs, setLogs] = useState<AdminLog[]>([]);
@@ -56,45 +145,21 @@ export const AdminLogViewer: React.FC = () => {
                         placeholder="Search IDs, Users, or Details..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-modtale-accent"
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent"
                     />
                 </div>
-                <select
+                <CustomSelect
                     value={actionFilter}
-                    onChange={(e) => { setActionFilter(e.target.value); setPage(0); }}
-                    className="px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-modtale-accent"
-                >
-                    <option value="">All Actions</option>
-                    <option value="BAN_EMAIL">BAN_EMAIL</option>
-                    <option value="UNBAN_EMAIL">UNBAN_EMAIL</option>
-                    <option value="DELETE_USER">DELETE_USER</option>
-                    <option value="UPDATE_TIER">UPDATE_TIER</option>
-                    <option value="ADD_ROLE">ADD_ROLE</option>
-                    <option value="REMOVE_ROLE">REMOVE_ROLE</option>
-                    <option value="PUBLISH_PROJECT">PUBLISH_PROJECT</option>
-                    <option value="APPROVE_VERSION">APPROVE_VERSION</option>
-                    <option value="REJECT_VERSION">REJECT_VERSION</option>
-                    <option value="REJECT_PROJECT">REJECT_PROJECT</option>
-                    <option value="DELETE_PROJECT">DELETE_PROJECT</option>
-                    <option value="HARD_DELETE_PROJECT">HARD_DELETE_PROJECT</option>
-                    <option value="RESTORE_PROJECT">RESTORE_PROJECT</option>
-                    <option value="UNLIST_PROJECT">UNLIST_PROJECT</option>
-                    <option value="DELETE_VERSION">DELETE_VERSION</option>
-                    <option value="RAW_UPDATE_PROJECT">RAW_UPDATE_PROJECT</option>
-                    <option value="RAW_UPDATE_USER">RAW_UPDATE_USER</option>
-                    <option value="RESCAN_VERSION">RESCAN_VERSION</option>
-                </select>
-                <select
+                    onChange={(val) => { setActionFilter(val); setPage(0); }}
+                    options={ACTION_OPTIONS}
+                    placeholder="All Actions"
+                />
+                <CustomSelect
                     value={targetTypeFilter}
-                    onChange={(e) => { setTargetTypeFilter(e.target.value); setPage(0); }}
-                    className="px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-modtale-accent"
-                >
-                    <option value="">All Targets</option>
-                    <option value="USER">USER</option>
-                    <option value="PROJECT">PROJECT</option>
-                    <option value="VERSION">VERSION</option>
-                    <option value="EMAIL">EMAIL</option>
-                </select>
+                    onChange={(val) => { setTargetTypeFilter(val); setPage(0); }}
+                    options={TARGET_OPTIONS}
+                    placeholder="All Targets"
+                />
                 <button type="submit" className="px-6 py-2 bg-modtale-accent text-white rounded-lg text-sm font-bold hover:bg-modtale-accent/90 transition-colors">
                     Search
                 </button>
@@ -155,7 +220,7 @@ export const AdminLogViewer: React.FC = () => {
                     <button
                         disabled={page === 0}
                         onClick={() => setPage(p => Math.max(0, p - 1))}
-                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors"
+                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
                     >
                         Previous
                     </button>
@@ -165,7 +230,7 @@ export const AdminLogViewer: React.FC = () => {
                     <button
                         disabled={page >= totalPages - 1}
                         onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors"
+                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
                     >
                         Next
                     </button>
