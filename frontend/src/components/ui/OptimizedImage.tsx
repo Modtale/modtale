@@ -20,19 +20,29 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
     const [isLoaded, setIsLoaded] = useState(false);
     const [currentSrc, setCurrentSrc] = useState<string>('');
 
-    const getCloudflareUrl = (url: string, width: number, quality: number = 85) => {
+    const getSteppedWidth = (width: number) => {
+        if (width <= 64) return 64;
+        if (width <= 128) return 128;
+        if (width <= 256) return 256;
+        if (width <= 640) return 640;
+        if (width <= 1280) return 1280;
+        return 1920;
+    };
+
+    const getCloudflareUrl = (url: string, width: number, quality: number = 80) => {
         if (!url || url.includes('.svg') || url.startsWith('blob:') || url.includes('localhost')) {
             return url;
         }
 
+        const steppedWidth = getSteppedWidth(width);
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
         const absoluteUrl = url.startsWith('http') ? url : `${origin}${url}`;
 
-        return `${origin}/cdn-cgi/image/width=${width},quality=${quality},format=auto/${absoluteUrl}`;
+        return `${origin}/cdn-cgi/image/width=${steppedWidth},quality=${quality},format=auto,onerror=redirect/${absoluteUrl}`;
     };
 
     useEffect(() => {
-        const lowRes = getCloudflareUrl(src, 32, 20);
+        const lowRes = getCloudflareUrl(src, 64, 10);
         setCurrentSrc(lowRes);
 
         if (priority) {
@@ -44,7 +54,6 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
     const res1x = getCloudflareUrl(src, baseWidth);
     const res2x = getCloudflareUrl(src, baseWidth * 2);
-    const res3x = getCloudflareUrl(src, baseWidth * 3);
 
     return (
         <div
@@ -53,7 +62,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         >
             <img
                 src={isLoaded ? res2x : currentSrc}
-                srcSet={isLoaded ? `${res1x} 1x, ${res2x} 2x, ${res3x} 3x` : undefined}
+                srcSet={isLoaded ? `${res1x} 1x, ${res2x} 2x` : undefined}
                 alt={alt}
                 loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
