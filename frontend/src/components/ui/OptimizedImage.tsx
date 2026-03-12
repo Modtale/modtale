@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getCloudflareUrl } from '../../utils/images';
 
 interface OptimizedImageProps {
     src: string;
@@ -9,51 +10,60 @@ interface OptimizedImageProps {
     aspectRatio?: string;
 }
 
+const FALLBACK_SRC = '/assets/favicon.svg';
+
 export const OptimizedImage: React.FC<OptimizedImageProps> = ({
-                                                                  src,
-                                                                  alt,
-                                                                  className,
-                                                                  baseWidth,
-                                                                  priority = false,
-                                                                  aspectRatio
+                                                                  src, alt, className, baseWidth, priority = false, aspectRatio
                                                               }) => {
     const [isLoaded, setIsLoaded] = useState(false);
-    const [currentSrc, setCurrentSrc] = useState<string>('');
+    const hasFallenBack = useRef(false);
 
-    const getSteppedWidth = (width: number) => {
-        if (width <= 64) return 64;
-        if (width <= 128) return 128;
-        if (width <= 256) return 256;
-        if (width <= 640) return 640;
-        if (width <= 1280) return 1280;
-        return 1920;
-    };
+    const { downlink, isSaveData } = useMemo(() => {
+        const conn = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
+        return {
+            downlink: conn?.downlink ?? 10,
+            isSaveData: conn?.saveData ?? false,
+        };
+    }, []);
 
-    const getCloudflareUrl = (url: string, width: number, quality: number = 80) => {
-        if (!url || url.includes('.svg') || url.startsWith('blob:') || url.includes('localhost')) {
-            return url;
-        }
-        const steppedWidth = getSteppedWidth(width);
-        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        const absoluteUrl = url.startsWith('http') ? url : `${origin}${url}`;
-        return `${origin}/cdn-cgi/image/width=${steppedWidth},quality=${quality},format=auto,onerror=redirect/${absoluteUrl}`;
-    };
+    const config = useMemo(() => {
+        const ultraSlow = downlink < 1 || isSaveData;
+        const fast = priority || (downlink >= 10 && !isSaveData);
+        return {
+            placeholder: getCloudflareUrl(src, 32, 10),
+            res1x: getCloudflareUrl(src, baseWidth, ultraSlow ? 50 : 80),
+            res2x: getCloudflareUrl(src, baseWidth * 2, 80),
+            isUltraSlow: ultraSlow,
+            isFast: fast,
+        };
+    }, [src, baseWidth, priority, downlink, isSaveData]);
 
     useEffect(() => {
-        const conn = (navigator as any).connection;
-        const isFast = !conn || (conn.effectiveType === '4g' && conn.rtt < 150);
+        setIsLoaded(false);
+        hasFallenBack.current = false;
+    }, [src]);
 
-        if (isFast || priority) {
+    useEffect(() => {
+        if (config.isFast) {
             setIsLoaded(true);
             return;
         }
 
-        const lowRes = getCloudflareUrl(src, 64, 10);
-        setCurrentSrc(lowRes);
-    }, [src, priority]);
+        const img = new Image();
+        img.src = config.res2x;
+        img.onload = () => setIsLoaded(true);
 
-    const res1x = getCloudflareUrl(src, baseWidth);
-    const res2x = getCloudflareUrl(src, baseWidth * 2);
+        return () => {
+            img.onload = null;
+        };
+    }, [config.res2x, config.isFast]);
+
+    const srcSet = useMemo(() => {
+        if (!isLoaded) return undefined;
+        return config.isUltraSlow
+            ? `${config.res1x} 1x`
+            : `${config.res1x} 1x, ${config.res2x} 2x`;
+    }, [isLoaded, config.isUltraSlow, config.res1x, config.res2x]);
 
     return (
         <div
@@ -61,20 +71,21 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
             style={{ aspectRatio }}
         >
             <img
-                src={isLoaded ? res2x : currentSrc}
-                srcSet={isLoaded ? `${res1x} 1x, ${res2x} 2x` : undefined}
+                key={src}
+                src={isLoaded ? config.res2x : config.placeholder}
+                srcSet={srcSet}
                 alt={alt}
                 loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
-                decoding={priority ? 'sync' : 'async'}
-                onLoad={() => setIsLoaded(true)}
-                className={`w-full h-full object-cover transition-all duration-500 ${
-                    isLoaded ? 'blur-0 scale-100' : 'blur-md scale-110'
+                decoding="async"
+                className={`w-full h-full object-cover transition-all duration-700 ${
+                    isLoaded ? 'blur-0 scale-100' : 'blur-2xl scale-110'
                 }`}
                 onError={(e) => {
-                    if (!src.includes('favicon')) {
-                        e.currentTarget.src = '/assets/favicon.svg';
-                    }
+                    if (hasFallenBack.current) return;
+                    hasFallenBack.current = true;
+                    e.currentTarget.src = FALLBACK_SRC;
+                    e.currentTarget.srcset = '';
                 }}
             />
         </div>
