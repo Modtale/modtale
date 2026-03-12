@@ -268,7 +268,7 @@ public class OgImageController {
         g2d.setClip(null);
 
         String type = mod.getClassification() != null ? mod.getClassification() : "PROJECT";
-        int badgeX = x + w - 30;
+        int badgeX = x + w - 50;
         int badgeY = y + 30;
         drawCategoryBadge(g2d, type, badgeX, badgeY);
 
@@ -282,7 +282,7 @@ public class OgImageController {
 
     private void drawProjectContent(Graphics2D g2d, Mod mod, BufferedImage icon, int cardX, int cardY, int cardW, int cardH) {
         int headerH = cardW / 3;
-        int padding = 70;
+        int padding = 50;
         int iconSize = 210;
 
         int iconX = cardX + padding;
@@ -444,7 +444,7 @@ public class OgImageController {
         float logoHeight = 44f;
         float logoWidth = (float) (logoHeight * (logoDocument.size().width / logoDocument.size().height));
 
-        float x = cardX + cardW - 70 - logoWidth;
+        float x = cardX + cardW - 50 - logoWidth;
         float y = cardY + cardH - 40 - logoHeight;
 
         Graphics2D logoG = (Graphics2D) g2d.create();
