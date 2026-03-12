@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpSession;
 import net.modtale.model.dto.UserDTO;
 import net.modtale.model.user.User;
 import net.modtale.model.user.GitRepository;
+import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.UserService;
 import net.modtale.service.user.GithubService;
 import net.modtale.service.resources.StorageService;
@@ -41,6 +42,7 @@ public class UserController {
     @Autowired private StorageService storageService;
     @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
     @Autowired private FileValidationService validationService;
+    @Autowired private UserRepository userRepository;
 
     @GetMapping("/users/search")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
@@ -62,6 +64,13 @@ public class UserController {
         return ResponseEntity.ok(users.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
+    }
+
+    @GetMapping("/users/lookup/{username}")
+    public ResponseEntity<Map<String, String>> lookupUserId(@PathVariable String username) {
+        Optional<User> target = userRepository.findByUsernameIgnoreCase(username);
+        if (target.isEmpty()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(Map.of("id", target.get().getId()));
     }
 
     @PostMapping("/orgs")
