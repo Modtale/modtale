@@ -604,9 +604,18 @@ export const Browse: React.FC<BrowseProps> = ({
     const initialData = typeof window !== 'undefined' ? (window as any).INITIAL_DATA : null;
     const useSSRData = initialData?.browseData && !hasComplexParams;
 
-    const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>(() => {
-        return (localStorage.getItem('modtale_view_style') as any) || (searchParams.get('style') as any) || 'grid';
-    });
+    const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>('grid');
+
+    useEffect(() => {
+        const savedStyle = localStorage.getItem('modtale_view_style') as 'grid' | 'list' | 'compact';
+        const urlStyle = searchParams.get('style') as 'grid' | 'list' | 'compact';
+
+        if (urlStyle && ['grid', 'list', 'compact'].includes(urlStyle)) {
+            setViewStyle(urlStyle);
+        } else if (savedStyle && ['grid', 'list', 'compact'].includes(savedStyle)) {
+            setViewStyle(savedStyle);
+        }
+    }, []);
 
     const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
 
