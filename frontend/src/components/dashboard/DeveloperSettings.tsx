@@ -331,7 +331,7 @@ export const DeveloperSettings: React.FC = () => {
                                                             {k.tier || 'USER'}
                                                         </span>
                                                     </div>
-                                                    <div className="text-xs text-slate-500 font-mono mt-1.5 flex items-center gap-2">
+                                                    <div className="text-sm text-slate-500 font-mono mt-1.5 flex items-center gap-2">
                                                         <span>Prefix: <span className="bg-white/60 dark:bg-black/30 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/5">{k.prefix}••••••••</span></span>
                                                     </div>
                                                 </div>
@@ -340,30 +340,30 @@ export const DeveloperSettings: React.FC = () => {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-3 space-y-2">
+                                            <div className="mt-4 space-y-3">
                                                 {activeContexts.map(ctx => {
                                                     const perms = k.contextPermissions[ctx] || [];
                                                     const ctxName = ctx === 'PERSONAL' ? 'Personal Account' : (orgs.find(o => o.id === ctx)?.username || 'Organization');
                                                     if (perms.length === 0) return null;
 
                                                     return (
-                                                        <div key={ctx} className="flex flex-col gap-1">
-                                                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                                                {ctx === 'PERSONAL' ? <UserIcon className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
+                                                        <div key={ctx} className="flex flex-col gap-1.5">
+                                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                                {ctx === 'PERSONAL' ? <UserIcon className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
                                                                 {ctxName}
                                                             </span>
-                                                            <div className="flex flex-wrap gap-1.5">
+                                                            <div className="flex flex-wrap gap-2">
                                                                 {perms.length === TOTAL_PERMISSIONS ? (
-                                                                    <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">All Permissions ({TOTAL_PERMISSIONS})</span>
+                                                                    <span className="text-xs px-2 py-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">All Permissions ({TOTAL_PERMISSIONS})</span>
                                                                 ) : (
                                                                     <>
                                                                         {perms.slice(0, 4).map(p => (
-                                                                            <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-medium whitespace-nowrap">
+                                                                            <span key={p} className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-medium whitespace-nowrap">
                                                                                 {getPermissionLabel(p)}
                                                                             </span>
                                                                         ))}
                                                                         {perms.length > 4 && (
-                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 font-medium">
+                                                                            <span className="text-xs px-2 py-1 rounded bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/20 font-medium">
                                                                                 +{perms.length - 4} more
                                                                             </span>
                                                                         )}
@@ -375,7 +375,7 @@ export const DeveloperSettings: React.FC = () => {
                                                 })}
                                             </div>
 
-                                            <div className="text-xs text-slate-400 mt-4 font-medium border-t border-slate-100 dark:border-white/5 pt-2">
+                                            <div className="text-xs text-slate-400 mt-4 font-medium border-t border-slate-100 dark:border-white/5 pt-3">
                                                 Created: {new Date(k.createdAt).toLocaleDateString()} • Last Used: {k.lastUsed ? new Date(k.lastUsed).toLocaleDateString() : 'Never'}
                                             </div>
                                         </div>
@@ -385,80 +385,76 @@ export const DeveloperSettings: React.FC = () => {
                         </div>
 
                         <div className="p-5 border-t border-slate-200 dark:border-white/10 mt-auto shrink-0 bg-slate-50/50 dark:bg-white/[0.01]">
-                            <form onSubmit={handleCreate} className="flex flex-col gap-5">
+                            <form onSubmit={handleCreate} className="flex flex-col gap-6">
                                 <input
                                     type="text"
                                     value={keyName}
                                     onChange={e => setKeyName(e.target.value)}
                                     placeholder="Key Name (e.g. GitHub Actions - Deploy)"
-                                    className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm dark:text-white focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all shadow-inner"
+                                    className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-base dark:text-white focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all shadow-inner"
                                     required
                                 />
 
                                 <div className="space-y-4">
-                                    <div className="flex flex-col gap-2 border-b border-slate-200 dark:border-white/10 pb-2">
-                                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Configure Contexts & Permissions</label>
+                                    <div className="flex flex-col gap-3 border-b border-slate-200 dark:border-white/10 pb-4">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Configure Contexts & Permissions</label>
+                                            <button
+                                                type="button"
+                                                onClick={toggleAllPerms}
+                                                className="text-xs font-bold text-modtale-accent hover:text-modtale-accentHover transition-colors flex items-center gap-1.5"
+                                            >
+                                                {activePerms.length === TOTAL_PERMISSIONS ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                                {activePerms.length === TOTAL_PERMISSIONS ? 'Deselect All' : 'Select All'}
+                                            </button>
+                                        </div>
 
-                                        <div className="flex overflow-x-auto gap-2 pb-1 custom-scrollbar">
+                                        <div className="flex w-full overflow-x-auto gap-2 pb-2 pt-1 px-1 custom-scrollbar">
                                             <button
                                                 type="button"
                                                 onClick={() => setActiveTab('PERSONAL')}
-                                                className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap ${activeTab === 'PERSONAL' ? 'bg-modtale-accent text-white' : 'bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                                                className={`shrink-0 px-4 py-2 text-sm font-bold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap border ${activeTab === 'PERSONAL' ? 'bg-modtale-accent text-white border-modtale-accent shadow-md' : 'bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/10 border-slate-200 dark:border-white/5'}`}
                                             >
-                                                <UserIcon className="w-3.5 h-3.5" /> Personal Account
-                                                {contextPerms['PERSONAL']?.length > 0 && <span className="ml-1 bg-white/20 px-1.5 rounded-full text-[10px]">{contextPerms['PERSONAL'].length}</span>}
+                                                <UserIcon className="w-4 h-4" /> Personal Profile
+                                                {contextPerms['PERSONAL']?.length > 0 && <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${activeTab === 'PERSONAL' ? 'bg-white/20' : 'bg-slate-200 dark:bg-white/10'}`}>{contextPerms['PERSONAL'].length}</span>}
                                             </button>
                                             {orgs.map(org => (
                                                 <button
                                                     key={org.id}
                                                     type="button"
                                                     onClick={() => setActiveTab(org.id)}
-                                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap ${activeTab === org.id ? 'bg-modtale-accent text-white' : 'bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                                                    className={`shrink-0 px-4 py-2 text-sm font-bold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap border ${activeTab === org.id ? 'bg-modtale-accent text-white border-modtale-accent shadow-md' : 'bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/10 border-slate-200 dark:border-white/5'}`}
                                                 >
-                                                    <Building2 className="w-3.5 h-3.5" /> {org.username}
-                                                    {contextPerms[org.id]?.length > 0 && <span className="ml-1 bg-white/20 px-1.5 rounded-full text-[10px]">{contextPerms[org.id].length}</span>}
+                                                    <Building2 className="w-4 h-4" /> {org.username}
+                                                    {contextPerms[org.id]?.length > 0 && <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${activeTab === org.id ? 'bg-white/20' : 'bg-slate-200 dark:bg-white/10'}`}>{contextPerms[org.id].length}</span>}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                                            Editing <span className="text-slate-900 dark:text-white">{activeTab === 'PERSONAL' ? 'Personal' : orgs.find(o=>o.id === activeTab)?.username}</span> scopes
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={toggleAllPerms}
-                                            className="text-[11px] font-bold text-modtale-accent hover:text-modtale-accentHover transition-colors flex items-center gap-1"
-                                        >
-                                            {activePerms.length === TOTAL_PERMISSIONS ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
-                                            {activePerms.length === TOTAL_PERMISSIONS ? 'Deselect All' : 'Select All'}
-                                        </button>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-6 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-4 custom-scrollbar bg-slate-100/50 dark:bg-black/20 rounded-2xl p-4">
                                         {PERMISSION_GROUPS.map((group, idx) => (
-                                            <div key={idx} className="space-y-2.5">
-                                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-1.5">
-                                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{group.group}</span>
+                                            <div key={idx} className="break-inside-avoid flex flex-col bg-white dark:bg-[#1a1f2e] rounded-xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
+                                                <div className="flex items-center justify-between bg-slate-50 dark:bg-white/5 px-3 py-2.5 border-b border-slate-200 dark:border-white/10">
+                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-widest">{group.group}</span>
                                                     <button
                                                         type="button"
                                                         onClick={() => toggleAllInGroup(group.permissions)}
-                                                        className="text-[10px] text-slate-400 hover:text-modtale-accent transition-colors font-medium bg-white/50 dark:bg-white/5 px-1.5 py-0.5 rounded"
+                                                        className="text-[10px] text-modtale-accent hover:text-modtale-accentHover transition-colors font-bold uppercase tracking-wider"
                                                     >
                                                         Toggle
                                                     </button>
                                                 </div>
-                                                <div className="flex flex-col gap-1.5">
+                                                <div className="p-2 space-y-0.5">
                                                     {group.permissions.map(perm => (
-                                                        <label key={perm.id} className="flex items-center gap-2.5 p-1.5 rounded-md border border-transparent hover:border-slate-200 dark:hover:border-white/5 hover:bg-white/40 dark:hover:bg-white/5 cursor-pointer transition-colors group/label">
+                                                        <label key={perm.id} className="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors group/label border border-transparent hover:border-slate-100 dark:hover:border-white/5">
                                                             <input
                                                                 type="checkbox"
                                                                 checked={activePerms.includes(perm.id)}
                                                                 onChange={() => togglePerm(perm.id)}
-                                                                className="w-3.5 h-3.5 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent bg-white dark:bg-black/20"
+                                                                className="w-4 h-4 shrink-0 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent focus:ring-offset-0 bg-white dark:bg-black/40 transition-all cursor-pointer"
                                                             />
-                                                            <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 group-hover/label:text-slate-900 dark:group-hover/label:text-white transition-colors">{perm.label}</span>
+                                                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover/label:text-slate-900 dark:group-hover/label:text-white transition-colors select-none">{perm.label}</span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -467,12 +463,12 @@ export const DeveloperSettings: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-white/10">
-                                    <span className="text-xs text-slate-500 font-medium">
-                                        Total Selected: {Object.values(contextPerms).reduce((sum, arr) => sum + (arr?.length || 0), 0)}
+                                <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-white/10">
+                                    <span className="text-sm text-slate-500 font-medium">
+                                        Total Permissions Selected: <span className="font-black text-modtale-accent">{Object.values(contextPerms).reduce((sum, arr) => sum + (arr?.length || 0), 0)}</span>
                                     </span>
-                                    <button disabled={isCreating} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all shadow-lg active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed w-full sm:w-auto">
-                                        <Plus className="w-4 h-4" /> Generate Key
+                                    <button disabled={isCreating} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-base transition-all shadow-xl shadow-modtale-accent/10 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed w-full sm:w-auto">
+                                        <Plus className="w-5 h-5" /> Generate Key
                                     </button>
                                 </div>
                             </form>
