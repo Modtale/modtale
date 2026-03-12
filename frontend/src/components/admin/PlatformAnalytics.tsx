@@ -44,7 +44,7 @@ export const PlatformAnalytics: React.FC = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const res = await api.get(`/admin/analytics/platform?range=${range}`);
+                const res = await api.get(`/analytics/platform/full?range=${range}`);
                 setData(res.data);
             } catch (e) {
                 console.error("Failed to fetch platform analytics", e);
