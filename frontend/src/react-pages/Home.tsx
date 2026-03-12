@@ -358,7 +358,6 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     ...(relevance.data?.content || [])
                 ];
 
-                // De-duplicate by ID and shuffle
                 const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
                 const mixed = unique.sort(() => Math.random() - 0.5);
 
@@ -370,7 +369,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
 
         const fetchStats = async () => {
             try {
-                const res = await api.get('/analytics/stats');
+                const res = await api.get('/analytics/platform/stats');
                 setStats(res.data);
             } catch (err) {
                 console.error("Failed to fetch platform stats", err);

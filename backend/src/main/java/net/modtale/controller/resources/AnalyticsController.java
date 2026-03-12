@@ -53,33 +53,6 @@ public class AnalyticsController {
         return Duration.between(now, midnight).getSeconds();
     }
 
-    @GetMapping("/analytics/stats")
-    public ResponseEntity<Map<String, Long>> getPublicStats() {
-        long totalProjects = mongoTemplate.count(new Query(Criteria.where("status").is("PUBLISHED")), Mod.class);
-        long totalUsers = mongoTemplate.count(new Query(), User.class);
-
-        Aggregation agg = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("status").is("PUBLISHED")),
-                Aggregation.group().sum("downloadCount").as("totalDownloads")
-        );
-
-        AggregationResults<Document> results = mongoTemplate.aggregate(agg, Mod.class, Document.class);
-        long totalDownloads = 0;
-        Document mappedResult = results.getUniqueMappedResult();
-        if (mappedResult != null && mappedResult.get("totalDownloads") != null) {
-            totalDownloads = ((Number) mappedResult.get("totalDownloads")).longValue();
-        }
-
-        Map<String, Long> stats = new HashMap<>();
-        stats.put("totalProjects", totalProjects);
-        stats.put("totalUsers", totalUsers);
-        stats.put("totalDownloads", totalDownloads);
-
-        return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePublic())
-                .body(stats);
-    }
-
     @GetMapping("/user/analytics")
     public ResponseEntity<?> getCreatorAnalytics(
             @RequestParam(defaultValue = "30d") String range,
