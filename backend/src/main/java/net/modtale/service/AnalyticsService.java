@@ -613,7 +613,7 @@ public class AnalyticsService {
     }
 
     public PlatformAnalyticsSummary getPlatformAnalytics(String range) {
-        LocalDate end = LocalDate.now();
+        LocalDate end = LocalDate.now().minusDays(1);
         LocalDate start = calculateStartDate(range);
 
         LocalDate comparisonEnd = start.minusDays(1);
@@ -715,7 +715,7 @@ public class AnalyticsService {
     }
 
     public CreatorAnalytics getCreatorDashboard(String userId, String range, List<String> include) {
-        LocalDate end = LocalDate.now();
+        LocalDate end = LocalDate.now().minusDays(1);
         LocalDate start = calculateStartDate(range);
 
         LocalDate comparisonEnd = start.minusDays(1);
@@ -768,7 +768,7 @@ public class AnalyticsService {
     }
 
     public ProjectAnalyticsDetail getProjectAnalytics(String projectId, String userId, String range) {
-        LocalDate end = LocalDate.now();
+        LocalDate end = LocalDate.now().minusDays(1);
         LocalDate start = calculateStartDate(range);
         LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
 
@@ -793,10 +793,11 @@ public class AnalyticsService {
     }
 
     private LocalDate calculateStartDate(String range) {
-        if ("7d".equals(range)) return LocalDate.now().minusDays(7);
-        if ("90d".equals(range)) return LocalDate.now().minusDays(90);
-        if ("1y".equals(range)) return LocalDate.now().minusYears(1);
-        return LocalDate.now().minusDays(30);
+        LocalDate baseDate = LocalDate.now().minusDays(1);
+        if ("7d".equals(range)) return baseDate.minusDays(7);
+        if ("90d".equals(range)) return baseDate.minusDays(90);
+        if ("1y".equals(range)) return baseDate.minusYears(1);
+        return baseDate.minusDays(30);
     }
 
     private List<ProjectMonthlyStats> getStatsInMemory(String id, LocalDate start, LocalDate end, boolean isProject, boolean excludeVersions) {
