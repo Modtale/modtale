@@ -1180,7 +1180,7 @@ export const ModDetail: React.FC<{
                     <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 w-full">
                         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full xl:w-auto">
                             <button
-                                onClick={() => initiateDownload(mod.versions[0]?.fileUrl, mod.versions[0]?.versionNumber, mod.versions[0]?.dependencies)}
+                                onClick={() => navigate(`${projectUrl}/download`)}
                                 disabled={!mod.versions || mod.versions.length === 0}
                                 className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
                             >
