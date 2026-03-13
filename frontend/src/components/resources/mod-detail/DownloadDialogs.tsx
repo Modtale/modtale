@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ProjectVersion } from '../../../types';
-import { Download, X, ChevronDown, ChevronUp, Link as LinkIcon, List, AlertCircle, FileText, ChevronRight } from 'lucide-react';
+import { Download, X, ChevronDown, ChevronUp, Link as LinkIcon, List, AlertCircle, FileText, ChevronRight, Check, Copy } from 'lucide-react';
 import { formatTimeAgo, ChannelBadge, compareSemVer } from '../../../utils/modHelpers';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -36,6 +36,128 @@ interface DependencyModalProps {
 interface MetaCache {
     [key: string]: { title: string; author: string; icon: string };
 }
+
+export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void; classification: string; title: string }> = ({ isOpen, onClose, classification, title }) => {
+    useScrollLock(isOpen);
+    const [os, setOs] = useState<'windows' | 'macos' | 'linux'>('windows');
+    const [copied, setCopied] = useState(false);
+    const [dontShow, setDontShow] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            if (userAgent.includes('mac')) setOs('macos');
+            else if (userAgent.includes('linux')) setOs('linux');
+            else setOs('windows');
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const isWorld = classification === 'SAVE';
+    const folderName = isWorld ? 'Saves' : 'Mods';
+    const typeName = isWorld ? 'World' : classification === 'MODPACK' ? 'Modpack' : 'Mod';
+
+    const paths = {
+        windows: `C:\\Program Files\\Hypixel Studios\\Hytale Launcher\\UserData\\${folderName}`,
+        macos: `/Applications/Hytale Launcher.app/Contents/MacOS/UserData/${folderName}`,
+        linux: `~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/UserData/${folderName}`
+    };
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(paths[os]);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleClose = () => {
+        if (dontShow) {
+            localStorage.setItem('hideInstallInstructions', 'true');
+        }
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={handleClose}>
+            <div className="bg-slate-950/95 backdrop-blur-2xl border border-white/10 rounded-3xl max-w-xl w-full shadow-2xl overflow-hidden flex flex-col ring-1 ring-black/50" onClick={e => e.stopPropagation()}>
+
+                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-center justify-center shadow-inner">
+                            <Download className="w-6 h-6 text-green-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-white tracking-tight">Download Started</h3>
+                            <p className="text-xs text-slate-400 font-medium mt-1">Installation instructions for {title}</p>
+                        </div>
+                    </div>
+                    <button onClick={handleClose} className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+                </div>
+
+                <div className="p-6 bg-slate-900/30 overflow-y-auto custom-scrollbar">
+                    <div className="flex bg-black/40 rounded-xl p-1.5 border border-white/5 mb-6">
+                        {(['windows', 'macos', 'linux'] as const).map(platform => (
+                            <button
+                                key={platform}
+                                onClick={() => setOs(platform)}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg capitalize transition-all ${os === platform ? 'bg-modtale-accent text-white shadow-md' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+                            >
+                                {platform}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="space-y-3 text-sm text-slate-300 font-medium">
+                        <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                            <div className="w-8 h-8 rounded-full bg-modtale-accent/20 text-modtale-accent font-black flex items-center justify-center shrink-0 shadow-inner">1</div>
+                            <div className="pt-1.5">
+                                Locate the downloaded file in your <code className="bg-black/50 border border-white/10 px-1.5 py-0.5 rounded-md font-mono text-xs text-modtale-accent shadow-inner">Downloads</code> folder.
+                            </div>
+                        </div>
+                        <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                            <div className="w-8 h-8 rounded-full bg-modtale-accent/20 text-modtale-accent font-black flex items-center justify-center shrink-0 shadow-inner">2</div>
+                            <div className="w-full min-w-0 pt-1.5">
+                                <p className="mb-3">Move or extract the file to your Hytale {folderName} directory:</p>
+                                <div className="flex items-center gap-3 bg-black/50 border border-white/10 rounded-xl p-2 pl-3">
+                                    <code className="flex-1 font-mono text-[11px] text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
+                                    <button
+                                        onClick={handleCopy}
+                                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors shadow-sm shrink-0 self-start"
+                                        title="Copy Path"
+                                    >
+                                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                            <div className="w-8 h-8 rounded-full bg-modtale-accent/20 text-modtale-accent font-black flex items-center justify-center shrink-0 shadow-inner">3</div>
+                            <div className="pt-1.5">
+                                Restart your Hytale Launcher. The {typeName.toLowerCase()} should now be loaded automatically.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-5 border-t border-white/5 bg-white/[0.02] flex justify-between items-center shrink-0">
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shadow-inner ${dontShow ? 'bg-modtale-accent border-modtale-accent' : 'bg-black/30 border-white/10 group-hover:border-white/30'}`}>
+                            {dontShow && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                        </div>
+                        <span className="text-xs font-bold text-slate-400 group-hover:text-slate-300 transition-colors select-none uppercase tracking-wider">Don't show again</span>
+                        <input type="checkbox" className="hidden" checked={dontShow} onChange={(e) => setDontShow(e.target.checked)} />
+                    </label>
+                    <button
+                        onClick={handleClose}
+                        className="px-8 py-2.5 rounded-xl font-black bg-white text-slate-900 hover:bg-slate-200 transition-colors shadow-lg active:scale-95 text-sm"
+                    >
+                        Got it
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, onClose, onConfirm }) => {
     useScrollLock(true);
