@@ -60,9 +60,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const displayTitle = user.username;
     const linkedAccounts = (user.connectedAccounts || []).filter(a => a.visible);
 
-    const containerClasses = isEditing
-        ? "w-full px-6"
-        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+    const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto";
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
@@ -165,14 +163,14 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const Avatar = ({ className, forceSizeClass }: { className?: string, forceSizeClass?: string }) => (
         <div className={`relative group ${className}`}>
-            <div className={`w-full h-full ${forceSizeClass || ''} rounded-[1.25rem] md:rounded-[2rem] border-[6px] ${isEditing ? 'border-white/80 dark:border-slate-800/80' : 'border-white/50 dark:border-slate-950 md:dark:border-slate-900/50'} shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20 backdrop-blur-md transition-colors`}>
+            <div className={`w-full h-full ${forceSizeClass || ''} rounded-3xl border-[6px] ${isEditing ? 'border-white/80 dark:border-slate-800/80' : 'border-white/50 dark:border-slate-950 md:dark:border-slate-900/50'} shadow-xl overflow-hidden bg-transparent relative z-20 backdrop-blur-md transition-colors`}>
                 {user.avatarUrl ? (
                     <OptimizedImage
                         src={user.avatarUrl}
                         alt={`${user.username} Avatar`}
                         baseWidth={224}
                         priority={true}
-                        className="w-full h-full"
+                        className="w-full h-full bg-transparent"
                     />
                 ) : (
                     <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
@@ -266,7 +264,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                     <div className="flex-1 w-full min-w-0 md:pt-0">
 
                         <div className={`md:hidden -mt-16 flex justify-start relative z-50 ${isEditing ? 'mb-4 ml-2' : 'mb-3'}`}>
-                            <Avatar className="w-28 h-28" forceSizeClass={isEditing ? "rounded-[1.5rem]" : "rounded-2xl"} />
+                            <Avatar className="w-28 h-28" forceSizeClass="rounded-3xl" />
                         </div>
 
                         <div className="mb-4 relative z-10">
@@ -387,7 +385,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             </div>
 
             {children && (
-                <div className="w-full transition-[max-width,padding] duration-300 mt-0 md:mt-16">
+                <div className={`${containerClasses} transition-[max-width,padding] duration-300 mt-0 md:mt-16`}>
                     {children}
                 </div>
             )}
