@@ -222,7 +222,8 @@ else if (isBot && id && isProjectRoute) {
             }
 
             if (modData.imageUrl) {
-                image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
+                const baseUrl = new URL(BACKEND_URL).origin;
+                image = `${baseUrl}/api/v1/og/project/${initialData.id}.png`;
             }
 
             const appSchema = {

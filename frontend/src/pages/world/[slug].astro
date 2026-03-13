@@ -42,7 +42,8 @@ if (isBot) {
             }
 
             if (modData.imageUrl) {
-                image = modData.imageUrl.startsWith('/api') ? `${BACKEND_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
+                const baseOrigin = new URL(BACKEND_URL).origin;
+                image = modData.imageUrl.startsWith('/api') ? `${baseOrigin}${modData.imageUrl}` : modData.imageUrl;
             }
 
             const appSchema = {
