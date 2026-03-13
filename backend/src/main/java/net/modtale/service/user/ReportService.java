@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class ReportService {
 
+    @Autowired private UserService userService;
     @Autowired private ReportRepository reportRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private UserRepository userRepository;
@@ -67,7 +68,7 @@ public class ReportService {
 
             if (commentOpt.isPresent()) {
                 String content = commentOpt.get().getContent();
-                targetSummary = "Comment by " + commentOpt.get().getUser() + ": " +
+                targetSummary = "Comment by " + userService.getPublicProfile(commentOpt.get().getId()).getUsername() + ": " +
                         (content.length() > 50 ? content.substring(0, 47) + "..." : content);
             }
         }
