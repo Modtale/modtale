@@ -1,5 +1,6 @@
 package net.modtale.controller.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import net.modtale.model.dto.ModDTO;
 import net.modtale.model.user.User;
 import net.modtale.model.resources.*;
@@ -24,6 +25,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +34,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -59,6 +62,8 @@ public class ModController {
     @Value("${app.hytalemodding.wiki-url:https://wiki.hytalemodding.dev/api}")
     private String wikiApiUrl;
 
+    private final Map<String, String> wikiSlugToIdCache = new ConcurrentHashMap<>();
+
     private boolean isAdminOrSuper(User user) {
         if (user == null) return false;
         if (SUPER_ADMIN_ID.equals(user.getId())) return true;
@@ -73,6 +78,37 @@ public class ModController {
         return xfHeader.split(",")[0];
     }
 
+    private String resolveWikiModId(String slug, RestTemplate restTemplate, HttpHeaders headers) {
+        if (wikiSlugToIdCache.containsKey(slug)) {
+            return wikiSlugToIdCache.get(slug);
+        }
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(wikiApiUrl + "/mods", HttpMethod.GET, entity, JsonNode.class);
+            JsonNode root = response.getBody();
+
+            if (root != null) {
+                JsonNode list = root.isArray() ? root : (root.has("data") ? root.get("data") : null);
+
+                if (list != null && list.isArray()) {
+                    for (JsonNode node : list) {
+                        if (node.has("slug") && slug.equalsIgnoreCase(node.get("slug").asText())) {
+                            if (node.has("id")) {
+                                String id = node.get("id").asText();
+                                wikiSlugToIdCache.put(slug, id);
+                                return id;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error resolving wiki mod id for slug: " + slug, e);
+        }
+        return null;
+    }
+
     @GetMapping("/wiki/{slug}")
     public ResponseEntity<?> getWikiMod(@PathVariable String slug) {
         RestTemplate restTemplate = new RestTemplate();
@@ -80,27 +116,54 @@ public class ModController {
         if (wikiApiKey != null && !wikiApiKey.isEmpty()) {
             headers.setBearerAuth(wikiApiKey);
         }
+
+        String modId = resolveWikiModId(slug, restTemplate, headers);
+        if (modId == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Wiki project not found for slug: " + slug);
+        }
+
         HttpEntity<String> entity = new HttpEntity<>(headers);
         try {
-            ResponseEntity<String> response = restTemplate.exchange(wikiApiUrl + "/mods/" + slug, HttpMethod.GET, entity, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(wikiApiUrl + "/mods/" + modId, HttpMethod.GET, entity, String.class);
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+        } catch (HttpStatusCodeException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
         } catch (Exception e) {
             logger.error("Error proxying to Wiki API", e);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Error fetching from Wiki API");
         }
     }
 
-    @GetMapping("/wiki/{slug}/{page}")
-    public ResponseEntity<?> getWikiPage(@PathVariable String slug, @PathVariable String page) {
+    @GetMapping("/wiki/{slug}/**")
+    public ResponseEntity<?> getWikiPage(@PathVariable String slug, HttpServletRequest request) {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         if (wikiApiKey != null && !wikiApiKey.isEmpty()) {
             headers.setBearerAuth(wikiApiKey);
         }
+
+        String modId = resolveWikiModId(slug, restTemplate, headers);
+        if (modId == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Wiki project not found for slug: " + slug);
+        }
+
         HttpEntity<String> entity = new HttpEntity<>(headers);
+
         try {
-            ResponseEntity<String> response = restTemplate.exchange(wikiApiUrl + "/mods/" + slug + "/" + page, HttpMethod.GET, entity, String.class);
+            String path = request.getRequestURI();
+            String searchStr = "/wiki/" + slug + "/";
+            int index = path.indexOf(searchStr);
+
+            if (index == -1) {
+                return ResponseEntity.badRequest().body("Invalid wiki path");
+            }
+
+            String pageSlug = path.substring(index + searchStr.length());
+
+            ResponseEntity<String> response = restTemplate.exchange(wikiApiUrl + "/mods/" + modId + "/" + pageSlug, HttpMethod.GET, entity, String.class);
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+        } catch (HttpStatusCodeException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
         } catch (Exception e) {
             logger.error("Error proxying to Wiki API", e);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Error fetching from Wiki API");
