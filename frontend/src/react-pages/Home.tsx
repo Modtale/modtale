@@ -124,7 +124,7 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
 };
 
 const MarqueeColumn = ({ mods, duration }: { mods: Mod[], duration: string }) => (
-    <div className="flex flex-col w-[380px] shrink-0">
+    <div className="flex flex-col w-[320px] shrink-0">
         <div className="flex flex-col gap-6 animate-marquee-up will-change-transform" style={{ '--marquee-duration': duration } as any}>
             {[...mods, ...mods].map((mod, index) => (
                 <FeaturedModCard key={`${mod.id}-${index}`} mod={mod} priority={index < 2} />
