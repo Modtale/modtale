@@ -75,12 +75,9 @@ const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boolean = fa
         setLoading(true);
         setError(false);
 
-        fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${hmWikiSlug}`, {
-            headers: { 'Authorization': `Bearer 086e1b4b7715c0b82eed27601362be5732f102bcd7b13a82c0c53f75b0227895` }
-        })
+        api.get(`/wiki/${hmWikiSlug}`)
             .then(res => {
-                if (!res.ok) throw new Error('Wiki not found');
-                return res.json();
+                return res.data;
             })
             .then(async (modData) => {
                 if (!isMounted) return;
@@ -90,12 +87,8 @@ const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boolean = fa
 
                 if (targetSlug) {
                     try {
-                        const res = await fetch(`https://dev.wiki.hytalemodding.dev/api/mods/${hmWikiSlug}/${targetSlug}`, {
-                            headers: { 'Authorization': `Bearer 086e1b4b7715c0b82eed27601362be5732f102bcd7b13a82c0c53f75b0227895` }
-                        });
-                        if (res.ok) {
-                            content = await res.json();
-                        }
+                        const res = await api.get(`/wiki/${hmWikiSlug}/${targetSlug}`);
+                        content = res.data;
                     } catch (e) {}
                 }
 

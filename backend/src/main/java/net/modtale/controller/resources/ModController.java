@@ -19,15 +19,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -56,6 +53,12 @@ public class ModController {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    @Value("${app.hytalemodding.wiki-key:}")
+    private String wikiApiKey;
+
+    @Value("${app.hytalemodding.wiki-url:https://wiki.hytalemodding.dev/api}")
+    private String wikiApiUrl;
+
     private boolean isAdminOrSuper(User user) {
         if (user == null) return false;
         if (SUPER_ADMIN_ID.equals(user.getId())) return true;
@@ -68,6 +71,40 @@ public class ModController {
             return request.getRemoteAddr();
         }
         return xfHeader.split(",")[0];
+    }
+
+    @GetMapping("/wiki/{slug}")
+    public ResponseEntity<?> getWikiMod(@PathVariable String slug) {
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        if (wikiApiKey != null && !wikiApiKey.isEmpty()) {
+            headers.setBearerAuth(wikiApiKey);
+        }
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(wikiApiUrl + "/mods/" + slug, HttpMethod.GET, entity, String.class);
+            return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+        } catch (Exception e) {
+            logger.error("Error proxying to Wiki API", e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Error fetching from Wiki API");
+        }
+    }
+
+    @GetMapping("/wiki/{slug}/{page}")
+    public ResponseEntity<?> getWikiPage(@PathVariable String slug, @PathVariable String page) {
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        if (wikiApiKey != null && !wikiApiKey.isEmpty()) {
+            headers.setBearerAuth(wikiApiKey);
+        }
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(wikiApiUrl + "/mods/" + slug + "/" + page, HttpMethod.GET, entity, String.class);
+            return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+        } catch (Exception e) {
+            logger.error("Error proxying to Wiki API", e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Error fetching from Wiki API");
+        }
     }
 
     @PutMapping("/projects/{id}/icon")
