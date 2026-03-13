@@ -33,7 +33,8 @@ const defaultImage = "https://modtale.net/assets/og-default.png";
 let image = propImage || defaultImage;
 
 if (initialData && initialData.id && initialData.classification) {
-    image = `${BACKEND_URL}/api/v1/og/project/${initialData.id}.png`;
+    const baseUrl = new URL(BACKEND_URL).origin;
+    image = `${baseUrl}/api/v1/og/project/${initialData.id}.png`;
 }
 
 const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
