@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { api, API_BASE_URL } from '../../../utils/api';
+import { Link } from 'react-router-dom';
 
 let scrollLockCount = 0;
 
@@ -315,13 +316,14 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                     <button onClick={onClose} className="px-5 py-2.5 font-bold text-slate-400 hover:bg-white/10 rounded-xl transition-colors text-sm">
                         Cancel
                     </button>
-                    <button
-                        onClick={handleDownload}
+                    <Link
+                        to="#"
+                        onClick={(e) => { e.preventDefault(); handleDownload(); }}
                         className="px-6 py-2.5 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-colors flex items-center gap-2 bg-modtale-accent hover:bg-modtale-accentHover text-white text-sm"
                     >
                         <Download className="w-4 h-4" />
                         {selected.size > 0 ? `Download (${selected.size})` : "Continue without Downloading"}
-                    </button>
+                    </Link>
                 </div>
             </div>
         </div>
@@ -459,8 +461,9 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
 
                     {latestVer ? (
                         <>
-                            <button
-                                onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies)}
+                            <Link
+                                to="#"
+                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies); }}
                                 className="w-full bg-modtale-accent hover:bg-modtale-accentHover text-white p-5 rounded-2xl shadow-lg shadow-modtale-accent/20 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden"
                             >
                                 <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
@@ -468,7 +471,7 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                                     v{latestVer.versionNumber}
                                     {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
                                 </div>
-                            </button>
+                            </Link>
 
                             <div className="relative mb-6">
                                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
@@ -494,7 +497,13 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                                                     <div className="text-xs text-slate-500">{formatTimeAgo(ver.releaseDate)}</div>
                                                 </div>
                                             </div>
-                                            <button onClick={() => onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies)} className="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-modtale-accent hover:bg-modtale-accent/10 transition-colors"><Download className="w-4 h-4" /></button>
+                                            <Link
+                                                to="#"
+                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies); }}
+                                                className="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-modtale-accent hover:bg-modtale-accent/10 transition-colors"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                            </Link>
                                         </div>
                                     ))}
                                 </div>
@@ -566,12 +575,13 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
                                                 <span className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> {(ver.downloadCount || 0).toLocaleString()}</span>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies)}
+                                        <Link
+                                            to="#"
+                                            onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies); }}
                                             className="px-4 py-2 bg-white/5 hover:bg-modtale-accent hover:text-white text-slate-300 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2"
                                         >
                                             <Download className="w-4 h-4" /> Download
-                                        </button>
+                                        </Link>
                                     </div>
 
                                     {ver.changelog ? (

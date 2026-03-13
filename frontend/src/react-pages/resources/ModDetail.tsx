@@ -1179,14 +1179,23 @@ export const ModDetail: React.FC<{
                 actionBar={
                     <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 w-full">
                         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full xl:w-auto">
-                            <button
-                                onClick={() => navigate(`${projectUrl}/download`)}
-                                disabled={!mod.versions || mod.versions.length === 0}
-                                className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
-                            >
-                                <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
-                                Download
-                            </button>
+                            {(!mod.versions || mod.versions.length === 0) ? (
+                                <button
+                                    disabled
+                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group cursor-not-allowed"
+                                >
+                                    <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
+                                    Download
+                                </button>
+                            ) : (
+                                <Link
+                                    to={`${projectUrl}/download`}
+                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
+                                >
+                                    <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
+                                    Download
+                                </Link>
+                            )}
 
                             <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-2"></div>
 
