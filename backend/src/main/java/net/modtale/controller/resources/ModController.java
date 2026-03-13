@@ -176,7 +176,8 @@ public class ModController {
                 ModVersion targetVersion = modService.findVersion(mod, version);
                 if (targetVersion == null) return ResponseEntity.notFound().build();
 
-                modService.incrementDownloadCount(mod.getId());
+                // Pass the specific version ID to increment its download count
+                modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
                 analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
                 if (targetVersion.getDependencies() != null) {
@@ -206,7 +207,8 @@ public class ModController {
             byte[] data = storageService.download(targetVersion.getFileUrl());
             ByteArrayResource resource = new ByteArrayResource(data);
 
-            modService.incrementDownloadCount(mod.getId());
+            // Pass the specific version ID to increment its download count
+            modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
             analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
             String originalPath = targetVersion.getFileUrl();
@@ -261,7 +263,7 @@ public class ModController {
                 ModVersion targetVersion = modService.findVersion(mod, version);
                 if (targetVersion == null) return ResponseEntity.notFound().build();
 
-                modService.incrementDownloadCount(mod.getId());
+                modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
                 analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
                 if (targetVersion.getDependencies() != null) {
@@ -291,7 +293,7 @@ public class ModController {
             byte[] data = storageService.download(targetVersion.getFileUrl());
             ByteArrayResource resource = new ByteArrayResource(data);
 
-            modService.incrementDownloadCount(mod.getId());
+            modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
             analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
             String originalPath = targetVersion.getFileUrl();
