@@ -461,42 +461,46 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     return (
         <>
             {modData?.status === 'PENDING' && (
-                <div className="bg-blue-500/10 border-b border-blue-500/20 px-8 py-3 flex items-center justify-between backdrop-blur-sm sticky top-0 z-50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                            <Clock className="w-5 h-5 text-blue-500" />
+                <div className="bg-blue-500/10 border-b border-blue-500/20 backdrop-blur-sm sticky top-0 z-50">
+                    <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                <Clock className="w-5 h-5 text-blue-500" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-blue-500 leading-tight">Pending Verification</div>
+                                <div className="text-[10px] text-blue-500/80 font-bold uppercase tracking-wide">Project is read-only</div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="font-bold text-blue-500 leading-tight">Pending Verification</div>
-                            <div className="text-[10px] text-blue-500/80 font-bold uppercase tracking-wide">Project is read-only</div>
-                        </div>
+                        {handleRevert && (
+                            <button onClick={handleRevert} disabled={isLoading} className="bg-blue-500 hover:bg-blue-600 text-white w-40 h-9 rounded-lg text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                                {isLoading ? <Spinner className="w-3 h-3 text-white"/> : <Edit2 className="w-3 h-3"/>}
+                                Revert to Draft
+                            </button>
+                        )}
                     </div>
-                    {handleRevert && (
-                        <button onClick={handleRevert} disabled={isLoading} className="bg-blue-500 hover:bg-blue-600 text-white w-40 h-9 rounded-lg text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
-                            {isLoading ? <Spinner className="w-3 h-3 text-white"/> : <Edit2 className="w-3 h-3"/>}
-                            Revert to Draft
-                        </button>
-                    )}
                 </div>
             )}
 
             {modData?.status === 'ARCHIVED' && (
-                <div className="bg-slate-800 border-b border-slate-700 px-8 py-3 flex items-center justify-between backdrop-blur-sm sticky top-0 z-50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                            <Archive className="w-5 h-5 text-slate-400" />
+                <div className="bg-slate-800 border-b border-slate-700 backdrop-blur-sm sticky top-0 z-50">
+                    <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                                <Archive className="w-5 h-5 text-slate-400" />
+                            </div>
+                            <div>
+                                <div className="font-bold text-slate-300 leading-tight">Archived</div>
+                                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Project is read-only</div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="font-bold text-slate-300 leading-tight">Archived</div>
-                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Project is read-only</div>
-                        </div>
+                        {handleRestore && (
+                            <button onClick={handleRestore} disabled={isLoading} className="bg-slate-700 hover:bg-slate-600 text-white w-40 h-9 rounded-lg text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                                {isLoading ? <Spinner className="w-3 h-3 text-white"/> : <RefreshCw className="w-3 h-3"/>}
+                                Restore Project
+                            </button>
+                        )}
                     </div>
-                    {handleRestore && (
-                        <button onClick={handleRestore} disabled={isLoading} className="bg-slate-700 hover:bg-slate-600 text-white w-40 h-9 rounded-lg text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
-                            {isLoading ? <Spinner className="w-3 h-3 text-white"/> : <RefreshCw className="w-3 h-3"/>}
-                            Restore Project
-                        </button>
-                    )}
                 </div>
             )}
 
