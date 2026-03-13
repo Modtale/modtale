@@ -55,8 +55,9 @@ export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void;
     if (!isOpen) return null;
 
     const isWorld = classification === 'SAVE';
+    const isModpack = classification === 'MODPACK';
     const folderName = isWorld ? 'Saves' : 'Mods';
-    const typeName = isWorld ? 'World' : classification === 'MODPACK' ? 'Modpack' : 'Mod';
+    const typeName = isWorld ? 'World' : isModpack ? 'Modpack' : 'Mod';
 
     const paths = {
         windows: `C:\\Program Files\\Hypixel Studios\\Hytale Launcher\\UserData\\${folderName}`,
@@ -117,7 +118,12 @@ export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void;
                         <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                             <div className="w-8 h-8 rounded-full bg-modtale-accent/20 text-modtale-accent font-black flex items-center justify-center shrink-0 shadow-inner">2</div>
                             <div className="w-full min-w-0 pt-1.5">
-                                <p className="mb-3">Move or extract the file to your Hytale {folderName} directory:</p>
+                                <p className="mb-3">
+                                    {isModpack
+                                        ? `Unzip the downloaded file and place its contents into your Hytale ${folderName} directory:`
+                                        : `Move or extract the file to your Hytale ${folderName} directory:`
+                                    }
+                                </p>
                                 <div className="flex items-center gap-3 bg-black/50 border border-white/10 rounded-xl p-2 pl-3">
                                     <code className="flex-1 font-mono text-[11px] text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
                                     <button
@@ -140,13 +146,15 @@ export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void;
                 </div>
 
                 <div className="p-5 border-t border-white/5 bg-white/[0.02] flex justify-between items-center shrink-0">
-                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                    <button
+                        onClick={() => setDontShow(!dontShow)}
+                        className="flex items-center gap-2.5 cursor-pointer group"
+                    >
                         <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shadow-inner ${dontShow ? 'bg-modtale-accent border-modtale-accent' : 'bg-black/30 border-white/10 group-hover:border-white/30'}`}>
                             {dontShow && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
                         </div>
                         <span className="text-xs font-bold text-slate-400 group-hover:text-slate-300 transition-colors select-none uppercase tracking-wider">Don't show again</span>
-                        <input type="checkbox" className="hidden" checked={dontShow} onChange={(e) => setDontShow(e.target.checked)} />
-                    </label>
+                    </button>
                     <button
                         onClick={handleClose}
                         className="px-8 py-2.5 rounded-xl font-black bg-white text-slate-900 hover:bg-slate-200 transition-colors shadow-lg active:scale-95 text-sm"
