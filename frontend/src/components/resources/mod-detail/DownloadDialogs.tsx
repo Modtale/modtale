@@ -562,6 +562,8 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
                                                 <span>{formatTimeAgo(ver.releaseDate)}</span>
                                                 <span className="w-1 h-1 rounded-full bg-slate-600"></span>
                                                 <span>{ver.gameVersions?.join(', ')}</span>
+                                                <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                                                <span className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> {(ver.downloadCount || 0).toLocaleString()}</span>
                                             </div>
                                         </div>
                                         <button
