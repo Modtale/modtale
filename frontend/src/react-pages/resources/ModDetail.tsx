@@ -23,8 +23,8 @@ import { useSSRData } from '../../context/SSRContext';
 import NotFound from '../../components/ui/error/NotFound';
 import { Spinner } from '../../components/ui/Spinner';
 import { compareSemVer, formatTimeAgo, DiscordIcon, getLicenseInfo, getClassificationIcon, toTitleCase } from '../../utils/modHelpers';
-import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
-import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
+import { DependencyModal, DownloadModal, HistoryModal, PostDownloadModal } from '@/components/resources/mod-detail/DownloadDialogs';
+import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout';
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
 import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
@@ -629,6 +629,7 @@ export const ModDetail: React.FC<{
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [pendingDownloadVer, setPendingDownloadVer] = useState<{url: string, ver: string, deps: any[]} | null>(null);
+    const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
 
     const isWikiRoute = location.pathname.includes('/wiki');
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
@@ -912,7 +913,10 @@ export const ModDetail: React.FC<{
                     onDownload(mod.id);
                 }
                 setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
-                setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+
+                if (localStorage.getItem('hideInstallInstructions') !== 'true') {
+                    setShowPostDownloadModal(true);
+                }
 
                 if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
                 return;
@@ -927,7 +931,10 @@ export const ModDetail: React.FC<{
                 onDownload(mod.id);
             }
             setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
-            setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+
+            if (localStorage.getItem('hideInstallInstructions') !== 'true') {
+                setShowPostDownloadModal(true);
+            }
 
             if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
         } catch (error) {
@@ -993,6 +1000,13 @@ export const ModDetail: React.FC<{
 
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />
+
+            <PostDownloadModal
+                isOpen={showPostDownloadModal}
+                onClose={() => setShowPostDownloadModal(false)}
+                classification={mod.classification}
+                title={mod.title}
+            />
 
             <ReportModal
                 isOpen={!!reportTarget}
@@ -1165,13 +1179,14 @@ export const ModDetail: React.FC<{
                 actionBar={
                     <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 w-full">
                         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full xl:w-auto">
-                            <Link
-                                to={`${projectUrl}/download`}
-                                className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
+                            <button
+                                onClick={() => initiateDownload(mod.versions[0]?.fileUrl, mod.versions[0]?.versionNumber, mod.versions[0]?.dependencies)}
+                                disabled={!mod.versions || mod.versions.length === 0}
+                                className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
                             >
                                 <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
                                 Download
-                            </Link>
+                            </button>
 
                             <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-2"></div>
 
