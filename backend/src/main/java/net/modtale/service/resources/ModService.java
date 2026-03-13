@@ -141,9 +141,9 @@ public class ModService {
     private final Map<String, Bucket> modpackGenBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> rescanBuckets = new ConcurrentHashMap<>();
 
-    // Batch metrics handling
     private final ConcurrentHashMap<String, Integer> pendingDownloadIncrements = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> pendingFavoriteIncrements = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> pendingVersionDownloadIncrements = new ConcurrentHashMap<>();
 
     private boolean isAdmin(User user) {
         return user != null && user.getRoles() != null && user.getRoles().contains("ADMIN");
@@ -442,12 +442,10 @@ public class ModService {
                 for (Comment c : mod.getComments()) {
                     if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
                         if (c.getUserId() != null) userIdsToFetch.add(c.getUserId());
-                        else if (c.getUser() != null) usernamesToFetch.add(c.getUser());
                     }
                     if (c.getDeveloperReply() != null) {
                         if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
                             if (c.getDeveloperReply().getUserId() != null) userIdsToFetch.add(c.getDeveloperReply().getUserId());
-                            else if (c.getDeveloperReply().getUser() != null) usernamesToFetch.add(c.getDeveloperReply().getUser());
                         }
                     }
                 }
@@ -463,12 +461,10 @@ public class ModService {
                         }
 
                         Map<String, String> avatarMapById = new HashMap<>();
-                        Map<String, String> avatarMapByName = new HashMap<>();
 
                         for (User u : users) {
                             if (u.getAvatarUrl() != null) {
                                 avatarMapById.put(u.getId(), u.getAvatarUrl());
-                                avatarMapByName.put(u.getUsername().toLowerCase(), u.getAvatarUrl());
                             }
                         }
 
@@ -476,7 +472,6 @@ public class ModService {
                             if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
                                 String avatar = null;
                                 if (c.getUserId() != null) avatar = avatarMapById.get(c.getUserId());
-                                else if (c.getUser() != null) avatar = avatarMapByName.get(c.getUser().toLowerCase());
 
                                 if (avatar != null && !avatar.isEmpty()) c.setUserAvatarUrl(avatar);
                             }
@@ -484,7 +479,6 @@ public class ModService {
                                 if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
                                     String avatar = null;
                                     if (c.getDeveloperReply().getUserId() != null) avatar = avatarMapById.get(c.getDeveloperReply().getUserId());
-                                    else if (c.getDeveloperReply().getUser() != null) avatar = avatarMapByName.get(c.getDeveloperReply().getUser().toLowerCase());
 
                                     if (avatar != null && !avatar.isEmpty()) c.getDeveloperReply().setUserAvatarUrl(avatar);
                                 }
@@ -1873,7 +1867,14 @@ public class ModService {
     }
 
     public void incrementDownloadCount(String modId) {
+        incrementDownloadCount(modId, null);
+    }
+
+    public void incrementDownloadCount(String modId, String versionId) {
         pendingDownloadIncrements.merge(modId, 1, Integer::sum);
+        if (versionId != null) {
+            pendingVersionDownloadIncrements.merge(modId + "|||" + versionId, 1, Integer::sum);
+        }
     }
 
     public void incrementDownloadCountByFileUrl(String fileUrl) {
@@ -1886,8 +1887,15 @@ public class ModService {
         }
         if (modOpt.isPresent()) {
             Mod mod = modOpt.get();
-            incrementDownloadCount(mod.getId());
-            analyticsService.logDownload(mod.getId(), null, mod.getAuthor(), false, "internal");
+            String versionId = null;
+            for (ModVersion v : mod.getVersions()) {
+                if (fileUrl.equals(v.getFileUrl()) || (v.getFileUrl() != null && v.getFileUrl().endsWith(fileUrl))) {
+                    versionId = v.getId();
+                    break;
+                }
+            }
+            incrementDownloadCount(mod.getId(), versionId);
+            analyticsService.logDownload(mod.getId(), versionId, mod.getAuthor(), false, "internal");
         }
     }
 
@@ -1914,7 +1922,7 @@ public class ModService {
 
     @Scheduled(fixedDelayString = "${app.metrics.flush-rate:60000}") // Runs every minute
     public void flushMetricsToDatabase() {
-        if (pendingDownloadIncrements.isEmpty() && pendingFavoriteIncrements.isEmpty()) {
+        if (pendingDownloadIncrements.isEmpty() && pendingFavoriteIncrements.isEmpty() && pendingVersionDownloadIncrements.isEmpty()) {
             return;
         }
 
@@ -1934,7 +1942,15 @@ public class ModService {
             favIterator.remove();
         }
 
-        if (!downloadsToFlush.isEmpty() || !favoritesToFlush.isEmpty()) {
+        Map<String, Integer> versionDownloadsToFlush = new HashMap<>();
+        Iterator<Map.Entry<String, Integer>> vDlIterator = pendingVersionDownloadIncrements.entrySet().iterator();
+        while (vDlIterator.hasNext()) {
+            Map.Entry<String, Integer> entry = vDlIterator.next();
+            versionDownloadsToFlush.put(entry.getKey(), entry.getValue());
+            vDlIterator.remove();
+        }
+
+        if (!downloadsToFlush.isEmpty() || !favoritesToFlush.isEmpty() || !versionDownloadsToFlush.isEmpty()) {
             BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Mod.class);
             Set<String> allIdsToEvict = new HashSet<>();
 
@@ -1956,6 +1972,17 @@ public class ModService {
                 allIdsToEvict.add(modId);
             }
 
+            for (Map.Entry<String, Integer> entry : versionDownloadsToFlush.entrySet()) {
+                String[] parts = entry.getKey().split("\\|\\|\\|");
+                String mId = parts[0];
+                String vId = parts[1];
+
+                Query query = new Query(Criteria.where("_id").is(mId).and("versions._id").is(vId));
+                Update update = new Update().inc("versions.$.downloadCount", entry.getValue());
+                bulkOps.updateOne(query, update);
+                allIdsToEvict.add(mId);
+            }
+
             try {
                 bulkOps.execute();
 
@@ -1967,6 +1994,7 @@ public class ModService {
                 logger.error("Failed to bulk flush metrics to database", e);
                 downloadsToFlush.forEach((k, v) -> pendingDownloadIncrements.merge(k, v, Integer::sum));
                 favoritesToFlush.forEach((k, v) -> pendingFavoriteIncrements.merge(k, v, Integer::sum));
+                versionDownloadsToFlush.forEach((k, v) -> pendingVersionDownloadIncrements.merge(k, v, Integer::sum));
             }
         }
     }
@@ -2123,7 +2151,6 @@ public class ModService {
             User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
             Comment comment = new Comment(user.getId(), user.getAvatarUrl(), sanitizer.sanitizePlainText(content));
-            comment.setUser(user.getUsername()); // legacy format
 
             if (mod.getComments() == null) mod.setComments(new ArrayList<>());
             mod.getComments().add(0, comment);
@@ -2155,11 +2182,6 @@ public class ModService {
             boolean isOwner = false;
             if (comment.getUserId() != null) {
                 isOwner = comment.getUserId().equals(userId);
-            } else if (comment.getUser() != null) {
-                User u = userRepository.findById(userId).orElse(null);
-                if (u != null) {
-                    isOwner = comment.getUser().equalsIgnoreCase(u.getUsername());
-                }
             }
 
             if (!isOwner) {
@@ -2185,9 +2207,8 @@ public class ModService {
                     boolean isCommentOwner = false;
                     if (c.getUserId() != null) {
                         isCommentOwner = c.getUserId().equals(userId);
-                    } else if (c.getUser() != null) {
-                        isCommentOwner = c.getUser().equalsIgnoreCase(user.getUsername());
                     }
+
                     if(!isCommentOwner && !isModOwner) {
                         throw new SecurityException("Permission denied.");
                     }
