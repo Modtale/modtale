@@ -66,38 +66,35 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
     const projectUrl = `/${mod.classification === 'MODPACK' ? 'modpack' : mod.classification === 'SAVE' ? 'world' : 'mod'}/${createSlug(mod.title, mod.id)}`;
 
     return (
-        <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent ring-1 ring-black/[0.02] dark:ring-white/[0.02]">
+        <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent">
             <Link
                 to={projectUrl}
                 className="absolute inset-0 z-30 focus:outline-none"
                 aria-label={`Download ${mod.title} Hytale Mod`}
             />
 
-            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0 ${!bannerUrl ? 'bg-slate-800' : 'bg-white dark:bg-slate-900'}`}>
+            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0 ${bannerUrl ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {bannerUrl ? (
                     <OptimizedImage
                         src={bannerUrl}
                         alt={`${mod.title} Banner`}
-                        baseWidth={320}
+                        baseWidth={400}
                         priority={priority}
-                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
+                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent"
                     />
                 ) : (
-                    <>
-                        <div className="w-full h-full bg-slate-200/30 dark:bg-slate-700/30" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent" />
-                    </>
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent pointer-events-none" />
                 )}
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-16 h-16 rounded-2xl absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 bg-transparent">
+                <div className="w-16 h-16 rounded-2xl absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
                     <OptimizedImage
                         src={iconUrl}
                         alt={`${mod.title} Icon`}
                         baseWidth={64}
                         priority={priority}
-                        className="w-full h-full"
+                        className="w-full h-full bg-transparent"
                     />
                 </div>
 
@@ -109,7 +106,7 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
                         <span>By</span>
                         <Link
                             to={`/creator/${mod.author}`}
-                            className="relative z-40 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate"
+                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-40"
                             aria-label={`View profile for ${mod.author}`}
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -127,7 +124,7 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
 };
 
 const MarqueeColumn = ({ mods, duration }: { mods: Mod[], duration: string }) => (
-    <div className="flex flex-col w-[320px] shrink-0">
+    <div className="flex flex-col w-[380px] shrink-0">
         <div className="flex flex-col gap-6 animate-marquee-up will-change-transform" style={{ '--marquee-duration': duration } as any}>
             {[...mods, ...mods].map((mod, index) => (
                 <FeaturedModCard key={`${mod.id}-${index}`} mod={mod} priority={index < 2} />
@@ -547,7 +544,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         {displayFeaturedMods.length > 0 && (
                             <div className="relative hidden md:block w-full min-h-[600px] lg:min-h-[750px]">
                                 <aside
-                                    className="absolute inset-0 flex gap-10 justify-end overflow-hidden w-full animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
+                                    className="absolute -inset-x-8 inset-y-0 px-8 flex gap-10 justify-end overflow-hidden animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
                                     style={{
                                         maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
                                         WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
