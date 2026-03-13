@@ -211,7 +211,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                     )}
                 </div>
 
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 via-slate-50/60 dark:via-slate-950/60 to-transparent md:to-black/30 z-10 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10 pointer-events-none" />
 
                 {onBack && (
                     <div className={`absolute top-0 left-0 right-0 z-40 mx-auto w-full ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
