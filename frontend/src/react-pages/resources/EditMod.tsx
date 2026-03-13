@@ -125,7 +125,9 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 links: formData.links,
                 repositoryUrl: formData.repositoryUrl,
                 license: formData.license,
-                allowModpacks: currentProject.allowModpacks
+                allowModpacks: currentProject.allowModpacks,
+                hmWikiEnabled: currentProject.hmWikiEnabled,
+                hmWikiSlug: currentProject.hmWikiSlug
             };
 
             await api.put(`/projects/${currentProject.id}`, body);

@@ -160,7 +160,9 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 repositoryUrl: metaData.repositoryUrl,
                 license: metaData.license,
                 allowModpacks: modData?.allowModpacks,
-                slug: metaData.slug
+                slug: metaData.slug,
+                hmWikiEnabled: modData?.hmWikiEnabled,
+                hmWikiSlug: modData?.hmWikiSlug
             };
             await api.put(`/projects/${draftId}`, body);
 
