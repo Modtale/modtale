@@ -129,7 +129,9 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                         <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900" />
                     )}
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 via-slate-50/60 dark:via-slate-950/60 to-transparent z-10" />
+
+                {/* Fade stop starts 12rem (h-48) from bottom, covering the md:-mt-32 glass overlap area */}
+                <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10 pointer-events-none" />
 
                 {onBack && (
                     <div className={`absolute top-0 left-0 right-0 z-40 mx-auto ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
@@ -169,14 +171,14 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/5 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
-                                <label className={`block w-32 h-32 rounded-2xl bg-slate-200 dark:bg-black/20 shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-32 h-32 rounded-2xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
                                             alt="Icon"
                                             baseWidth={128}
-                                            className="w-full h-full"
+                                            className="w-full h-full bg-transparent"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
@@ -192,7 +194,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
-                                <label className={`block w-56 h-56 rounded-[2.5rem] bg-slate-200 dark:bg-black/20 shadow-xl border-[8px] border-white dark:border-slate-800 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-56 h-56 rounded-[2.5rem] bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
                                         <OptimizedImage
@@ -200,7 +202,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             alt="Icon"
                                             baseWidth={224}
                                             priority={true}
-                                            className="w-full h-full"
+                                            className="w-full h-full bg-transparent"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
