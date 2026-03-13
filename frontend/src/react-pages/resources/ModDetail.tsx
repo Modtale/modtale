@@ -474,7 +474,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                     const authorId = (comment as any).userId;
                     const authorUsername = authorId && userProfiles[authorId] ? userProfiles[authorId].username : (comment.user || 'Unknown');
                     const authorAvatar = authorId && userProfiles[authorId] ? userProfiles[authorId].avatarUrl : comment.userAvatarUrl;
-                    const profileLink = `/creator/${authorId || comment.user}`;
+                    const profileLink = `/creator/${authorUsername}`;
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === comment.user);
 
                     return (
@@ -548,7 +548,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                 const replyId = (comment.developerReply as any).userId;
                                 const replyUsername = replyId && userProfiles[replyId] ? userProfiles[replyId].username : (comment.developerReply.user || 'Developer');
                                 const replyAvatar = replyId && userProfiles[replyId] ? userProfiles[replyId].avatarUrl : comment.developerReply.userAvatarUrl;
-                                const replyProfileLink = `/creator/${replyId || comment.developerReply.user}`;
+                                const replyProfileLink = `/creator/${replyUsername || comment.developerReply.user}`;
 
                                 return (
                                     <div className="mt-6 ml-6 md:ml-12 pl-6 border-l-2 border-slate-200 dark:border-white/10 relative">
@@ -1153,7 +1153,7 @@ export const ModDetail: React.FC<{
 
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
-                                <span>by <Link to={`/creator/${mod.authorId || mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
+                                <span>by <Link to={`/creator/${mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
                                 {currentUser && currentUser.id !== mod.authorId && (
                                     <button
                                         onClick={handleFollowToggle}
