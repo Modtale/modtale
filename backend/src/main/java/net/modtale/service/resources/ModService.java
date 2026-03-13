@@ -2215,7 +2215,6 @@ public class ModService {
                     .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
             Comment.Reply reply = new Comment.Reply(user.getId(), user.getAvatarUrl(), sanitizer.sanitizePlainText(replyContent));
-            reply.setUser(user.getUsername()); // legacy format
 
             comment.setDeveloperReply(reply);
 
@@ -2225,8 +2224,6 @@ public class ModService {
             User commenter = null;
             if (comment.getUserId() != null) {
                 commenter = userRepository.findById(comment.getUserId()).orElse(null);
-            } else if (comment.getUser() != null) {
-                commenter = userRepository.findByUsernameIgnoreCase(comment.getUser()).orElse(null);
             }
 
             if (commenter != null) {

@@ -5,7 +5,6 @@ import java.util.UUID;
 public class Comment {
     private String id;
     private String userId;
-    private String user;
     private String userAvatarUrl;
     private String content;
     private String date;
@@ -25,7 +24,6 @@ public class Comment {
 
     public static class Reply {
         private String userId;
-        private String user;
         private String userAvatarUrl;
         private String content;
         private String date;
@@ -41,8 +39,6 @@ public class Comment {
 
         public String getUserId() { return userId; }
         public void setUserId(String userId) { this.userId = userId; }
-        public String getUser() { return user; }
-        public void setUser(String user) { this.user = user; }
         public String getUserAvatarUrl() { return userAvatarUrl; }
         public void setUserAvatarUrl(String userAvatarUrl) { this.userAvatarUrl = userAvatarUrl; }
         public String getContent() { return content; }
@@ -55,8 +51,6 @@ public class Comment {
     public void setId(String id) { this.id = id; }
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
-    public String getUser() { return user; }
-    public void setUser(String user) { this.user = user; }
     public String getUserAvatarUrl() { return userAvatarUrl; }
     public void setUserAvatarUrl(String userAvatarUrl) { this.userAvatarUrl = userAvatarUrl; }
     public String getContent() { return content; }
