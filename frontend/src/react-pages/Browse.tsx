@@ -74,22 +74,22 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
     const currentLabel = options.find(o => o.id === value)?.label || 'Sort';
 
     return (
-        <div className="relative w-full md:w-auto" ref={containerRef}>
+        <div className="relative flex-1 md:flex-none w-full md:w-auto" ref={containerRef}>
             <button
                 onClick={handleToggle}
                 aria-label="Sort options"
-                className={`w-full md:w-auto h-10 flex items-center justify-between gap-2 border rounded-xl px-4 text-xs md:text-sm font-bold transition-all whitespace-nowrap min-w-[130px] shadow-sm ${
+                className={`w-full md:w-auto h-10 flex items-center justify-center md:justify-between gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap md:min-w-[130px] shadow-sm ${
                     isOpen
                         ? 'bg-modtale-accent text-white border-transparent'
                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02]'
                 }`}
             >
                 <span className="truncate">{currentLabel}</span>
-                <ChevronDown className={`w-4 h-4 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180 text-white' : 'text-slate-400'}`} />
+                <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180 text-white' : 'text-slate-400'}`} />
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl py-2 z-[70] animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-[240px] sm:w-64 md:w-48 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl py-2 z-[70] animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
                     <div className="px-4 py-2 mb-1 border-b border-slate-100 dark:border-white/5">
                         <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Sort By</span>
                     </div>
@@ -246,37 +246,70 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     ].filter(Boolean).length;
 
     return (
-        <div className="w-full flex flex-col gap-3 relative z-40">
-            <div className="md:hidden w-full">
-                <div className="relative group w-full h-10">
+        <div className="w-full flex flex-col gap-3 relative z-40 min-w-0">
+            <div className="md:hidden flex items-center gap-2 w-full">
+                <div className="relative group flex-1 h-10 min-w-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10 pointer-events-none group-focus-within:text-modtale-accent transition-colors" />
                     <input
                         type="text"
-                        className="block w-full pl-9 pr-3 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white relative z-0"
+                        className="block w-full pl-9 pr-9 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white relative z-0"
                         placeholder="Search projects..."
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
                         aria-label="Mobile search"
                     />
+                    {searchTerm && (
+                        <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 z-20" aria-label="Clear search">
+                            <X className="w-4 h-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" />
+                        </button>
+                    )}
+                </div>
+                <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
+                    <button
+                        onClick={() => onViewStyleChange('grid')}
+                        className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                        title="Grid View"
+                    >
+                        <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => onViewStyleChange('list')}
+                        className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'list' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                        title="List View"
+                    >
+                        <List className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => onViewStyleChange('compact')}
+                        className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'compact' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                        title="Compact View"
+                    >
+                        <AlignJustify className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
-                <div className="flex items-center gap-4 w-full md:w-auto min-w-0 flex-1">
-                    {categoryPills ? categoryPills : (
-                        <div className="hidden md:block shrink-0">
-                            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm">{pageTitle}</h1>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full min-w-0">
+
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                    {categoryPills ? (
+                        <div className="min-w-0 max-w-full">
+                            {categoryPills}
+                        </div>
+                    ) : (
+                        <div className="hidden md:block shrink-0 min-w-0">
+                            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm truncate">{pageTitle}</h1>
                         </div>
                     )}
-                    <div className="hidden lg:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
-                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide block drop-shadow-sm">
+                    <div className="hidden xl:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide block drop-shadow-sm whitespace-nowrap">
                             {loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}
                         </span>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 w-full md:w-auto shrink-0">
-                    <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm">
+                <div className="flex items-center justify-start md:justify-end gap-2 shrink-0">
+                    <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
                         <button
                             onClick={() => onViewStyleChange('grid')}
                             className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
@@ -303,13 +336,13 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </button>
                     </div>
 
-                    <div className="relative flex-1 md:flex-none shrink-0 h-10" ref={tagRef}>
-                        <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-between md:justify-start gap-2 border rounded-xl px-3 md:px-4 text-xs md:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
-                            <div className="flex items-center gap-2 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
+                    <div className="relative flex-1 md:flex-none h-10" ref={tagRef}>
+                        <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                            <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
                             {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{selectedTags.length}</span>}
                         </button>
                         {isTagsOpen && (
-                            <div className="absolute right-0 md:left-0 top-full mt-2 w-[calc(100vw-2rem)] md:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute left-0 md:left-auto top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</span>
                                     {selectedTags.length > 0 && <button onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
@@ -326,14 +359,14 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         )}
                     </div>
 
-                    <div className="relative flex-1 md:flex-none shrink-0 h-10" ref={filterRef}>
-                        <button onClick={onToggleFilterMenu} className={`w-full md:w-auto h-full flex items-center justify-between md:justify-start gap-2 border rounded-xl px-3 md:px-4 text-xs md:text-sm font-bold transition-all ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
-                            <div className="flex items-center gap-2 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
+                    <div className="relative flex-1 md:flex-none h-10" ref={filterRef}>
+                        <button onClick={onToggleFilterMenu} className={`w-full h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                            <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
                             {displayFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{displayFilterCount}</span>}
                         </button>
 
                         {isFilterOpen && (
-                            <div className="absolute right-0 md:right-0 md:translate-x-0 top-full mt-2 w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute right-0 top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
                                 <div className="p-4 border-b border-slate-200 dark:border-white/10">
                                     <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
                                 </div>
@@ -412,7 +445,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     </div>
 
                     {isDownloadSort && (
-                        <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0 shadow-sm">
+                        <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0 shadow-sm">
                             {[
                                 { label: '7d', val: 7 },
                                 { label: '30d', val: 30 },
@@ -430,15 +463,13 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </div>
                     )}
 
-                    <div className="flex-1 md:flex-none shrink-0 h-10">
-                        <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
-                    </div>
+                    <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
                 </div>
             </div>
 
             {isDownloadSort && (
-                <div className="md:hidden mt-3 flex justify-center h-10">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full max-w-xs justify-between shadow-sm">
+                <div className="md:hidden flex justify-center h-10 w-full">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full max-w-md justify-between shadow-sm">
                         {[
                             { label: '7 Days', val: 7 },
                             { label: '30 Days', val: 30 },
@@ -449,6 +480,27 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                 key={opt.label}
                                 onClick={() => handleDownloadTimeframe(opt.val)}
                                 className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {isDownloadSort && (
+                <div className="hidden md:flex lg:hidden justify-end h-10 w-full">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex items-center animate-in fade-in slide-in-from-right-4 duration-200 shadow-sm">
+                        {[
+                            { label: '7d', val: 7 },
+                            { label: '30d', val: 30 },
+                            { label: '90d', val: 90 },
+                            { label: 'All', val: 0 }
+                        ].map((opt) => (
+                            <button
+                                key={opt.label}
+                                onClick={() => handleDownloadTimeframe(opt.val)}
+                                className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
                             >
                                 {opt.label}
                             </button>
@@ -502,36 +554,46 @@ const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All'
         if (!navContainerRef.current) return;
         const { scrollLeft, scrollWidth, clientWidth } = navContainerRef.current;
         setShowLeftFade(scrollLeft > 0);
-        setShowRightFade(scrollLeft + clientWidth < scrollWidth - 1);
+        setShowRightFade(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 1);
     }, []);
 
     useLayoutEffect(() => {
         calculatePillPosition();
         checkScroll();
-        const timer = setTimeout(() => { calculatePillPosition(); checkScroll(); }, 100);
-        window.addEventListener('resize', calculatePillPosition);
-        window.addEventListener('resize', checkScroll);
 
         const nav = navContainerRef.current;
-        if(nav) nav.addEventListener('scroll', checkScroll);
+        if (!nav) return;
+
+        const resizeObserver = new ResizeObserver(() => {
+            calculatePillPosition();
+            checkScroll();
+        });
+
+        resizeObserver.observe(nav);
+        nav.addEventListener('scroll', checkScroll);
+
+        const timer = setTimeout(() => {
+            calculatePillPosition();
+            checkScroll();
+        }, 150);
 
         return () => {
             clearTimeout(timer);
-            window.removeEventListener('resize', calculatePillPosition);
-            window.removeEventListener('resize', checkScroll);
-            if(nav) nav.removeEventListener('scroll', checkScroll);
+            resizeObserver.disconnect();
+            nav.removeEventListener('scroll', checkScroll);
         };
     }, [calculatePillPosition, checkScroll]);
 
     return (
-        <div className="relative group flex-shrink-0 max-w-full flex items-center">
+        <div className="relative group min-w-0 max-w-full inline-flex items-center align-middle">
             <div className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-50/80 via-slate-50/80 to-transparent dark:from-[#0B1120]/80 dark:via-[#0B1120]/80 pointer-events-none z-30 transition-opacity duration-300 ${showLeftFade ? 'opacity-100' : 'opacity-0'}`} />
             <div className={`absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-50/80 via-slate-50/80 to-transparent dark:from-[#0B1120]/80 dark:via-[#0B1120]/80 pointer-events-none z-30 transition-opacity duration-300 ${showRightFade ? 'opacity-100' : 'opacity-0'}`} />
 
             <div ref={navContainerRef} className="relative inline-flex h-11 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-white/10 max-w-full overflow-x-auto snap-x scrollbar-hide z-10 shadow-sm" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 <style>{` .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
                 <div className="absolute top-1 bottom-1 bg-modtale-accent shadow-md rounded-xl transition-all duration-300 ease-out z-0" style={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.opacity }} />
-                <div className="flex relative z-10 h-full">
+
+                <div className="flex relative z-10 h-full w-max">
                     {PROJECT_TYPES.map((type, index) => {
                         const Icon = type.icon;
                         const isSelected = selectedClassification === type.id;
@@ -590,7 +652,6 @@ export const Browse: React.FC<BrowseProps> = ({
     const urlSearchTerm = searchParams.get('q') || '';
 
     const pageParam = searchParams.get('page');
-    const styleParam = searchParams.get('style');
     const hasComplexParams =
         searchParams.has('q') ||
         searchParams.has('tags') ||
@@ -598,26 +659,18 @@ export const Browse: React.FC<BrowseProps> = ({
         searchParams.has('minDl') ||
         searchParams.has('minFav') ||
         searchParams.has('date') ||
-        (pageParam !== null && parseInt(pageParam, 10) > 0) ||
-        (styleParam !== null && styleParam !== 'grid');
+        (pageParam !== null && parseInt(pageParam, 10) > 0);
 
     const initialData = typeof window !== 'undefined' ? (window as any).INITIAL_DATA : null;
     const useSSRData = initialData?.browseData && !hasComplexParams;
 
-    const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>('grid');
-
-    useEffect(() => {
+    const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>(() => {
         if (typeof window !== 'undefined') {
             const savedStyle = localStorage.getItem('modtale_view_style') as 'grid' | 'list' | 'compact';
-            const urlStyle = searchParams.get('style') as 'grid' | 'list' | 'compact';
-
-            if (urlStyle && ['grid', 'list', 'compact'].includes(urlStyle)) {
-                setViewStyle(urlStyle);
-            } else if (savedStyle && ['grid', 'list', 'compact'].includes(savedStyle)) {
-                setViewStyle(savedStyle);
-            }
+            if (savedStyle && ['grid', 'list', 'compact'].includes(savedStyle)) return savedStyle;
         }
-    }, [searchParams]);
+        return 'grid';
+    });
 
     const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
 
@@ -862,10 +915,11 @@ export const Browse: React.FC<BrowseProps> = ({
 
     const handleViewStyleChange = useCallback((style: 'grid' | 'list' | 'compact') => {
         setViewStyle(style);
-        localStorage.setItem('modtale_view_style', style);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('modtale_view_style', style);
+        }
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
-            next.set('style', style);
             next.set('page', '0');
             return next;
         });
@@ -941,7 +995,12 @@ export const Browse: React.FC<BrowseProps> = ({
                         <div className="mb-6">
                             <div className="relative group h-11">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none z-10 group-focus-within:text-modtale-accent transition-colors" />
-                                <input type="text" className="block w-full pl-9 pr-3 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white transition-all relative z-0" aria-label="Quick search" placeholder="Search projects..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                <input type="text" className="block w-full pl-9 pr-9 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white transition-all relative z-0" aria-label="Quick search" placeholder="Search projects..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                {searchTerm && (
+                                    <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 z-20" aria-label="Clear search">
+                                        <X className="w-4 h-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
@@ -960,7 +1019,7 @@ export const Browse: React.FC<BrowseProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-[500px]" ref={cardsSectionRef}>
+                    <div className="flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>
                         <div className="sticky top-24 z-50 mb-4 bg-slate-50/80 dark:bg-[#0B1120]/80 backdrop-blur-xl -mx-4 sm:mx-0 px-4 sm:px-0 pt-3 pb-3 border-b border-slate-200 dark:border-white/10 transition-all">
                             <BrowseFilters
                                 categoryPills={categoryPills}
