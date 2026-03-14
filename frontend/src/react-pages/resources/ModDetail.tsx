@@ -669,6 +669,28 @@ export const ModDetail: React.FC<{
 
     const projectUrl = getProjectUrl(mod);
 
+    const wikiTopRef = useRef<HTMLDivElement>(null);
+    const prevWikiSlugRef = useRef(wikiPageSlug);
+    const prevPathnameRef = useRef(location.pathname);
+
+    useEffect(() => {
+        if (isWikiRoute && !wikiLoading && wikiTopRef.current) {
+            const wasWikiNavigation = prevPathnameRef.current.includes('/wiki') && location.pathname.includes('/wiki');
+            const slugChanged = prevWikiSlugRef.current !== wikiPageSlug;
+
+            if (wasWikiNavigation && slugChanged) {
+                setTimeout(() => {
+                    if (wikiTopRef.current) {
+                        const y = wikiTopRef.current.getBoundingClientRect().top + window.scrollY - 120;
+                        window.scrollTo({ top: y, behavior: 'smooth' });
+                    }
+                }, 50);
+            }
+            prevWikiSlugRef.current = wikiPageSlug;
+        }
+        prevPathnameRef.current = location.pathname;
+    }, [wikiPageSlug, wikiLoading, isWikiRoute, location.pathname]);
+
     useEffect(() => {
         if (isWikiRoute && !wikiPageSlug && wikiData?.mod) {
             const defaultSlug = wikiData.mod.index?.slug || (wikiData.mod.pages?.length > 0 ? wikiData.mod.pages[0].slug : null);
@@ -1364,7 +1386,7 @@ export const ModDetail: React.FC<{
                 }
                 mainContent={
                     isWikiRoute ? (
-                        <>
+                        <div ref={wikiTopRef} className="scroll-mt-24">
                             {wikiLoading ? (
                                 <div className="flex justify-center p-12"><Spinner /></div>
                             ) : wikiError || !wikiData ? (
@@ -1413,7 +1435,7 @@ export const ModDetail: React.FC<{
                                     </a>
                                 </div>
                             )}
-                        </>
+                        </div>
                     ) : (
                         <>
                             <div className="prose dark:prose-invert prose-lg max-w-none">
