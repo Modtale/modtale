@@ -124,7 +124,6 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-4 sm:p-5 ${HOVER_BORDER}`}
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-
                 <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0 group-hover:-translate-y-1 transition-transform duration-500">
                     <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
                 </div>
@@ -148,7 +147,6 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                     <p className="mt-1.5 sm:mt-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1 leading-relaxed">{desc}</p>
                     <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-1 sm:gap-1.5"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
-
                         <button
                             disabled={!isLoggedIn}
                             onClick={(e) => {
@@ -166,7 +164,6 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         >
                             <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isFavorite ? 'fill-current' : ''}`} /> {favorites}
                         </button>
-
                         <span className="flex items-center gap-1 sm:gap-1.5"><Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {timeAgo}</span>
                     </div>
                 </div>
@@ -285,15 +282,15 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
             </div>
         </div>
     );
-}, (prevProps, nextProps) => {
+}, (p, n) => {
     return (
-        prevProps.mod.id === nextProps.mod.id &&
-        prevProps.mod.updatedAt === nextProps.mod.updatedAt &&
-        prevProps.mod.favoriteCount === nextProps.mod.favoriteCount &&
-        prevProps.isFavorite === nextProps.isFavorite &&
-        prevProps.isLoggedIn === nextProps.isLoggedIn &&
-        prevProps.priority === nextProps.priority &&
-        prevProps.viewStyle === nextProps.viewStyle
+        p.mod.id === n.mod.id &&
+        p.mod.updatedAt === n.mod.updatedAt &&
+        p.mod.favoriteCount === n.mod.favoriteCount &&
+        p.isFavorite === n.isFavorite &&
+        p.isLoggedIn === n.isLoggedIn &&
+        p.priority === n.priority &&
+        p.viewStyle === n.viewStyle
     );
 });
 
