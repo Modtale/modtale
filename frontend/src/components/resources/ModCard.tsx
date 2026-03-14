@@ -88,10 +88,10 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md hover:shadow-modtale-accent/5 ${COMPACT_HOVER_BORDER}`}
+                className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 ${COMPACT_HOVER_BORDER}`}
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <div className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                <div className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0 group-hover:-translate-y-1 transition-transform duration-500">
                     <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -121,12 +121,11 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-4 sm:p-5 ${HOVER_BORDER}`}
+                className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-4 sm:p-5 ${HOVER_BORDER}`}
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
 
-                {/* Forced specific width/height classes to keep it perfectly square and shrunk to left side */}
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0 group-hover:-translate-y-1 transition-transform duration-500">
                     <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
                 </div>
 
@@ -150,7 +149,6 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                     <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-1 sm:gap-1.5"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
 
-                        {/* Upgraded heart to an interactive button like the grid view */}
                         <button
                             disabled={!isLoggedIn}
                             onClick={(e) => {
