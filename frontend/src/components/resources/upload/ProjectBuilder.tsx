@@ -898,7 +898,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     </div>
 
                                     <div className="flex items-center justify-between mb-4">
-                                        <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">HytaleModding Wiki</h3><p className="text-xs text-slate-500">Enable integration with the HytaleModding Wiki.</p></div>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">HytaleModding Wiki</h3>
+                                            <p className="text-xs text-slate-500 mt-0.5">Embed your <a href="https://wiki.hytalemodding.dev" target="_blank" rel="noopener noreferrer" className="text-modtale-accent hover:underline font-bold">HytaleModding Wiki</a> directly on your project page.</p>
+                                        </div>
                                         <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, hmWikiEnabled: !prev.hmWikiEnabled} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.hmWikiEnabled ? 'text-green-500' : 'text-slate-600'}`}>{modData?.hmWikiEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
@@ -912,7 +915,12 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                 placeholder="e.g., my-awesome-mod"
                                                 className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all"
                                             />
-                                            <p className="text-xs text-slate-500 mt-2">This is the unique identifier used in the HytaleModding Wiki URL for your project.</p>
+                                            <div className="mt-3 flex items-start gap-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 p-3 rounded-lg border border-blue-500/20 text-xs leading-relaxed">
+                                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                <div>
+                                                    Don't have a wiki yet? <a href="https://wiki.hytalemodding.dev" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-blue-500 transition-colors">Create one on HytaleModding first</a>, then link the URL slug here to display it on Modtale!
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 

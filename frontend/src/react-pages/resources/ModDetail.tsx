@@ -1346,38 +1346,56 @@ export const ModDetail: React.FC<{
                 }
                 mainContent={
                     isWikiRoute ? (
-                        wikiLoading ? (
-                            <div className="flex justify-center p-12"><Spinner /></div>
-                        ) : wikiError || !wikiData ? (
-                            <div className="text-center py-12 text-slate-500">
-                                <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">No Wiki Available</h3>
-                                <p className="mt-2">This project does not have a HytaleModding wiki set up.</p>
-                            </div>
-                        ) : (
-                            <div className="prose dark:prose-invert prose-lg max-w-none">
-                                {wikiData.content?.content ? (
-                                    <>
-                                        <h1 className="text-4xl font-black mb-6">{wikiData.content.title || wikiData.mod.name}</h1>
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                                                ...defaultSchema,
-                                                attributes: {
-                                                    ...defaultSchema.attributes,
-                                                    code: ['className']
-                                                }
-                                            }]]}
-                                            components={markdownComponents}
-                                        >
-                                            {wikiData.content.content}
-                                        </ReactMarkdown>
-                                    </>
-                                ) : (
-                                    <div className="text-slate-500 italic">Page content is empty.</div>
-                                )}
-                            </div>
-                        )
+                        <>
+                            {wikiLoading ? (
+                                <div className="flex justify-center p-12"><Spinner /></div>
+                            ) : wikiError || !wikiData ? (
+                                <div className="text-center py-12 text-slate-500">
+                                    <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                    <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">No Wiki Available</h3>
+                                    <p className="mt-2">This project does not have a HytaleModding wiki set up.</p>
+                                </div>
+                            ) : (
+                                <div className="prose dark:prose-invert prose-lg max-w-none">
+                                    {wikiData.content?.content ? (
+                                        <>
+                                            <h1 className="text-4xl font-black mb-6">{wikiData.content.title || wikiData.mod.name}</h1>
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
+                                                    ...defaultSchema,
+                                                    attributes: {
+                                                        ...defaultSchema.attributes,
+                                                        code: ['className']
+                                                    }
+                                                }]]}
+                                                components={markdownComponents}
+                                            >
+                                                {wikiData.content.content}
+                                            </ReactMarkdown>
+                                        </>
+                                    ) : (
+                                        <div className="text-slate-500 italic">Page content is empty.</div>
+                                    )}
+                                </div>
+                            )}
+
+                            {(!wikiLoading && !wikiError && wikiData) && (
+                                <div className="mt-16 pt-6 border-t border-slate-200 dark:border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-slate-500">
+                                    <div className="flex items-center gap-1.5 font-medium">
+                                        Powered by <a href="https://wiki.hytalemodding.dev" target="_blank" rel="noopener noreferrer" className="text-slate-700 dark:text-slate-300 font-bold hover:text-modtale-accent transition-colors">HytaleModding</a>
+                                    </div>
+                                    <a
+                                        href={`https://wiki.hytalemodding.dev/mod/${mod.hmWikiSlug}${wikiPageSlug && wikiPageSlug !== wikiData.mod.index?.slug ? `/${wikiPageSlug}` : ''}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 hover:text-modtale-accent transition-colors font-bold bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 hover:border-modtale-accent/30"
+                                    >
+                                        View on HytaleModding <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                </div>
+                            )}
+                        </>
                     ) : (
                         <>
                             <div className="prose dark:prose-invert prose-lg max-w-none">
