@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ChevronLeft, Upload, Plus, Image as ImageIcon,
     Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink,
@@ -52,6 +52,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
     const [uploadingBanner, setUploadingBanner] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [scrollY, setScrollY] = useState(0);
 
     const [copied, setCopied] = useState(false);
     const [popupCopied, setPopupCopied] = useState<string | null>(null);
@@ -61,6 +62,23 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const linkedAccounts = (user.connectedAccounts || []).filter(a => a.visible);
 
     const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto";
+
+    useEffect(() => {
+        let ticking = false;
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    setScrollY(Math.min(Math.max(0, window.scrollY), 1500));
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll();
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
@@ -163,14 +181,14 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const Avatar = ({ className, forceSizeClass }: { className?: string, forceSizeClass?: string }) => (
         <div className={`relative group ${className}`}>
-            <div className={`w-full h-full ${forceSizeClass || ''} rounded-3xl border-[6px] ${isEditing ? 'border-white/80 dark:border-slate-800/80' : 'border-white/50 dark:border-slate-950 md:dark:border-slate-900/50'} shadow-xl overflow-hidden bg-transparent relative z-20 backdrop-blur-md transition-colors`}>
+            <div className={`w-full h-full ${forceSizeClass || ''} rounded-3xl border-[6px] md:border-[8px] border-white dark:border-slate-800 shadow-xl overflow-hidden bg-transparent relative z-20 backdrop-blur-md transition-colors`}>
                 {user.avatarUrl ? (
                     <OptimizedImage
                         src={user.avatarUrl}
                         alt={`${user.username} Avatar`}
                         baseWidth={224}
                         priority={true}
-                        className="w-full h-full bg-transparent"
+                        className="w-full h-full bg-transparent object-cover"
                     />
                 ) : (
                     <div className="w-full h-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
@@ -189,41 +207,38 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         </div>
     );
 
+    const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
+
     return (
-        <div className={`relative ${isEditing ? '' : 'mb-6 md:mb-16'}`}>
+        <div className={`relative z-0 overflow-x-hidden ${isEditing ? '' : 'mb-6 md:mb-16'}`}>
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
 
-            <div className={`relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group shadow-sm z-10 ${isEditing ? 'md:rounded-3xl' : 'md:rounded-b-3xl'}`}>
-                <div className="absolute inset-0 z-0">
+            <div
+                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] bg-slate-800 z-0 will-change-transform ${isEditing ? 'md:rounded-3xl' : 'md:rounded-b-3xl'}`}
+                style={{ transform: `translateY(${parallaxOffset}px)` }}
+            >
+                <div className="absolute inset-0 z-0 overflow-hidden">
                     {user.bannerUrl ? (
                         <OptimizedImage
                             src={user.bannerUrl}
                             alt={`${user.username} Banner`}
                             baseWidth={1920}
                             priority={true}
-                            className="w-full h-full opacity-100"
+                            className="w-full h-full object-cover opacity-100"
                         />
                     ) : (
                         <div className="w-full h-full bg-gradient-to-br from-modtale-accent/20 via-slate-900 to-black" />
                     )}
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10 pointer-events-none" />
-
-                {onBack && (
-                    <div className={`absolute top-0 left-0 right-0 z-40 mx-auto w-full ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
-                        <div className="pt-6 pointer-events-auto w-fit">
-                            <button onClick={onBack} className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
-                                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
-                                <span className="hidden md:inline">Back</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <div
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
+                    style={{ height: `calc(var(--fade-base) + ${parallaxOffset}px)` }}
+                />
 
                 {isEditing && (
-                    <label className={`cursor-pointer transition-all duration-300 ${
+                    <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                         user.bannerUrl
                             ? "absolute top-6 right-6 z-30 bg-white/80 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 text-slate-900 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/20 backdrop-blur-md shadow-sm hover:scale-105"
                             : "absolute inset-x-6 top-6 bottom-0 z-30 flex flex-col items-center justify-center rounded-t-3xl border-2 border-b-0 border-dashed border-slate-400/50 dark:border-white/20 hover:border-slate-500/60 dark:hover:border-white/40 bg-slate-100/50 dark:bg-white/5 hover:bg-slate-200/50 dark:hover:bg-white/10 group/banner backdrop-blur-sm pb-4 md:pb-28"
@@ -250,11 +265,23 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 )}
             </div>
 
+            <div className="w-full aspect-[3/1] pointer-events-none relative z-0" />
+
+            {onBack && (
+                <div className={`absolute top-0 left-0 right-0 z-40 mx-auto w-full ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
+                    <div className="pt-6 pointer-events-auto w-fit">
+                        <button onClick={onBack} className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
+                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
+                            <span className="hidden md:inline">Back</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* GLASS CARD */}
             <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300 -mt-2 md:-mt-32`}>
-                <div className={`bg-transparent md:backdrop-blur-xl md:border md:border-slate-200 md:dark:border-white/10 md:rounded-3xl md:px-10 md:pb-6 flex flex-col md:flex-row gap-4 md:gap-10 items-start transition-colors ${
-                    isEditing
-                        ? 'md:bg-white/95 md:dark:bg-slate-800/95 md:shadow-xl md:pt-6'
-                        : 'md:bg-white/90 md:dark:bg-slate-900/90 md:shadow-2xl md:pt-10'
+                <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl md:px-10 md:pb-6 flex flex-col md:flex-row gap-4 md:gap-10 items-start transition-colors ${
+                    isEditing ? 'md:pt-6' : 'md:pt-10'
                 }`}>
 
                     <div className="hidden md:block flex-shrink-0 self-start relative z-20 md:-mt-24">
@@ -385,7 +412,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             </div>
 
             {children && (
-                <div className={`${containerClasses} transition-[max-width,padding] duration-300 mt-0 md:mt-16`}>
+                <div className={`${containerClasses} transition-[max-width,padding] duration-300 mt-0 md:mt-16 relative z-10`}>
                     {children}
                 </div>
             )}
