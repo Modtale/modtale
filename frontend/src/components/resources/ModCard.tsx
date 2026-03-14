@@ -92,7 +92,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
                 <div className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
-                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent" />
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
@@ -121,33 +121,55 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className={`group relative flex flex-col sm:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-5 ${HOVER_BORDER}`}
+                className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden hover:-translate-y-1 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ring-1 ring-black/[0.02] dark:ring-white/[0.02] p-4 sm:p-5 ${HOVER_BORDER}`}
             >
                 <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
-                <div className="w-full sm:w-32 h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
-                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent group-hover:scale-105 transition-transform duration-700" />
+
+                {/* Forced specific width/height classes to keep it perfectly square and shrunk to left side */}
+                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden shrink-0">
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
                 </div>
-                <div className="flex-1 min-w-0 flex flex-col">
-                    <div className="flex justify-between items-start gap-4">
-                        <div>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">{title}</h3>
-                            <div className="flex items-center gap-1 text-sm font-bold text-slate-500 mt-1">
+
+                <div className="flex-1 min-w-0 flex flex-col justify-center sm:justify-start">
+                    <div className="flex justify-between items-start gap-2 sm:gap-4">
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">{title}</h3>
+                            <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
                                 <span>by</span>
-                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-20 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block">
                                     {author}
                                 </Link>
                             </div>
                         </div>
-                        <div className="bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5">
+                        <div className="hidden sm:flex bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5">
                             <span className="text-blue-600 dark:text-blue-400">{getClassificationIcon(classification)}</span>
                             {displayClassification}
                         </div>
                     </div>
-                    <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1 leading-relaxed">{desc}</p>
-                    <div className="mt-5 flex items-center gap-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5"><Download className="w-4 h-4" /> {downloads}</span>
-                        <span className="flex items-center gap-1.5"><Heart className={`w-4 h-4 ${isFavorite ? 'text-red-500 fill-current' : ''}`} /> {favorites}</span>
-                        <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {timeAgo}</span>
+                    <p className="mt-1.5 sm:mt-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1 leading-relaxed">{desc}</p>
+                    <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span className="flex items-center gap-1 sm:gap-1.5"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
+
+                        {/* Upgraded heart to an interactive button like the grid view */}
+                        <button
+                            disabled={!isLoggedIn}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if(isLoggedIn) onToggleFavorite(mod.id);
+                            }}
+                            className={`flex items-center gap-1 sm:gap-1.5 transition-colors relative z-20 ${
+                                !isLoggedIn
+                                    ? 'text-slate-300 dark:text-white/10 cursor-not-allowed'
+                                    : isFavorite
+                                        ? 'text-red-500'
+                                        : 'text-slate-400 hover:text-red-400'
+                            }`}
+                        >
+                            <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isFavorite ? 'fill-current' : ''}`} /> {favorites}
+                        </button>
+
+                        <span className="flex items-center gap-1 sm:gap-1.5"><Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {timeAgo}</span>
                     </div>
                 </div>
             </div>
@@ -176,7 +198,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         alt=""
                         priority={priority}
                         baseWidth={640}
-                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent"
+                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
                     />
                 ) : (
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent pointer-events-none" />
@@ -196,7 +218,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         src={resolvedImage}
                         alt={title}
                         baseWidth={80}
-                        className="w-full h-full bg-transparent"
+                        className="w-full h-full bg-transparent object-cover"
                     />
                     {classification === 'MODPACK' && modCount > 0 && (
                         <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
