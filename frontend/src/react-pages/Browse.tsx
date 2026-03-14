@@ -291,8 +291,8 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
             </div>
 
             <div className={`w-full flex flex-col transition-all duration-300 overflow-visible ${isScrolled && isMobile ? 'max-h-0 opacity-0 pointer-events-none mt-0' : 'max-h-[500px] opacity-100 mt-3 md:mt-0 gap-3'}`}>
-
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full min-w-0">
+
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                         {categoryPills ? (
                             <div className="min-w-0 max-w-full">
@@ -310,7 +310,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-start md:justify-end gap-2 w-full md:w-auto shrink-0">
+                    <div className="flex items-center justify-start md:justify-end gap-2 shrink-0">
                         <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
                             <button
                                 onClick={() => onViewStyleChange('grid')}
@@ -446,34 +446,32 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             )}
                         </div>
 
-                        {isDownloadSort && (
-                            <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0 shadow-sm">
-                                {[
-                                    { label: '7d', val: 7 },
-                                    { label: '30d', val: 30 },
-                                    { label: '90d', val: 90 },
-                                    { label: 'All', val: 0 }
-                                ].map((opt) => (
-                                    <button
-                                        key={opt.label}
-                                        onClick={() => handleDownloadTimeframe(opt.val)}
-                                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        <div className="flex-1 md:flex-none h-10">
-                            <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
-                        </div>
+                        <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
+
+                    {isDownloadSort && (
+                        <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0 shadow-sm">
+                            {[
+                                { label: '7d', val: 7 },
+                                { label: '30d', val: 30 },
+                                { label: '90d', val: 90 },
+                                { label: 'All', val: 0 }
+                            ].map((opt) => (
+                                <button
+                                    key={opt.label}
+                                    onClick={() => handleDownloadTimeframe(opt.val)}
+                                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {isDownloadSort && (
                     <div className="md:hidden flex justify-center h-10 w-full">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full max-w-md justify-between shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full justify-between shadow-sm">
                             {[
                                 { label: '7 Days', val: 7 },
                                 { label: '30 Days', val: 30 },
