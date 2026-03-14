@@ -153,6 +153,7 @@ export interface BrowseFiltersProps {
     isMobile: boolean;
     viewStyle: 'grid' | 'list' | 'compact';
     onViewStyleChange: (style: 'grid' | 'list' | 'compact') => void;
+    isScrolled: boolean;
 }
 
 export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
@@ -161,7 +162,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                                                            selectedTags, onToggleTag, onClearTags, activeFilterCount, onResetFilters,
                                                                            isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
                                                                            selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate, setPage,
-                                                                           isMobile, viewStyle, onViewStyleChange
+                                                                           isMobile, viewStyle, onViewStyleChange, isScrolled
                                                                        }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
@@ -246,13 +247,13 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     ].filter(Boolean).length;
 
     return (
-        <div className="w-full flex flex-col gap-3 relative z-40 min-w-0">
-            <div className="md:hidden flex items-center gap-2 w-full">
-                <div className="relative group flex-1 h-10 min-w-0">
+        <div className="w-full flex flex-col relative z-40 min-w-0">
+            <div className="md:hidden flex items-center w-full transition-all duration-300 gap-2">
+                <div className="relative group flex-1 h-10 min-w-0 transition-all duration-300">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10 pointer-events-none group-focus-within:text-modtale-accent transition-colors" />
                     <input
                         type="text"
-                        className="block w-full pl-9 pr-9 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white relative z-0"
+                        className="block w-full pl-9 pr-9 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white relative z-0 transition-all duration-300"
                         placeholder="Search projects..."
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
@@ -264,7 +265,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </button>
                     )}
                 </div>
-                <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
+                <div className={`flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl items-center shadow-sm shrink-0 transition-all duration-300 overflow-hidden ${isScrolled && isMobile ? 'max-w-0 opacity-0 border-transparent p-0 m-0 h-10' : 'max-w-[200px] opacity-100 p-1 h-10'}`}>
                     <button
                         onClick={() => onViewStyleChange('grid')}
                         className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
@@ -289,163 +290,211 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full min-w-0">
+            <div className={`w-full flex flex-col transition-all duration-300 overflow-visible ${isScrolled && isMobile ? 'max-h-0 opacity-0 pointer-events-none mt-0' : 'max-h-[500px] opacity-100 mt-3 md:mt-0 gap-3'}`}>
 
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                    {categoryPills ? (
-                        <div className="min-w-0 max-w-full">
-                            {categoryPills}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full min-w-0">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                        {categoryPills ? (
+                            <div className="min-w-0 max-w-full">
+                                {categoryPills}
+                            </div>
+                        ) : (
+                            <div className="hidden md:block shrink-0 min-w-0">
+                                <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm truncate">{pageTitle}</h1>
+                            </div>
+                        )}
+                        <div className="hidden xl:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide block drop-shadow-sm whitespace-nowrap">
+                                {loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}
+                            </span>
                         </div>
-                    ) : (
-                        <div className="hidden md:block shrink-0 min-w-0">
-                            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm truncate">{pageTitle}</h1>
+                    </div>
+
+                    <div className="flex items-center justify-start md:justify-end gap-2 w-full md:w-auto shrink-0">
+                        <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
+                            <button
+                                onClick={() => onViewStyleChange('grid')}
+                                className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                                title="Grid View"
+                                aria-label="Grid View"
+                            >
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => onViewStyleChange('list')}
+                                className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'list' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                                title="List View"
+                                aria-label="List View"
+                            >
+                                <List className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => onViewStyleChange('compact')}
+                                className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'compact' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                                title="Compact View"
+                                aria-label="Compact View"
+                            >
+                                <AlignJustify className="w-4 h-4" />
+                            </button>
                         </div>
-                    )}
-                    <div className="hidden xl:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
-                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide block drop-shadow-sm whitespace-nowrap">
-                            {loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}
-                        </span>
+
+                        <div className="relative flex-1 md:flex-none h-10" ref={tagRef}>
+                            <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                                <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
+                                {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{selectedTags.length}</span>}
+                            </button>
+                            {isTagsOpen && (
+                                <div className="absolute left-0 md:left-auto top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</span>
+                                        {selectedTags.length > 0 && <button onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                        <style>{` .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 20px; } `}</style>
+                                        {GLOBAL_TAGS.map(tag => (
+                                            <button key={tag} onClick={() => onToggleTag(tag)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${selectedTags.includes(tag) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm'}`}>
+                                                {tag} {selectedTags.includes(tag) && <Check className="w-3 h-3" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="relative flex-1 md:flex-none h-10" ref={filterRef}>
+                            <button onClick={onToggleFilterMenu} className={`w-full h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                                <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
+                                {displayFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{displayFilterCount}</span>}
+                            </button>
+
+                            {isFilterOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
+                                    <div className="p-4 border-b border-slate-200 dark:border-white/10">
+                                        <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
+                                    </div>
+                                    <div className="p-4 space-y-5">
+                                        <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
+
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
+                                            <div className="grid grid-cols-4 gap-1 mb-2">
+                                                {[0, 10, 50, 100].map(f => (
+                                                    <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minFavorites === f && customFav === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                        {f === 0 ? 'Any' : `${f}+`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="relative group">
+                                                <Heart className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Custom min favorites..."
+                                                    value={customFav}
+                                                    onChange={e => {
+                                                        setCustomFav(e.target.value);
+                                                        setMinFavorites(Number(e.target.value));
+                                                    }}
+                                                    aria-label="Custom minimum favorites"
+                                                    className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Downloads</label>
+                                            <div className="grid grid-cols-4 gap-1 mb-2">
+                                                {[0, 1000, 5000, 10000].map(d => (
+                                                    <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minDownloads === d && customDl === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                        {d === 0 ? 'Any' : `${d/1000}k+`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="relative group">
+                                                <Download className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
+                                                <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} aria-label="Custom minimum downloads" className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0" />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Last Updated</label>
+                                            </div>
+                                            {showCalendar ? ( <CalendarWidget selectedDate={selectedDateObj} onSelect={handleDateSelect} /> ) : (
+                                                <>
+                                                    <div className="grid grid-cols-4 gap-1 mb-2">
+                                                        {[0, 7, 30, 90].map(d => (
+                                                            <button key={d} onClick={() => handleDaysAgo(d)} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${isPresetActive(d) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                                {d === 0 ? 'Any' : `${d}d`}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <button onClick={() => setShowCalendar(true)} className={`w-full flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm ${filterDate && !isPresetActive(7) && !isPresetActive(30) && !isPresetActive(90) && !isDownloadSort ? 'text-modtale-accent font-bold border-modtale-accent' : 'text-slate-500 dark:text-slate-300'}`}>
+                                                        <span className="flex items-center gap-2 pointer-events-none"><CalendarIcon className="w-3.5 h-3.5" /> {filterDate && !isDownloadSort ? `Since ${new Date(filterDate).toLocaleDateString()}` : 'Pick a Date'}</span>
+                                                        <ChevronDown className="w-3.5 h-3.5 pointer-events-none" />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <div className="pt-2 border-t border-slate-200 dark:border-white/10">
+                                            <button onClick={resetAll} className="w-full py-2 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold rounded-xl text-xs hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2 border border-transparent dark:border-red-500/20">
+                                                <RotateCcw className="w-3 h-3 pointer-events-none" /> Reset Filters
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {isDownloadSort && (
+                            <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0 shadow-sm">
+                                {[
+                                    { label: '7d', val: 7 },
+                                    { label: '30d', val: 30 },
+                                    { label: '90d', val: 90 },
+                                    { label: 'All', val: 0 }
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.label}
+                                        onClick={() => handleDownloadTimeframe(opt.val)}
+                                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="flex-1 md:flex-none h-10">
+                            <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-start md:justify-end gap-2 shrink-0">
-                    <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
-                        <button
-                            onClick={() => onViewStyleChange('grid')}
-                            className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
-                            title="Grid View"
-                            aria-label="Grid View"
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => onViewStyleChange('list')}
-                            className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'list' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
-                            title="List View"
-                            aria-label="List View"
-                        >
-                            <List className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => onViewStyleChange('compact')}
-                            className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'compact' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
-                            title="Compact View"
-                            aria-label="Compact View"
-                        >
-                            <AlignJustify className="w-4 h-4" />
-                        </button>
+                {isDownloadSort && (
+                    <div className="md:hidden flex justify-center h-10 w-full">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full max-w-md justify-between shadow-sm">
+                            {[
+                                { label: '7 Days', val: 7 },
+                                { label: '30 Days', val: 30 },
+                                { label: '3 Months', val: 90 },
+                                { label: 'All Time', val: 0 }
+                            ].map((opt) => (
+                                <button
+                                    key={opt.label}
+                                    onClick={() => handleDownloadTimeframe(opt.val)}
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
+                )}
 
-                    <div className="relative flex-1 md:flex-none h-10" ref={tagRef}>
-                        <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
-                            <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
-                            {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{selectedTags.length}</span>}
-                        </button>
-                        {isTagsOpen && (
-                            <div className="absolute left-0 md:left-auto top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
-                                <div className="flex justify-between items-center mb-3">
-                                    <span className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</span>
-                                    {selectedTags.length > 0 && <button onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
-                                </div>
-                                <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                    <style>{` .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 20px; } `}</style>
-                                    {GLOBAL_TAGS.map(tag => (
-                                        <button key={tag} onClick={() => onToggleTag(tag)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${selectedTags.includes(tag) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm'}`}>
-                                            {tag} {selectedTags.includes(tag) && <Check className="w-3 h-3" />}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="relative flex-1 md:flex-none h-10" ref={filterRef}>
-                        <button onClick={onToggleFilterMenu} className={`w-full h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
-                            <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
-                            {displayFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{displayFilterCount}</span>}
-                        </button>
-
-                        {isFilterOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
-                                <div className="p-4 border-b border-slate-200 dark:border-white/10">
-                                    <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
-                                </div>
-                                <div className="p-4 space-y-5">
-                                    <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
-
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
-                                        <div className="grid grid-cols-4 gap-1 mb-2">
-                                            {[0, 10, 50, 100].map(f => (
-                                                <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minFavorites === f && customFav === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
-                                                    {f === 0 ? 'Any' : `${f}+`}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <div className="relative group">
-                                            <Heart className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
-                                            <input
-                                                type="number"
-                                                placeholder="Custom min favorites..."
-                                                value={customFav}
-                                                onChange={e => {
-                                                    setCustomFav(e.target.value);
-                                                    setMinFavorites(Number(e.target.value));
-                                                }}
-                                                aria-label="Custom minimum favorites"
-                                                className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Downloads</label>
-                                        <div className="grid grid-cols-4 gap-1 mb-2">
-                                            {[0, 1000, 5000, 10000].map(d => (
-                                                <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minDownloads === d && customDl === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
-                                                    {d === 0 ? 'Any' : `${d/1000}k+`}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <div className="relative group">
-                                            <Download className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
-                                            <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} aria-label="Custom minimum downloads" className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0" />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1.5">
-                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Last Updated</label>
-                                        </div>
-                                        {showCalendar ? ( <CalendarWidget selectedDate={selectedDateObj} onSelect={handleDateSelect} /> ) : (
-                                            <>
-                                                <div className="grid grid-cols-4 gap-1 mb-2">
-                                                    {[0, 7, 30, 90].map(d => (
-                                                        <button key={d} onClick={() => handleDaysAgo(d)} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${isPresetActive(d) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
-                                                            {d === 0 ? 'Any' : `${d}d`}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                                <button onClick={() => setShowCalendar(true)} className={`w-full flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm ${filterDate && !isPresetActive(7) && !isPresetActive(30) && !isPresetActive(90) && !isDownloadSort ? 'text-modtale-accent font-bold border-modtale-accent' : 'text-slate-500 dark:text-slate-300'}`}>
-                                                    <span className="flex items-center gap-2 pointer-events-none"><CalendarIcon className="w-3.5 h-3.5" /> {filterDate && !isDownloadSort ? `Since ${new Date(filterDate).toLocaleDateString()}` : 'Pick a Date'}</span>
-                                                    <ChevronDown className="w-3.5 h-3.5 pointer-events-none" />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    <div className="pt-2 border-t border-slate-200 dark:border-white/10">
-                                        <button onClick={resetAll} className="w-full py-2 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold rounded-xl text-xs hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2 border border-transparent dark:border-red-500/20">
-                                            <RotateCcw className="w-3 h-3 pointer-events-none" /> Reset Filters
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {isDownloadSort && (
-                        <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0 shadow-sm">
+                {isDownloadSort && (
+                    <div className="hidden md:flex lg:hidden justify-end h-10 w-full">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex items-center animate-in fade-in slide-in-from-right-4 duration-200 shadow-sm">
                             {[
                                 { label: '7d', val: 7 },
                                 { label: '30d', val: 30 },
@@ -461,53 +510,9 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                 </button>
                             ))}
                         </div>
-                    )}
-
-                    <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
-                </div>
+                    </div>
+                )}
             </div>
-
-            {isDownloadSort && (
-                <div className="md:hidden flex justify-center h-10 w-full">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full max-w-md justify-between shadow-sm">
-                        {[
-                            { label: '7 Days', val: 7 },
-                            { label: '30 Days', val: 30 },
-                            { label: '3 Months', val: 90 },
-                            { label: 'All Time', val: 0 }
-                        ].map((opt) => (
-                            <button
-                                key={opt.label}
-                                onClick={() => handleDownloadTimeframe(opt.val)}
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {isDownloadSort && (
-                <div className="hidden md:flex lg:hidden justify-end h-10 w-full">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex items-center animate-in fade-in slide-in-from-right-4 duration-200 shadow-sm">
-                        {[
-                            { label: '7d', val: 7 },
-                            { label: '30d', val: 30 },
-                            { label: '90d', val: 90 },
-                            { label: 'All', val: 0 }
-                        ].map((opt) => (
-                            <button
-                                key={opt.label}
-                                onClick={() => handleDownloadTimeframe(opt.val)}
-                                className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 });
@@ -683,6 +688,8 @@ export const Browse: React.FC<BrowseProps> = ({
     const [isTopFilterOpen, setIsTopFilterOpen] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(12);
 
+    const [isScrolled, setIsScrolled] = useState(false);
+
     const abortControllerRef = useRef<AbortController | null>(null);
     const cardsSectionRef = useRef<HTMLDivElement>(null);
     const isFirstRender = useRef(true);
@@ -700,6 +707,15 @@ export const Browse: React.FC<BrowseProps> = ({
         }
         return null;
     }, [items]);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 20);
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll();
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     useEffect(() => {
         if (urlSearchTerm !== searchTerm) {
@@ -1020,7 +1036,7 @@ export const Browse: React.FC<BrowseProps> = ({
                     </div>
 
                     <div className="flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>
-                        <div className="sticky top-24 z-50 mb-4 bg-slate-50/80 dark:bg-[#0B1120]/80 backdrop-blur-xl -mx-4 sm:mx-0 px-4 sm:px-0 pt-3 pb-3 border-b border-slate-200 dark:border-white/10 transition-all">
+                        <div className={`sticky top-24 z-50 mb-4 bg-slate-50/90 dark:bg-[#0B1120]/90 backdrop-blur-xl -mx-4 sm:mx-0 px-4 sm:px-0 border-b border-slate-200 dark:border-white/10 transition-all duration-300 ${isScrolled && isMobile ? 'pt-2 pb-2 shadow-sm' : 'pt-3 pb-3'}`}>
                             <BrowseFilters
                                 categoryPills={categoryPills}
                                 pageTitle={getPageTitle()}
@@ -1054,6 +1070,7 @@ export const Browse: React.FC<BrowseProps> = ({
                                 isMobile={isMobile}
                                 viewStyle={viewStyle}
                                 onViewStyleChange={handleViewStyleChange}
+                                isScrolled={isScrolled}
                             />
                         </div>
 
