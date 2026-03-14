@@ -64,50 +64,59 @@ const markdownComponents = {
 };
 
 const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boolean = false) => {
-    const [data, setData] = useState<{mod: any, content: any} | null>(null);
+    const [modData, setModData] = useState<any>(null);
+    const [content, setContent] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
 
     useEffect(() => {
         if (!enabled || !hmWikiSlug) return;
-
         let isMounted = true;
-        setLoading(true);
         setError(false);
 
         api.get(`/wiki/${hmWikiSlug}`)
             .then(res => {
-                return res.data;
-            })
-            .then(async (modData) => {
-                if (!isMounted) return;
-
-                let content = null;
-                const targetSlug = pageSlug || modData.index?.slug;
-
-                if (targetSlug) {
-                    try {
-                        const res = await api.get(`/wiki/${hmWikiSlug}/${targetSlug}`);
-                        content = res.data;
-                    } catch (e) {}
-                }
-
-                if (isMounted) {
-                    setData({ mod: modData, content });
-                    setLoading(false);
-                }
+                if (isMounted) setModData(res.data);
             })
             .catch(() => {
-                if (isMounted) {
-                    setError(true);
-                    setLoading(false);
-                }
+                if (isMounted) setError(true);
             });
 
         return () => { isMounted = false; };
-    }, [hmWikiSlug, pageSlug, enabled]);
+    }, [hmWikiSlug, enabled]);
 
-    return { data, loading, error };
+    useEffect(() => {
+        if (!enabled || !hmWikiSlug || !modData) return;
+
+        let isMounted = true;
+        setLoading(true);
+
+        const targetSlug = pageSlug || modData.index?.slug || (modData.pages?.length > 0 ? modData.pages[0].slug : null);
+
+        if (targetSlug) {
+            api.get(`/wiki/${hmWikiSlug}/${targetSlug}`)
+                .then(res => {
+                    if (isMounted) setContent(res.data);
+                })
+                .catch(() => {
+                    if (isMounted) setContent(null);
+                })
+                .finally(() => {
+                    if (isMounted) setLoading(false);
+                });
+        } else {
+            setContent(null);
+            setLoading(false);
+        }
+
+        return () => { isMounted = false; };
+    }, [hmWikiSlug, pageSlug, enabled, modData]);
+
+    return {
+        data: modData ? { mod: modData, content } : null,
+        loading: loading || (enabled && !modData && !error),
+        error
+    };
 };
 
 const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string }> = ({ tree, projectUrl, currentSlug, indexSlug }) => {
@@ -115,7 +124,7 @@ const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: str
         return (
             <ul className="space-y-1">
                 {pages.map(p => {
-                    const isActive = currentSlug === p.slug || (!currentSlug && indexSlug === p.slug);
+                    const isActive = currentSlug === p.slug || (!currentSlug && (indexSlug === p.slug || p.slug === tree[0]?.slug));
                     return (
                         <li key={p.id}>
                             <Link to={`${projectUrl}/wiki/${p.slug}`} className={`block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-modtale-accent text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
@@ -658,6 +667,17 @@ export const ModDetail: React.FC<{
     const depsDropdownRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
 
+    const projectUrl = getProjectUrl(mod);
+
+    useEffect(() => {
+        if (isWikiRoute && !wikiPageSlug && wikiData?.mod) {
+            const defaultSlug = wikiData.mod.index?.slug || (wikiData.mod.pages?.length > 0 ? wikiData.mod.pages[0].slug : null);
+            if (defaultSlug) {
+                navigate(`${projectUrl}/wiki/${defaultSlug}`, { replace: true });
+            }
+        }
+    }, [isWikiRoute, wikiPageSlug, wikiData?.mod, navigate, projectUrl]);
+
     const memoizedDescription = useMemo(() => {
         if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
 
@@ -964,8 +984,6 @@ export const ModDetail: React.FC<{
 
     const isUnlisted = mod.status === 'UNLISTED';
     const isArchived = mod.status === 'ARCHIVED';
-
-    const projectUrl = getProjectUrl(mod);
 
     return (
         <>
