@@ -612,36 +612,26 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             )}
 
             {showCardPreview && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="relative w-full max-w-4xl">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowCardPreview(false)}>
+                    <div className="relative w-full max-w-[380px] flex flex-col items-center" onClick={e => e.stopPropagation()}>
                         <button
                             onClick={() => setShowCardPreview(false)}
-                            className="absolute -top-10 -right-2 md:-right-10 text-white/50 hover:text-white transition-colors z-10"
+                            className="absolute -top-16 md:-top-20 right-0 md:-right-8 text-white/50 hover:text-white transition-colors z-20 p-2"
                         >
                             <X className="w-8 h-8" />
                         </button>
                         <div
-                            className="cursor-default pointer-events-none select-none shadow-2xl w-full flex items-center justify-center"
+                            className="cursor-default pointer-events-none select-none shadow-2xl w-full rounded-2xl overflow-hidden scale-110 sm:scale-125 md:scale-150 transform-gpu origin-center bg-white dark:bg-modtale-card"
                             onClickCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         >
-                            <div
-                                className="w-full"
-                                style={{
-                                    zoom: '1.5',
-                                    MozTransform: 'scale(1.5)',
-                                    MozTransformOrigin: 'center center'
-                                }}
-                            >
-                                <ModCard
-                                    mod={previewMod}
-                                    isFavorite={false}
-                                    onToggleFavorite={() => {}}
-                                    isLoggedIn={false}
-                                />
-                            </div>
+                            <ModCard
+                                mod={previewMod}
+                                isFavorite={false}
+                                onToggleFavorite={() => {}}
+                                isLoggedIn={false}
+                            />
                         </div>
                     </div>
-                    <div className="absolute inset-0 -z-10" onClick={() => setShowCardPreview(false)} />
                 </div>
             )}
 
@@ -976,34 +966,22 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 sidebarContent={
                     <>
                         <SidebarSection title="Card Preview" icon={Eye}>
-                            <div className="flex justify-center w-full overflow-hidden">
-                                <div
-                                    className="cursor-pointer transition-transform origin-top mt-2 relative group"
-                                    onClick={() => setShowCardPreview(true)}
-                                    style={{
-                                        width: '115%',
-                                        zoom: '0.75',
-                                        MozTransform: 'scale(0.75)',
-                                        MozTransformOrigin: 'top center',
-                                    }}
-                                >
-                                    <div className="pointer-events-none select-none h-full w-full block relative" onClickCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                                        <ModCard
-                                            mod={previewMod}
-                                            isFavorite={false}
-                                            onToggleFavorite={() => {}}
-                                            isLoggedIn={false}
-                                        />
-                                        <div className="absolute inset-0 z-50 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px] rounded-xl border-2 border-white/20">
-                                            <div className="bg-black/50 px-3 py-1.5 rounded-full flex items-center gap-2 text-white border border-white/10 shadow-xl transform scale-125">
-                                                <Maximize2 className="w-4 h-4" />
-                                                <span className="text-xs font-bold uppercase tracking-widest">Expand</span>
-                                            </div>
-                                        </div>
+                            <div className="w-full max-w-[340px] mx-auto relative group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm" onClick={() => setShowCardPreview(true)}>
+                                <div className="pointer-events-none select-none">
+                                    <ModCard
+                                        mod={previewMod}
+                                        isFavorite={false}
+                                        onToggleFavorite={() => {}}
+                                        isLoggedIn={false}
+                                    />
+                                </div>
+                                <div className="absolute inset-0 z-50 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                                    <div className="bg-black/60 px-4 py-2 rounded-full flex items-center gap-2 text-white border border-white/20 shadow-xl transform scale-90 group-hover:scale-100 transition-transform">
+                                        <Maximize2 className="w-4 h-4" />
+                                        <span className="text-xs font-bold uppercase tracking-widest">Expand</span>
                                     </div>
                                 </div>
                             </div>
-                            <p className="text-center text-[10px] text-slate-500 mt-2">Click to expand</p>
                         </SidebarSection>
                         <SidebarSection title="Repository Source" icon={GitMerge}>
                             <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2">
