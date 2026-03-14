@@ -233,7 +233,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                 onBack={onBack}
                 onReport={() => setShowReportModal(true)}
             >
-                <div className="w-full max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28">
+                <div className="w-full">
                     {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
                         <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
