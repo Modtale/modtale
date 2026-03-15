@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useSearchParams, Link, useLocation } from 'react-router-dom';
 import { Filter, Tag, ArrowDownUp, ChevronDown, Check, X, Search, Heart, RotateCcw, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight, Clock, CornerDownLeft, PackageSearch, LayoutGrid, List, AlignJustify } from 'lucide-react';
@@ -167,6 +168,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
+    useRef<HTMLDivElement>(null);
     const [customDl, setCustomDl] = useState('');
     const [customFav, setCustomFav] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
@@ -174,9 +176,22 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     const [gameVersionOptions, setGameVersionOptions] = useState<string[]>(['Any']);
 
     useEffect(() => {
+        if (isMobile && isFilterOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [isMobile, isFilterOpen]);
+
+    useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             if (tagRef.current && !tagRef.current.contains(e.target as Node)) setIsTagsOpen(false);
             if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+                const mobileModal = document.getElementById('mobile-filter-modal');
+                if (isMobile && isFilterOpen && mobileModal && mobileModal.contains(e.target as Node)) {
+                    return;
+                }
                 if(isFilterOpen) onToggleFilterMenu();
             }
         };
@@ -184,7 +199,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         return () => {
             document.removeEventListener('mousedown', handleClick);
         };
-    }, [isFilterOpen, onToggleFilterMenu]);
+    }, [isFilterOpen, onToggleFilterMenu, isMobile]);
 
     useEffect(() => {
         api.get('/meta/game-versions').then(res => {
@@ -291,8 +306,8 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
             </div>
 
             <div className={`w-full flex flex-col transition-all duration-300 overflow-visible ${isScrolled && isMobile ? 'max-h-0 opacity-0 pointer-events-none mt-0' : 'max-h-[500px] opacity-100 mt-3 md:mt-0 gap-3'}`}>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full min-w-0">
 
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full min-w-0">
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                         {categoryPills ? (
                             <div className="min-w-0 max-w-full">
@@ -310,7 +325,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-start md:justify-end gap-2 shrink-0">
+                    <div className="flex items-center justify-start md:justify-end gap-2 w-full md:w-auto shrink-0">
                         <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
                             <button
                                 onClick={() => onViewStyleChange('grid')}
@@ -339,7 +354,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </div>
 
                         <div className="relative flex-1 md:flex-none h-10" ref={tagRef}>
-                            <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                            <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-3 sm:px-4 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
                                 <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
                                 {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{selectedTags.length}</span>}
                             </button>
@@ -362,111 +377,191 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </div>
 
                         <div className="relative flex-1 md:flex-none h-10" ref={filterRef}>
-                            <button onClick={onToggleFilterMenu} className={`w-full h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                            <button onClick={onToggleFilterMenu} className={`w-full h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-3 sm:px-4 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
                                 <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
                                 {displayFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{displayFilterCount}</span>}
                             </button>
 
                             {isFilterOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
-                                    <div className="p-4 border-b border-slate-200 dark:border-white/10">
-                                        <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
-                                    </div>
-                                    <div className="p-4 space-y-5">
-                                        <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
+                                <>
+                                    {isMobile ? (
+                                        typeof document !== 'undefined' ? createPortal(
+                                            <div
+                                                className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                                                onClick={(e) => { e.stopPropagation(); onToggleFilterMenu(); }}
+                                            >
+                                                <div
+                                                    id="mobile-filter-modal"
+                                                    className="w-full max-w-sm max-h-[85vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <div className="p-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-slate-950/50">
+                                                        <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
+                                                        <button onClick={onToggleFilterMenu} className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+                                                            <X className="w-5 h-5 text-slate-500" />
+                                                        </button>
+                                                    </div>
 
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
-                                            <div className="grid grid-cols-4 gap-1 mb-2">
-                                                {[0, 10, 50, 100].map(f => (
-                                                    <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minFavorites === f && customFav === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
-                                                        {f === 0 ? 'Any' : `${f}+`}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="relative group">
-                                                <Heart className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
-                                                <input
-                                                    type="number"
-                                                    placeholder="Custom min favorites..."
-                                                    value={customFav}
-                                                    onChange={e => {
-                                                        setCustomFav(e.target.value);
-                                                        setMinFavorites(Number(e.target.value));
-                                                    }}
-                                                    aria-label="Custom minimum favorites"
-                                                    className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0"
-                                                />
-                                            </div>
-                                        </div>
+                                                    <div className="p-4 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+                                                        <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
 
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Downloads</label>
-                                            <div className="grid grid-cols-4 gap-1 mb-2">
-                                                {[0, 1000, 5000, 10000].map(d => (
-                                                    <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minDownloads === d && customDl === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
-                                                        {d === 0 ? 'Any' : `${d/1000}k+`}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="relative group">
-                                                <Download className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
-                                                <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} aria-label="Custom minimum downloads" className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0" />
-                                            </div>
-                                        </div>
+                                                        <div>
+                                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
+                                                            <div className="grid grid-cols-4 gap-1 mb-2">
+                                                                {[0, 10, 50, 100].map(f => (
+                                                                    <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minFavorites === f && customFav === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                                        {f === 0 ? 'Any' : `${f}+`}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <div className="relative group">
+                                                                <Heart className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
+                                                                <input
+                                                                    type="number"
+                                                                    placeholder="Custom min favorites..."
+                                                                    value={customFav}
+                                                                    onChange={e => {
+                                                                        setCustomFav(e.target.value);
+                                                                        setMinFavorites(Number(e.target.value));
+                                                                    }}
+                                                                    aria-label="Custom minimum favorites"
+                                                                    className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0"
+                                                                />
+                                                            </div>
+                                                        </div>
 
-                                        <div>
-                                            <div className="flex justify-between items-center mb-1.5">
-                                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Last Updated</label>
+                                                        <div>
+                                                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Downloads</label>
+                                                            <div className="grid grid-cols-4 gap-1 mb-2">
+                                                                {[0, 1000, 5000, 10000].map(d => (
+                                                                    <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minDownloads === d && customDl === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                                        {d === 0 ? 'Any' : `${d/1000}k+`}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <div className="relative group">
+                                                                <Download className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
+                                                                <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} aria-label="Custom minimum downloads" className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0" />
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <div className="flex justify-between items-center mb-1.5">
+                                                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Last Updated</label>
+                                                            </div>
+                                                            {showCalendar ? ( <CalendarWidget selectedDate={selectedDateObj} onSelect={handleDateSelect} /> ) : (
+                                                                <>
+                                                                    <div className="grid grid-cols-4 gap-1 mb-2">
+                                                                        {[0, 7, 30, 90].map(d => (
+                                                                            <button key={d} onClick={() => handleDaysAgo(d)} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${isPresetActive(d) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                                                {d === 0 ? 'Any' : `${d}d`}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                    <button onClick={() => setShowCalendar(true)} className={`w-full flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm ${filterDate && !isPresetActive(7) && !isPresetActive(30) && !isPresetActive(90) && !isDownloadSort ? 'text-modtale-accent font-bold border-modtale-accent' : 'text-slate-500 dark:text-slate-300'}`}>
+                                                                        <span className="flex items-center gap-2 pointer-events-none"><CalendarIcon className="w-3.5 h-3.5" /> {filterDate && !isDownloadSort ? `Since ${new Date(filterDate).toLocaleDateString()}` : 'Pick a Date'}</span>
+                                                                        <ChevronDown className="w-3.5 h-3.5 pointer-events-none" />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/50 flex gap-3">
+                                                        <button onClick={resetAll} className="px-4 py-3 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold rounded-xl text-xs hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center justify-center border border-transparent dark:border-red-500/20">
+                                                            <RotateCcw className="w-5 h-5" />
+                                                        </button>
+                                                        <button onClick={onToggleFilterMenu} className="flex-1 py-3 bg-modtale-accent text-white font-bold rounded-xl text-sm shadow-md hover:bg-modtale-accentHover transition-colors">
+                                                            Show Results
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>,
+                                            document.body
+                                        ) : null
+                                    ) : (
+                                        <div className="absolute right-0 top-full mt-2 w-[280px] md:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
+                                            <div className="p-4 border-b border-slate-200 dark:border-white/10">
+                                                <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
                                             </div>
-                                            {showCalendar ? ( <CalendarWidget selectedDate={selectedDateObj} onSelect={handleDateSelect} /> ) : (
-                                                <>
+                                            <div className="p-4 space-y-5">
+                                                <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={(val) => {setSelectedVersion(val);}} />
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
                                                     <div className="grid grid-cols-4 gap-1 mb-2">
-                                                        {[0, 7, 30, 90].map(d => (
-                                                            <button key={d} onClick={() => handleDaysAgo(d)} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${isPresetActive(d) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
-                                                                {d === 0 ? 'Any' : `${d}d`}
+                                                        {[0, 10, 50, 100].map(f => (
+                                                            <button key={f} onClick={() => { setMinFavorites(f); setCustomFav(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minFavorites === f && customFav === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                                {f === 0 ? 'Any' : `${f}+`}
                                                             </button>
                                                         ))}
                                                     </div>
-                                                    <button onClick={() => setShowCalendar(true)} className={`w-full flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm ${filterDate && !isPresetActive(7) && !isPresetActive(30) && !isPresetActive(90) && !isDownloadSort ? 'text-modtale-accent font-bold border-modtale-accent' : 'text-slate-500 dark:text-slate-300'}`}>
-                                                        <span className="flex items-center gap-2 pointer-events-none"><CalendarIcon className="w-3.5 h-3.5" /> {filterDate && !isDownloadSort ? `Since ${new Date(filterDate).toLocaleDateString()}` : 'Pick a Date'}</span>
-                                                        <ChevronDown className="w-3.5 h-3.5 pointer-events-none" />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
+                                                    <div className="relative group">
+                                                        <Heart className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
+                                                        <input
+                                                            type="number"
+                                                            placeholder="Custom min favorites..."
+                                                            value={customFav}
+                                                            onChange={e => {
+                                                                setCustomFav(e.target.value);
+                                                                setMinFavorites(Number(e.target.value));
+                                                            }}
+                                                            aria-label="Custom minimum favorites"
+                                                            className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0"
+                                                        />
+                                                    </div>
+                                                </div>
 
-                                        <div className="pt-2 border-t border-slate-200 dark:border-white/10">
-                                            <button onClick={resetAll} className="w-full py-2 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold rounded-xl text-xs hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2 border border-transparent dark:border-red-500/20">
-                                                <RotateCcw className="w-3 h-3 pointer-events-none" /> Reset Filters
-                                            </button>
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Downloads</label>
+                                                    <div className="grid grid-cols-4 gap-1 mb-2">
+                                                        {[0, 1000, 5000, 10000].map(d => (
+                                                            <button key={d} onClick={() => { setMinDownloads(d); setCustomDl(''); }} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${minDownloads === d && customDl === '' ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                                {d === 0 ? 'Any' : `${d/1000}k+`}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <div className="relative group">
+                                                        <Download className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 z-10 pointer-events-none" />
+                                                        <input type="number" placeholder="Custom min downloads..." value={customDl} onChange={e => { setCustomDl(e.target.value); setMinDownloads(Number(e.target.value)); }} aria-label="Custom minimum downloads" className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-1 focus:ring-modtale-accent outline-none shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none relative z-0" />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <div className="flex justify-between items-center mb-1.5">
+                                                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Last Updated</label>
+                                                    </div>
+                                                    {showCalendar ? ( <CalendarWidget selectedDate={selectedDateObj} onSelect={handleDateSelect} /> ) : (
+                                                        <>
+                                                            <div className="grid grid-cols-4 gap-1 mb-2">
+                                                                {[0, 7, 30, 90].map(d => (
+                                                                    <button key={d} onClick={() => handleDaysAgo(d)} className={`py-1.5 rounded-xl text-[10px] font-bold border transition-colors ${isPresetActive(d) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                                                        {d === 0 ? 'Any' : `${d}d`}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <button onClick={() => setShowCalendar(true)} className={`w-full flex items-center justify-between bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm ${filterDate && !isPresetActive(7) && !isPresetActive(30) && !isPresetActive(90) && !isDownloadSort ? 'text-modtale-accent font-bold border-modtale-accent' : 'text-slate-500 dark:text-slate-300'}`}>
+                                                                <span className="flex items-center gap-2 pointer-events-none"><CalendarIcon className="w-3.5 h-3.5" /> {filterDate && !isDownloadSort ? `Since ${new Date(filterDate).toLocaleDateString()}` : 'Pick a Date'}</span>
+                                                                <ChevronDown className="w-3.5 h-3.5 pointer-events-none" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                <div className="pt-2 border-t border-slate-200 dark:border-white/10">
+                                                    <button onClick={resetAll} className="w-full py-2 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold rounded-xl text-xs hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2 border border-transparent dark:border-red-500/20">
+                                                        <RotateCcw className="w-3 h-3 pointer-events-none" /> Reset Filters
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
                         <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
-
-                    {isDownloadSort && (
-                        <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shrink-0 shadow-sm">
-                            {[
-                                { label: '7d', val: 7 },
-                                { label: '30d', val: 30 },
-                                { label: '90d', val: 90 },
-                                { label: 'All', val: 0 }
-                            ].map((opt) => (
-                                <button
-                                    key={opt.label}
-                                    onClick={() => handleDownloadTimeframe(opt.val)}
-                                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
                 </div>
 
                 {isDownloadSort && (
@@ -687,6 +782,7 @@ export const Browse: React.FC<BrowseProps> = ({
     const [itemsPerPage, setItemsPerPage] = useState(12);
 
     const [isScrolled, setIsScrolled] = useState(false);
+    const isScrolledRef = useRef(false);
 
     const abortControllerRef = useRef<AbortController | null>(null);
     const cardsSectionRef = useRef<HTMLDivElement>(null);
@@ -707,12 +803,81 @@ export const Browse: React.FC<BrowseProps> = ({
     }, [items]);
 
     useEffect(() => {
+        let lastScrollY = window.scrollY;
+        let ticking = false;
+        let transitionLock = false;
+        let lockTimeout: NodeJS.Timeout;
+
         const handleScroll = () => {
-            setIsScrolled(window.scrollY > 20);
+            if (transitionLock) return;
+
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const currentScrollY = Math.max(0, window.scrollY);
+
+                    if (currentScrollY <= 0 || currentScrollY + window.innerHeight >= document.documentElement.scrollHeight - 50) {
+                        ticking = false;
+                        return;
+                    }
+
+                    const scrollDownThreshold = 15;
+                    const scrollUpThreshold = 20;
+                    const offsetThreshold = 80;
+
+                    if (currentScrollY > lastScrollY + scrollDownThreshold) {
+                        if (currentScrollY > offsetThreshold && !isScrolledRef.current) {
+                            isScrolledRef.current = true;
+                            setIsScrolled(true);
+
+                            // Lock scroll processing while animating (300ms duration)
+                            transitionLock = true;
+                            clearTimeout(lockTimeout);
+                            lockTimeout = setTimeout(() => {
+                                transitionLock = false;
+                                lastScrollY = window.scrollY;
+                            }, 300);
+                        } else if (!transitionLock) {
+                            lastScrollY = currentScrollY;
+                        }
+                    } else if (currentScrollY < lastScrollY - scrollUpThreshold) {
+                        if (isScrolledRef.current) {
+                            isScrolledRef.current = false;
+                            setIsScrolled(false);
+
+                            transitionLock = true;
+                            clearTimeout(lockTimeout);
+                            lockTimeout = setTimeout(() => {
+                                transitionLock = false;
+                                lastScrollY = window.scrollY;
+                            }, 300);
+                        } else if (!transitionLock) {
+                            lastScrollY = currentScrollY;
+                        }
+                    } else if (currentScrollY <= offsetThreshold && isScrolledRef.current) {
+                        isScrolledRef.current = false;
+                        setIsScrolled(false);
+
+                        transitionLock = true;
+                        clearTimeout(lockTimeout);
+                        lockTimeout = setTimeout(() => {
+                            transitionLock = false;
+                            lastScrollY = window.scrollY;
+                        }, 300);
+                    }
+
+                    ticking = false;
+                });
+                ticking = true;
+            }
         };
+
         window.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll();
-        return () => window.removeEventListener('scroll', handleScroll);
+        handleScroll(); // Init
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            clearTimeout(lockTimeout);
+        };
     }, []);
 
     useEffect(() => {
