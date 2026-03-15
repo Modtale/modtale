@@ -896,7 +896,7 @@ export const Browse: React.FC<BrowseProps> = ({
                     } else {
                         next.delete('q');
                     }
-                    next.set('page', '0');
+                    next.delete('page');
                     return next;
                 }, { replace: true });
             }
@@ -915,8 +915,8 @@ export const Browse: React.FC<BrowseProps> = ({
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
-            let cols = 1;
-            let rows = 12;
+            let cols;
+            let rows;
 
             if (viewStyle === 'grid') {
                 cols = width >= 1800 ? 3 : (width >= 768 ? 2 : 1);
@@ -935,7 +935,7 @@ export const Browse: React.FC<BrowseProps> = ({
                 if (prev !== targetSize) {
                     setSearchParams(prevParams => {
                         const next = new URLSearchParams(prevParams);
-                        next.set('page', '0');
+                        next.delete('page');
                         return next;
                     }, { replace: true });
                     return targetSize;
@@ -1023,14 +1023,22 @@ export const Browse: React.FC<BrowseProps> = ({
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             Object.entries(updates).forEach(([key, value]) => {
-                if (value === null) {
+                if (
+                    value === null ||
+                    (key === 'page' && value === '0') ||
+                    (key === 'sort' && value === 'relevance') ||
+                    (key === 'view' && value === 'all') ||
+                    (key === 'version' && value === 'Any') ||
+                    (key === 'minDl' && value === '0') ||
+                    (key === 'minFav' && value === '0')
+                ) {
                     next.delete(key);
                 } else {
                     next.set(key, value);
                 }
             });
             if (!updates.hasOwnProperty('page')) {
-                next.set('page', '0');
+                next.delete('page');
             }
             return next;
         });
@@ -1070,7 +1078,11 @@ export const Browse: React.FC<BrowseProps> = ({
         if (p >= 0 && p < totalPages) {
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev);
-                next.set('page', p.toString());
+                if (p === 0) {
+                    next.delete('page');
+                } else {
+                    next.set('page', p.toString());
+                }
                 return next;
             });
             handleScrollTop();
@@ -1099,7 +1111,7 @@ export const Browse: React.FC<BrowseProps> = ({
         }
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
-            next.set('page', '0');
+            next.delete('page');
             return next;
         });
     }, [setSearchParams]);
@@ -1126,7 +1138,7 @@ export const Browse: React.FC<BrowseProps> = ({
             next.delete('minFav');
             next.delete('date');
             next.delete('tags');
-            next.set('page', '0');
+            next.delete('page');
             return next;
         });
         setIsTopFilterOpen(false);
@@ -1134,21 +1146,29 @@ export const Browse: React.FC<BrowseProps> = ({
 
     const createViewUrl = (viewId: string) => {
         const search = new URLSearchParams(searchParams);
-        search.set('view', viewId);
+        if (viewId === 'all') search.delete('view'); else search.set('view', viewId);
+
         if (viewId === 'hidden_gems') search.set('sort', 'favorites');
         else if (viewId === 'popular') search.set('sort', 'popular');
         else if (viewId === 'trending') search.set('sort', 'trending');
         else if (viewId === 'new') search.set('sort', 'newest');
         else if (viewId === 'updated') search.set('sort', 'updated');
-        else search.set('sort', 'relevance');
+        else search.delete('sort');
+
         search.delete('page');
-        return `?${search.toString()}`;
+        const str = search.toString();
+        return str ? `?${str}` : '';
     };
 
     const createPageUrl = (p: number) => {
         const search = new URLSearchParams(searchParams);
-        search.set('page', p.toString());
-        return `?${search.toString()}`;
+        if (p === 0) {
+            search.delete('page');
+        } else {
+            search.set('page', p.toString());
+        }
+        const str = search.toString();
+        return str ? `?${str}` : '';
     };
 
     const activeFilterCount = (selectedVersion !== 'Any' ? 1 : 0) + (minDownloads > 0 ? 1 : 0) + (minFavorites > 0 ? 1 : 0) + (filterDate ? 1 : 0);
