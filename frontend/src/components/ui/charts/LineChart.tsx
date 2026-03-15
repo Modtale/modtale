@@ -1,4 +1,4 @@
-import React, { useState, useId } from 'react';
+import React, { useState, useId, useEffect, useRef } from 'react';
 
 interface DataPoint {
     date: string;
@@ -27,10 +27,10 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
     const hasData = activeDatasets.length > 0;
 
     const allValues = activeDatasets.flatMap(d => d.data.map(p => p.value));
-    const rawMax = Math.max(...allValues, 5);
-    const rawMin = Math.min(...allValues, 0);
+    const rawMax = hasData ? Math.max(...allValues, 5) : 5;
+    const rawMin = hasData ? Math.min(...allValues, 0) : 0;
 
-    const hasNegative = allValues.some(v => v < 0);
+    const hasNegative = hasData ? allValues.some(v => v < 0) : false;
     const valRange = Math.max(rawMax - (hasNegative ? rawMin : 0), 1);
 
     const roughStep = Math.max(valRange / 4, 1);
@@ -43,12 +43,47 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
     else if (normalizedStep <= 5) niceStep = 5;
     const finalStep = niceStep * stepMagnitude;
 
-    const displayMin = hasNegative ? Math.floor(rawMin / finalStep) * finalStep : 0;
-    const displayMax = Math.ceil(rawMax / finalStep) * finalStep;
+    const targetDisplayMin = hasNegative ? Math.floor(rawMin / finalStep) * finalStep : 0;
+    const targetDisplayMax = Math.ceil(rawMax / finalStep) * finalStep;
+
+    const animMinRef = useRef(targetDisplayMin);
+    const animMaxRef = useRef(targetDisplayMax);
+    const [animMin, setAnimMin] = useState(targetDisplayMin);
+    const [animMax, setAnimMax] = useState(targetDisplayMax);
+
+    useEffect(() => {
+        let frameId: number;
+        const update = () => {
+            const currentMin = animMinRef.current;
+            const currentMax = animMaxRef.current;
+
+            let nextMin = currentMin + (targetDisplayMin - currentMin) * 0.1;
+            let nextMax = currentMax + (targetDisplayMax - currentMax) * 0.1;
+
+            if (Math.abs(targetDisplayMin - nextMin) < 0.5) nextMin = targetDisplayMin;
+            if (Math.abs(targetDisplayMax - nextMax) < 0.5) nextMax = targetDisplayMax;
+
+            animMinRef.current = nextMin;
+            animMaxRef.current = nextMax;
+
+            setAnimMin(nextMin);
+            setAnimMax(nextMax);
+
+            if (nextMin !== targetDisplayMin || nextMax !== targetDisplayMax) {
+                frameId = requestAnimationFrame(update);
+            }
+        };
+
+        frameId = requestAnimationFrame(update);
+        return () => cancelAnimationFrame(frameId);
+    }, [targetDisplayMin, targetDisplayMax]);
+
+    const displayMin = animMin;
+    const displayMax = animMax;
     const displayRange = Math.max(displayMax - displayMin, 1);
 
     const ticks = [];
-    for (let i = displayMin; i <= displayMax; i += finalStep) {
+    for (let i = targetDisplayMin; i <= targetDisplayMax; i += finalStep) {
         ticks.push(i);
     }
 
@@ -98,7 +133,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
 
     const referenceDataset = activeDatasets.find(d => d.data.length > 0) || activeDatasets[0];
     const dates = referenceDataset?.data.map(d => d.date) || [];
-    const zeroY = displayMin < 0 && displayMax > 0 ? getY(0) : null;
+    const zeroY = targetDisplayMin < 0 && targetDisplayMax > 0 ? getY(0) : null;
 
     return (
         <div className="w-full select-none h-full flex flex-col relative">

@@ -1,4 +1,4 @@
-import React, { useState, useId } from 'react';
+import React, { useState, useId, useEffect, useRef } from 'react';
 
 interface BarData {
     id: string;
@@ -31,7 +31,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
     const chartWidth = width - (paddingX * 2);
     const chartHeight = height - paddingTop - paddingBottom;
 
-    const rawMax = Math.max(...activeData.map(d => d.value), 1);
+    const rawMax = hasData ? Math.max(...activeData.map(d => d.value), 1) : 1;
     const roughStep = Math.max(rawMax / 4, 1);
     const stepMagnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
     const normalizedStep = roughStep / stepMagnitude;
@@ -42,9 +42,35 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
     else if (normalizedStep <= 5) niceStep = 5;
     const finalStep = niceStep * stepMagnitude;
 
-    const displayMax = Math.ceil(rawMax / finalStep) * finalStep;
+    const targetDisplayMax = Math.ceil(rawMax / finalStep) * finalStep;
+
+    const animMaxRef = useRef(targetDisplayMax);
+    const [animMax, setAnimMax] = useState(targetDisplayMax);
+
+    useEffect(() => {
+        let frameId: number;
+        const update = () => {
+            const currentMax = animMaxRef.current;
+            let nextMax = currentMax + (targetDisplayMax - currentMax) * 0.1;
+
+            if (Math.abs(targetDisplayMax - nextMax) < 0.5) nextMax = targetDisplayMax;
+
+            animMaxRef.current = nextMax;
+            setAnimMax(nextMax);
+
+            if (nextMax !== targetDisplayMax) {
+                frameId = requestAnimationFrame(update);
+            }
+        };
+
+        frameId = requestAnimationFrame(update);
+        return () => cancelAnimationFrame(frameId);
+    }, [targetDisplayMax]);
+
+    const displayMax = animMax;
+
     const ticks = [];
-    for (let i = 0; i <= displayMax; i += finalStep) {
+    for (let i = 0; i <= targetDisplayMax; i += finalStep) {
         ticks.push(i);
     }
 
