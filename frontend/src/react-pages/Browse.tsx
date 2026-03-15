@@ -820,26 +820,26 @@ export const Browse: React.FC<BrowseProps> = ({
                         return;
                     }
 
-                    const scrollDownThreshold = 15;
-                    const scrollUpThreshold = 20;
-                    const offsetThreshold = 80;
+                    const collapseThreshold = 300;
+                    const expandThreshold = 50;
 
-                    if (currentScrollY > lastScrollY + scrollDownThreshold) {
-                        if (currentScrollY > offsetThreshold && !isScrolledRef.current) {
+                    const delta = currentScrollY - lastScrollY;
+
+                    if (delta > 15) {
+                        if (currentScrollY > collapseThreshold && !isScrolledRef.current) {
                             isScrolledRef.current = true;
                             setIsScrolled(true);
 
-                            // Lock scroll processing while animating (300ms duration)
                             transitionLock = true;
                             clearTimeout(lockTimeout);
                             lockTimeout = setTimeout(() => {
                                 transitionLock = false;
                                 lastScrollY = window.scrollY;
-                            }, 300);
+                            }, 400);
                         } else if (!transitionLock) {
                             lastScrollY = currentScrollY;
                         }
-                    } else if (currentScrollY < lastScrollY - scrollUpThreshold) {
+                    } else if (delta < -25) {
                         if (isScrolledRef.current) {
                             isScrolledRef.current = false;
                             setIsScrolled(false);
@@ -849,11 +849,11 @@ export const Browse: React.FC<BrowseProps> = ({
                             lockTimeout = setTimeout(() => {
                                 transitionLock = false;
                                 lastScrollY = window.scrollY;
-                            }, 300);
+                            }, 400);
                         } else if (!transitionLock) {
                             lastScrollY = currentScrollY;
                         }
-                    } else if (currentScrollY <= offsetThreshold && isScrolledRef.current) {
+                    } else if (currentScrollY <= expandThreshold && isScrolledRef.current) {
                         isScrolledRef.current = false;
                         setIsScrolled(false);
 
@@ -862,7 +862,7 @@ export const Browse: React.FC<BrowseProps> = ({
                         lockTimeout = setTimeout(() => {
                             transitionLock = false;
                             lastScrollY = window.scrollY;
-                        }, 300);
+                        }, 400);
                     }
 
                     ticking = false;
@@ -872,7 +872,7 @@ export const Browse: React.FC<BrowseProps> = ({
         };
 
         window.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll(); // Init
+        handleScroll();
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
