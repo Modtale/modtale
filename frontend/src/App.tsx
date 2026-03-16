@@ -206,8 +206,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} /> :
-                                        <Navigate to="/" />
+                                    <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
                             } />
 
                             <Route path="/dashboard/*" element={

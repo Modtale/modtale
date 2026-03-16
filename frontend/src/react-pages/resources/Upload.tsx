@@ -9,6 +9,7 @@ import { ArrowLeft, ArrowRight, AlertCircle, Building2, User as UserIcon, Chevro
 import type { User, Mod } from '../../types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { SignInModal } from '../../components/user/SignInModal';
 
 interface UploadProps {
     onNavigate: (page: string) => void;
@@ -25,6 +26,7 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     const [draftId, setDraftId] = useState<string | null>(null);
     const [statusModal, setStatusModal] = useState<{type: 'success' | 'error' | 'warning', title: string, msg: string} | null>(null);
     const [versionToDelete, setVersionToDelete] = useState<string | null>(null);
+    const [showSignInModal, setShowSignInModal] = useState(false);
 
     const [classification, setClassification] = useState<Classification | null>(null);
     const [title, setTitle] = useState('');
@@ -49,7 +51,15 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
     });
 
     useEffect(() => {
-        if (currentUser) {
+        if (!currentUser) {
+            setShowSignInModal(true);
+        } else if (!currentUser.emailVerified) {
+            setStatusModal({
+                type: 'error',
+                title: 'Verification Required',
+                msg: "You must verify your email address before creating a project."
+            });
+        } else {
             if (!owner) {
                 setOwner(currentUser.username);
             }
@@ -70,6 +80,20 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [currentUser]);
+
+    const handleSignInClose = () => {
+        setShowSignInModal(false);
+        if (!currentUser) {
+            navigate('/');
+        }
+    };
+
+    const handleStatusModalClose = () => {
+        setStatusModal(null);
+        if (currentUser && !currentUser.emailVerified) {
+            navigate('/');
+        }
+    };
 
     const handleClassificationSelect = (typeId: string) => {
         if (!currentUser) {
@@ -365,7 +389,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
         return (
             <>
-                {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
+                {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={handleStatusModalClose} />}
+                {showSignInModal && <SignInModal isOpen={showSignInModal} onClose={handleSignInClose} />}
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors duration-300">
                     <div className={`${containerClasses} mx-auto w-full flex flex-col transition-[max-width,padding] duration-300 flex-1 pt-12 md:pt-20 pb-16`}>
 
@@ -414,7 +439,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
         return (
             <>
-                {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
+                {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={handleStatusModalClose} />}
+                {showSignInModal && <SignInModal isOpen={showSignInModal} onClose={handleSignInClose} />}
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors duration-300">
                     <div className={`${containerClasses} mx-auto w-full flex flex-col pt-12 md:pt-20 pb-16 flex-1`}>
                         <button onClick={() => setStep(0)} className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors group w-fit mb-12 md:mb-16">
@@ -504,7 +530,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
 
     return (
         <>
-            {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
+            {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={handleStatusModalClose} />}
+            {showSignInModal && <SignInModal isOpen={showSignInModal} onClose={handleSignInClose} />}
             {versionToDelete && (
                 <StatusModal
                     type="warning"
