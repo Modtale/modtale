@@ -31,36 +31,57 @@ import { useMobile } from '../../context/MobileContext';
 import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
 
 const markdownComponents = {
-    code({node, inline, className, children, ...props}: any) {
-        const match = /language-(\w+)/.exec(className || '')
+    code({ node, inline, className, children, ...props }: any) {
+        const match = /language-(\w+)/.exec(className || '');
+        const raw = Array.isArray(children) ? children.join('') : String(children ?? '');
+        const content = raw.replace(/\n$/, '');
+
         return !inline && match ? (
-            <SyntaxHighlighter
-                {...props}
-                style={vscDarkPlus}
-                language={match[1]}
-                PreTag="div"
-                className="rounded-lg text-sm"
-            >
-                {String(children).replace(/\n$/, '')}
-            </SyntaxHighlighter>
+            <div className="relative w-full my-6 rounded-xl overflow-hidden bg-[#1e1e1e] ring-1 ring-white/10 shadow-2xl">
+                <SyntaxHighlighter
+                    {...props}
+                    style={vscDarkPlus}
+                    language={match[1]}
+                    PreTag="div"
+                    className="!bg-transparent !m-0 !p-5 text-sm font-mono leading-relaxed"
+                    customStyle={{
+                        margin: 0,
+                        padding: '1.25rem',
+                        background: 'transparent',
+                        whiteSpace: 'pre-wrap',
+                    }}
+                >
+                    {content}
+                </SyntaxHighlighter>
+            </div>
         ) : (
-            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                {children}
+            <code
+                className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[0.9em] font-bold font-mono text-blue-600 dark:text-blue-400`}
+                {...props}
+            >
+                {raw}
             </code>
-        )
+        );
     },
-    p({node, children, ...props}: any) {
-        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
+    p({ node, children, ...props }: any) {
+        return <p className="my-4 leading-relaxed break-words" {...props}>{children}</p>;
     },
-    li({node, children, ...props}: any) {
-        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
+    li({ node, children, ...props }: any) {
+        return <li className="my-1 [&>p]:my-0 break-words" {...props}>{children}</li>;
     },
-    ul({node, children, ...props}: any) {
-        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
+    ul({ node, children, ...props }: any) {
+        return <ul className="list-disc pl-6 my-4 space-y-1" {...props}>{children}</ul>;
     },
-    ol({node, children, ...props}: any) {
-        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
-    }
+    ol({ node, children, ...props }: any) {
+        return <ol className="list-decimal pl-6 my-4 space-y-1" {...props}>{children}</ol>;
+    },
+    pre({ node, children, ...props }: any) {
+        return (
+            <pre className="w-full overflow-x-auto rounded-xl bg-transparent p-0 m-0" {...props}>
+                {children}
+            </pre>
+        );
+    },
 };
 
 const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boolean = false) => {
@@ -503,19 +524,25 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                         <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group relative overflow-hidden">
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden shrink-0">
-                                        {authorAvatar ? (
-                                            <OptimizedImage
-                                                src={authorAvatar}
-                                                alt={`${authorUsername} Avatar`}
-                                                baseWidth={40}
-                                                className="w-full h-full"
-                                            />
-                                        ) : (
-                                            authorUsername.charAt(0).toUpperCase()
-                                        )}
+                                    <Link to={profileLink} className="relative z-10 shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all">
+                                            {authorAvatar ? (
+                                                <OptimizedImage
+                                                    src={authorAvatar}
+                                                    alt={`${authorUsername} Avatar`}
+                                                    baseWidth={40}
+                                                    className="w-full h-full"
+                                                />
+                                            ) : (
+                                                authorUsername.charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                    </Link>
+                                    <div className="relative z-10">
+                                        <Link to={profileLink} className="font-bold text-slate-900 dark:text-white block hover:text-modtale-accent transition-colors">
+                                            {authorUsername}
+                                        </Link>
                                     </div>
-                                    <div><Link to={profileLink} className="font-bold text-slate-900 dark:text-white block hover:text-modtale-accent transition-colors">{authorUsername}</Link></div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
                                     <div suppressHydrationWarning className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -545,7 +572,9 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                     </div>
                                 </div>
                             </div>
-                            <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
+                            <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap leading-relaxed">
+                                {comment.content}
+                            </div>
 
                             {replyingCommentId === comment.id && (
                                 <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
@@ -587,19 +616,21 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                         <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-white/5">
                                             <div className="flex justify-between items-start mb-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0 shadow-sm">
-                                                        {replyAvatar ? (
-                                                            <OptimizedImage
-                                                                src={replyAvatar}
-                                                                alt={`${replyUsername} Avatar`}
-                                                                baseWidth={32}
-                                                                className="w-full h-full"
-                                                            />
-                                                        ) : (
-                                                            <Crown className="w-4 h-4" aria-hidden="true" />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex flex-col">
+                                                    <Link to={replyProfileLink} className="relative z-10 shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0 shadow-sm hover:ring-2 hover:ring-white transition-all">
+                                                            {replyAvatar ? (
+                                                                <OptimizedImage
+                                                                    src={replyAvatar}
+                                                                    alt={`${replyUsername} Avatar`}
+                                                                    baseWidth={32}
+                                                                    className="w-full h-full"
+                                                                />
+                                                            ) : (
+                                                                <Crown className="w-4 h-4" aria-hidden="true" />
+                                                            )}
+                                                        </div>
+                                                    </Link>
+                                                    <div className="flex flex-col relative z-10">
                                                         <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1">
                                                             <Link to={replyProfileLink} className="hover:text-modtale-accent transition-colors">{replyUsername}</Link>
                                                             <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-widest ml-1 flex items-center gap-1">
@@ -612,7 +643,9 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">{comment.developerReply.content}</p>
+                                            <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed">
+                                                {comment.developerReply.content}
+                                            </div>
                                         </div>
                                     </div>
                                 );
