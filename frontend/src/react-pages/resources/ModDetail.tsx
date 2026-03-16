@@ -27,8 +27,8 @@ import { DependencyModal, DownloadModal, HistoryModal, PostDownloadModal } from 
 import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout';
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
-import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
 import { useMobile } from '../../context/MobileContext';
+import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
 
 const markdownComponents = {
     code({node, inline, className, children, ...props}: any) {
@@ -450,8 +450,8 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
         } catch (err: any) { onError(err.response?.data || 'Failed to post reply.'); } finally { setSubmitting(false); }
     };
 
-    const resolveAvatar = (url?: string) => {
-        if (!url) return null;
+    const resolveAvatar = (url?: string | null) => {
+        if (!url || url === 'null') return null;
         if (url.startsWith('http')) return url;
         return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     };
@@ -488,13 +488,11 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                     const anyC = comment as any;
                     const authorId = anyC.authorId || anyC.userId;
 
-                    const authorUsername = authorId && userProfiles[authorId]
-                        ? userProfiles[authorId].username
-                        : (anyC.author?.username || anyC.authorName || anyC.author || anyC.username || anyC.user || 'Unknown');
+                    const authorUsername = (authorId && userProfiles[authorId]?.username)
+                        || anyC.author?.username || anyC.authorName || anyC.author || anyC.username || anyC.user || anyC.userId || 'Unknown';
 
-                    const rawAvatar = authorId && userProfiles[authorId]
-                        ? userProfiles[authorId].avatarUrl
-                        : (anyC.author?.avatarUrl || anyC.authorAvatarUrl || anyC.avatarUrl || anyC.userAvatarUrl);
+                    const rawAvatar = (authorId && userProfiles[authorId]?.avatarUrl)
+                        || anyC.author?.avatarUrl || anyC.authorAvatarUrl || anyC.avatarUrl || anyC.userAvatarUrl;
 
                     const authorAvatar = resolveAvatar(rawAvatar);
 
@@ -572,13 +570,11 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                 const devReply = comment.developerReply as any;
                                 const replyId = devReply.authorId || devReply.userId;
 
-                                const replyUsername = replyId && userProfiles[replyId]
-                                    ? userProfiles[replyId].username
-                                    : (devReply.author?.username || devReply.authorName || devReply.author || devReply.username || devReply.user || 'Developer');
+                                const replyUsername = (replyId && userProfiles[replyId]?.username)
+                                    || devReply.author?.username || devReply.authorName || devReply.author || devReply.username || devReply.user || devReply.userId || 'Developer';
 
-                                const rawReplyAvatar = replyId && userProfiles[replyId]
-                                    ? userProfiles[replyId].avatarUrl
-                                    : (devReply.author?.avatarUrl || devReply.authorAvatarUrl || devReply.avatarUrl || devReply.userAvatarUrl);
+                                const rawReplyAvatar = (replyId && userProfiles[replyId]?.avatarUrl)
+                                    || devReply.author?.avatarUrl || devReply.authorAvatarUrl || devReply.avatarUrl || devReply.userAvatarUrl;
 
                                 const replyAvatar = resolveAvatar(rawReplyAvatar);
                                 const replyProfileLink = `/creator/${replyUsername}`;
@@ -1067,14 +1063,14 @@ export const ModDetail: React.FC<{
             )}
 
             {isUnlisted && (
-                <div className="sticky top-0 z-[100] w-full bg-amber-500/90 dark:bg-amber-500/20 backdrop-blur-md border-b border-amber-500/30 text-white dark:text-amber-500 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
+                <div className="sticky top-16 lg:top-20 z-[100] w-full bg-amber-500/90 dark:bg-amber-500/20 backdrop-blur-md border-b border-amber-500/30 text-white dark:text-amber-500 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
                     <AlertTriangle className="w-4 h-4" />
                     This project is unlisted. Only people with the link can view it.
                 </div>
             )}
 
             {isArchived && (
-                <div className="sticky top-0 z-[100] w-full bg-slate-600/90 dark:bg-slate-500/20 backdrop-blur-md border-b border-slate-500/30 text-white dark:text-slate-400 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
+                <div className="sticky top-16 lg:top-20 z-[100] w-full bg-slate-600/90 dark:bg-slate-500/20 backdrop-blur-md border-b border-slate-500/30 text-white dark:text-slate-400 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
                     <Archive className="w-4 h-4" />
                     This project is archived. It is read-only and no longer actively maintained.
                 </div>
@@ -1306,7 +1302,7 @@ export const ModDetail: React.FC<{
                                         <Box className="w-4 h-4" aria-hidden="true" /> Included Mods <ChevronDown className={`w-4 h-4 transition-transform ${showMobileDeps ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileDeps && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
+                                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
                                             {latestDependencies.map((dep, idx) => {
                                                 const meta = depMeta[dep.modId];
                                                 const title = meta?.title || dep.modTitle || dep.modId;
@@ -1366,7 +1362,7 @@ export const ModDetail: React.FC<{
                                         <LinkIcon className="w-4 h-4" aria-hidden="true" /> External Links <ChevronDown className={`w-4 h-4 transition-transform ${showMobileLinks ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileLinks && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
+                                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
                                             {links.map((link, idx) => (
                                                 <a
                                                     key={idx}
