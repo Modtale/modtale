@@ -370,8 +370,14 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
     useEffect(() => {
         const userIds = new Set<string>();
         comments.forEach(c => {
-            if ((c as any).userId && !userProfiles[(c as any).userId]) userIds.add((c as any).userId);
-            if (c.developerReply && (c.developerReply as any).userId && !userProfiles[(c.developerReply as any).userId]) userIds.add((c.developerReply as any).userId);
+            const anyC = c as any;
+            const aId = anyC.authorId || anyC.userId;
+            if (aId && !userProfiles[aId]) userIds.add(aId);
+
+            if (anyC.developerReply) {
+                const rId = anyC.developerReply.authorId || anyC.developerReply.userId;
+                if (rId && !userProfiles[rId]) userIds.add(rId);
+            }
         });
 
         if (userIds.size > 0) {
@@ -444,6 +450,12 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
         } catch (err: any) { onError(err.response?.data || 'Failed to post reply.'); } finally { setSubmitting(false); }
     };
 
+    const resolveAvatar = (url?: string) => {
+        if (!url) return null;
+        if (url.startsWith('http')) return url;
+        return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
+
     if (commentsDisabled && !isCreator) return null;
 
     return (
@@ -473,11 +485,21 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
 
             <div className="space-y-4">
                 {comments?.length > 0 ? comments.map((comment) => {
-                    const authorId = (comment as any).userId;
-                    const authorUsername = authorId && userProfiles[authorId] ? userProfiles[authorId].username : (comment.user || 'Unknown');
-                    const authorAvatar = authorId && userProfiles[authorId] ? userProfiles[authorId].avatarUrl : comment.userAvatarUrl;
+                    const anyC = comment as any;
+                    const authorId = anyC.authorId || anyC.userId;
+
+                    const authorUsername = authorId && userProfiles[authorId]
+                        ? userProfiles[authorId].username
+                        : (anyC.author?.username || anyC.authorName || anyC.author || anyC.username || anyC.user || 'Unknown');
+
+                    const rawAvatar = authorId && userProfiles[authorId]
+                        ? userProfiles[authorId].avatarUrl
+                        : (anyC.author?.avatarUrl || anyC.authorAvatarUrl || anyC.avatarUrl || anyC.userAvatarUrl);
+
+                    const authorAvatar = resolveAvatar(rawAvatar);
+
                     const profileLink = `/creator/${authorUsername}`;
-                    const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === comment.user);
+                    const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
 
                     return (
                         <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group relative overflow-hidden">
@@ -547,10 +569,19 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                             )}
 
                             {comment.developerReply && !replyingCommentId && (() => {
-                                const replyId = (comment.developerReply as any).userId;
-                                const replyUsername = replyId && userProfiles[replyId] ? userProfiles[replyId].username : (comment.developerReply.user || 'Developer');
-                                const replyAvatar = replyId && userProfiles[replyId] ? userProfiles[replyId].avatarUrl : comment.developerReply.userAvatarUrl;
-                                const replyProfileLink = `/creator/${replyUsername || comment.developerReply.user}`;
+                                const devReply = comment.developerReply as any;
+                                const replyId = devReply.authorId || devReply.userId;
+
+                                const replyUsername = replyId && userProfiles[replyId]
+                                    ? userProfiles[replyId].username
+                                    : (devReply.author?.username || devReply.authorName || devReply.author || devReply.username || devReply.user || 'Developer');
+
+                                const rawReplyAvatar = replyId && userProfiles[replyId]
+                                    ? userProfiles[replyId].avatarUrl
+                                    : (devReply.author?.avatarUrl || devReply.authorAvatarUrl || devReply.avatarUrl || devReply.userAvatarUrl);
+
+                                const replyAvatar = resolveAvatar(rawReplyAvatar);
+                                const replyProfileLink = `/creator/${replyUsername}`;
 
                                 return (
                                     <div className="mt-6 ml-6 md:ml-12 pl-6 border-l-2 border-slate-200 dark:border-white/10 relative">
@@ -1035,6 +1066,20 @@ export const ModDetail: React.FC<{
                 </Helmet>
             )}
 
+            {isUnlisted && (
+                <div className="sticky top-0 z-[100] w-full bg-amber-500/90 dark:bg-amber-500/20 backdrop-blur-md border-b border-amber-500/30 text-white dark:text-amber-500 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
+                    <AlertTriangle className="w-4 h-4" />
+                    This project is unlisted. Only people with the link can view it.
+                </div>
+            )}
+
+            {isArchived && (
+                <div className="sticky top-0 z-[100] w-full bg-slate-600/90 dark:bg-slate-500/20 backdrop-blur-md border-b border-slate-500/30 text-white dark:text-slate-400 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
+                    <Archive className="w-4 h-4" />
+                    This project is archived. It is read-only and no longer actively maintained.
+                </div>
+            )}
+
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />
 
@@ -1138,20 +1183,6 @@ export const ModDetail: React.FC<{
                 </div>
             )}
 
-            {isUnlisted && (
-                <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-500 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold">
-                    <AlertTriangle className="w-4 h-4" />
-                    This project is unlisted. Only people with the link can view it.
-                </div>
-            )}
-
-            {isArchived && (
-                <div className="bg-slate-500/10 border-b border-slate-500/20 text-slate-700 dark:text-slate-400 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold">
-                    <Archive className="w-4 h-4" />
-                    This project is archived. It is read-only and no longer actively maintained.
-                </div>
-            )}
-
             <ProjectLayout
                 bannerUrl={mod.bannerUrl}
                 iconUrl={mod.imageUrl}
@@ -1215,8 +1246,8 @@ export const ModDetail: React.FC<{
                     </>
                 }
                 actionBar={
-                    <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 w-full">
-                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full xl:w-auto">
+                    <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-2 xl:gap-6 w-full">
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full xl:w-auto">
                             {(!mod.versions || mod.versions.length === 0) ? (
                                 <button
                                     disabled
@@ -1265,7 +1296,7 @@ export const ModDetail: React.FC<{
                             </div>
                         </div>
 
-                        <div className="w-full xl:w-auto flex flex-col md:flex-row justify-start md:justify-end gap-3">
+                        <div className="w-full xl:w-auto flex flex-col md:flex-row justify-start md:justify-end gap-2">
                             {isMobile && mod.classification === 'MODPACK' && latestDependencies.length > 0 && (
                                 <div className="relative w-full" ref={depsDropdownRef}>
                                     <button
@@ -1275,7 +1306,7 @@ export const ModDetail: React.FC<{
                                         <Box className="w-4 h-4" aria-hidden="true" /> Included Mods <ChevronDown className={`w-4 h-4 transition-transform ${showMobileDeps ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileDeps && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
                                             {latestDependencies.map((dep, idx) => {
                                                 const meta = depMeta[dep.modId];
                                                 const title = meta?.title || dep.modTitle || dep.modId;
@@ -1285,9 +1316,9 @@ export const ModDetail: React.FC<{
                                                         key={idx}
                                                         to={path}
                                                         onClick={() => setShowMobileDeps(false)}
-                                                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white text-left"
+                                                        className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-left"
                                                     >
-                                                        <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center border border-white/5 shrink-0 overflow-hidden">
+                                                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-950 flex items-center justify-center border border-slate-200 dark:border-white/5 shrink-0 overflow-hidden">
                                                             {meta?.icon ? (
                                                                 <OptimizedImage
                                                                     src={resolveUrl(meta.icon)}
@@ -1299,7 +1330,7 @@ export const ModDetail: React.FC<{
                                                         </div>
                                                         <div className="min-w-0 flex-1">
                                                             <div className="text-sm font-bold truncate">{title}</div>
-                                                            <div className="text-[10px] text-slate-400 font-mono">v{dep.versionNumber}</div>
+                                                            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">v{dep.versionNumber}</div>
                                                         </div>
                                                         <ExternalLink className="w-3 h-3 opacity-50 shrink-0" aria-hidden="true" />
                                                     </Link>
@@ -1335,16 +1366,16 @@ export const ModDetail: React.FC<{
                                         <LinkIcon className="w-4 h-4" aria-hidden="true" /> External Links <ChevronDown className={`w-4 h-4 transition-transform ${showMobileLinks ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileLinks && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
                                             {links.map((link, idx) => (
                                                 <a
                                                     key={idx}
                                                     href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white"
+                                                    className="flex items-center gap-3 p-2.5 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                                                 >
-                                                    <div className={`p-1.5 rounded-lg border bg-slate-950 ${getLinkColor(link.type)}`}>
+                                                    <div className={`p-1.5 rounded-lg border bg-slate-50 dark:bg-slate-950 ${getLinkColor(link.type)}`}>
                                                         <link.icon className="w-4 h-4" aria-hidden="true" />
                                                     </div>
                                                     <span className="text-sm font-bold">{link.label}</span>
