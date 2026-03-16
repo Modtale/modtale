@@ -136,7 +136,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             )}
 
             <div
-                className="absolute top-0 left-0 right-0 w-full aspect-[3/1] bg-slate-800 z-0 will-change-transform"
+                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
                 style={{ transform: `translateY(${parallaxOffset}px)` }}
             >
                 <div className="absolute inset-0 z-0">
@@ -149,7 +149,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             className="w-full h-full object-cover opacity-100"
                         />
                     ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-slate-950 dark:via-slate-950/20 to-transparent pointer-events-none" />
                     )}
                 </div>
 
@@ -194,11 +194,11 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             )}
 
             <div className={`${containerClasses} mx-auto relative z-50 -mt-2 md:-mt-32 transition-[max-width,padding] duration-300`}>
-                <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl min-h-[80vh]`}>
+                <div className={`bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl min-h-[80vh]`}>
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/5 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
-                                <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-32 h-32 rounded-3xl bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
                                         <OptimizedImage
@@ -208,7 +208,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             className="w-full h-full bg-transparent object-cover"
                                         />
                                     ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                                        <div className="w-full h-full bg-transparent flex flex-col items-center justify-center text-slate-500">
                                             <ImageIcon className="w-8 h-8 opacity-50" aria-hidden="true" />
                                         </div>
                                     )}
@@ -221,7 +221,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
-                                <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-56 h-56 rounded-3xl bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
                                         <OptimizedImage
@@ -232,7 +232,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             className="w-full h-full bg-transparent object-cover"
                                         />
                                     ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                                        <div className="w-full h-full bg-transparent flex flex-col items-center justify-center text-slate-500 gap-2">
                                             <ImageIcon className="w-10 h-10 opacity-50" aria-hidden="true" />
                                             <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">512x512</span>
                                         </div>
