@@ -7,7 +7,6 @@ import {
     Box, ChevronDown, Github, Code, X, List, TrendingUp
 } from 'lucide-react';
 import { LineChart } from '../components/ui/charts/LineChart';
-import { SignInModal } from '../components/user/SignInModal';
 import { OptimizedImage } from '../components/ui/OptimizedImage';
 import type { Mod, User } from '../types';
 import { api, BACKEND_URL } from '../utils/api';
@@ -417,13 +416,11 @@ const InlineNotificationUI = () => (
 );
 
 export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
-    const navigate = useNavigate();
     const ssrData = getInitialData();
 
     const [allMods, setAllMods] = useState<Mod[]>(ssrData?.homeMods || []);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
-    const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
 
     useEffect(() => {
         if (!ssrData || !ssrData.homeMods || ssrData.homeMods.length === 0) {
@@ -484,15 +481,6 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
         setHiddenSeries(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const handlePublishClick = (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (user) {
-            navigate('/upload');
-        } else {
-            setIsSignInModalOpen(true);
-        }
-    };
-
     const validFeaturedMods = allMods.filter(mod => {
         const hasBanner = Boolean(mod.bannerUrl);
         const hasCustomIcon = Boolean(mod.imageUrl) && !mod.imageUrl.includes('favicon.svg') && !mod.imageUrl.includes('favicon.png');
@@ -525,8 +513,6 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     }
                 `}</style>
             </Helmet>
-
-            <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
 
             <main className="relative z-10">
                 <section className="relative w-full min-h-[90vh] flex flex-col items-center justify-center pt-28 lg:pt-36 pb-20 border-b border-slate-200 dark:border-white/5 overflow-hidden">
@@ -570,14 +556,13 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                     <Search className="w-5 h-5 mr-3" aria-hidden="true" />
                                     Discover Projects
                                 </Link>
-                                <a
-                                    href="/upload"
-                                    onClick={handlePublishClick}
-                                    className="flex items-center justify-center px-10 h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+                                <Link
+                                    to="/upload"
+                                    className="flex items-center justify-center px-10 h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5"
                                 >
                                     <Upload className="w-5 h-5 mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                     Publish Work
-                                </a>
+                                </Link>
                             </nav>
 
                             <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-10 sm:gap-14 w-fit p-8 shadow-sm lg:-ml-1.5`}>
@@ -674,9 +659,9 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                                 Creators get access to powerful, privacy-respecting analytics. Track your daily modpack downloads, world page views, and week-over-week asset growth metrics instantly from your dashboard.
                             </p>
-                            <a href="/upload" onClick={handlePublishClick} className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-lg cursor-pointer">
+                            <Link to="/upload" className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-lg">
                                 Publish your project <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
-                            </a>
+                            </Link>
                         </div>
                         <div className="flex-1 w-full relative">
                             <div className="absolute -inset-10 bg-gradient-to-tr from-purple-400/20 to-transparent dark:from-purple-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
