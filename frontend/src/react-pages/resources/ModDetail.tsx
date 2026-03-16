@@ -868,6 +868,10 @@ export const ModDetail: React.FC<{
         return [...displayedVersions].sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
     }, [allVersions, showExperimental]);
 
+    const hasExperimentalVersions = useMemo(() => {
+        return allVersions.some(v => v.channel && v.channel !== 'RELEASE');
+    }, [allVersions]);
+
     const latestForGame = useMemo(() => {
         const result: Record<string, ProjectVersion[]> = {};
         allVersions.forEach(v => {
@@ -1084,6 +1088,7 @@ export const ModDetail: React.FC<{
                 showExperimental={showExperimental}
                 onToggleExperimental={() => setShowExperimental(!showExperimental)}
                 onDownload={initiateDownload}
+                hasExperimentalVersions={hasExperimentalVersions}
             />
 
             {galleryIndex !== null && mod.galleryImages && mod.galleryImages[galleryIndex] && (

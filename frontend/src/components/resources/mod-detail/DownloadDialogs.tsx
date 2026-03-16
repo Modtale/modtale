@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { ProjectVersion } from '../../../types';
 import { Download, X, ChevronDown, ChevronUp, Link as LinkIcon, List, AlertCircle, FileText, ChevronRight, Check, Copy } from 'lucide-react';
 import { formatTimeAgo, compareSemVer } from '../../../utils/modHelpers';
@@ -488,6 +488,10 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
     const [selectedGameVer, setSelectedGameVer] = useState<string>('');
     const [isListExpanded, setIsListExpanded] = useState(false);
 
+    const hasExperimentalVersions = useMemo(() => {
+        return Object.values(versionsByGame).flat().some((v: any) => v.channel && v.channel !== 'RELEASE');
+    }, [versionsByGame]);
+
     useEffect(() => {
         if (show) {
             const keys = Object.keys(versionsByGame).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
@@ -501,11 +505,11 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
         const currentVersions = versionsByGame[selectedGameVer] || [];
         if (currentVersions.length > 0) {
             const hasRelease = currentVersions.some((v: any) => !v.channel || v.channel === 'RELEASE');
-            if (!hasRelease && !showExperimental) {
+            if (!hasRelease && !showExperimental && hasExperimentalVersions) {
                 onToggleExperimental();
             }
         }
-    }, [selectedGameVer, versionsByGame, showExperimental, onToggleExperimental]);
+    }, [selectedGameVer, versionsByGame, showExperimental, onToggleExperimental, hasExperimentalVersions]);
 
     if (!show) return null;
 
@@ -543,12 +547,14 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
                     <div>
                         <h3 className="text-xl font-black text-white flex items-center gap-2"><Download className="w-5 h-5 text-modtale-accent" /> Download</h3>
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
-                            <div className={`w-8 h-4 rounded-full relative transition-colors ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-700'}`}>
-                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showExperimental ? 'translate-x-4' : ''}`} />
+                        {hasExperimentalVersions && (
+                            <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                                <div className={`w-8 h-4 rounded-full relative transition-colors ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-700'}`}>
+                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showExperimental ? 'translate-x-4' : ''}`} />
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">Show Beta/Alpha</span>
                             </div>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">Show Beta/Alpha</span>
-                        </div>
+                        )}
                     </div>
                     <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
@@ -621,7 +627,7 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                         <div className="text-center py-12 text-slate-500 flex flex-col items-center gap-2">
                             <AlertCircle className="w-8 h-8 opacity-50" />
                             <p className="font-medium">No compatible versions found.</p>
-                            {!showExperimental && currentVersions.length > 0 && (
+                            {!showExperimental && currentVersions.length > 0 && hasExperimentalVersions && (
                                 <button onClick={onToggleExperimental} className="text-xs text-modtale-accent font-bold hover:underline">
                                     Show Beta/Alpha versions
                                 </button>
@@ -640,9 +646,26 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
     );
 };
 
-export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperimental, onToggleExperimental, onDownload }) => {
+export const HistoryModal: React.FC<any> = ({
+                                                show,
+                                                onClose,
+                                                history,
+                                                showExperimental,
+                                                onToggleExperimental,
+                                                onDownload,
+                                                hasExperimentalVersions
+                                            }) => {
     useScrollLock(show);
     const [expandedChangelog, setExpandedChangelog] = useState<string | null>(null);
+
+    const actualHasExperimental = useMemo(() => {
+        if (hasExperimentalVersions !== undefined) return hasExperimentalVersions;
+        return history.some((v: any) => v.channel && v.channel !== 'RELEASE');
+    }, [history, hasExperimentalVersions]);
+
+    const visibleHistory = useMemo(() => {
+        return history.filter((v: any) => showExperimental || !v.channel || v.channel === 'RELEASE');
+    }, [history, showExperimental]);
 
     if (!show) return null;
 
@@ -661,19 +684,21 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20 shrink-0">
                     <div>
                         <h3 className="text-xl font-black text-white flex items-center gap-2"><List className="w-5 h-5 text-modtale-accent" /> Changelog</h3>
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
-                            <div className={`w-8 h-4 rounded-full relative transition-colors ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-700'}`}>
-                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showExperimental ? 'translate-x-4' : ''}`} />
+                        {actualHasExperimental && (
+                            <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                                <div className={`w-8 h-4 rounded-full relative transition-colors ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-700'}`}>
+                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showExperimental ? 'translate-x-4' : ''}`} />
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">Show Beta/Alpha</span>
                             </div>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">Show Beta/Alpha</span>
-                        </div>
+                        )}
                     </div>
                     <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 bg-slate-900 custom-scrollbar">
                     <div className="space-y-6">
-                        {history.map((ver: any) => {
+                        {visibleHistory.map((ver: any) => {
                             const isLong = ver.changelog && ver.changelog.length > 300;
                             return (
                                 <div key={ver.id} className="bg-slate-800/30 border border-white/5 rounded-xl p-5 shadow-sm hover:border-white/10 transition-colors">
