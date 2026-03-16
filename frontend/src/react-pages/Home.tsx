@@ -66,14 +66,14 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
     const projectUrl = `/${mod.classification === 'MODPACK' ? 'modpack' : mod.classification === 'SAVE' ? 'world' : 'mod'}/${createSlug(mod.title, mod.id)}`;
 
     return (
-        <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent">
+        <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden isolate hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent">
             <Link
                 to={projectUrl}
                 className="absolute inset-0 z-30 focus:outline-none"
                 aria-label={`Download ${mod.title} Hytale Mod`}
             />
 
-            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden shrink-0 ${bannerUrl ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
+            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 rounded-t-2xl overflow-hidden shrink-0 ${bannerUrl ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {bannerUrl ? (
                     <OptimizedImage
                         src={bannerUrl}
@@ -580,7 +580,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 </a>
                             </nav>
 
-                            <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-10 sm:gap-14 w-fit p-8 shadow-sm`}>
+                            <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-10 sm:gap-14 w-fit p-8 shadow-sm lg:-ml-1.5`}>
                                 <div className="flex flex-col items-center lg:items-start">
                                     <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalProjects} />
