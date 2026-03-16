@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ProjectVersion } from '../../../types';
 import { Download, X, ChevronDown, ChevronUp, Link as LinkIcon, List, AlertCircle, FileText, ChevronRight, Check, Copy } from 'lucide-react';
-import { formatTimeAgo, ChannelBadge, compareSemVer } from '../../../utils/modHelpers';
+import { formatTimeAgo, compareSemVer } from '../../../utils/modHelpers';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
@@ -38,7 +38,7 @@ interface MetaCache {
     [key: string]: { title: string; author: string; icon: string };
 }
 
-export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void; classification: string; title: string }> = ({ isOpen, onClose, classification, title }) => {
+export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void; classification: string; title: string; channel?: string }> = ({ isOpen, onClose, classification, title, channel = 'RELEASE' }) => {
     useScrollLock(isOpen);
     const [os, setOs] = useState<'windows' | 'macos' | 'linux'>('windows');
     const [copied, setCopied] = useState(false);
@@ -79,14 +79,37 @@ export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void;
         onClose();
     };
 
+    const theme = channel === 'ALPHA' ? {
+        text: 'text-red-400',
+        bg: 'bg-red-600',
+        bgAlpha: 'bg-red-500/20',
+        border: 'border-red-500/20',
+        iconGlow: 'bg-red-500/10 border-red-500/20',
+        checkHover: 'group-hover:border-red-500/30'
+    } : channel === 'BETA' ? {
+        text: 'text-purple-400',
+        bg: 'bg-purple-600',
+        bgAlpha: 'bg-purple-500/20',
+        border: 'border-purple-500/20',
+        iconGlow: 'bg-purple-500/10 border-purple-500/20',
+        checkHover: 'group-hover:border-purple-500/30'
+    } : {
+        text: 'text-modtale-accent',
+        bg: 'bg-modtale-accent',
+        bgAlpha: 'bg-modtale-accent/20',
+        border: 'border-modtale-accent/20',
+        iconGlow: 'bg-green-500/10 border-green-500/20 text-green-500',
+        checkHover: 'group-hover:border-white/30'
+    };
+
     return (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={handleClose}>
             <div className="bg-slate-950/95 backdrop-blur-2xl border border-white/10 rounded-3xl max-w-xl w-full shadow-2xl overflow-hidden flex flex-col ring-1 ring-black/50" onClick={e => e.stopPropagation()}>
 
-                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02] shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-center justify-center shadow-inner">
-                            <Download className="w-6 h-6 text-green-500" />
+                        <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shadow-inner ${theme.iconGlow}`}>
+                            <Download className={`w-6 h-6 ${channel === 'RELEASE' ? 'text-green-500' : theme.text}`} />
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-white tracking-tight">Download Started</h3>
@@ -96,52 +119,128 @@ export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void;
                     <button onClick={handleClose} className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className="p-6 bg-slate-900/30 overflow-y-auto custom-scrollbar">
-                    <div className="flex bg-black/40 rounded-xl p-1.5 border border-white/5 mb-6">
-                        {(['windows', 'macos', 'linux'] as const).map(platform => (
-                            <button
-                                key={platform}
-                                onClick={() => setOs(platform)}
-                                className={`flex-1 py-2 text-xs font-bold rounded-lg capitalize transition-all ${os === platform ? 'bg-modtale-accent text-white shadow-md' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
-                            >
-                                {platform}
-                            </button>
-                        ))}
-                    </div>
+                <div className="bg-slate-900/30 overflow-y-auto custom-scrollbar">
 
-                    <div className="space-y-3 text-sm text-slate-300 font-medium">
-                        <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                            <div className="w-8 h-8 rounded-full bg-modtale-accent/20 text-modtale-accent font-black flex items-center justify-center shrink-0 shadow-inner">1</div>
-                            <div className="pt-1.5">
-                                Locate the downloaded file in your <code className="bg-black/50 border border-white/10 px-1.5 py-0.5 rounded-md font-mono text-xs text-modtale-accent shadow-inner">Downloads</code> folder.
+                    {channel === 'ALPHA' && (
+                        <div className="mx-6 mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 text-red-400">
+                            <AlertCircle className="w-5 h-5 shrink-0" />
+                            <div>
+                                <p className="font-bold text-sm text-red-300">Alpha Version</p>
+                                <p className="text-xs text-red-200 mt-0.5 leading-relaxed">This is an early testing version. It may contain severe bugs, lack features, or cause data corruption. Use with caution.</p>
                             </div>
                         </div>
-                        <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                            <div className="w-8 h-8 rounded-full bg-modtale-accent/20 text-modtale-accent font-black flex items-center justify-center shrink-0 shadow-inner">2</div>
-                            <div className="w-full min-w-0 pt-1.5">
-                                <p className="mb-3">
-                                    {isModpack
-                                        ? `Unzip the downloaded file and place its contents into your Hytale ${folderName} directory:`
-                                        : `Move or extract the file to your Hytale ${folderName} directory:`
-                                    }
-                                </p>
-                                <div className="flex items-center gap-3 bg-black/50 border border-white/10 rounded-xl p-2 pl-3">
-                                    <code className="flex-1 font-mono text-[11px] text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
-                                    <button
-                                        onClick={handleCopy}
-                                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors shadow-sm shrink-0 self-start"
-                                        title="Copy Path"
-                                    >
-                                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                    </button>
-                                </div>
+                    )}
+
+                    {channel === 'BETA' && (
+                        <div className="mx-6 mt-6 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 flex gap-3 text-purple-400">
+                            <AlertCircle className="w-5 h-5 shrink-0" />
+                            <div>
+                                <p className="font-bold text-sm text-purple-300">Beta Version</p>
+                                <p className="text-xs text-purple-200 mt-0.5 leading-relaxed">This version is in testing and may contain bugs. Please report any issues you find to the developer.</p>
                             </div>
                         </div>
-                        <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                            <div className="w-8 h-8 rounded-full bg-modtale-accent/20 text-modtale-accent font-black flex items-center justify-center shrink-0 shadow-inner">3</div>
-                            <div className="pt-1.5">
-                                Restart your Hytale Launcher. The {typeName.toLowerCase()} should now be loaded automatically.
-                            </div>
+                    )}
+
+                    <div className="p-6">
+                        <div className="flex bg-black/40 rounded-xl p-1.5 border border-white/5 mb-6">
+                            {(['windows', 'macos', 'linux'] as const).map(platform => (
+                                <button
+                                    key={platform}
+                                    onClick={() => setOs(platform)}
+                                    className={`flex-1 py-2 text-xs font-bold rounded-lg capitalize transition-all ${os === platform ? `${theme.bg} text-white shadow-md` : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+                                >
+                                    {platform}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="space-y-3 text-sm text-slate-300 font-medium">
+                            {isWorld && (
+                                <>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>1</div>
+                                        <div className="pt-1.5">
+                                            Locate the downloaded zip file in your <code className={`bg-black/50 border border-white/10 px-1.5 py-0.5 rounded-md font-mono text-xs ${theme.text} shadow-inner`}>Downloads</code> folder.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
+                                        <div className="w-full min-w-0 pt-1.5">
+                                            <p className="mb-3">Extract the world folder and move it into your Hytale Saves directory:</p>
+                                            <div className="flex items-center gap-3 bg-black/50 border border-white/10 rounded-xl p-2 pl-3">
+                                                <code className="flex-1 font-mono text-[11px] text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
+                                                <button onClick={handleCopy} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors shadow-sm shrink-0 self-start" title="Copy Path">
+                                                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>3</div>
+                                        <div className="pt-1.5">
+                                            Launch Hytale and select the world from the Singleplayer menu.
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {isModpack && (
+                                <>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>1</div>
+                                        <div className="pt-1.5">
+                                            Locate the downloaded modpack in your <code className={`bg-black/50 border border-white/10 px-1.5 py-0.5 rounded-md font-mono text-xs ${theme.text} shadow-inner`}>Downloads</code> folder.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
+                                        <div className="w-full min-w-0 pt-1.5">
+                                            <p className="mb-3">Unzip the downloaded file and place ALL contents into your Hytale Mods directory:</p>
+                                            <div className="flex items-center gap-3 bg-black/50 border border-white/10 rounded-xl p-2 pl-3">
+                                                <code className="flex-1 font-mono text-[11px] text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
+                                                <button onClick={handleCopy} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors shadow-sm shrink-0 self-start" title="Copy Path">
+                                                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>3</div>
+                                        <div className="pt-1.5">
+                                            Restart your Hytale Launcher. The modpack will be loaded automatically.
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {!isWorld && !isModpack && (
+                                <>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>1</div>
+                                        <div className="pt-1.5">
+                                            Locate the downloaded file in your <code className={`bg-black/50 border border-white/10 px-1.5 py-0.5 rounded-md font-mono text-xs ${theme.text} shadow-inner`}>Downloads</code> folder.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
+                                        <div className="w-full min-w-0 pt-1.5">
+                                            <p className="mb-3">Move the file to your Hytale Mods directory:</p>
+                                            <div className="flex items-center gap-3 bg-black/50 border border-white/10 rounded-xl p-2 pl-3">
+                                                <code className="flex-1 font-mono text-[11px] text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
+                                                <button onClick={handleCopy} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors shadow-sm shrink-0 self-start" title="Copy Path">
+                                                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>3</div>
+                                        <div className="pt-1.5">
+                                            Restart your Hytale Launcher to load the new mod.
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -151,7 +250,7 @@ export const PostDownloadModal: React.FC<{ isOpen: boolean; onClose: () => void;
                         onClick={() => setDontShow(!dontShow)}
                         className="flex items-center gap-2.5 cursor-pointer group"
                     >
-                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shadow-inner ${dontShow ? 'bg-modtale-accent border-modtale-accent' : 'bg-black/30 border-white/10 group-hover:border-white/30'}`}>
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shadow-inner ${dontShow ? `${theme.bg} ${theme.border}` : `bg-black/30 border-white/10 ${theme.checkHover}`}`}>
                             {dontShow && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
                         </div>
                         <span className="text-xs font-bold text-slate-400 group-hover:text-slate-300 transition-colors select-none uppercase tracking-wider">Don't show again</span>
@@ -425,11 +524,17 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
 
     const getVersionBadgeColor = (channel: string) => {
         switch(channel) {
-            case 'BETA': return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
-            case 'ALPHA': return 'bg-orange-500/20 text-orange-200 border-orange-500/30';
+            case 'BETA': return 'bg-purple-500/20 text-purple-200 border-purple-500/30';
+            case 'ALPHA': return 'bg-red-500/20 text-red-100 border-red-500/30';
             default: return 'bg-black/20 border-white/10';
         }
     };
+
+    const themeClass = latestVer?.channel === 'ALPHA'
+        ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20 text-white'
+        : latestVer?.channel === 'BETA'
+            ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20 text-white'
+            : 'bg-modtale-accent hover:bg-modtale-accentHover shadow-modtale-accent/20 text-white';
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" onClick={onClose}>
@@ -463,8 +568,8 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                         <>
                             <Link
                                 to="#"
-                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies); }}
-                                className="w-full bg-modtale-accent hover:bg-modtale-accentHover text-white p-5 rounded-2xl shadow-lg shadow-modtale-accent/20 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden"
+                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies, latestVer.channel); }}
+                                className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
                             >
                                 <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
                                 <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
@@ -493,13 +598,16 @@ export const DownloadModal: React.FC<any> = ({ show, onClose, versionsByGame, on
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400"><FileText className="w-5 h-5" /></div>
                                                 <div>
-                                                    <div className="font-bold text-white text-sm flex items-center gap-2">v{ver.versionNumber} <ChannelBadge channel={ver.channel} /></div>
+                                                    <div className="font-bold text-white text-sm flex items-center gap-2">
+                                                        v{ver.versionNumber}
+                                                        {ver.channel !== 'RELEASE' && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
+                                                    </div>
                                                     <div className="text-xs text-slate-500">{formatTimeAgo(ver.releaseDate)}</div>
                                                 </div>
                                             </div>
                                             <Link
                                                 to="#"
-                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies); }}
+                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies, ver.channel); }}
                                                 className="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-modtale-accent hover:bg-modtale-accent/10 transition-colors"
                                             >
                                                 <Download className="w-4 h-4" />
@@ -538,6 +646,14 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
 
     if (!show) return null;
 
+    const getVersionBadgeColor = (channel: string) => {
+        switch(channel) {
+            case 'BETA': return 'bg-purple-500/20 text-purple-200 border-purple-500/30';
+            case 'ALPHA': return 'bg-red-500/20 text-red-100 border-red-500/30';
+            default: return 'bg-black/20 border-white/10';
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={onClose}>
             <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85dvh]" onClick={e => e.stopPropagation()}>
@@ -565,7 +681,7 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
                                         <div>
                                             <div className="flex items-center gap-3 mb-1">
                                                 <span className="text-xl font-black text-white">v{ver.versionNumber}</span>
-                                                <ChannelBadge channel={ver.channel} />
+                                                {ver.channel !== 'RELEASE' && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
                                             </div>
                                             <div className="flex items-center gap-3 text-xs font-bold text-slate-500 uppercase tracking-wide">
                                                 <span>{formatTimeAgo(ver.releaseDate)}</span>
@@ -577,7 +693,7 @@ export const HistoryModal: React.FC<any> = ({ show, onClose, history, showExperi
                                         </div>
                                         <Link
                                             to="#"
-                                            onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies); }}
+                                            onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies, ver.channel); }}
                                             className="px-4 py-2 bg-white/5 hover:bg-modtale-accent hover:text-white text-slate-300 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2"
                                         >
                                             <Download className="w-4 h-4" /> Download
