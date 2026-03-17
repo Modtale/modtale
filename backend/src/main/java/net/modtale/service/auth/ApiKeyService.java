@@ -1,7 +1,9 @@
 package net.modtale.service.auth;
 
+import net.modtale.model.resources.Mod;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
+import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.UserService;
@@ -23,6 +25,7 @@ public class ApiKeyService {
     @Autowired private ApiKeyRepository apiKeyRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private UserService userService;
+    @Autowired private ModRepository modRepository;
 
     @Qualifier("taskExecutor")
     @Autowired private Executor taskExecutor;
@@ -52,36 +55,57 @@ public class ApiKeyService {
             if ("PERSONAL".equals(contextId)) {
                 validatedContexts.put(contextId, requestedPerms);
             } else {
-                User org = userOrgs.stream()
-                        .filter(o -> o.getId().equals(contextId))
-                        .findFirst()
-                        .orElseThrow(() -> new SecurityException("You are not a member of organization: " + contextId));
+                Optional<User> orgOpt = userOrgs.stream().filter(o -> o.getId().equals(contextId)).findFirst();
 
-                User.OrganizationMember membership = org.getOrganizationMembers().stream()
-                        .filter(m -> m.getUserId().equals(userId))
-                        .findFirst()
-                        .orElseThrow(() -> new SecurityException("Membership details not found."));
+                if (orgOpt.isPresent()) {
+                    User org = orgOpt.get();
+                    User.OrganizationMember membership = org.getOrganizationMembers().stream()
+                            .filter(m -> m.getUserId().equals(userId)).findFirst().orElseThrow(() -> new SecurityException("Membership not found."));
 
-                Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
+                    Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
+                    if ("ADMIN".equals(membership.getRole())) {
+                        allowedPerms.addAll(requestedPerms);
+                    } else if (membership.getRoleId() != null) {
+                        User.OrganizationRole role = org.getOrganizationRoles().stream()
+                                .filter(r -> r.getId().equals(membership.getRoleId())).findFirst().orElse(null);
 
-                if ("ADMIN".equals(membership.getRole())) {
-                    allowedPerms.addAll(requestedPerms);
-                } else if (membership.getRoleId() != null) {
-                    User.OrganizationRole role = org.getOrganizationRoles().stream()
-                            .filter(r -> r.getId().equals(membership.getRoleId()))
-                            .findFirst().orElse(null);
-
-                    if (role != null && role.getPermissions() != null) {
-                        for (ApiKey.ApiPermission perm : requestedPerms) {
-                            if (role.getPermissions().contains(perm)) {
-                                allowedPerms.add(perm);
+                        if (role != null) {
+                            if (role.isOwner()) {
+                                allowedPerms.addAll(requestedPerms);
+                            } else if (role.getPermissions() != null) {
+                                for (ApiKey.ApiPermission perm : requestedPerms) {
+                                    if (role.getPermissions().contains(perm)) allowedPerms.add(perm);
+                                }
                             }
                         }
                     }
-                }
+                    if (!allowedPerms.isEmpty()) validatedContexts.put(contextId, allowedPerms);
+                } else {
+                    Mod project = modRepository.findById(contextId).orElse(null);
+                    if (project != null) {
+                        Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
 
-                if (!allowedPerms.isEmpty()) {
-                    validatedContexts.put(contextId, allowedPerms);
+                        if (project.getAuthorId() != null && project.getAuthorId().equals(userId)) {
+                            allowedPerms.addAll(requestedPerms);
+                        } else {
+                            Mod.ProjectMember member = project.getTeamMembers() != null ?
+                                    project.getTeamMembers().stream().filter(m -> m.getUserId().equals(userId)).findFirst().orElse(null) : null;
+
+                            if (member == null) throw new SecurityException("You are not a contributor to project: " + contextId);
+
+                            Mod.ProjectRole role = project.getProjectRoles() != null && member.getRoleId() != null ?
+                                    project.getProjectRoles().stream().filter(r -> r.getId().equals(member.getRoleId())).findFirst().orElse(null) : null;
+
+                            if (role != null && role.getPermissions() != null) {
+                                for (ApiKey.ApiPermission perm : requestedPerms) {
+                                    if (role.getPermissions().contains(perm.name())) allowedPerms.add(perm);
+                                }
+                            }
+                        }
+                        if (!allowedPerms.isEmpty()) validatedContexts.put(contextId, allowedPerms);
+                    } else {
+                        throw new SecurityException("Invalid context or you are not a member: " + contextId);
+                    }
                 }
             }
         }
@@ -112,6 +136,33 @@ public class ApiKeyService {
                     if (changed) {
                         if (currentPerms.isEmpty()) {
                             key.getContextPermissions().remove(orgId);
+                        }
+                        apiKeyRepository.save(key);
+                    }
+                }
+            }
+        }
+    }
+
+    public void syncUserProjectPermissions(String userId, String projectId, List<String> allowedPermsList) {
+        Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
+        if (allowedPermsList != null) {
+            for (String p : allowedPermsList) {
+                try {
+                    allowedPerms.add(ApiKey.ApiPermission.valueOf(p));
+                } catch (IllegalArgumentException ignored) {}
+            }
+        }
+
+        List<ApiKey> keys = apiKeyRepository.findByUserIdAndContext(userId, projectId);
+        for (ApiKey key : keys) {
+            if (key.getContextPermissions() != null) {
+                Set<ApiKey.ApiPermission> currentPerms = key.getContextPermissions().get(projectId);
+                if (currentPerms != null) {
+                    boolean changed = currentPerms.retainAll(allowedPerms);
+                    if (changed) {
+                        if (currentPerms.isEmpty()) {
+                            key.getContextPermissions().remove(projectId);
                         }
                         apiKeyRepository.save(key);
                     }

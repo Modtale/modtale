@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../utils/api.ts';
-import { Trash2, Plus, Copy, Key, Check, Shield, Info, ExternalLink, Github, ArrowRight, Code, CheckSquare, Square, Building2, User as UserIcon } from 'lucide-react';
+import { Trash2, Plus, Copy, Key, Check, Shield, Info, ExternalLink, Github, ArrowRight, Code, CheckSquare, Square, Building2, User as UserIcon, Box } from 'lucide-react';
 import { StatusModal } from '../ui/StatusModal.tsx';
 import { Link } from 'react-router-dom';
+import type { User, Mod } from '../../types.ts';
 
 interface ApiKey {
     id: string;
@@ -14,104 +15,70 @@ interface ApiKey {
     lastUsed: string | null;
 }
 
-interface Organization {
-    id: string;
-    username: string;
-    avatarUrl?: string;
-}
-
 const PERMISSION_GROUPS = [
     {
-        group: 'Projects',
+        group: 'Organization Settings',
+        permissions: [
+            { id: 'ORG_READ', label: 'Read Org' },
+            { id: 'ORG_EDIT_METADATA', label: 'Edit Profile' },
+            { id: 'ORG_EDIT_AVATAR', label: 'Edit Avatar' },
+            { id: 'ORG_EDIT_BANNER', label: 'Edit Banner' },
+            { id: 'ORG_DELETE', label: 'Delete Org' },
+            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
+            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
+            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
+            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
+            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Connections' }
+        ]
+    },
+    {
+        group: 'Project Management',
         permissions: [
             { id: 'PROJECT_READ', label: 'Read Projects' },
             { id: 'PROJECT_CREATE', label: 'Create Projects' },
             { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
-            { id: 'PROJECT_EDIT_ICON', label: 'Update Project Icon' },
-            { id: 'PROJECT_EDIT_BANNER', label: 'Update Project Banner' },
-            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' },
-            { id: 'PROJECT_TRANSFER_RESOLVE', label: 'Resolve Transfer' },
-            { id: 'PROJECT_DELETE', label: 'Delete Projects' },
-            { id: 'PROJECT_FAVORITE', label: 'Favorite Projects' }
-        ]
-    },
-    {
-        group: 'Project Status & Publishing',
-        permissions: [
-            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
-            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
-            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Projects' },
-            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Projects' },
-            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
-        ]
-    },
-    {
-        group: 'Project Gallery & Team',
-        permissions: [
-            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
-            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
-            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
-            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' }
+            { id: 'PROJECT_EDIT_ICON', label: 'Edit Icon' },
+            { id: 'PROJECT_EDIT_BANNER', label: 'Edit Banner' },
+            { id: 'PROJECT_DELETE', label: 'Delete Projects' }
         ]
     },
     {
         group: 'Versions & Releases',
         permissions: [
             { id: 'VERSION_READ', label: 'Read Versions' },
-            { id: 'VERSION_CREATE', label: 'Create Versions' },
+            { id: 'VERSION_CREATE', label: 'Upload Versions' },
             { id: 'VERSION_EDIT', label: 'Edit Versions' },
             { id: 'VERSION_DELETE', label: 'Delete Versions' },
             { id: 'VERSION_DOWNLOAD', label: 'Download Files' }
         ]
     },
     {
-        group: 'Reviews & Comments',
+        group: 'Visibility & Publishing',
         permissions: [
-            { id: 'COMMENT_READ', label: 'Read Comments' },
-            { id: 'COMMENT_CREATE', label: 'Create Comments' },
-            { id: 'COMMENT_EDIT', label: 'Edit Comments' },
+            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
+            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
+            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Project' },
+            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Project' },
+            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
+        ]
+    },
+    {
+        group: 'Community & Media',
+        permissions: [
+            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
+            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
             { id: 'COMMENT_DELETE', label: 'Delete Comments' },
-            { id: 'COMMENT_REPLY', label: 'Reply to Comments' }
+            { id: 'COMMENT_REPLY', label: 'Reply as Developer' }
         ]
     },
     {
-        group: 'Profile & Account Settings',
+        group: 'Team Management',
         permissions: [
-            { id: 'PROFILE_READ', label: 'Read Profile' },
-            { id: 'PROFILE_EDIT_BASIC', label: 'Edit Basic Info' },
-            { id: 'PROFILE_EDIT_AVATAR', label: 'Update Avatar' },
-            { id: 'PROFILE_EDIT_BANNER', label: 'Update Banner' },
-            { id: 'PROFILE_DELETE', label: 'Delete Account' },
-            { id: 'PROFILE_FOLLOW', label: 'Follow Users' },
-            { id: 'PROFILE_UNFOLLOW', label: 'Unfollow Users' },
-            { id: 'PROFILE_CONNECTION_MANAGE', label: 'Manage Connections' },
-            { id: 'PROFILE_NOTIFICATION_MANAGE', label: 'Manage Notification Settings' }
-        ]
-    },
-    {
-        group: 'Notifications',
-        permissions: [
-            { id: 'NOTIFICATION_READ', label: 'Read Notifications' },
-            { id: 'NOTIFICATION_UPDATE', label: 'Update Notification State' },
-            { id: 'NOTIFICATION_DELETE', label: 'Delete Notifications' }
-        ]
-    },
-    {
-        group: 'Organization Settings',
-        permissions: [
-            { id: 'ORG_READ', label: 'Read Organizations' },
-            { id: 'ORG_CREATE', label: 'Create Organizations' },
-            { id: 'ORG_EDIT_METADATA', label: 'Edit Org Profile' },
-            { id: 'ORG_EDIT_AVATAR', label: 'Update Org Avatar' },
-            { id: 'ORG_EDIT_BANNER', label: 'Update Org Banner' },
-            { id: 'ORG_DELETE', label: 'Delete Organizations' },
-            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
-            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
-            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
-            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Edit Member Roles' },
-            { id: 'ORG_INVITE_ACCEPT', label: 'Accept Org Invites' },
-            { id: 'ORG_INVITE_DECLINE', label: 'Decline Org Invites' },
-            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Org Connections' }
+            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
+            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' },
+            { id: 'PROJECT_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
+            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' },
+            { id: 'PROJECT_TRANSFER_RESOLVE', label: 'Resolve Transfer' }
         ]
     }
 ];
@@ -128,9 +95,14 @@ const getPermissionLabel = (id: string) => {
 
 const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ', 'NOTIFICATION_READ'];
 
-export const DeveloperSettings: React.FC = () => {
+interface DeveloperSettingsProps {
+    user: User;
+}
+
+export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) => {
     const [keys, setKeys] = useState<ApiKey[]>([]);
-    const [orgs, setOrgs] = useState<Organization[]>([]);
+    const [orgs, setOrgs] = useState<User[]>([]);
+    const [projects, setProjects] = useState<Mod[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [newKey, setNewKey] = useState<string | null>(null);
@@ -146,6 +118,7 @@ export const DeveloperSettings: React.FC = () => {
     useEffect(() => {
         fetchKeys();
         fetchOrgs();
+        fetchProjects();
     }, []);
 
     const fetchKeys = async () => {
@@ -163,8 +136,24 @@ export const DeveloperSettings: React.FC = () => {
 
             setContextPerms(prev => {
                 const updated = { ...prev };
-                res.data.forEach((org: Organization) => {
+                res.data.forEach((org: User) => {
                     if (!updated[org.id]) updated[org.id] = [];
+                });
+                return updated;
+            });
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchProjects = async () => {
+        try {
+            const res = await api.get('/projects/user/contributed?size=100');
+            const contribProjects = (res.data.content || []).filter((p: Mod) => p.authorId !== user.id && !p.isOwner);
+            setProjects(contribProjects);
+
+            setContextPerms(prev => {
+                const updated = { ...prev };
+                contribProjects.forEach((proj: Mod) => {
+                    if (!updated[proj.id]) updated[proj.id] = [];
                 });
                 return updated;
             });
@@ -185,7 +174,7 @@ export const DeveloperSettings: React.FC = () => {
         });
 
         if (!hasAnyPerms) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Please select at least one permission across any profile or organization.' });
+            setStatus({ type: 'error', title: 'Error', msg: 'Please select at least one permission across any profile, organization, or project.' });
             return;
         }
 
@@ -343,14 +332,19 @@ export const DeveloperSettings: React.FC = () => {
                                             <div className="mt-4 space-y-3">
                                                 {activeContexts.map(ctx => {
                                                     const perms = k.contextPermissions[ctx] || [];
-                                                    const ctxName = ctx === 'PERSONAL' ? 'Personal Account' : (orgs.find(o => o.id === ctx)?.username || 'Organization');
+                                                    const isPersonal = ctx === 'PERSONAL';
+                                                    const orgMatch = orgs.find(o => o.id === ctx);
+                                                    const projMatch = projects.find(p => p.id === ctx);
+
+                                                    const ctxName = isPersonal ? 'Personal Account' : (orgMatch?.username || projMatch?.title || 'Unknown Context');
+                                                    const Icon = isPersonal ? UserIcon : (orgMatch ? Building2 : Box);
+
                                                     if (perms.length === 0) return null;
 
                                                     return (
                                                         <div key={ctx} className="flex flex-col gap-1.5">
                                                             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                                                                {ctx === 'PERSONAL' ? <UserIcon className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
-                                                                {ctxName}
+                                                                <Icon className="w-3.5 h-3.5" /> {ctxName}
                                                             </span>
                                                             <div className="flex flex-wrap gap-2">
                                                                 {perms.length === TOTAL_PERMISSIONS ? (
@@ -418,6 +412,9 @@ export const DeveloperSettings: React.FC = () => {
                                                 <UserIcon className="w-4 h-4" /> Personal Profile
                                                 {contextPerms['PERSONAL']?.length > 0 && <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${activeTab === 'PERSONAL' ? 'bg-white/20' : 'bg-slate-200 dark:bg-white/10'}`}>{contextPerms['PERSONAL'].length}</span>}
                                             </button>
+
+                                            {orgs.length > 0 && <div className="w-px h-6 bg-slate-200 dark:bg-white/10 my-auto mx-1" />}
+
                                             {orgs.map(org => (
                                                 <button
                                                     key={org.id}
@@ -427,6 +424,20 @@ export const DeveloperSettings: React.FC = () => {
                                                 >
                                                     <Building2 className="w-4 h-4" /> {org.username}
                                                     {contextPerms[org.id]?.length > 0 && <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${activeTab === org.id ? 'bg-white/20' : 'bg-slate-200 dark:bg-white/10'}`}>{contextPerms[org.id].length}</span>}
+                                                </button>
+                                            ))}
+
+                                            {projects.length > 0 && <div className="w-px h-6 bg-slate-200 dark:bg-white/10 my-auto mx-1" />}
+
+                                            {projects.map(proj => (
+                                                <button
+                                                    key={proj.id}
+                                                    type="button"
+                                                    onClick={() => setActiveTab(proj.id)}
+                                                    className={`shrink-0 px-4 py-2 text-sm font-bold rounded-xl flex items-center gap-2 transition-all whitespace-nowrap border ${activeTab === proj.id ? 'bg-modtale-accent text-white border-modtale-accent shadow-md' : 'bg-white/60 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/10 border-slate-200 dark:border-white/5'}`}
+                                                >
+                                                    <Box className="w-4 h-4" /> {proj.title}
+                                                    {contextPerms[proj.id]?.length > 0 && <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${activeTab === proj.id ? 'bg-white/20' : 'bg-slate-200 dark:bg-white/10'}`}>{contextPerms[proj.id].length}</span>}
                                                 </button>
                                             ))}
                                         </div>

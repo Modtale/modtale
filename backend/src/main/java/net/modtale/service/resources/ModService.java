@@ -9,6 +9,7 @@ import net.modtale.model.user.User;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.AnalyticsService;
+import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.security.SanitizationService;
 import net.modtale.service.security.FileValidationService;
 import net.modtale.service.security.WardenClientService;
@@ -102,6 +103,10 @@ public class ModService {
     @Autowired private NotificationService notificationService;
     @Autowired private CacheManager cacheManager;
     @Autowired private WardenClientService wardenService;
+
+    @Lazy
+    @Autowired private ApiKeyService apiKeyService;
+
     @Qualifier("taskExecutor")
     @Autowired private Executor taskExecutor;
 
@@ -1128,7 +1133,20 @@ public class ModService {
 
         if (name != null) role.setName(name);
         if (color != null) role.setColor(color);
-        if (perms != null) role.setPermissions(perms);
+        if (perms != null) {
+            role.setPermissions(perms);
+
+            if (mod.getTeamMembers() != null) {
+                List<String> affectedUsers = mod.getTeamMembers().stream()
+                        .filter(m -> roleId.equals(m.getRoleId()))
+                        .map(Mod.ProjectMember::getUserId)
+                        .collect(Collectors.toList());
+
+                for (String uId : affectedUsers) {
+                    apiKeyService.syncUserProjectPermissions(uId, modId, perms);
+                }
+            }
+        }
 
         modRepository.save(mod);
         evictProjectDetails(mod);
@@ -1212,6 +1230,8 @@ public class ModService {
             modRepository.save(mod);
             evictProjectDetails(mod);
 
+            apiKeyService.syncUserProjectPermissions(targetUserId, modId, role.getPermissions());
+
             notificationService.sendNotification(
                     List.of(targetUserId),
                     "Role Updated",
@@ -1228,7 +1248,10 @@ public class ModService {
         if (mod != null && (hasProjectPermission(mod, currentUser, "PROJECT_TEAM_REMOVE") || currentUser.getId().equals(targetUserId))) {
             ensureEditable(mod);
             if (mod.getTeamMembers() != null) {
-                mod.getTeamMembers().removeIf(m -> m.getUserId().equals(targetUserId));
+                boolean removed = mod.getTeamMembers().removeIf(m -> m.getUserId().equals(targetUserId));
+                if (removed) {
+                    apiKeyService.syncUserProjectPermissions(targetUserId, modId, new ArrayList<>());
+                }
             }
             modRepository.save(mod);
             evictProjectDetails(mod);
