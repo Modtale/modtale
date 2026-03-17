@@ -665,7 +665,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     return (
-        <>
+        <div className="relative">
             {modData?.status === 'PENDING' && (
                 <div className="bg-blue-500/10 border-b border-blue-500/20 backdrop-blur-sm sticky top-0 z-50">
                     <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-3 flex items-center justify-between">
@@ -708,10 +708,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         )}
                     </div>
                 </div>
-            )}
-
-            {(inviteRoleDropdownOpen || memberRoleDropdownOpen) && (
-                <div className="fixed inset-0 z-[90]" onClick={() => { setInviteRoleDropdownOpen(false); setMemberRoleDropdownOpen(null); }} />
             )}
 
             {memberToRemove && createPortal(
@@ -1334,7 +1330,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                                                         return (
                                                             <div key={invite.userId} className="p-4 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
-                                                                <div className="flex items-center gap-3">
+                                                                <div className="flex items-center gap-4">
                                                                     <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 opacity-70 grayscale">
                                                                         {invite.avatarUrl ? <img src={invite.avatarUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-400">{invite.username?.charAt(0).toUpperCase() || '?'}</div>}
                                                                     </div>
@@ -1559,7 +1555,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                 ) : (!hasGithub && !hasGitlab) ? (
                                     <div className="text-center py-4 text-xs text-slate-500">Link account in settings.</div>
                                 ) : (
-                                    <div className="relative" ref={repoDropdownRef}>
+                                    <div className="relative modtale-dropdown-container">
                                         <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => setRepoDropdownOpen(!repoDropdownOpen)} className={`w-full flex items-center justify-between bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white transition-colors ${(!readOnly && hasProjectPermission('PROJECT_EDIT_METADATA')) ? 'hover:border-modtale-accent' : 'opacity-50 cursor-not-allowed'}`}>
                                             <span className="truncate">{metaData.repositoryUrl || "Select Repo..."}</span>
                                             <ChevronDown className="w-3 h-3 text-slate-500" />
@@ -1644,6 +1640,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                     </>
                 }
             />
-        </>
+        </div>
     );
 };

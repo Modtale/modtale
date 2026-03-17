@@ -42,7 +42,13 @@ public class ModDTO {
     private String hmWikiSlug;
     private String status;
     private String expiresAt;
+
+    private List<Mod.ProjectRole> projectRoles;
+    private List<Mod.ProjectMember> teamMembers;
+    private List<Mod.ProjectMember> teamInvites;
+
     private List<String> contributors;
+
     private List<String> galleryImages;
     private List<Comment> comments;
     private List<ModVersionDTO> versions;
@@ -89,6 +95,11 @@ public class ModDTO {
             dto.setAbout(mod.getAbout());
             dto.setChildProjectIds(mod.getChildProjectIds());
             dto.setModIds(mod.getModIds());
+
+            dto.setProjectRoles(mod.getProjectRoles());
+            dto.setTeamMembers(mod.getTeamMembers());
+            dto.setTeamInvites(mod.getTeamInvites());
+
             dto.setContributors(mod.getContributors());
             dto.setGalleryImages(mod.getGalleryImages());
             dto.setComments(mod.getComments() != null ? mod.getComments() : new ArrayList<>());
@@ -169,6 +180,14 @@ public class ModDTO {
     public void setStatus(String status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
     public void setExpiresAt(String expiresAt) { this.expiresAt = expiresAt; }
+
+    public List<Mod.ProjectRole> getProjectRoles() { return projectRoles; }
+    public void setProjectRoles(List<Mod.ProjectRole> projectRoles) { this.projectRoles = projectRoles; }
+    public List<Mod.ProjectMember> getTeamMembers() { return teamMembers; }
+    public void setTeamMembers(List<Mod.ProjectMember> teamMembers) { this.teamMembers = teamMembers; }
+    public List<Mod.ProjectMember> getTeamInvites() { return teamInvites; }
+    public void setTeamInvites(List<Mod.ProjectMember> teamInvites) { this.teamInvites = teamInvites; }
+
     public List<String> getContributors() { return contributors; }
     public void setContributors(List<String> contributors) { this.contributors = contributors; }
     public List<String> getGalleryImages() { return galleryImages; }
