@@ -21,6 +21,7 @@ public class UserDTO {
     private ApiKey.Tier tier;
     private List<String> roles;
     private User.AccountType accountType;
+    private List<User.OrganizationRole> organizationRoles;
     private List<User.OrganizationMember> organizationMembers;
     private List<User.OrganizationMember> pendingOrgInvites;
     private List<String> likedModIds;
@@ -45,9 +46,10 @@ public class UserDTO {
         dto.setAccountType(user.getAccountType());
         dto.setBadges(user.getBadges());
 
+        dto.setOrganizationRoles(user.getOrganizationRoles());
+        dto.setOrganizationMembers(user.getOrganizationMembers());
         dto.setFollowingIds(user.getFollowingIds());
         dto.setFollowerIds(user.getFollowerIds());
-        dto.setOrganizationMembers(user.getOrganizationMembers());
 
         if (user.getConnectedAccounts() != null) {
             if (includePrivate) {
@@ -102,6 +104,8 @@ public class UserDTO {
     public void setRoles(List<String> roles) { this.roles = roles; }
     public User.AccountType getAccountType() { return accountType; }
     public void setAccountType(User.AccountType accountType) { this.accountType = accountType; }
+    public List<User.OrganizationRole> getOrganizationRoles() { return organizationRoles; }
+    public void setOrganizationRoles(List<User.OrganizationRole> organizationRoles) { this.organizationRoles = organizationRoles; }
     public List<User.OrganizationMember> getOrganizationMembers() { return organizationMembers; }
     public void setOrganizationMembers(List<User.OrganizationMember> organizationMembers) { this.organizationMembers = organizationMembers; }
     public List<User.OrganizationMember> getPendingOrgInvites() { return pendingOrgInvites; }

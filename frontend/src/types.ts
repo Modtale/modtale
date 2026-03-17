@@ -6,9 +6,17 @@ export interface ConnectedAccount {
     visible: boolean;
 }
 
+export interface OrganizationRole {
+    id: string;
+    name: string;
+    color: string;
+    permissions: string[];
+    isOwner?: boolean;
+}
+
 export interface OrganizationMember {
     userId: string;
-    role: 'ADMIN' | 'MEMBER';
+    roleId: string;
 }
 
 export interface User {
@@ -37,6 +45,8 @@ export interface User {
     tier?: string;
     accountType?: 'USER' | 'ORGANIZATION';
     organizationMembers?: OrganizationMember[];
+    organizationRoles?: OrganizationRole[];
+    pendingOrgInvites?: OrganizationMember[];
 }
 
 export interface ModDependency {
@@ -96,6 +106,20 @@ export interface Comment {
     developerReply?: Reply;
 }
 
+export interface ProjectRole {
+    id: string;
+    name: string;
+    color: string;
+    permissions: string[];
+}
+
+export interface ProjectMember {
+    userId: string;
+    roleId: string;
+    username?: string;
+    avatarUrl?: string;
+}
+
 export interface Mod {
     id: string;
     slug?: string;
@@ -121,8 +145,11 @@ export interface Mod {
     versions: ProjectVersion[];
     galleryImages: string[];
     repositoryUrl?: string;
-    contributors?: string[];
-    pendingInvites?: string[];
+
+    projectRoles?: ProjectRole[];
+    teamMembers?: ProjectMember[];
+    teamInvites?: ProjectMember[];
+
     lastTrendingNotification?: string;
     allowModpacks?: boolean;
     allowComments?: boolean;

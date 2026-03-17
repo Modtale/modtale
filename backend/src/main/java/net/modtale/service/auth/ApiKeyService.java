@@ -63,17 +63,23 @@ public class ApiKeyService {
                         .orElseThrow(() -> new SecurityException("Membership details not found."));
 
                 Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
-                for (ApiKey.ApiPermission perm : requestedPerms) {
-                    if ("ADMIN".equals(membership.getRole())) {
-                        allowedPerms.add(perm);
-                    } else {
-                        if (!perm.name().contains("ORG_DELETE") &&
-                                !perm.name().contains("ORG_EDIT_") &&
-                                !perm.name().contains("ORG_MEMBER_")) {
-                            allowedPerms.add(perm);
+
+                if ("ADMIN".equals(membership.getRole())) {
+                    allowedPerms.addAll(requestedPerms);
+                } else if (membership.getRoleId() != null) {
+                    User.OrganizationRole role = org.getOrganizationRoles().stream()
+                            .filter(r -> r.getId().equals(membership.getRoleId()))
+                            .findFirst().orElse(null);
+
+                    if (role != null && role.getPermissions() != null) {
+                        for (ApiKey.ApiPermission perm : requestedPerms) {
+                            if (role.getPermissions().contains(perm)) {
+                                allowedPerms.add(perm);
+                            }
                         }
                     }
                 }
+
                 if (!allowedPerms.isEmpty()) {
                     validatedContexts.put(contextId, allowedPerms);
                 }
@@ -93,6 +99,25 @@ public class ApiKeyService {
 
         apiKeyRepository.save(apiKey);
         return plainKey;
+    }
+
+    public void syncUserOrgPermissions(String userId, String orgId, Set<ApiKey.ApiPermission> allowedPerms) {
+        List<ApiKey> keys = apiKeyRepository.findByUserIdAndContext(userId, orgId);
+
+        for (ApiKey key : keys) {
+            if (key.getContextPermissions() != null) {
+                Set<ApiKey.ApiPermission> currentPerms = key.getContextPermissions().get(orgId);
+                if (currentPerms != null) {
+                    boolean changed = currentPerms.retainAll(allowedPerms);
+                    if (changed) {
+                        if (currentPerms.isEmpty()) {
+                            key.getContextPermissions().remove(orgId);
+                        }
+                        apiKeyRepository.save(key);
+                    }
+                }
+            }
+        }
     }
 
     public ApiKey resolveKey(String plainKey) {
