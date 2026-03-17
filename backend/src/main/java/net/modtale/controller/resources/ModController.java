@@ -216,7 +216,7 @@ public class ModController {
             if ("DRAFT".equals(mod.getStatus()) || "PENDING".equals(mod.getStatus())) {
                 User user = userService.getCurrentUser();
                 if (!isAdminOrSuper(user)) {
-                    if (user == null || !modService.hasEditPermission(mod, user)) {
+                    if (user == null || !modService.hasProjectPermission(mod, user, "VERSION_DOWNLOAD")) {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                     }
                 }
@@ -276,7 +276,6 @@ public class ModController {
                 ModVersion targetVersion = modService.findVersion(mod, version);
                 if (targetVersion == null) return ResponseEntity.notFound().build();
 
-                // Pass the specific version ID to increment its download count
                 modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
                 analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
@@ -307,7 +306,6 @@ public class ModController {
             byte[] data = storageService.download(targetVersion.getFileUrl());
             ByteArrayResource resource = new ByteArrayResource(data);
 
-            // Pass the specific version ID to increment its download count
             modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
             analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
@@ -324,90 +322,6 @@ public class ModController {
 
         } catch (Exception e) {
             logger.error("Error processing download", e);
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    @Deprecated
-    @GetMapping("/projects/{id}/versions/{version}/download")
-    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_DOWNLOAD', authentication)")
-    public ResponseEntity<Resource> downloadVersion(@PathVariable String id, @PathVariable String version, HttpServletRequest request) {
-        try {
-            Mod mod = modService.getModById(id);
-            if (mod == null) return ResponseEntity.notFound().build();
-
-            if ("DRAFT".equals(mod.getStatus()) || "PENDING".equals(mod.getStatus())) {
-                User user = userService.getCurrentUser();
-                if (!isAdminOrSuper(user)) {
-                    if (user == null || !modService.hasEditPermission(mod, user)) {
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-                    }
-                }
-            }
-
-            boolean isApi = false;
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-
-            if (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) {
-                isApi = true;
-            } else {
-                String referer = request.getHeader("Referer");
-                if (referer == null || !referer.startsWith(frontendUrl)) {
-                    isApi = true;
-                }
-            }
-
-            String clientIp = getClientIp(request);
-
-            if ("MODPACK".equals(mod.getClassification())) {
-                ModVersion targetVersion = modService.findVersion(mod, version);
-                if (targetVersion == null) return ResponseEntity.notFound().build();
-
-                modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
-                analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
-
-                if (targetVersion.getDependencies() != null) {
-                    for (ModDependency dep : targetVersion.getDependencies()) {
-                        modService.incrementDownloadCount(dep.getModId());
-                        analyticsService.logDownload(dep.getModId(), null, null, isApi, clientIp);
-                    }
-                }
-
-                byte[] zipData = modService.generateModpackZip(mod, targetVersion);
-                ByteArrayResource resource = new ByteArrayResource(zipData);
-                String zipFilename = mod.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-" + targetVersion.getVersionNumber() + ".zip";
-
-                return ResponseEntity.ok()
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFilename + "\"")
-                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                        .body(resource);
-            }
-
-            ModVersion targetVersion = mod.getVersions().stream()
-                    .filter(v -> v.getVersionNumber().equalsIgnoreCase(version))
-                    .findFirst()
-                    .orElse(null);
-
-            if (targetVersion == null) return ResponseEntity.notFound().build();
-
-            byte[] data = storageService.download(targetVersion.getFileUrl());
-            ByteArrayResource resource = new ByteArrayResource(data);
-
-            modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
-            analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
-
-            String originalPath = targetVersion.getFileUrl();
-            String filename = originalPath.contains("/") ? originalPath.substring(originalPath.lastIndexOf('/') + 1) : originalPath;
-            if (filename.length() > 37 && filename.charAt(36) == '-') {
-                filename = filename.substring(37);
-            }
-
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(resource);
-
-        } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
     }
@@ -488,7 +402,7 @@ public class ModController {
         if ("DRAFT".equals(mod.getStatus()) || "PENDING".equals(mod.getStatus())) {
             User user = userService.getCurrentUser();
             if (!isAdminOrSuper(user)) {
-                if (user == null || !modService.hasEditPermission(mod, user)) {
+                if (user == null || !modService.hasProjectPermission(mod, user, "PROJECT_READ")) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                 }
             }
@@ -908,19 +822,69 @@ public class ModController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/projects/{id}/roles")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_MEMBER_EDIT_ROLE', authentication)")
+    public ResponseEntity<?> createProjectRole(@PathVariable String id, @RequestBody Mod.ProjectRole payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        if (payload.getName() == null || payload.getName().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Role name is required.");
+        }
+        try {
+            Mod updated = modService.createProjectRole(id, payload.getName(), payload.getColor(), payload.getPermissions(), user);
+            return ResponseEntity.ok(ModDTO.fromEntity(updated, false));
+        } catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+    }
+
+    @PutMapping("/projects/{id}/roles/{roleId}")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_MEMBER_EDIT_ROLE', authentication)")
+    public ResponseEntity<?> updateProjectRole(@PathVariable String id, @PathVariable String roleId, @RequestBody Mod.ProjectRole payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            Mod updated = modService.updateProjectRole(id, roleId, payload.getName(), payload.getColor(), payload.getPermissions(), user);
+            return ResponseEntity.ok(ModDTO.fromEntity(updated, false));
+        } catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+    }
+
+    @DeleteMapping("/projects/{id}/roles/{roleId}")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_MEMBER_EDIT_ROLE', authentication)")
+    public ResponseEntity<?> deleteProjectRole(@PathVariable String id, @PathVariable String roleId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            Mod updated = modService.deleteProjectRole(id, roleId, user);
+            return ResponseEntity.ok(ModDTO.fromEntity(updated, false));
+        } catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+    }
+
     @PostMapping("/projects/{id}/invite")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_TEAM_INVITE', authentication)")
-    public ResponseEntity<?> inviteContributor(@PathVariable String id, @RequestParam String userId) {
+    public ResponseEntity<?> inviteContributor(@PathVariable String id, @RequestBody Map<String, String> payload) {
+        String userId = payload.get("userId");
+        String roleId = payload.get("roleId");
+        if (userId == null || roleId == null) return ResponseEntity.badRequest().body("User ID and Role ID are required.");
         try {
-            modService.inviteContributor(id, userId);
+            modService.inviteContributor(id, userId, roleId);
             return ResponseEntity.ok().build();
         }
         catch (SecurityException e) { return ResponseEntity.status(403).body(e.getMessage()); }
         catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
     }
 
-    @PostMapping("/projects/{id}/invite/accept")
+    @DeleteMapping("/projects/{id}/invites/{userId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_TEAM_INVITE', authentication)")
+    public ResponseEntity<?> cancelInvite(@PathVariable String id, @PathVariable String userId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            modService.cancelInvite(id, userId, user);
+            return ResponseEntity.ok().build();
+        }
+        catch (Exception e) { return ResponseEntity.status(403).body(e.getMessage()); }
+    }
+
+    @PostMapping("/projects/{id}/invite/accept")
     public ResponseEntity<?> acceptInvite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -933,7 +897,6 @@ public class ModController {
     }
 
     @PostMapping("/projects/{id}/invite/decline")
-    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_TEAM_INVITE', authentication)")
     public ResponseEntity<?> declineInvite(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -942,8 +905,21 @@ public class ModController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/projects/{id}/contributors/{userId}")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_MEMBER_EDIT_ROLE', authentication)")
+    public ResponseEntity<?> updateContributorRole(@PathVariable String id, @PathVariable String userId, @RequestBody Map<String, String> payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        String roleId = payload.get("roleId");
+        if (roleId == null) return ResponseEntity.badRequest().body("Role ID required");
+        try {
+            modService.updateContributorRole(id, userId, roleId, user);
+            return ResponseEntity.ok().build();
+        }
+        catch (Exception e) { return ResponseEntity.status(403).body(e.getMessage()); }
+    }
+
     @DeleteMapping("/projects/{id}/contributors/{userId}")
-    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_TEAM_REMOVE', authentication)")
     public ResponseEntity<?> removeContributor(@PathVariable String id, @PathVariable String userId) {
         try {
             modService.removeContributor(id, userId);
