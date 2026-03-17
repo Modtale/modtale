@@ -11,11 +11,13 @@ import net.modtale.repository.user.UserRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.NotificationRepository;
 import net.modtale.service.AnalyticsService;
+import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.security.SanitizationService;
 import net.modtale.service.auth.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -63,6 +65,9 @@ public class UserService {
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailService emailService;
 
+    @Lazy
+    @Autowired private ApiKeyService apiKeyService;
+
     @Value("${app.security.pre-auth-secret:default-secret-change-in-prod}")
     private String preAuthSigningKey;
 
@@ -71,6 +76,25 @@ public class UserService {
 
     @Value("${app.limits.max-orgs-per-user:5}")
     private int maxOrgsPerUser;
+
+    public boolean hasOrgPermission(User org, String userId, ApiKey.ApiPermission perm) {
+        User.OrganizationMember member = org.getOrganizationMembers().stream()
+                .filter(m -> m.getUserId().equals(userId))
+                .findFirst().orElse(null);
+        if (member == null) return false;
+
+        if (member.getRoleId() != null) {
+            User.OrganizationRole role = org.getOrganizationRoles().stream()
+                    .filter(r -> r.getId().equals(member.getRoleId()))
+                    .findFirst().orElse(null);
+
+            if (role != null) {
+                if (role.isOwner()) return true;
+                if (role.getPermissions() != null) return role.getPermissions().contains(perm);
+            }
+        }
+        return false;
+    }
 
     public User registerUser(String username, String email, String password) {
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
@@ -439,7 +463,7 @@ public class UserService {
         List<User> myOrgs = getUserOrganizations(owner.getId());
         long adminOrgCount = myOrgs.stream()
                 .filter(o -> o.getOrganizationMembers().stream()
-                        .anyMatch(m -> m.getUserId().equals(owner.getId()) && "ADMIN".equals(m.getRole())))
+                        .anyMatch(m -> m.getUserId().equals(owner.getId()) && hasOrgPermission(o, owner.getId(), ApiKey.ApiPermission.ORG_EDIT_METADATA)))
                 .count();
 
         if (adminOrgCount >= maxOrgsPerUser) {
@@ -453,8 +477,38 @@ public class UserService {
         org.setTier(owner.getTier());
         org.setAvatarUrl("https://ui-avatars.com/api/?name=" + cleanName + "&background=random");
 
+        User.OrganizationRole ownerRole = new User.OrganizationRole(
+                UUID.randomUUID().toString(),
+                "Owner",
+                "#ef4444",
+                EnumSet.allOf(ApiKey.ApiPermission.class)
+        );
+        ownerRole.setOwner(true);
+
+        User.OrganizationRole adminRole = new User.OrganizationRole(
+                UUID.randomUUID().toString(),
+                "Admin",
+                "#fbbf24",
+                EnumSet.complementOf(EnumSet.of(ApiKey.ApiPermission.ORG_DELETE))
+        );
+
+        Set<ApiKey.ApiPermission> memberPerms = EnumSet.of(
+                ApiKey.ApiPermission.PROJECT_READ,
+                ApiKey.ApiPermission.VERSION_READ,
+                ApiKey.ApiPermission.VERSION_DOWNLOAD
+        );
+        User.OrganizationRole memberRole = new User.OrganizationRole(
+                UUID.randomUUID().toString(),
+                "Member",
+                "#3b82f6",
+                memberPerms
+        );
+
+        org.setOrganizationRoles(new ArrayList<>(List.of(ownerRole, adminRole, memberRole)));
+
         List<User.OrganizationMember> members = new ArrayList<>();
-        members.add(new User.OrganizationMember(owner.getId(), "ADMIN"));
+        User.OrganizationMember ownerMember = new User.OrganizationMember(owner.getId(), ownerRole.getId());
+        members.add(ownerMember);
         org.setOrganizationMembers(members);
 
         User savedOrg = userRepository.save(org);
@@ -467,9 +521,9 @@ public class UserService {
     public User updateOrganization(String orgId, String newName, String bio, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
 
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_EDIT_METADATA)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
 
         if (newName != null && !newName.isBlank() && !newName.equals(org.getUsername())) {
             Optional<User> existing = userRepository.findByUsernameIgnoreCase(newName);
@@ -488,13 +542,87 @@ public class UserService {
         return userRepository.save(org);
     }
 
-    public void inviteOrganizationMember(String orgId, String targetUserId, String role, User requester) {
+    public User createOrganizationRole(String orgId, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_MEMBER_EDIT_ROLE)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
+
+        if (org.getOrganizationRoles() == null) org.setOrganizationRoles(new ArrayList<>());
+        if (org.getOrganizationRoles().size() >= 20) {
+            throw new IllegalArgumentException("Maximum of 20 roles reached.");
+        }
+
+        User.OrganizationRole role = new User.OrganizationRole(UUID.randomUUID().toString(), name, color, perms);
+        org.getOrganizationRoles().add(role);
+        return userRepository.save(org);
+    }
+
+    public User updateOrganizationRole(String orgId, String roleId, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_MEMBER_EDIT_ROLE)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
+
+        User.OrganizationRole role = org.getOrganizationRoles().stream()
+                .filter(r -> r.getId().equals(roleId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Role not found."));
+
+        if (role.isOwner()) {
+            throw new SecurityException("The Owner role cannot be modified.");
+        }
+
+        if (name != null) role.setName(name);
+        if (color != null) role.setColor(color);
+        if (perms != null) {
+            role.setPermissions(perms);
+
+            List<String> affectedUsers = org.getOrganizationMembers().stream()
+                    .filter(m -> roleId.equals(m.getRoleId()))
+                    .map(User.OrganizationMember::getUserId)
+                    .collect(Collectors.toList());
+
+            for (String uId : affectedUsers) {
+                apiKeyService.syncUserOrgPermissions(uId, orgId, perms);
+            }
+        }
+
+        return userRepository.save(org);
+    }
+
+    public User deleteOrganizationRole(String orgId, String roleId, User requester) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_MEMBER_EDIT_ROLE)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
+
+        User.OrganizationRole role = org.getOrganizationRoles().stream()
+                .filter(r -> r.getId().equals(roleId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Role not found."));
+
+        if (role.isOwner()) {
+            throw new SecurityException("The Owner role cannot be deleted.");
+        }
+
+        boolean inUse = org.getOrganizationMembers().stream().anyMatch(m -> roleId.equals(m.getRoleId()));
+        if (inUse) {
+            throw new IllegalArgumentException("Cannot delete role while members are assigned to it.");
+        }
+
+        org.getOrganizationRoles().removeIf(r -> r.getId().equals(roleId));
+        return userRepository.save(org);
+    }
+
+    public void inviteOrganizationMember(String orgId, String targetUserId, String roleId, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
         if (org.getAccountType() != User.AccountType.ORGANIZATION) throw new IllegalArgumentException("Target is not an organization");
 
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isAdmin) throw new SecurityException("Only organization admins can invite members.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_MEMBER_INVITE)) {
+            throw new SecurityException("Only members with invite permissions can invite members.");
+        }
 
         User target = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -506,8 +634,14 @@ public class UserService {
             throw new IllegalArgumentException("User has already been invited.");
         }
 
+        User.OrganizationRole role = org.getOrganizationRoles().stream().filter(r -> r.getId().equals(roleId)).findFirst().orElseThrow(() -> new IllegalArgumentException("Role not found."));
+
+        if (role.isOwner()) {
+            throw new SecurityException("You cannot invite someone directly to the Owner role. Transfer ownership instead.");
+        }
+
         if (org.getPendingOrgInvites() == null) org.setPendingOrgInvites(new ArrayList<>());
-        org.getPendingOrgInvites().add(new User.OrganizationMember(target.getId(), role));
+        org.getPendingOrgInvites().add(new User.OrganizationMember(target.getId(), roleId));
         userRepository.save(org);
 
         Map<String, String> metadata = new HashMap<>();
@@ -517,7 +651,7 @@ public class UserService {
         notificationService.sendActionableNotification(
                 List.of(target.getId()),
                 "Organization Invite",
-                "You have been invited to join " + org.getUsername() + " as a " + role.toLowerCase() + ".",
+                "You have been invited to join " + org.getUsername() + " as " + role.getName() + ".",
                 URI.create("/dashboard/orgs"),
                 org.getAvatarUrl(),
                 "ORG_INVITE",
@@ -545,7 +679,7 @@ public class UserService {
 
             String msg = responder.getUsername() + " accepted the invitation to join " + org.getUsername();
             org.getOrganizationMembers().stream()
-                    .filter(m -> "ADMIN".equals(m.getRole()) && !m.getUserId().equals(responder.getId()))
+                    .filter(m -> hasOrgPermission(org, m.getUserId(), ApiKey.ApiPermission.ORG_MEMBER_READ) && !m.getUserId().equals(responder.getId()))
                     .forEach(admin -> notificationService.sendNotification(
                             List.of(admin.getUserId()),
                             "Invite Accepted",
@@ -568,37 +702,65 @@ public class UserService {
         });
     }
 
-    public void updateOrganizationMemberRole(String orgId, String targetUserId, String newRole, User requester) {
+    public void updateOrganizationMemberRole(String orgId, String targetUserId, String newRoleId, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
 
-        boolean isRequesterAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isRequesterAdmin) throw new SecurityException("Insufficient permissions.");
-
-        if (!"ADMIN".equals(newRole) && !"MEMBER".equals(newRole)) {
-            throw new IllegalArgumentException("Invalid role. Must be ADMIN or MEMBER.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_MEMBER_EDIT_ROLE)) {
+            throw new SecurityException("Insufficient permissions.");
         }
+
+        User.OrganizationRole newRole = org.getOrganizationRoles().stream()
+                .filter(r -> r.getId().equals(newRoleId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Target role not found."));
 
         User.OrganizationMember targetMember = org.getOrganizationMembers().stream()
                 .filter(m -> m.getUserId().equals(targetUserId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("User is not a member of this organization."));
 
-        if ("MEMBER".equals(newRole) && targetUserId.equals(requester.getId())) {
-            long adminCount = org.getOrganizationMembers().stream().filter(m -> "ADMIN".equals(m.getRole())).count();
-            if (adminCount <= 1) {
-                throw new IllegalArgumentException("You cannot demote yourself as the only Admin.");
+        User.OrganizationRole targetCurrentRole = org.getOrganizationRoles().stream()
+                .filter(r -> r.getId().equals(targetMember.getRoleId()))
+                .findFirst().orElse(null);
+
+        User.OrganizationMember requesterMember = org.getOrganizationMembers().stream()
+                .filter(m -> m.getUserId().equals(requester.getId()))
+                .findFirst().orElse(null);
+
+        User.OrganizationRole requesterRole = requesterMember != null ?
+                org.getOrganizationRoles().stream().filter(r -> r.getId().equals(requesterMember.getRoleId())).findFirst().orElse(null) : null;
+
+        boolean isRequesterOwner = requesterRole != null && requesterRole.isOwner();
+        boolean isTargetOwner = targetCurrentRole != null && targetCurrentRole.isOwner();
+
+        if (newRole.isOwner()) {
+            if (!isRequesterOwner) {
+                throw new SecurityException("Only the current Owner can transfer ownership.");
             }
+            if (requester.getId().equals(targetUserId)) {
+                throw new IllegalArgumentException("You are already the owner.");
+            }
+
+            targetMember.setRoleId(newRole.getId());
+            requesterMember.setRoleId(targetCurrentRole != null ? targetCurrentRole.getId() : org.getOrganizationRoles().stream().filter(r -> !r.isOwner()).findFirst().get().getId());
+
+            userRepository.save(org);
+
+            apiKeyService.syncUserOrgPermissions(targetUserId, orgId, newRole.getPermissions());
+            apiKeyService.syncUserOrgPermissions(requester.getId(), orgId, org.getOrganizationRoles().stream().filter(r -> r.getId().equals(requesterMember.getRoleId())).findFirst().get().getPermissions());
+
+        } else if (isTargetOwner) {
+            throw new IllegalArgumentException("You cannot demote the Owner. Transfer ownership to another member instead.");
+        } else {
+            targetMember.setRoleId(newRoleId);
+            userRepository.save(org);
+            apiKeyService.syncUserOrgPermissions(targetUserId, orgId, newRole.getPermissions());
         }
 
-        targetMember.setRole(newRole);
-        userRepository.save(org);
-
-        String roleName = "ADMIN".equals(newRole) ? "an Admin" : "a Member";
         notificationService.sendNotification(
                 List.of(targetUserId),
                 "Role Updated",
-                "Your role in " + org.getUsername() + " has been updated to " + roleName + ".",
+                "Your role in " + org.getUsername() + " has been updated to " + newRole.getName() + ".",
                 URI.create("/dashboard/orgs"),
                 org.getAvatarUrl()
         );
@@ -607,26 +769,35 @@ public class UserService {
     public void removeOrganizationMember(String orgId, String targetUserId, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
 
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
+        boolean canRemove = hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_MEMBER_REMOVE);
 
-        if (!isAdmin && !requester.getId().equals(targetUserId)) {
+        if (!canRemove && !requester.getId().equals(targetUserId)) {
             throw new SecurityException("Insufficient permissions.");
         }
 
-        if (org.getOrganizationMembers().size() <= 1) {
-            throw new IllegalArgumentException("Cannot remove the last member. Delete the organization instead.");
+        User.OrganizationMember targetMember = org.getOrganizationMembers().stream()
+                .filter(m -> m.getUserId().equals(targetUserId))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("User not found in organization."));
+
+        User.OrganizationRole targetRole = org.getOrganizationRoles().stream()
+                .filter(r -> r.getId().equals(targetMember.getRoleId())).findFirst().orElse(null);
+
+        if (targetRole != null && targetRole.isOwner()) {
+            throw new IllegalArgumentException("The Owner cannot be removed or leave the organization. Transfer ownership first or delete the organization entirely.");
         }
 
         boolean removed = org.getOrganizationMembers().removeIf(m -> m.getUserId().equals(targetUserId));
-        if (removed) userRepository.save(org);
+        if (removed) {
+            userRepository.save(org);
+            apiKeyService.syncUserOrgPermissions(targetUserId, orgId, new HashSet<>());
+        }
     }
 
     public void updateOrganizationAvatar(String orgId, String url, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_EDIT_AVATAR)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
 
         org.setAvatarUrl(url);
         userRepository.save(org);
@@ -634,9 +805,9 @@ public class UserService {
 
     public void updateOrganizationBanner(String orgId, String url, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_EDIT_BANNER)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
 
         org.setBannerUrl(url);
         userRepository.save(org);
@@ -646,9 +817,9 @@ public class UserService {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
         if (org.getAccountType() != User.AccountType.ORGANIZATION) throw new IllegalArgumentException("Target is not an organization");
 
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_DELETE)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
 
         deleteUser(orgId);
     }
@@ -665,6 +836,19 @@ public class UserService {
 
         Query query = new Query(Criteria.where("_id").in(memberIds).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id", "bio");
+        return mongoTemplate.find(query, User.class);
+    }
+
+    public List<User> getOrganizationInvites(String orgId) {
+        User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        if (org.getPendingOrgInvites() == null || org.getPendingOrgInvites().isEmpty()) return new ArrayList<>();
+
+        List<String> inviteIds = org.getPendingOrgInvites().stream()
+                .map(User.OrganizationMember::getUserId)
+                .collect(Collectors.toList());
+
+        Query query = new Query(Criteria.where("_id").in(inviteIds).and("deletedAt").is(null));
+        query.fields().include("username", "avatarUrl", "id");
         return mongoTemplate.find(query, User.class);
     }
 
@@ -705,9 +889,9 @@ public class UserService {
 
     public void unlinkOrgAccount(String orgId, String provider, User requester) {
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_CONNECTION_MANAGE)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
 
         boolean removed = org.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
         if (removed) {
@@ -725,9 +909,9 @@ public class UserService {
         if ("google".equals(provider)) throw new IllegalArgumentException("Google accounts cannot be made visible.");
 
         User org = userRepository.findById(orgId).orElseThrow(() -> new IllegalArgumentException("Organization not found"));
-        boolean isAdmin = org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "ADMIN".equals(m.getRole()));
-        if (!isAdmin) throw new SecurityException("Insufficient permissions.");
+        if (!hasOrgPermission(org, requester.getId(), ApiKey.ApiPermission.ORG_CONNECTION_MANAGE)) {
+            throw new SecurityException("Insufficient permissions.");
+        }
 
         org.getConnectedAccounts().stream()
                 .filter(a -> a.getProvider().equals(provider))
