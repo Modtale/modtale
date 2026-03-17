@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -8,10 +9,10 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { useDropzone } from 'react-dropzone';
 import {
     Save, UploadCloud, Link as LinkIcon, Tag,
-    GitMerge, Settings,
+    GitMerge, Settings, Plus,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
     UserPlus, Scale, Check, Copy, Link2, Edit2, X, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
-    AlertCircle, Clock, Archive, Globe, EyeOff, Image as ImageIcon, MessageSquare, ExternalLink, Sparkles
+    AlertCircle, Clock, Archive, Globe, EyeOff, Image as ImageIcon, MessageSquare, ExternalLink, Sparkles, Users, Palette, ShieldCheck, Shield
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -22,10 +23,57 @@ import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { createSlug } from '../../../utils/slug';
-import type { Mod, User, ProjectVersion } from '../../../types';
+import type { Mod, User, ProjectVersion, ProjectRole, ProjectMember } from '../../../types';
 import { ModCard } from '../ModCard';
 import { VersionFields, ThemedInput } from './FormShared';
 import type { MetadataFormData, VersionFormData } from './FormShared';
+
+const PERMISSION_GROUPS = [
+    {
+        group: 'Project Management',
+        permissions: [
+            { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
+            { id: 'PROJECT_EDIT_ICON', label: 'Edit Icon' },
+            { id: 'PROJECT_EDIT_BANNER', label: 'Edit Banner' },
+            { id: 'PROJECT_DELETE', label: 'Delete Project' }
+        ]
+    },
+    {
+        group: 'Versions & Releases',
+        permissions: [
+            { id: 'VERSION_CREATE', label: 'Upload Versions' },
+            { id: 'VERSION_EDIT', label: 'Edit Versions' },
+            { id: 'VERSION_DELETE', label: 'Delete Versions' }
+        ]
+    },
+    {
+        group: 'Visibility & Publishing',
+        permissions: [
+            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
+            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
+            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Project' },
+            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Project' }
+        ]
+    },
+    {
+        group: 'Community & Media',
+        permissions: [
+            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
+            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
+            { id: 'COMMENT_DELETE', label: 'Delete Comments' },
+            { id: 'COMMENT_REPLY', label: 'Reply as Developer' }
+        ]
+    },
+    {
+        group: 'Team Management',
+        permissions: [
+            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
+            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' },
+            { id: 'PROJECT_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
+            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' }
+        ]
+    }
+];
 
 interface ProjectBuilderProps {
     modData: Mod | null;
@@ -51,8 +99,8 @@ interface ProjectBuilderProps {
     isLoading: boolean;
     classification: Classification | string;
     currentUser: User | null;
-    activeTab: 'details' | 'files' | 'gallery' | 'settings';
-    setActiveTab: (tab: 'details' | 'files' | 'gallery' | 'settings') => void;
+    activeTab: 'details' | 'files' | 'gallery' | 'team' | 'settings';
+    setActiveTab: (tab: 'details' | 'files' | 'gallery' | 'team' | 'settings') => void;
     onShowStatus: (type: 'success' | 'error', title: string, msg: string) => void;
     readOnly?: boolean;
 }
@@ -122,8 +170,15 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>(readOnly ? 'preview' : 'write');
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviteUserId, setInviteUserId] = useState('');
+    const [inviteRoleId, setInviteRoleId] = useState('');
     const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
     const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+
+    const [inviteRoleDropdownOpen, setInviteRoleDropdownOpen] = useState(false);
+    const [memberRoleDropdownOpen, setMemberRoleDropdownOpen] = useState<string | null>(null);
+
+    const [editingRole, setEditingRole] = useState<Partial<ProjectRole> | null>(null);
+    const [roleModalOpen, setRoleModalOpen] = useState(false);
 
     const [isInviting, setIsInviting] = useState(false);
     const [showPublishConfirm, setShowPublishConfirm] = useState(false);
@@ -147,6 +202,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [editingVersion, setEditingVersion] = useState<ProjectVersion | null>(null);
     const [editVersionData, setEditVersionData] = useState<VersionFormData | null>(null);
     const [isSavingVersion, setIsSavingVersion] = useState(false);
+    const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
 
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
@@ -171,6 +227,32 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const isPublishable = publishRequirements.every(r => r.met);
     const metCount = publishRequirements.filter(r => r.met).length;
 
+    const isModalOpen = roleModalOpen || showSlugPrompt || showPublishConfirm || showCardPreview || editingVersion !== null || memberToRemove !== null;
+
+    useEffect(() => {
+        if (isModalOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isModalOpen]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.modtale-dropdown-container')) {
+                setInviteRoleDropdownOpen(false);
+                setMemberRoleDropdownOpen(null);
+                setUserSearchResults([]);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const markDirty = () => !readOnly && !isDirty && setIsDirty(true);
     const checkRepoUrl = useCallback((url: string) => {
         if (!url) { setRepoValid(true); return true; }
@@ -189,10 +271,15 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             api.get(`/projects/${modData.id}`).then(res => {
                 if (isMounted && res.data) {
                     setModData(prev => {
-                        if (prev && res.data.versions && prev.versions?.length !== res.data.versions.length) {
-                            return { ...prev, versions: res.data.versions };
+                        if (!prev) return res.data;
+                        const merged = { ...prev };
+                        if (res.data.versions && prev.versions?.length !== res.data.versions.length) {
+                            merged.versions = res.data.versions;
                         }
-                        return prev;
+                        if (res.data.teamMembers) merged.teamMembers = res.data.teamMembers;
+                        if (res.data.teamInvites) merged.teamInvites = res.data.teamInvites;
+                        if (res.data.projectRoles) merged.projectRoles = res.data.projectRoles;
+                        return merged;
                     });
                 }
             }).catch(() => {});
@@ -273,18 +360,49 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
-    const handleInvite = async () => {
-        if (!modData?.id || !inviteUserId) return;
+    const hasProjectPermission = (perm: string) => {
+        if (!modData || !currentUser) return false;
+        if (modData.isOwner) return true;
+        if (modData.authorId === currentUser.id) return true;
+
+        const member = modData.teamMembers?.find(m => m.userId === currentUser.id);
+        if (member && member.roleId && modData.projectRoles) {
+            const role = modData.projectRoles.find(r => r.id === member.roleId);
+            if (role && role.permissions && role.permissions.includes(perm)) return true;
+        }
+        return false;
+    };
+
+    const canManageRoles = hasProjectPermission('PROJECT_MEMBER_EDIT_ROLE');
+    const canInvite = hasProjectPermission('PROJECT_TEAM_INVITE');
+    const canRemove = hasProjectPermission('PROJECT_TEAM_REMOVE');
+
+    const handleInvite = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!modData?.id || !inviteUserId || !inviteRoleId) return;
         setIsInviting(true);
         try {
-            await api.post(`/projects/${modData.id}/invite`, null, { params: { userId: inviteUserId } });
-            setModData(prev => prev ? ({
-                ...prev,
-                pendingInvites: [...(prev.pendingInvites || []), inviteUsername]
-            }) : null);
+            await api.post(`/projects/${modData.id}/invite`, { userId: inviteUserId, roleId: inviteRoleId });
+
+            const selectedRole = modData.projectRoles?.find(r => r.id === inviteRoleId);
+            const userMatch = userSearchResults.find(u => u.id === inviteUserId);
+
+            if (userMatch) {
+                setModData(prev => prev ? ({
+                    ...prev,
+                    teamInvites: [...(prev.teamInvites || []), {
+                        userId: inviteUserId,
+                        roleId: inviteRoleId,
+                        username: userMatch.username,
+                        avatarUrl: userMatch.avatarUrl
+                    }]
+                }) : null);
+            }
+
             setInviteUsername('');
             setInviteUserId('');
-            onShowStatus('success', 'Invited', `Invited user`);
+            setUserSearchResults([]);
+            onShowStatus('success', 'Invited', `Invitation sent successfully.`);
         } catch (e: any) {
             const errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
@@ -295,30 +413,101 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
-    const handleRemoveContributor = async (username: string) => {
+    const handleCancelInvite = async (userId: string) => {
         if (!modData?.id) return;
         try {
-            const searchRes = await api.get(`/users/search?query=${username}`);
-            const targetUser = searchRes.data.find((u: User) => u.username === username);
+            await api.delete(`/projects/${modData.id}/invites/${userId}`);
+            setModData(prev => prev ? ({
+                ...prev,
+                teamInvites: (prev.teamInvites || []).filter(m => m.userId !== userId)
+            }) : null);
+        } catch (e: any) {
+            onShowStatus('error', 'Error', e.response?.data || "Could not cancel invite.");
+        }
+    };
 
-            if (!targetUser) throw new Error("User not found");
-
-            await api.delete(`/projects/${modData.id}/contributors/${targetUser.id}`);
-
+    const confirmRemoveContributor = async () => {
+        if (!modData?.id || !memberToRemove) return;
+        try {
+            await api.delete(`/projects/${modData.id}/contributors/${memberToRemove}`);
             setModData(prev => {
                 if (!prev) return null;
                 return {
                     ...prev,
-                    contributors: (prev.contributors || []).filter(u => u !== username),
-                    pendingInvites: (prev.pendingInvites || []).filter(u => u !== username)
+                    teamMembers: (prev.teamMembers || []).filter(m => m.userId !== memberToRemove),
+                    teamInvites: (prev.teamInvites || []).filter(m => m.userId !== memberToRemove)
                 };
             });
-            onShowStatus('success', 'Removed', `Removed ${username}`);
+            onShowStatus('success', 'Removed', `Member removed from project.`);
         } catch (e: any) {
             const errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
                 : e.response?.data?.message || e.message || 'Failed to remove contributor.';
             onShowStatus('error', 'Error', errorMsg);
+        } finally {
+            setMemberToRemove(null);
+        }
+    };
+
+    const handleSaveRole = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!modData?.id || !editingRole?.name || !editingRole?.color) return;
+
+        try {
+            let updatedMod;
+            if (editingRole.id) {
+                const res = await api.put(`/projects/${modData.id}/roles/${editingRole.id}`, editingRole);
+                updatedMod = res.data;
+            } else {
+                const res = await api.post(`/projects/${modData.id}/roles`, editingRole);
+                updatedMod = res.data;
+            }
+
+            setModData(prev => {
+                if (!prev) return updatedMod;
+                return { ...prev, projectRoles: updatedMod.projectRoles };
+            });
+
+            setRoleModalOpen(false);
+            setEditingRole(null);
+            onShowStatus('success', 'Saved', 'Role saved successfully.');
+        } catch (err: any) {
+            onShowStatus('error', 'Error', err.response?.data || "Failed to save role.");
+        }
+    };
+
+    const handleDeleteRole = async (roleId: string) => {
+        if (!modData?.id) return;
+        try {
+            const res = await api.delete(`/projects/${modData.id}/roles/${roleId}`);
+            setModData(prev => {
+                if (!prev) return res.data;
+                return { ...prev, projectRoles: res.data.projectRoles };
+            });
+            onShowStatus('success', 'Deleted', 'Role deleted successfully.');
+        } catch (err: any) {
+            onShowStatus('error', 'Delete Failed', err.response?.data || "Cannot delete role.");
+        }
+    };
+
+    const handleRoleUpdate = async (userId: string, newRoleId: string) => {
+        if (!modData?.id) return;
+        try {
+            await api.put(`/projects/${modData.id}/contributors/${userId}`, { roleId: newRoleId });
+
+            setModData(prev => {
+                if (!prev) return null;
+                const members = [...(prev.teamMembers || [])];
+                const idx = members.findIndex(m => m.userId === userId);
+                if (idx > -1) {
+                    members[idx] = { ...members[idx], roleId: newRoleId };
+                }
+                return { ...prev, teamMembers: members };
+            });
+
+            onShowStatus('success', 'Updated', 'Member role updated.');
+        } catch (err: any) {
+            onShowStatus('error', 'Update Failed', err.response?.data || "Failed to update role.");
         }
     };
 
@@ -382,13 +571,9 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         versions: modData?.versions || [],
         comments: [],
         galleryImages: [],
-        pendingInvites: modData?.pendingInvites || []
+        teamMembers: modData?.teamMembers || [],
+        teamInvites: modData?.teamInvites || []
     };
-
-    const allContributors = [
-        ...(modData?.contributors?.map(c => ({ username: c, status: 'active' })) || []),
-        ...(modData?.pendingInvites?.map(c => ({ username: c, status: 'pending' })) || [])
-    ];
 
     const handleSubmitClick = () => {
         if (!metaData.slug && !modData?.slug) {
@@ -525,7 +710,109 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 </div>
             )}
 
-            {editingVersion && editVersionData && (
+            {(inviteRoleDropdownOpen || memberRoleDropdownOpen) && (
+                <div className="fixed inset-0 z-[90]" onClick={() => { setInviteRoleDropdownOpen(false); setMemberRoleDropdownOpen(null); }} />
+            )}
+
+            {memberToRemove && createPortal(
+                <StatusModal
+                    type="warning"
+                    title="Remove Member?"
+                    message="Are you sure you want to remove this member from the project team?"
+                    actionLabel="Remove"
+                    onAction={confirmRemoveContributor}
+                    secondaryLabel="Cancel"
+                    onClose={() => setMemberToRemove(null)}
+                />,
+                document.body
+            )}
+
+            {roleModalOpen && editingRole && createPortal(
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">{editingRole.id ? 'Edit Role' : 'Create Role'}</h3>
+                                <p className="text-xs text-slate-500">Configure permissions for this project role.</p>
+                            </div>
+                            <button onClick={() => setRoleModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl"><X className="w-5 h-5" /></button>
+                        </div>
+
+                        <form onSubmit={handleSaveRole} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role Name</label>
+                                        <input
+                                            type="text"
+                                            value={editingRole.name || ''}
+                                            onChange={e => setEditingRole({...editingRole, name: e.target.value})}
+                                            className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-medium"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role Color</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="color"
+                                                value={editingRole.color || '#3b82f6'}
+                                                onChange={e => setEditingRole({...editingRole, color: e.target.value})}
+                                                className="w-12 h-12 p-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl cursor-pointer"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={editingRole.color || '#3b82f6'}
+                                                onChange={e => setEditingRole({...editingRole, color: e.target.value})}
+                                                className="flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-mono text-sm"
+                                                pattern="^#[0-9A-Fa-f]{6}$"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h4 className="font-bold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-white/10 pb-2">Permissions</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {PERMISSION_GROUPS.map((group, idx) => (
+                                            <div key={idx} className="bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden self-start">
+                                                <div className="bg-slate-100 dark:bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{group.group}</div>
+                                                <div className="p-2 space-y-1">
+                                                    {group.permissions.map(perm => (
+                                                        <label key={perm.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer group/label border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={(editingRole.permissions || []).includes(perm.id)}
+                                                                onChange={(e) => {
+                                                                    const cur = editingRole.permissions || [];
+                                                                    setEditingRole({
+                                                                        ...editingRole,
+                                                                        permissions: e.target.checked ? [...cur, perm.id] : cur.filter(p => p !== perm.id)
+                                                                    });
+                                                                }}
+                                                                className="w-4 h-4 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent focus:ring-offset-0 bg-white dark:bg-black/40 cursor-pointer"
+                                                            />
+                                                            <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300 group-hover/label:text-slate-900 dark:group-hover/label:text-white transition-colors">{perm.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
+                                <button type="button" onClick={() => setRoleModalOpen(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl">Cancel</button>
+                                <button type="submit" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-2.5 rounded-xl font-bold shadow-lg transition-all active:scale-95 flex items-center gap-2">Save Role</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {editingVersion && editVersionData && createPortal(
                 <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
                         <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
@@ -566,10 +853,11 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
-            {showSlugPrompt && (
+            {showSlugPrompt && createPortal(
                 <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
                         <div className="p-8">
@@ -617,10 +905,11 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
-            {showPublishConfirm && handlePublish && (
+            {showPublishConfirm && handlePublish && createPortal(
                 <StatusModal
                     type="info"
                     title="Ready to publish?"
@@ -629,10 +918,11 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                     actionLabel="Submit Now"
                     onAction={() => { setShowPublishConfirm(false); handlePublish(); }}
                     secondaryLabel="Cancel"
-                />
+                />,
+                document.body
             )}
 
-            {showCardPreview && (
+            {showCardPreview && createPortal(
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowCardPreview(false)}>
                     <div className="relative w-full max-w-[380px] flex flex-col items-center" onClick={e => e.stopPropagation()}>
                         <button
@@ -653,7 +943,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             <ProjectLayout
@@ -664,8 +955,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 onIconUpload={(f, p) => { markDirty(); setMetaData(m => ({...m, iconFile: f, iconPreview: p})); }}
                 headerContent={
                     <div>
-                        <input value={metaData.title} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, title: e.target.value}); }} className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white bg-transparent border-b border-transparent outline-none pb-1 placeholder:text-slate-400 w-full hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent" placeholder="Project Title"/>
-                        <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} className="text-lg text-slate-600 dark:text-slate-300 font-medium bg-transparent border-b border-transparent outline-none pb-1 placeholder:text-slate-400 w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent" placeholder="Short summary..."/>
+                        <input value={metaData.title} disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onChange={e => { markDirty(); setMetaData({...metaData, title: e.target.value}); }} className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white bg-transparent border-b border-transparent outline-none pb-1 placeholder:text-slate-400 w-full hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent" placeholder="Project Title"/>
+                        <input value={metaData.summary} disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} className="text-lg text-slate-600 dark:text-slate-300 font-medium bg-transparent border-b border-transparent outline-none pb-1 placeholder:text-slate-400 w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent" placeholder="Short summary..."/>
                     </div>
                 }
                 headerActions={
@@ -716,7 +1007,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 }
                 tabs={
                     <div className="flex items-center gap-1">
-                        {[{id: 'details', icon: FileText, label: 'Details'}, {id: 'files', icon: UploadCloud, label: `Files (${modData?.versions?.length||0})`}, {id: 'gallery', icon: ImageIcon, label: `Gallery (${modData?.galleryImages?.length||0})`}, {id: 'settings', icon: Settings, label: 'Settings'}].map(t => (
+                        {[{id: 'details', icon: FileText, label: 'Details'}, {id: 'files', icon: UploadCloud, label: `Files (${modData?.versions?.length||0})`}, {id: 'gallery', icon: ImageIcon, label: `Gallery (${modData?.galleryImages?.length||0})`}, {id: 'team', icon: Users, label: `Team (${(modData?.teamMembers?.length||0) + 1})`}, {id: 'settings', icon: Settings, label: 'Settings'}].map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                                 <t.icon className="w-4 h-4"/> {t.label}
                             </button>
@@ -729,9 +1020,9 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             <div className="h-full flex flex-col">
                                 <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-200 dark:border-white/5">
                                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2"><FileText className="w-3 h-3"/> Description</h3>
-                                    {!readOnly && <div className="flex bg-slate-100 dark:bg-slate-950/50 rounded-lg p-1 border border-slate-200 dark:border-white/10"><button onClick={() => setEditorMode('write')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${editorMode === 'write' ? 'bg-modtale-accent text-white' : 'text-slate-500'}`}>Write</button><button onClick={() => setEditorMode('preview')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${editorMode === 'preview' ? 'bg-modtale-accent text-white' : 'text-slate-500'}`}>Preview</button></div>}
+                                    {!readOnly && hasProjectPermission('PROJECT_EDIT_METADATA') && <div className="flex bg-slate-100 dark:bg-slate-950/50 rounded-lg p-1 border border-slate-200 dark:border-white/10"><button onClick={() => setEditorMode('write')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${editorMode === 'write' ? 'bg-modtale-accent text-white' : 'text-slate-500'}`}>Write</button><button onClick={() => setEditorMode('preview')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${editorMode === 'preview' ? 'bg-modtale-accent text-white' : 'text-slate-500'}`}>Preview</button></div>}
                                 </div>
-                                {editorMode === 'write' && !readOnly ? (
+                                {editorMode === 'write' && !readOnly && hasProjectPermission('PROJECT_EDIT_METADATA') ? (
                                     <textarea value={metaData.description} onChange={e => { markDirty(); setMetaData({...metaData, description: e.target.value}); }} className="flex-1 w-full h-full min-h-[400px] bg-transparent border-none outline-none text-slate-900 dark:text-slate-300 font-mono text-sm resize-none" placeholder="# Description..." />
                                 ) : (
                                     <div className="prose dark:prose-invert prose-lg max-w-none min-h-[400px]">
@@ -759,7 +1050,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                         {activeTab === 'files' && (
                             <div className="space-y-8">
-                                {!readOnly && (
+                                {!readOnly && hasProjectPermission('VERSION_CREATE') && (
                                     <div className="bg-slate-50 dark:bg-slate-950/30 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
                                         <VersionFields data={versionData} onChange={setVersionData} isModpack={classification === 'MODPACK'} projectType={typeof classification === 'string' ? classification : 'PLUGIN'} disabled={readOnly} />
                                         <div className="mt-6 flex justify-end"><button onClick={handleUploadVersion} disabled={isLoading || readOnly} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 h-12 rounded-xl font-bold shadow-lg flex items-center gap-2 disabled:opacity-50">{isLoading ? <Spinner className="w-5 h-5"/> : <UploadCloud className="w-5 h-5" />} Upload Version</button></div>
@@ -773,14 +1064,16 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         </div>
                                         {!readOnly && (
                                             <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleEditVersion(v)}
-                                                    className="p-2 text-slate-500 hover:text-modtale-accent hover:bg-modtale-accent/10 rounded-lg transition-colors"
-                                                    title="Edit Version Metadata"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                {handleDeleteVersion && (
+                                                {hasProjectPermission('VERSION_EDIT') && (
+                                                    <button
+                                                        onClick={() => handleEditVersion(v)}
+                                                        className="p-2 text-slate-500 hover:text-modtale-accent hover:bg-modtale-accent/10 rounded-lg transition-colors"
+                                                        title="Edit Version Metadata"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {handleDeleteVersion && hasProjectPermission('VERSION_DELETE') && (
                                                     <button onClick={() => handleDeleteVersion(v.id)} className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -798,7 +1091,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                     {modData?.galleryImages?.map((img, idx) => (
                                         <div key={idx} className="relative group aspect-video bg-black/20 rounded-xl overflow-hidden border border-slate-200 dark:border-white/5">
                                             <img src={img.startsWith('/api') ? `${BACKEND_URL}${img}` : img} alt="" className="w-full h-full object-cover" />
-                                            {!readOnly && (
+                                            {!readOnly && hasProjectPermission('PROJECT_GALLERY_REMOVE') && (
                                                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                     <button onClick={() => handleGalleryDelete(img)} disabled={isLoading} className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
                                                         <Trash2 className="w-5 h-5" />
@@ -807,7 +1100,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             )}
                                         </div>
                                     ))}
-                                    {!readOnly && (
+                                    {!readOnly && hasProjectPermission('PROJECT_GALLERY_ADD') && (
                                         <div
                                             {...getGalleryRootProps()}
                                             className={`aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${isGalleryDragActive ? 'border-modtale-accent bg-modtale-accent/5' : 'border-slate-300 dark:border-white/10 bg-slate-100 dark:bg-white/5 hover:border-modtale-accent hover:bg-slate-200 dark:hover:bg-white/10'}`}
@@ -828,6 +1121,297 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             </div>
                         )}
 
+                        {activeTab === 'team' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div className="lg:col-span-2 space-y-6">
+                                        {canInvite && (
+                                            <div className="relative z-20 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm">
+                                                <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-4">Invite Contributor</h3>
+                                                {modData?.projectRoles && modData.projectRoles.length > 0 ? (
+                                                    <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 items-end">
+                                                        <div className="flex-1 w-full relative modtale-dropdown-container">
+                                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Username</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search username..."
+                                                                value={inviteUsername}
+                                                                onChange={e => { setInviteUsername(e.target.value); setInviteUserId(''); }}
+                                                                className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white font-medium shadow-inner"
+                                                            />
+
+                                                            {userSearchResults.length > 0 && (
+                                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95">
+                                                                    {userSearchResults.map(res => (
+                                                                        <button
+                                                                            key={res.id}
+                                                                            type="button"
+                                                                            onClick={() => { setInviteUsername(res.username); setInviteUserId(res.id); setUserSearchResults([]); }}
+                                                                            className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                                                                        >
+                                                                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
+                                                                            <span className="font-bold text-sm text-slate-900 dark:text-white">{res.username}</span>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="w-full md:w-48 relative modtale-dropdown-container">
+                                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role</label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setInviteRoleDropdownOpen(!inviteRoleDropdownOpen)}
+                                                                className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-medium shadow-inner flex justify-between items-center"
+                                                            >
+                                                                {inviteRoleId ? (
+                                                                    <div className="flex items-center gap-2 truncate">
+                                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: modData.projectRoles.find(r => r.id === inviteRoleId)?.color}} />
+                                                                        <span className="truncate">{modData.projectRoles.find(r => r.id === inviteRoleId)?.name}</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-slate-400">Select Role...</span>
+                                                                )}
+                                                                <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${inviteRoleDropdownOpen ? 'rotate-180' : ''}`} />
+                                                            </button>
+
+                                                            {inviteRoleDropdownOpen && (
+                                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95">
+                                                                    <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                                        {modData.projectRoles.map(role => (
+                                                                            <button
+                                                                                key={role.id}
+                                                                                type="button"
+                                                                                onClick={() => { setInviteRoleId(role.id); setInviteRoleDropdownOpen(false); }}
+                                                                                className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                                                                            >
+                                                                                <div className="flex items-center gap-2 truncate">
+                                                                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: role.color}} />
+                                                                                    <span className="font-bold text-sm text-slate-900 dark:text-white truncate">{role.name}</span>
+                                                                                </div>
+                                                                                {inviteRoleId === role.id && <Check className="w-4 h-4 text-modtale-accent flex-shrink-0" />}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <button
+                                                            type="submit"
+                                                            disabled={!inviteUserId || !inviteRoleId || isInviting}
+                                                            className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-6 py-2.5 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg h-11"
+                                                        >
+                                                            {isInviting ? <Spinner className="w-4 h-4" /> : <><Plus className="w-4 h-4" /> Invite</>}
+                                                        </button>
+                                                    </form>
+                                                ) : (
+                                                    <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 p-4 rounded-xl flex items-center gap-2 font-medium">
+                                                        <Shield className="w-5 h-5" /> You must create at least one Role before inviting members.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="relative z-10 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+                                            <div className="px-6 py-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-black/10">
+                                                <h3 className="font-bold text-slate-900 dark:text-white">Active Team</h3>
+                                                <span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400">{(modData?.teamMembers?.length || 0) + 1}</span>
+                                            </div>
+                                            <div className="divide-y divide-slate-200 dark:divide-white/10">
+                                                <div className="p-4 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-400 border border-slate-200 dark:border-white/5">
+                                                            {modData?.author?.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-slate-900 dark:text-white text-sm">{modData?.author}</div>
+                                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-slate-100 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/10 dark:text-slate-400">Author</span>
+                                                                {modData?.authorId === currentUser?.id && <span className="text-[9px] text-slate-400 font-medium italic">(You)</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Owner</span>
+                                                    </div>
+                                                </div>
+
+                                                {modData?.teamMembers?.map(member => {
+                                                    const role = modData.projectRoles?.find(r => r.id === member.roleId);
+                                                    const isMe = member.userId === currentUser?.id;
+
+                                                    return (
+                                                        <div key={member.userId} className="p-4 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors group">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
+                                                                    {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-400">{member.username?.charAt(0).toUpperCase() || '?'}</div>}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-bold text-slate-900 dark:text-white text-sm">{member.username || 'Unknown User'}</div>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        {role ? (
+                                                                            <div className="flex items-center gap-1.5 border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-black/20 px-2 py-0.5 rounded-md">
+                                                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: role.color }} />
+                                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{role.name}</span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-slate-100 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/10 dark:text-slate-400">Legacy Contributor</span>
+                                                                        )}
+                                                                        {isMe && <span className="text-[10px] text-slate-400 font-medium italic">(You)</span>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-3">
+                                                                {canManageRoles && !isMe && (
+                                                                    <div className="relative modtale-dropdown-container">
+                                                                        <button
+                                                                            onClick={() => setMemberRoleDropdownOpen(memberRoleDropdownOpen === member.userId ? null : member.userId)}
+                                                                            className={`flex items-center justify-between min-w-[120px] bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors cursor-pointer shadow-sm`}
+                                                                        >
+                                                                            <div className="flex items-center gap-2 truncate">
+                                                                                {role && <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
+                                                                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate">
+                                                                                    {role ? role.name : 'Select Role'}
+                                                                                </span>
+                                                                            </div>
+                                                                            <ChevronDown className={`w-3 h-3 text-slate-400 ml-2 flex-shrink-0 transition-transform ${memberRoleDropdownOpen === member.userId ? 'rotate-180' : ''}`} />
+                                                                        </button>
+
+                                                                        {memberRoleDropdownOpen === member.userId && (
+                                                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95">
+                                                                                <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                                                    {modData.projectRoles?.map(r => (
+                                                                                        <button
+                                                                                            key={r.id}
+                                                                                            onClick={() => {
+                                                                                                handleRoleUpdate(member.userId, r.id);
+                                                                                                setMemberRoleDropdownOpen(null);
+                                                                                            }}
+                                                                                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                                                                                        >
+                                                                                            <div className="flex items-center gap-2 truncate">
+                                                                                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: r.color}} />
+                                                                                                <span className="font-bold text-xs text-slate-900 dark:text-white truncate">{r.name}</span>
+                                                                                            </div>
+                                                                                            {member.roleId === r.id && <Check className="w-3 h-3 text-modtale-accent flex-shrink-0" />}
+                                                                                        </button>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {(canRemove || isMe) && (
+                                                                    <div className="relative group/tooltip">
+                                                                        <button
+                                                                            onClick={() => setMemberToRemove(member.userId)}
+                                                                            className={`p-2 rounded-xl transition-all text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20`}
+                                                                            title={isMe ? "Leave Project" : "Remove Contributor"}
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {(modData?.teamInvites?.length || 0) > 0 && (
+                                            <div className="relative z-0 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+                                                <div className="px-6 py-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-black/10">
+                                                    <h3 className="font-bold text-slate-900 dark:text-white">Pending Invites</h3>
+                                                    <span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400">{modData?.teamInvites?.length || 0}</span>
+                                                </div>
+                                                <div className="divide-y divide-slate-200 dark:divide-white/10">
+                                                    {modData?.teamInvites?.map(invite => {
+                                                        const role = modData.projectRoles?.find(r => r.id === invite.roleId);
+
+                                                        return (
+                                                            <div key={invite.userId} className="p-4 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 opacity-70 grayscale">
+                                                                        {invite.avatarUrl ? <img src={invite.avatarUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-400">{invite.username?.charAt(0).toUpperCase() || '?'}</div>}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-bold text-slate-900 dark:text-white text-sm">{invite.username || 'Unknown User'}</div>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-700/30 dark:text-amber-400">Pending</span>
+                                                                            {role && (
+                                                                                <span className="text-[10px] text-slate-500 font-medium">As {role.name}</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {canInvite && (
+                                                                    <button onClick={() => handleCancelInvite(invite.userId)} className="text-xs font-bold text-red-500 hover:text-red-600 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/30 transition-colors">
+                                                                        Cancel
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="lg:col-span-1 space-y-6">
+                                        <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold text-slate-900 dark:text-white">Project Roles</h3>
+                                                {canManageRoles && (
+                                                    <button onClick={() => { setEditingRole({ permissions: [] }); setRoleModalOpen(true); }} className="text-modtale-accent hover:text-modtale-accentHover font-bold text-xs flex items-center gap-1 transition-colors">
+                                                        <Plus className="w-3 h-3" /> New
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                {modData?.projectRoles?.map(role => {
+                                                    const count = modData.teamMembers?.filter(m => m.roleId === role.id).length || 0;
+                                                    return (
+                                                        <div key={role.id} className="bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm group">
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
+                                                                    <div>
+                                                                        <div className="font-bold text-xs text-slate-900 dark:text-white leading-tight">{role.name}</div>
+                                                                        <div className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mt-0.5">{count} Member{count !== 1 ? 's' : ''}</div>
+                                                                    </div>
+                                                                </div>
+                                                                {canManageRoles && (
+                                                                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button onClick={() => { setEditingRole(role); setRoleModalOpen(true); }} className="p-1 text-slate-400 hover:text-modtale-accent hover:bg-modtale-accent/10 rounded transition-colors">
+                                                                            <Settings className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                        <button onClick={() => handleDeleteRole(role.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors">
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {(!modData?.projectRoles || modData.projectRoles.length === 0) && (
+                                                    <div className="text-center py-6 text-xs text-slate-500 italic bg-white/50 dark:bg-black/10 rounded-xl border border-slate-200 dark:border-white/5">
+                                                        No custom roles defined.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'settings' && (
                             <div className="space-y-6">
                                 <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-2xl border border-slate-200 dark:border-white/10">
@@ -838,8 +1422,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 <button
                                                     onClick={handleRestore}
-                                                    disabled={isLoading || modData.status === 'PUBLISHED'}
-                                                    className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${modData.status === 'PUBLISHED' ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-green-500 hover:text-green-500'}`}
+                                                    disabled={isLoading || modData.status === 'PUBLISHED' || !hasProjectPermission('PROJECT_STATUS_PUBLISH')}
+                                                    className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${modData.status === 'PUBLISHED' ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-green-500 hover:text-green-500 disabled:opacity-50 disabled:hover:border-slate-200 dark:disabled:hover:border-white/10 disabled:hover:text-inherit'}`}
                                                 >
                                                     <Globe className="w-6 h-6" />
                                                     <div className="text-center">
@@ -850,8 +1434,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                                                 <button
                                                     onClick={handleUnlist}
-                                                    disabled={isLoading || modData.status === 'UNLISTED'}
-                                                    className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${modData.status === 'UNLISTED' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-orange-500 hover:text-orange-500'}`}
+                                                    disabled={isLoading || modData.status === 'UNLISTED' || !hasProjectPermission('PROJECT_STATUS_UNLIST')}
+                                                    className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${modData.status === 'UNLISTED' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : 'bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-orange-500 hover:text-orange-500 disabled:opacity-50 disabled:hover:border-slate-200 dark:disabled:hover:border-white/10 disabled:hover:text-inherit'}`}
                                                 >
                                                     <EyeOff className="w-6 h-6" />
                                                     <div className="text-center">
@@ -862,8 +1446,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                                                 <button
                                                     onClick={handleArchive}
-                                                    disabled={isLoading}
-                                                    className="p-4 rounded-xl border flex flex-col items-center gap-3 transition-all bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-slate-500 hover:text-slate-500"
+                                                    disabled={isLoading || !hasProjectPermission('PROJECT_STATUS_ARCHIVE')}
+                                                    className="p-4 rounded-xl border flex flex-col items-center gap-3 transition-all bg-white dark:bg-black/20 border-slate-200 dark:border-white/10 hover:border-slate-500 hover:text-slate-500 disabled:opacity-50 disabled:hover:border-slate-200 dark:disabled:hover:border-white/10 disabled:hover:text-inherit"
                                                 >
                                                     <Archive className="w-6 h-6" />
                                                     <div className="text-center">
@@ -892,7 +1476,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             <div><h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-slate-500" /> Project Slug</h3><p className="text-xs text-slate-500">Customize the URL.</p></div>
                                             <div className={`flex items-center w-full bg-white dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`}>
                                                 <div className="px-4 py-2 bg-slate-50 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-500 text-sm font-mono whitespace-nowrap select-none">{getUrlPrefix()}</div>
-                                                <input disabled={readOnly} value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder={createSlug(metaData.title, modData?.id || 'id')} />
+                                                <input disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder={createSlug(metaData.title, modData?.id || 'id')} />
                                             </div>
                                             {slugError && <p className="text-[10px] text-red-500 font-bold">{slugError}</p>}
                                         </div>
@@ -900,12 +1484,12 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                                     <div className="flex items-center justify-between mb-4">
                                         <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Modpacks</h3><p className="text-xs text-slate-500">Allow inclusion in modpacks?</p></div>
-                                        <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowModpacks: !prev.allowModpacks} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowModpacks ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowModpacks ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                                        <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowModpacks: !prev.allowModpacks} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA') ? 'opacity-50' : modData?.allowModpacks ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowModpacks ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
                                     <div className="flex items-center justify-between mb-4">
                                         <div><h3 className="text-sm font-bold text-slate-900 dark:text-white">Allow Comments</h3><p className="text-xs text-slate-500">Enable community comments?</p></div>
-                                        <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowComments: !prev.allowComments} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.allowComments ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowComments ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                                        <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, allowComments: !prev.allowComments} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA') ? 'opacity-50' : modData?.allowComments ? 'text-green-500' : 'text-slate-600'}`}>{modData?.allowComments ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
                                     <div className="flex items-center justify-between mb-4">
@@ -913,7 +1497,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             <h3 className="text-sm font-bold text-slate-900 dark:text-white">HytaleModding Wiki</h3>
                                             <p className="text-xs text-slate-500 mt-0.5">Embed your <a href="https://wiki.hytalemodding.dev" target="_blank" rel="noopener noreferrer" className="text-modtale-accent hover:underline font-bold">HytaleModding Wiki</a> directly on your project page.</p>
                                         </div>
-                                        <button disabled={readOnly} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, hmWikiEnabled: !prev.hmWikiEnabled} : null); }} className={`transition-colors ${readOnly ? 'opacity-50' : modData?.hmWikiEnabled ? 'text-green-500' : 'text-slate-600'}`}>{modData?.hmWikiEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                                        <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, hmWikiEnabled: !prev.hmWikiEnabled} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA') ? 'opacity-50' : modData?.hmWikiEnabled ? 'text-green-500' : 'text-slate-600'}`}>{modData?.hmWikiEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                                     </div>
 
                                     {modData?.hmWikiEnabled && (
@@ -922,7 +1506,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             <input
                                                 value={modData.hmWikiSlug || ''}
                                                 onChange={e => { markDirty(); setModData(prev => prev ? {...prev, hmWikiSlug: e.target.value} : null); }}
-                                                disabled={readOnly}
+                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
                                                 placeholder="e.g., my-awesome-mod"
                                                 className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all"
                                             />
@@ -934,52 +1518,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             </div>
                                         </div>
                                     )}
-
-                                    <div className="pt-4 border-t border-slate-200 dark:border-white/5">
-                                        <h3 className="text-sm font-bold mb-2">Contributors</h3>
-                                        <div className="flex flex-col md:flex-row gap-4 items-end relative mb-4">
-                                            <div className="flex-1 w-full relative">
-                                                <input
-                                                    disabled={readOnly}
-                                                    value={inviteUsername}
-                                                    onChange={e => { setInviteUsername(e.target.value); setInviteUserId(''); }}
-                                                    placeholder="Search username..."
-                                                    className="w-full bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm"
-                                                />
-                                                {userSearchResults.length > 0 && (
-                                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
-                                                        {userSearchResults.map(res => (
-                                                            <button
-                                                                key={res.id}
-                                                                type="button"
-                                                                onClick={() => { setInviteUsername(res.username); setInviteUserId(res.id); setUserSearchResults([]); }}
-                                                                className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
-                                                            >
-                                                                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
-                                                                <span className="font-bold text-sm text-slate-900 dark:text-white">{res.username}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <button onClick={handleInvite} disabled={readOnly || isInviting || !inviteUserId} className="bg-modtale-accent text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 h-9 w-full md:w-auto"><UserPlus className="w-3 h-3" /> Invite</button>
-                                        </div>
-                                        {allContributors.map(u => (
-                                            <div key={u.username} className="flex justify-between items-center p-2 bg-slate-100 dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/5 mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold">{u.username}</span>
-                                                    {u.status === 'pending' && <span className="text-[10px] font-bold bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded">PENDING</span>}
-                                                </div>
-                                                {!readOnly && (
-                                                    <button onClick={() => handleRemoveContributor(u.username)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
                                 </div>
-                                {!readOnly && <button onClick={handleDelete} className="w-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white p-4 rounded-xl font-bold flex justify-center gap-2 transition-all"><Trash2 className="w-4 h-4"/> Delete Project</button>}
+                                {!readOnly && hasProjectPermission('PROJECT_DELETE') && <button onClick={handleDelete} className="w-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white p-4 rounded-xl font-bold flex justify-center gap-2 transition-all"><Trash2 className="w-4 h-4"/> Delete Project</button>}
                             </div>
                         )}
                     </>
@@ -1007,32 +1547,32 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         <SidebarSection title="Repository Source" icon={GitMerge}>
                             <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2">
                                 <div className="flex bg-slate-200 dark:bg-black/40 rounded-lg p-1 mb-3">
-                                    <button onClick={() => { setManualRepo(false); if (hasGithub) { if (provider !== 'github') setRepos([]); setProvider('github'); } }} disabled={readOnly || !hasGithub} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'github' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitHub</button>
-                                    <button onClick={() => { setManualRepo(false); if (hasGitlab) { if (provider !== 'gitlab') setRepos([]); setProvider('gitlab'); } }} disabled={readOnly || !hasGitlab} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'gitlab' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitLab</button>
-                                    <button onClick={() => setManualRepo(true)} disabled={readOnly} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${manualRepo ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>Link URL</button>
+                                    <button onClick={() => { setManualRepo(false); if (hasGithub) { if (provider !== 'github') setRepos([]); setProvider('github'); } }} disabled={readOnly || !hasGithub || !hasProjectPermission('PROJECT_EDIT_METADATA')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'github' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitHub</button>
+                                    <button onClick={() => { setManualRepo(false); if (hasGitlab) { if (provider !== 'gitlab') setRepos([]); setProvider('gitlab'); } }} disabled={readOnly || !hasGitlab || !hasProjectPermission('PROJECT_EDIT_METADATA')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${!manualRepo && provider === 'gitlab' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>GitLab</button>
+                                    <button onClick={() => setManualRepo(true)} disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${manualRepo ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30'}`}>Link URL</button>
                                 </div>
                                 {manualRepo ? (
                                     <div className="relative">
-                                        <input value={metaData.repositoryUrl} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, repositoryUrl: e.target.value}); checkRepoUrl(e.target.value); }} className={`w-full bg-slate-100 dark:bg-slate-900 border rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white outline-none transition-all pr-8 ${!repoValid && metaData.repositoryUrl ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`} placeholder="https://github.com/..." />
+                                        <input value={metaData.repositoryUrl} disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onChange={e => { markDirty(); setMetaData({...metaData, repositoryUrl: e.target.value}); checkRepoUrl(e.target.value); }} className={`w-full bg-slate-100 dark:bg-slate-900 border rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white outline-none transition-all pr-8 ${!repoValid && metaData.repositoryUrl ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`} placeholder="https://github.com/..." />
                                         {metaData.repositoryUrl && <div className="absolute right-3 top-2.5">{repoValid ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <X className="w-3.5 h-3.5 text-red-500" />}</div>}
                                     </div>
                                 ) : (!hasGithub && !hasGitlab) ? (
                                     <div className="text-center py-4 text-xs text-slate-500">Link account in settings.</div>
                                 ) : (
                                     <div className="relative" ref={repoDropdownRef}>
-                                        <button disabled={readOnly} onClick={() => setRepoDropdownOpen(!repoDropdownOpen)} className={`w-full flex items-center justify-between bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white transition-colors ${!readOnly ? 'hover:border-modtale-accent' : 'opacity-50 cursor-not-allowed'}`}>
+                                        <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => setRepoDropdownOpen(!repoDropdownOpen)} className={`w-full flex items-center justify-between bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-white transition-colors ${(!readOnly && hasProjectPermission('PROJECT_EDIT_METADATA')) ? 'hover:border-modtale-accent' : 'opacity-50 cursor-not-allowed'}`}>
                                             <span className="truncate">{metaData.repositoryUrl || "Select Repo..."}</span>
                                             <ChevronDown className="w-3 h-3 text-slate-500" />
                                         </button>
-                                        {repoDropdownOpen && !readOnly && (
-                                            <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                                        {repoDropdownOpen && !readOnly && hasProjectPermission('PROJECT_EDIT_METADATA') && (
+                                            <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[60] overflow-hidden">
                                                 <div className="p-2 border-b border-slate-200 dark:border-white/5 flex gap-2">
                                                     <input autoFocus value={repoSearch} onChange={e => setRepoSearch(e.target.value)} className="flex-1 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-md px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none" placeholder="Filter..." />
-                                                    <button onClick={fetchRepos} className="p-1 bg-slate-100 dark:bg-white/5 rounded hover:bg-slate-200 dark:hover:bg-white/10"><RefreshCw className={`w-3 h-3 text-slate-400 ${loadingRepos ? 'animate-spin' : ''}`} /></button>
+                                                    <button type="button" onClick={fetchRepos} className="p-1 bg-slate-100 dark:bg-white/5 rounded hover:bg-slate-200 dark:hover:bg-white/10"><RefreshCw className={`w-3 h-3 text-slate-400 ${loadingRepos ? 'animate-spin' : ''}`} /></button>
                                                 </div>
                                                 <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
                                                     {loadingRepos ? <div className="p-4 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto text-modtale-accent" /></div> : filteredRepos.length > 0 ? filteredRepos.map(r => (
-                                                        <button key={r.url} onClick={() => { markDirty(); setMetaData({...metaData, repositoryUrl: r.html_url || r.url}); checkRepoUrl(r.html_url || r.url); setRepoDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-xs text-slate-600 dark:text-slate-300 flex justify-between items-center group"><span className="font-mono">{r.name}</span>{metaData.repositoryUrl === (r.html_url || r.url) && <Check className="w-3 h-3 text-modtale-accent" />}</button>
+                                                        <button key={r.url} type="button" onClick={() => { markDirty(); setMetaData({...metaData, repositoryUrl: r.html_url || r.url}); checkRepoUrl(r.html_url || r.url); setRepoDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-xs text-slate-600 dark:text-slate-300 flex justify-between items-center group"><span className="font-mono">{r.name}</span>{metaData.repositoryUrl === (r.html_url || r.url) && <Check className="w-3 h-3 text-modtale-accent" />}</button>
                                                     )) : <div className="p-2 text-center text-[10px] text-slate-500">No repos found</div>}
                                                 </div>
                                             </div>
@@ -1045,13 +1585,13 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
                                 <div className="bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl p-2 max-h-80 overflow-y-auto custom-scrollbar">
                                     {LICENSES.map(lic => (
-                                        <button key={lic.id} disabled={readOnly} onClick={() => { markDirty(); setIsCustomLicense(false); setMetaData({ ...metaData, license: lic.id }); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${!isCustomLicense && metaData.license === lic.id ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}>
+                                        <button key={lic.id} disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => { markDirty(); setIsCustomLicense(false); setMetaData({ ...metaData, license: lic.id }); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${!isCustomLicense && metaData.license === lic.id ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}>
                                             <span>{lic.name}</span>{!isCustomLicense && metaData.license === lic.id && <Check className="w-3 h-3" />}
                                         </button>
                                     ))}
 
                                     <button
-                                        disabled={readOnly}
+                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
                                         onClick={() => { markDirty(); setIsCustomLicense(true); if(!metaData.license || LICENSES.some(l => l.id === metaData.license)) setMetaData({...metaData, license: ''}); }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between border-t border-slate-200 dark:border-white/10 mt-1 pt-2 ${isCustomLicense ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10'}`}
                                     >
@@ -1065,14 +1605,14 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                 value={metaData.license}
                                                 onChange={(e) => { markDirty(); setMetaData({...metaData, license: e.target.value}); }}
                                                 placeholder="License Name"
-                                                disabled={readOnly}
+                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
                                                 className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs"
                                             />
                                             <input
                                                 value={metaData.links.LICENSE || ''}
                                                 onChange={(e) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, LICENSE: e.target.value}}); }}
                                                 placeholder="License URL"
-                                                disabled={readOnly}
+                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
                                                 className={`w-full bg-white dark:bg-white/5 border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : 'border-slate-200 dark:border-white/10'}`}
                                             />
                                             {!metaData.links.LICENSE && (
@@ -1087,7 +1627,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         <SidebarSection title="Tags" icon={Tag} defaultOpen={false}>
                             <div className="flex flex-wrap gap-2">
                                 {GLOBAL_TAGS.map(tag => (
-                                    <button disabled={readOnly} key={tag} onClick={() => toggleTag(tag)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${metaData.tags.includes(tag) ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10'}`}>
+                                    <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} key={tag} onClick={() => toggleTag(tag)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${metaData.tags.includes(tag) ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10'}`}>
                                         {tag}
                                     </button>
                                 ))}
@@ -1097,7 +1637,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         <SidebarSection title="External Links" icon={LinkIcon} defaultOpen={false}>
                             <div className="space-y-3">
                                 {['WEBSITE', 'WIKI', 'ISSUE_TRACKER', 'DISCORD'].map(k => (
-                                    <ThemedInput key={k} disabled={readOnly} label={k.replace('_', ' ')} value={metaData.links[k] || ''} onChange={(e:any) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, [k]: e.target.value}}); }} placeholder="https://..." />
+                                    <ThemedInput key={k} disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} label={k.replace('_', ' ')} value={metaData.links[k] || ''} onChange={(e:any) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, [k]: e.target.value}}); }} placeholder="https://..." />
                                 ))}
                             </div>
                         </SidebarSection>

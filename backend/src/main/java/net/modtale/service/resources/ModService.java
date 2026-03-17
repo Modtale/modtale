@@ -4,6 +4,7 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
 import net.modtale.model.resources.*;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.resources.ModRepository;
 import net.modtale.repository.user.UserRepository;
@@ -237,29 +238,47 @@ public class ModService {
         return new ArrayList<>(ALLOWED_CLASSIFICATIONS);
     }
 
-    public boolean hasEditPermission(Mod mod, User user) {
+    public boolean hasProjectPermission(Mod mod, User user, String perm) {
         if (mod == null || user == null) return false;
 
         if (mod.getAuthorId() != null && mod.getAuthorId().equals(user.getId())) return true;
-        if (mod.getAuthor() != null && mod.getAuthor().equalsIgnoreCase(user.getUsername())) return true;
 
         User authorUser = getAuthorUser(mod);
-
         if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
-            boolean isOrgMember = authorUser.getOrganizationMembers().stream()
-                    .anyMatch(m -> m.getUserId().equals(user.getId()));
-
-            if (isOrgMember) return true;
+            try {
+                if (userService.hasOrgPermission(authorUser, user.getId(), ApiKey.ApiPermission.valueOf(perm))) return true;
+            } catch (Exception e) {
+                if (authorUser.getOrganizationMembers().stream().anyMatch(m -> m.getUserId().equals(user.getId()) && "ADMIN".equals(m.getRole()))) return true;
+            }
         }
 
-        return (mod.getContributors() != null && mod.getContributors().stream().anyMatch(c -> c.equalsIgnoreCase(user.getUsername()) || c.equals(user.getId())));
+        if (mod.getTeamMembers() != null) {
+            Mod.ProjectMember member = mod.getTeamMembers().stream()
+                    .filter(m -> m.getUserId().equals(user.getId()))
+                    .findFirst().orElse(null);
+
+            if (member != null && member.getRoleId() != null && mod.getProjectRoles() != null) {
+                Mod.ProjectRole role = mod.getProjectRoles().stream()
+                        .filter(r -> r.getId().equals(member.getRoleId()))
+                        .findFirst().orElse(null);
+
+                if (role != null && role.getPermissions() != null && role.getPermissions().contains(perm)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public boolean hasEditPermission(Mod mod, User user) {
+        return isOwner(mod, user) || hasProjectPermission(mod, user, "PROJECT_EDIT_METADATA");
     }
 
     public boolean isOwner(Mod mod, User user) {
         if (mod == null || user == null) return false;
 
         if (mod.getAuthorId() != null && mod.getAuthorId().equals(user.getId())) return true;
-        if (mod.getAuthor() != null && mod.getAuthor().equalsIgnoreCase(user.getUsername())) return true;
 
         User authorUser = getAuthorUser(mod);
 
@@ -435,10 +454,17 @@ public class ModService {
                 mod.setComments(new ArrayList<>());
             }
 
-            if (mod.getComments() != null && !mod.getComments().isEmpty()) {
-                Set<String> userIdsToFetch = new HashSet<>();
-                Set<String> usernamesToFetch = new HashSet<>();
+            Set<String> userIdsToFetch = new HashSet<>();
+            Set<String> usernamesToFetch = new HashSet<>();
 
+            if (mod.getTeamMembers() != null) {
+                mod.getTeamMembers().forEach(m -> userIdsToFetch.add(m.getUserId()));
+            }
+            if (mod.getTeamInvites() != null) {
+                mod.getTeamInvites().forEach(m -> userIdsToFetch.add(m.getUserId()));
+            }
+
+            if (mod.getComments() != null && !mod.getComments().isEmpty()) {
                 for (Comment c : mod.getComments()) {
                     if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
                         if (c.getUserId() != null) userIdsToFetch.add(c.getUserId());
@@ -449,60 +475,80 @@ public class ModService {
                         }
                     }
                 }
+            }
 
-                if (!userIdsToFetch.isEmpty() || !usernamesToFetch.isEmpty()) {
-                    try {
-                        List<User> users = new ArrayList<>();
-                        if (!userIdsToFetch.isEmpty()) {
-                            users.addAll(mongoTemplate.find(new Query(Criteria.where("_id").in(userIdsToFetch)), User.class));
-                        }
-                        if (!usernamesToFetch.isEmpty()) {
-                            users.addAll(userRepository.findByUsernameIn(usernamesToFetch));
-                        }
+            if (!userIdsToFetch.isEmpty() || !usernamesToFetch.isEmpty()) {
+                try {
+                    List<User> users = new ArrayList<>();
+                    if (!userIdsToFetch.isEmpty()) {
+                        users.addAll(mongoTemplate.find(new Query(Criteria.where("_id").in(userIdsToFetch)), User.class));
+                    }
+                    if (!usernamesToFetch.isEmpty()) {
+                        users.addAll(userRepository.findByUsernameIn(usernamesToFetch));
+                    }
 
-                        Map<String, String> avatarMapById = new HashMap<>();
+                    Map<String, User> userMapById = new HashMap<>();
 
-                        for (User u : users) {
-                            if (u.getAvatarUrl() != null) {
-                                avatarMapById.put(u.getId(), u.getAvatarUrl());
+                    for (User u : users) {
+                        userMapById.put(u.getId(), u);
+                    }
+
+                    if (mod.getTeamMembers() != null) {
+                        mod.getTeamMembers().forEach(m -> {
+                            User u = userMapById.get(m.getUserId());
+                            if (u != null) {
+                                m.setUsername(u.getUsername());
+                                m.setAvatarUrl(u.getAvatarUrl());
                             }
-                        }
+                        });
+                    }
+                    if (mod.getTeamInvites() != null) {
+                        mod.getTeamInvites().forEach(m -> {
+                            User u = userMapById.get(m.getUserId());
+                            if (u != null) {
+                                m.setUsername(u.getUsername());
+                                m.setAvatarUrl(u.getAvatarUrl());
+                            }
+                        });
+                    }
 
+                    if (mod.getComments() != null) {
                         for (Comment c : mod.getComments()) {
                             if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
-                                String avatar = null;
-                                if (c.getUserId() != null) avatar = avatarMapById.get(c.getUserId());
-
-                                if (avatar != null && !avatar.isEmpty()) c.setUserAvatarUrl(avatar);
+                                User u = userMapById.get(c.getUserId());
+                                if (u != null && u.getAvatarUrl() != null) c.setUserAvatarUrl(u.getAvatarUrl());
                             }
                             if (c.getDeveloperReply() != null) {
                                 if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
-                                    String avatar = null;
-                                    if (c.getDeveloperReply().getUserId() != null) avatar = avatarMapById.get(c.getDeveloperReply().getUserId());
-
-                                    if (avatar != null && !avatar.isEmpty()) c.getDeveloperReply().setUserAvatarUrl(avatar);
+                                    User u = userMapById.get(c.getDeveloperReply().getUserId());
+                                    if (u != null && u.getAvatarUrl() != null) c.getDeveloperReply().setUserAvatarUrl(u.getAvatarUrl());
                                 }
                             }
                         }
-                    } catch (Exception e) {
-                        logger.warn("Failed to batch load avatars for comments", e);
                     }
+                } catch (Exception e) {
+                    logger.warn("Failed to batch load data for mod details", e);
                 }
             }
+
             return mod;
         }
         return null;
     }
 
     public Page<Mod> getContributedProjects(String userId, Pageable pageable) {
-        Page<Mod> results = modRepository.findByContributors(userId, pageable);
-        if (results.hasContent()) results.getContent().forEach(m -> {
+        Query query = new Query(Criteria.where("teamMembers.userId").is(userId));
+        long count = mongoTemplate.count(query, Mod.class);
+        List<Mod> mods = mongoTemplate.find(query.with(pageable), Mod.class);
+
+        for (Mod m : mods) {
             if (m.getVersions() != null) m.getVersions().forEach(v -> v.setScanResult(null));
             if (m.getAuthorId() != null && m.getAuthor() == null) {
                 userRepository.findById(m.getAuthorId()).ifPresent(u -> m.setAuthor(u.getUsername()));
             }
-        });
-        return results;
+        }
+
+        return new org.springframework.data.domain.PageImpl<>(mods, pageable, count);
     }
 
     public Page<Mod> getCreatorProjects(String userId, Pageable pageable) {
@@ -579,12 +625,16 @@ public class ModService {
         mod.setStatus("DRAFT");
         mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
         mod.setUpdatedAt(LocalDateTime.now().toString());
-        mod.setContributors(new ArrayList<>());
-        mod.setPendingInvites(new ArrayList<>());
         mod.setVersions(new ArrayList<>());
         mod.setAllowModpacks(true);
         mod.setAllowComments(true);
         mod.setTags(new ArrayList<>());
+
+        Mod.ProjectRole adminRole = new Mod.ProjectRole(UUID.randomUUID().toString(), "Admin", "#fbbf24", List.of("PROJECT_EDIT_METADATA", "VERSION_CREATE", "VERSION_EDIT", "VERSION_DELETE", "PROJECT_TEAM_INVITE", "PROJECT_TEAM_REMOVE", "PROJECT_MEMBER_EDIT_ROLE"));
+        Mod.ProjectRole devRole = new Mod.ProjectRole(UUID.randomUUID().toString(), "Developer", "#3b82f6", List.of("VERSION_CREATE"));
+        mod.setProjectRoles(new ArrayList<>(List.of(adminRole, devRole)));
+        mod.setTeamMembers(new ArrayList<>());
+        mod.setTeamInvites(new ArrayList<>());
 
         return modRepository.save(mod);
     }
@@ -596,7 +646,7 @@ public class ModService {
     public void submitMod(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
-        if(mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
+        if(mod == null || !hasProjectPermission(mod, user, "PROJECT_STATUS_SUBMIT")) throw new SecurityException("Permission denied.");
 
         if (user != null && !user.isEmailVerified()) {
             throw new SecurityException("Email verification required.");
@@ -624,7 +674,7 @@ public class ModService {
     public void revertModToDraft(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
-        if (mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
+        if (mod == null || !hasProjectPermission(mod, user, "PROJECT_STATUS_REVERT")) throw new SecurityException("Permission denied.");
 
         if (!"PENDING".equals(mod.getStatus())) {
             throw new IllegalArgumentException("Only pending projects can be reverted to draft.");
@@ -639,7 +689,7 @@ public class ModService {
     public void archiveMod(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
-        if (mod == null || !isOwner(mod, user)) throw new SecurityException("Permission denied.");
+        if (mod == null || !hasProjectPermission(mod, user, "PROJECT_STATUS_ARCHIVE")) throw new SecurityException("Permission denied.");
 
         if (!"PUBLISHED".equals(mod.getStatus()) && !"UNLISTED".equals(mod.getStatus())) {
             throw new IllegalArgumentException("Only published or unlisted projects can be archived.");
@@ -654,7 +704,7 @@ public class ModService {
     public void unlistMod(String id, String username) {
         Mod mod = getRawModById(id);
         User user = userService.getCurrentUser();
-        if (mod == null || !isOwner(mod, user)) throw new SecurityException("Permission denied.");
+        if (mod == null || !hasProjectPermission(mod, user, "PROJECT_STATUS_UNLIST")) throw new SecurityException("Permission denied.");
 
         if (!"PUBLISHED".equals(mod.getStatus()) && !"ARCHIVED".equals(mod.getStatus())) {
             throw new IllegalArgumentException("Project must be published or archived to unlist.");
@@ -676,7 +726,7 @@ public class ModService {
         boolean isRestoration = "ARCHIVED".equals(mod.getStatus()) || "UNLISTED".equals(mod.getStatus());
 
         if (isRestoration) {
-            if (!hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
+            if (!hasProjectPermission(mod, user, "PROJECT_STATUS_PUBLISH")) throw new SecurityException("Permission denied.");
         } else {
             if (!isAdmin) throw new SecurityException("Only Admins can approve new projects.");
         }
@@ -973,11 +1023,11 @@ public class ModService {
     public void requestTransfer(String modId, String targetUserId, User requester) {
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
-        if (!isOwner(mod, requester)) throw new SecurityException("Only the owner can transfer ownership.");
+        if (!hasProjectPermission(mod, requester, "PROJECT_TRANSFER_REQUEST")) throw new SecurityException("Permission denied.");
         ensureEditable(mod);
 
         User target = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("Target user/org not found"));
-        if (mod.getAuthorId() != null && target.getId().equals(mod.getAuthorId())) throw new IllegalArgumentException("Project is already owned by this user.");
+        if (mod.getAuthorId() != null && target.getId().equals(mod.getAuthorId())) throw new IllegalArgumentException("Project is already owned by this entity.");
 
         mod.setPendingTransferTo(target.getUsername());
         modRepository.save(mod);
@@ -1029,7 +1079,11 @@ public class ModService {
             mod.setAuthorId(newOwner.getId());
             mod.setAuthor(null);
             mod.setPendingTransferTo(null);
-            mod.getContributors().remove(newOwner.getUsername());
+
+            if (mod.getTeamMembers() != null) {
+                mod.getTeamMembers().removeIf(m -> m.getUserId().equals(newOwner.getId()));
+            }
+
             modRepository.save(mod);
             evictProjectDetails(mod);
 
@@ -1045,6 +1099,178 @@ public class ModService {
             if(oldOwner != null) {
                 notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Declined", "Transfer request for " + mod.getTitle() + " was declined.", URI.create("/dashboard/projects"), mod.getImageUrl());
             }
+        }
+    }
+
+    public Mod createProjectRole(String modId, String name, String color, List<String> perms, User requester) {
+        Mod mod = getRawModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        if (!hasProjectPermission(mod, requester, "PROJECT_MEMBER_EDIT_ROLE")) throw new SecurityException("Insufficient permissions.");
+
+        if (mod.getProjectRoles() == null) mod.setProjectRoles(new ArrayList<>());
+        if (mod.getProjectRoles().size() >= 20) throw new IllegalArgumentException("Maximum of 20 roles reached.");
+
+        Mod.ProjectRole role = new Mod.ProjectRole(UUID.randomUUID().toString(), name, color, perms);
+        mod.getProjectRoles().add(role);
+        modRepository.save(mod);
+        evictProjectDetails(mod);
+        return mod;
+    }
+
+    public Mod updateProjectRole(String modId, String roleId, String name, String color, List<String> perms, User requester) {
+        Mod mod = getRawModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        if (!hasProjectPermission(mod, requester, "PROJECT_MEMBER_EDIT_ROLE")) throw new SecurityException("Insufficient permissions.");
+
+        Mod.ProjectRole role = mod.getProjectRoles().stream()
+                .filter(r -> r.getId().equals(roleId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Role not found."));
+
+        if (name != null) role.setName(name);
+        if (color != null) role.setColor(color);
+        if (perms != null) role.setPermissions(perms);
+
+        modRepository.save(mod);
+        evictProjectDetails(mod);
+        return mod;
+    }
+
+    public Mod deleteProjectRole(String modId, String roleId, User requester) {
+        Mod mod = getRawModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        if (!hasProjectPermission(mod, requester, "PROJECT_MEMBER_EDIT_ROLE")) throw new SecurityException("Insufficient permissions.");
+
+        boolean inUse = false;
+        if (mod.getTeamMembers() != null) inUse = inUse || mod.getTeamMembers().stream().anyMatch(m -> roleId.equals(m.getRoleId()));
+        if (mod.getTeamInvites() != null) inUse = inUse || mod.getTeamInvites().stream().anyMatch(m -> roleId.equals(m.getRoleId()));
+
+        if (inUse) {
+            throw new IllegalArgumentException("Cannot delete role while members or invites are assigned to it.");
+        }
+
+        mod.getProjectRoles().removeIf(r -> r.getId().equals(roleId));
+        modRepository.save(mod);
+        evictProjectDetails(mod);
+        return mod;
+    }
+
+    public void inviteContributor(String modId, String targetUserId, String roleId) {
+        User currentUser = userService.getCurrentUser();
+        Mod mod = getRawModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        if (!hasProjectPermission(mod, currentUser, "PROJECT_TEAM_INVITE")) throw new SecurityException("Permission denied.");
+        ensureEditable(mod);
+
+        User invitee = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (mod.getAuthorId() != null && mod.getAuthorId().equals(invitee.getId())) {
+            throw new IllegalArgumentException("The author is already part of the project.");
+        }
+
+        if (mod.getTeamMembers() != null && mod.getTeamMembers().stream().anyMatch(m -> m.getUserId().equals(invitee.getId()))) {
+            throw new IllegalArgumentException("User is already a team member.");
+        }
+
+        if (mod.getTeamInvites() == null) mod.setTeamInvites(new ArrayList<>());
+        if (mod.getTeamInvites().stream().anyMatch(m -> m.getUserId().equals(invitee.getId()))) {
+            throw new IllegalArgumentException("User has already been invited.");
+        }
+
+        mod.getTeamInvites().add(new Mod.ProjectMember(invitee.getId(), roleId));
+        modRepository.save(mod);
+        evictProjectDetails(mod);
+
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("modId", mod.getId());
+        metadata.put("action", "CONTRIBUTOR_INVITE");
+        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", URI.create("/dashboard/projects"), mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
+    }
+
+    public void cancelInvite(String modId, String targetUserId, User requester) {
+        Mod mod = getRawModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        if (!hasProjectPermission(mod, requester, "PROJECT_TEAM_INVITE")) throw new SecurityException("Permission denied.");
+
+        if (mod.getTeamInvites() != null) {
+            mod.getTeamInvites().removeIf(m -> m.getUserId().equals(targetUserId));
+            modRepository.save(mod);
+            evictProjectDetails(mod);
+        }
+    }
+
+    public void updateContributorRole(String modId, String targetUserId, String newRoleId, User requester) {
+        Mod mod = getRawModById(modId);
+        if (mod == null) throw new IllegalArgumentException("Project not found");
+        if (!hasProjectPermission(mod, requester, "PROJECT_MEMBER_EDIT_ROLE")) throw new SecurityException("Permission denied.");
+        ensureEditable(mod);
+
+        Mod.ProjectRole role = mod.getProjectRoles().stream().filter(r -> r.getId().equals(newRoleId)).findFirst().orElseThrow(() -> new IllegalArgumentException("Role not found."));
+
+        if (mod.getTeamMembers() != null) {
+            Mod.ProjectMember member = mod.getTeamMembers().stream().filter(m -> m.getUserId().equals(targetUserId)).findFirst().orElseThrow(() -> new IllegalArgumentException("Team member not found."));
+            member.setRoleId(newRoleId);
+            modRepository.save(mod);
+            evictProjectDetails(mod);
+
+            notificationService.sendNotification(
+                    List.of(targetUserId),
+                    "Role Updated",
+                    "Your role in " + mod.getTitle() + " has been updated to " + role.getName() + ".",
+                    URI.create(getProjectLink(mod)),
+                    mod.getImageUrl()
+            );
+        }
+    }
+
+    public void removeContributor(String modId, String targetUserId) {
+        User currentUser = userService.getCurrentUser();
+        Mod mod = getRawModById(modId);
+        if (mod != null && (hasProjectPermission(mod, currentUser, "PROJECT_TEAM_REMOVE") || currentUser.getId().equals(targetUserId))) {
+            ensureEditable(mod);
+            if (mod.getTeamMembers() != null) {
+                mod.getTeamMembers().removeIf(m -> m.getUserId().equals(targetUserId));
+            }
+            modRepository.save(mod);
+            evictProjectDetails(mod);
+        } else {
+            throw new SecurityException("Permission denied.");
+        }
+    }
+
+    public void acceptInvite(String modId, String userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Mod mod = getRawModById(modId);
+
+        if (mod != null && mod.getTeamInvites() != null) {
+            Mod.ProjectMember invite = mod.getTeamInvites().stream().filter(m -> m.getUserId().equals(userId)).findFirst().orElse(null);
+            if (invite != null) {
+                mod.getTeamInvites().remove(invite);
+                if (mod.getTeamMembers() == null) mod.setTeamMembers(new ArrayList<>());
+                mod.getTeamMembers().add(invite);
+
+                modRepository.save(mod);
+                evictProjectDetails(mod);
+
+                User owner = getAuthorUser(mod);
+                if (owner != null) {
+                    notificationService.sendNotification(
+                            List.of(owner.getId()),
+                            "Invite Accepted",
+                            user.getUsername() + " joined the team for " + mod.getTitle(),
+                            URI.create(getProjectLink(mod)),
+                            user.getAvatarUrl()
+                    );
+                }
+            }
+        }
+    }
+
+    public void declineInvite(String modId, String userId) {
+        Mod mod = getRawModById(modId);
+        if (mod != null && mod.getTeamInvites() != null) {
+            mod.getTeamInvites().removeIf(m -> m.getUserId().equals(userId));
+            modRepository.save(mod);
+            evictProjectDetails(mod);
         }
     }
 
@@ -1064,7 +1290,7 @@ public class ModService {
     public void updateMod(String id, Mod updatedMod) {
         User user = userService.getCurrentUser();
         Mod existing = getRawModById(id);
-        if (existing == null || !hasEditPermission(existing, user)) {
+        if (existing == null || !hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")) {
             throw new SecurityException("You do not have permission to edit this project.");
         }
         ensureEditable(existing);
@@ -1141,7 +1367,7 @@ public class ModService {
     public void updateProjectIcon(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
         Mod mod = getRawModById(id);
-        if (mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
+        if (mod == null || !hasProjectPermission(mod, user, "PROJECT_EDIT_ICON")) throw new SecurityException("Permission denied.");
         ensureEditable(mod);
 
         if (mod.getImageUrl() != null && !mod.getImageUrl().contains("default.png") && !mod.getImageUrl().contains("placeholder") && !mod.getImageUrl().contains("favicon")) {
@@ -1157,7 +1383,7 @@ public class ModService {
     public void updateProjectBanner(String id, MultipartFile file) throws IOException {
         User user = userService.getCurrentUser();
         Mod mod = getRawModById(id);
-        if (mod == null || !hasEditPermission(mod, user)) throw new SecurityException("Permission denied.");
+        if (mod == null || !hasProjectPermission(mod, user, "PROJECT_EDIT_BANNER")) throw new SecurityException("Permission denied.");
         ensureEditable(mod);
 
         if (mod.getBannerUrl() != null && !mod.getBannerUrl().isEmpty()) {
@@ -1181,7 +1407,7 @@ public class ModService {
         User user = userService.getCurrentUser();
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
-        if (!hasEditPermission(mod, user)) throw new SecurityException("No permission.");
+        if (!hasProjectPermission(mod, user, "VERSION_EDIT")) throw new SecurityException("No permission.");
         ensureEditable(mod);
 
         ModVersion version = mod.getVersions().stream().filter(v -> v.getId().equals(versionId)).findFirst().orElse(null);
@@ -1263,7 +1489,7 @@ public class ModService {
 
         Mod mod = getRawModById(modId);
         if (mod == null) throw new IllegalArgumentException("Project not found");
-        if (!hasEditPermission(mod, user)) throw new SecurityException("You do not have permission to update this project.");
+        if (!hasProjectPermission(mod, user, "VERSION_CREATE")) throw new SecurityException("You do not have permission to update this project.");
         ensureEditable(mod);
 
         if ("DRAFT".equals(mod.getStatus()) && !mod.getVersions().isEmpty()) {
@@ -1536,8 +1762,8 @@ public class ModService {
         if (mod == null) throw new IllegalArgumentException("Project not found");
         ensureEditable(mod);
 
-        if (!isOwner(mod, user)) {
-            throw new SecurityException("Only the owner can delete versions.");
+        if (!hasProjectPermission(mod, user, "VERSION_DELETE")) {
+            throw new SecurityException("Permission denied.");
         }
 
         if (!"DRAFT".equals(mod.getStatus()) && mod.getVersions().size() <= 1) {
@@ -1564,7 +1790,7 @@ public class ModService {
         Mod mod = getRawModById(id);
         User user = userRepository.findById(userId).orElse(null);
 
-        if (mod == null || !isOwner(mod, user)) {
+        if (mod == null || !hasProjectPermission(mod, user, "PROJECT_DELETE")) {
             throw new SecurityException("Permission denied or Project not found.");
         }
 
@@ -1708,8 +1934,9 @@ public class ModService {
                 mod.getGalleryImages().clear();
             }
 
-            mod.setContributors(new ArrayList<>());
-            mod.setPendingInvites(new ArrayList<>());
+            mod.setTeamMembers(new ArrayList<>());
+            mod.setTeamInvites(new ArrayList<>());
+            mod.setProjectRoles(new ArrayList<>());
             mod.setComments(new ArrayList<>());
             mod.setTags(new ArrayList<>());
 
@@ -1920,7 +2147,7 @@ public class ModService {
         }
     }
 
-    @Scheduled(fixedDelayString = "${app.metrics.flush-rate:60000}") // Runs every minute
+    @Scheduled(fixedDelayString = "${app.metrics.flush-rate:60000}")
     public void flushMetricsToDatabase() {
         if (pendingDownloadIncrements.isEmpty() && pendingFavoriteIncrements.isEmpty() && pendingVersionDownloadIncrements.isEmpty()) {
             return;
@@ -2080,67 +2307,6 @@ public class ModService {
         }
     }
 
-    public void inviteContributor(String modId, String targetUserId) {
-        User currentUser = userService.getCurrentUser();
-        Mod mod = getRawModById(modId);
-        if (mod == null) throw new IllegalArgumentException("Project not found");
-        if (!isOwner(mod, currentUser)) throw new SecurityException("Only the owner can manage contributors.");
-        ensureEditable(mod);
-
-        User invitee = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        mod.getPendingInvites().add(invitee.getUsername());
-        modRepository.save(mod);
-        evictProjectDetails(mod);
-        Map<String, String> metadata = new HashMap<>();
-        metadata.put("modId", mod.getId());
-        metadata.put("action", "CONTRIBUTOR_INVITE");
-        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to contribute to " + mod.getTitle() + ".", URI.create("/dashboard/projects"), mod.getImageUrl(), "CONTRIBUTOR_INVITE", metadata);
-    }
-
-    public void removeContributor(String modId, String targetUserId) {
-        User currentUser = userService.getCurrentUser();
-        Mod mod = getRawModById(modId);
-        User targetUser = userRepository.findById(targetUserId).orElse(null);
-        if (mod != null && isOwner(mod, currentUser) && targetUser != null) {
-            ensureEditable(mod);
-            mod.getContributors().remove(targetUser.getUsername());
-            if (mod.getPendingInvites() != null) {
-                mod.getPendingInvites().remove(targetUser.getUsername());
-            }
-            modRepository.save(mod);
-            evictProjectDetails(mod);
-        }
-    }
-
-    public void acceptInvite(String modId, String userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        Mod mod = getRawModById(modId);
-        if (mod != null && mod.getPendingInvites().remove(user.getUsername())) {
-            mod.getContributors().add(user.getUsername());
-            modRepository.save(mod);
-            evictProjectDetails(mod);
-            User owner = getAuthorUser(mod);
-            if (owner != null) {
-                notificationService.sendNotification(
-                        List.of(owner.getId()),
-                        "Invite Accepted",
-                        user.getUsername() + " joined the team for " + mod.getTitle(),
-                        URI.create(getProjectLink(mod) + "/contributors"),
-                        user.getAvatarUrl()
-                );
-            }
-        }
-    }
-
-    public void declineInvite(String modId, String userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        Mod mod = getRawModById(modId);
-        if (mod != null && mod.getPendingInvites().remove(user.getUsername())) {
-            modRepository.save(mod);
-            evictProjectDetails(mod);
-        }
-    }
-
     public void addComment(String modId, String userId, String content) {
         Mod mod = getRawModById(modId);
         if (mod != null) {
@@ -2200,7 +2366,7 @@ public class ModService {
         Mod mod = getRawModById(modId);
         User user = userRepository.findById(userId).orElse(null);
         if (mod != null && user != null) {
-            boolean isModOwner = hasEditPermission(mod, user);
+            boolean isModOwner = hasProjectPermission(mod, user, "COMMENT_DELETE");
 
             mod.getComments().removeIf(c -> {
                 if(c.getId().equals(commentId)) {
@@ -2226,7 +2392,7 @@ public class ModService {
         Mod mod = getRawModById(modId);
 
         if (mod != null) {
-            if (!hasEditPermission(mod, user)) {
+            if (!hasProjectPermission(mod, user, "COMMENT_REPLY")) {
                 throw new SecurityException("Only project team members can reply to comments.");
             }
 
@@ -2275,7 +2441,7 @@ public class ModService {
     public void removeGalleryImage(String modId, String imageUrl, String userId) {
         User user = userRepository.findById(userId).orElse(null);
         Mod mod = getRawModById(modId);
-        if (mod != null && hasEditPermission(mod, user)) {
+        if (mod != null && hasProjectPermission(mod, user, "PROJECT_GALLERY_REMOVE")) {
             ensureEditable(mod);
             mod.getGalleryImages().remove(imageUrl);
             storageService.deleteFile(imageUrl);
