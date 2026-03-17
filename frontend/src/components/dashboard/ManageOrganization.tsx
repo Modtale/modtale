@@ -23,37 +23,68 @@ const BlueskyIcon = ({ className }: { className?: string }) => (
 
 const PERMISSION_GROUPS = [
     {
-        group: 'Projects',
+        group: 'Organization Settings',
+        permissions: [
+            { id: 'ORG_READ', label: 'Read Org' },
+            { id: 'ORG_EDIT_METADATA', label: 'Edit Profile' },
+            { id: 'ORG_EDIT_AVATAR', label: 'Edit Avatar' },
+            { id: 'ORG_EDIT_BANNER', label: 'Edit Banner' },
+            { id: 'ORG_DELETE', label: 'Delete Org' },
+            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
+            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
+            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
+            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
+            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Connections' }
+        ]
+    },
+    {
+        group: 'Project Management',
         permissions: [
             { id: 'PROJECT_READ', label: 'Read Projects' },
             { id: 'PROJECT_CREATE', label: 'Create Projects' },
             { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
-            { id: 'PROJECT_DELETE', label: 'Delete Projects' },
-            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
+            { id: 'PROJECT_EDIT_ICON', label: 'Edit Icon' },
+            { id: 'PROJECT_EDIT_BANNER', label: 'Edit Banner' },
+            { id: 'PROJECT_DELETE', label: 'Delete Projects' }
         ]
     },
     {
         group: 'Versions & Releases',
         permissions: [
             { id: 'VERSION_READ', label: 'Read Versions' },
-            { id: 'VERSION_CREATE', label: 'Create Versions' },
+            { id: 'VERSION_CREATE', label: 'Upload Versions' },
             { id: 'VERSION_EDIT', label: 'Edit Versions' },
             { id: 'VERSION_DELETE', label: 'Delete Versions' },
             { id: 'VERSION_DOWNLOAD', label: 'Download Files' }
         ]
     },
     {
-        group: 'Organization Settings',
+        group: 'Visibility & Publishing',
         permissions: [
-            { id: 'ORG_READ', label: 'Read Org' },
-            { id: 'ORG_EDIT_METADATA', label: 'Edit Org Profile' },
-            { id: 'ORG_EDIT_AVATAR', label: 'Update Org Avatar' },
-            { id: 'ORG_DELETE', label: 'Delete Organization' },
-            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
-            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
-            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
-            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Edit Member Roles' },
-            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Org Connections' }
+            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
+            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
+            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Project' },
+            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Project' },
+            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
+        ]
+    },
+    {
+        group: 'Community & Media',
+        permissions: [
+            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
+            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
+            { id: 'COMMENT_DELETE', label: 'Delete Comments' },
+            { id: 'COMMENT_REPLY', label: 'Reply as Developer' }
+        ]
+    },
+    {
+        group: 'Team Management',
+        permissions: [
+            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
+            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' },
+            { id: 'PROJECT_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
+            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' },
+            { id: 'PROJECT_TRANSFER_RESOLVE', label: 'Resolve Transfer' }
         ]
     }
 ];
@@ -514,7 +545,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         const hasRoles = nonOwnerRoles.length > 0;
 
         return (
-            <div className="space-y-6">
+            <div className="space-y-6 relative">
                 {status && createPortal(
                     <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />,
                     document.body
@@ -574,7 +605,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
                 {roleModalOpen && editingRole && createPortal(
                     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
                             <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
                                 <div>
                                     <h3 className="text-xl font-black text-slate-900 dark:text-white">{editingRole.id ? 'Edit Role' : 'Create Role'}</h3>
@@ -618,9 +649,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
                                     <div className="space-y-4">
                                         <h4 className="font-bold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-white/10 pb-2">Permissions</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
                                             {PERMISSION_GROUPS.map((group, idx) => (
-                                                <div key={idx} className="bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden self-start">
+                                                <div key={idx} className="break-inside-avoid bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
                                                     <div className="bg-slate-100 dark:bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{group.group}</div>
                                                     <div className="p-2 space-y-1">
                                                         {group.permissions.map(perm => (
@@ -844,7 +875,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                         <button
                                                             onClick={() => setMemberRoleDropdownOpen(memberRoleDropdownOpen === member.id ? null : member.id)}
                                                             disabled={isOwner && !myRole?.isOwner}
-                                                            className={`flex items-center justify-between min-w-[140px] bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors ${isOwner && !myRole?.isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                            className={`flex items-center justify-between min-w-[140px] bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors ${isOwner && !myRole?.isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer shadow-sm'}`}
                                                         >
                                                             <div className="flex items-center gap-2 truncate">
                                                                 {role && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
@@ -935,7 +966,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
                                                 {canInvite && (
                                                     <button onClick={() => handleCancelInvite(inviteUser.id)} className="text-xs font-bold text-red-500 hover:text-red-600 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/30 transition-colors">
-                                                        Cancel Invite
+                                                        Cancel
                                                     </button>
                                                 )}
                                             </div>
