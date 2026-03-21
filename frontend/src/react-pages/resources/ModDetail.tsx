@@ -250,50 +250,75 @@ const ProjectSidebar: React.FC<{
             </SidebarSection>
 
             {author && author.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
-                <SidebarSection title="Team Members" icon={Users}>
+                <SidebarSection title="Organization Members" icon={Users}>
                     <div className="flex flex-col gap-2">
-                        {orgMembers.map(member => (
-                            <Link
-                                key={member.id}
-                                to={`/creator/${member.username}`}
-                                className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
-                            >
-                                <OptimizedImage
-                                    src={member.avatarUrl}
-                                    alt={`${member.username} Avatar`}
-                                    baseWidth={32}
-                                    className="w-8 h-8 rounded-lg"
-                                />
-                                <div>
-                                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{member.username}</div>
-                                    <div className="text-[10px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">
-                                        {author.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                        {orgMembers.map(member => {
+                            const orgMembership = author.organizationMembers?.find(m => m.userId === member.id);
+                            const role = author.organizationRoles?.find(r => r.id === orgMembership?.roleId);
+
+                            return (
+                                <Link
+                                    key={member.id}
+                                    to={`/creator/${member.username}`}
+                                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
+                                >
+                                    <OptimizedImage
+                                        src={member.avatarUrl}
+                                        alt={`${member.username} Avatar`}
+                                        baseWidth={32}
+                                        className="w-8 h-8 rounded-lg border border-slate-200 dark:border-white/5 shrink-0"
+                                    />
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{member.username}</div>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            {role ? (
+                                                <>
+                                                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
+                                                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{role.name}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Member</span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </Link>
-                        ))}
+                                </Link>
+                            );
+                        })}
                     </div>
                 </SidebarSection>
             )}
 
             {contributors.length > 0 && (
-                <SidebarSection title="Contributors" icon={Users}>
+                <SidebarSection title={author?.accountType === 'ORGANIZATION' ? "Project Contributors" : "Team Members"} icon={Users}>
                     <div className="flex flex-col gap-2">
-                        {contributors.map(contributor => (
-                            <Link
-                                key={contributor.id}
-                                to={`/creator/${contributor.username}`}
-                                className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
-                            >
-                                <OptimizedImage
-                                    src={contributor.avatarUrl}
-                                    alt={`${contributor.username} Avatar`}
-                                    baseWidth={32}
-                                    className="w-8 h-8 rounded-lg"
-                                />
-                                <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{contributor.username}</div>
-                            </Link>
-                        ))}
+                        {contributors.map(contributor => {
+                            const teamMembership = mod.teamMembers?.find(m => m.userId === contributor.id);
+                            const role = mod.projectRoles?.find(r => r.id === teamMembership?.roleId);
+
+                            return (
+                                <Link
+                                    key={contributor.id}
+                                    to={`/creator/${contributor.username}`}
+                                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
+                                >
+                                    <OptimizedImage
+                                        src={contributor.avatarUrl}
+                                        alt={`${contributor.username} Avatar`}
+                                        baseWidth={32}
+                                        className="w-8 h-8 rounded-lg border border-slate-200 dark:border-white/5 shrink-0"
+                                    />
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{contributor.username}</div>
+                                        {role && (
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{role.name}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </Link>
+                            );
+                        })}
                     </div>
                 </SidebarSection>
             )}
@@ -841,7 +866,7 @@ export const ModDetail: React.FC<{
         }
     }, [currentUser, mod?.author]);
 
-    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
+    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.teamMembers?.some(m => m.userId === currentUser.id)));
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
 
@@ -867,15 +892,16 @@ export const ModDetail: React.FC<{
                 setAuthorProfile(author);
 
                 if (author.accountType === 'ORGANIZATION') {
-                    const membersRes = await api.get(`/orgs/${mod.author}/members`);
+                    const membersRes = await api.get(`/orgs/${author.id}/members`);
                     setOrgMembers(membersRes.data);
                 }
             } catch (e) {
             }
 
-            if (mod.contributors && mod.contributors.length > 0) {
+            if (mod.teamMembers && mod.teamMembers.length > 0) {
                 try {
-                    const res = await api.post('/users/batch', { usernames: mod.contributors });
+                    const userIds = mod.teamMembers.map(m => m.userId);
+                    const res = await api.post('/users/batch', { userIds });
                     setContributors(res.data);
                 } catch (e) {
                 }
@@ -883,7 +909,7 @@ export const ModDetail: React.FC<{
         };
 
         if (mod) fetchTeam();
-    }, [mod?.id, mod?.author]);
+    }, [mod?.id, mod?.author, mod?.teamMembers]);
 
     useEffect(() => {
         if (mod && !loading) {
