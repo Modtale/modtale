@@ -25,7 +25,7 @@ let ssrSuccessfullyCompleted = false;
 
 if (isBot) {
     try {
-        const res = await fetch(`${BACKEND_URL}/projects/${id}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${id}`);
         if (res.ok) {
             modData = await res.json();
             modData.classification = 'MODPACK';
@@ -41,22 +41,17 @@ if (isBot) {
                 description = meta.description;
             }
 
-            if (modData.imageUrl) {
-                const baseOrigin = new URL(BACKEND_URL).origin;
-                image = modData.imageUrl.startsWith('/api') ? `${baseOrigin}${modData.imageUrl}` : modData.imageUrl;
-            }
-
             const appSchema = {
                 "@context": "https://schema.org",
                 "@type": "SoftwareApplication",
                 "name": modData.title,
                 "description": meta?.description || description,
-                "image": image,
+                "image": modData.imageUrl,
                 "author": { "@type": "Person", "name": modData.author || 'Unknown' },
                 "applicationCategory": "GameApplication",
                 "operatingSystem": "Windows, macOS, Linux",
                 "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-                "aggregateRating": modData.rating > 0 ? {
+                "aggregateRating": (modData.rating && modData.rating > 0) ? {
                     "@type": "AggregateRating",
                     "ratingValue": modData.rating,
                 } : undefined

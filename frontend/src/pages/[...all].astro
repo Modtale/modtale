@@ -14,8 +14,6 @@ const path = url.pathname;
 const cleanPath = path.replace(/\/$/, "");
 const searchParams = url.searchParams;
 
-const API_URL = BACKEND_URL;
-
 let title = DEFAULT_SEO.title;
 let description = DEFAULT_SEO.description;
 let keywords = DEFAULT_SEO.keywords;
@@ -115,11 +113,11 @@ if (classification) {
         try {
             if (isHome) {
                 const [trendingRes, popularRes, gemsRes, relevanceRes, statsRes] = await Promise.allSettled([
-                    fetch(`${API_URL}/projects?size=20&sort=trending`),
-                    fetch(`${API_URL}/projects?size=20&sort=popular`),
-                    fetch(`${API_URL}/projects?category=hidden_gems&size=20&sort=favorites`),
-                    fetch(`${API_URL}/projects?size=20&sort=relevance`),
-                    fetch(`${API_URL}/analytics/platform/stats`)
+                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=trending`),
+                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=popular`),
+                    fetch(`${BACKEND_URL}/api/v1/projects?category=hidden_gems&size=20&sort=favorites`),
+                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=relevance`),
+                    fetch(`${BACKEND_URL}/api/v1/analytics/platform/stats`)
                 ]);
 
                 const getJson = async (res: any) => res.status === 'fulfilled' && res.value.ok ? await res.value.json() : null;
@@ -171,7 +169,7 @@ if (classification) {
                 const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
 
                 const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
-                const endpoint = `${API_URL}/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
+                const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
 
                 const res = await fetch(endpoint, {
                     headers: { "Cache-Control": "public, s-maxage=300" }
@@ -203,7 +201,7 @@ if (classification) {
 }
 else if (isBot && id && isProjectRoute) {
     try {
-        const res = await fetch(`${API_URL}/projects/${id}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${id}`);
 
         if (res.ok) {
             const modData = await res.json();
@@ -222,8 +220,7 @@ else if (isBot && id && isProjectRoute) {
             }
 
             if (modData.imageUrl) {
-                const baseUrl = new URL(BACKEND_URL).origin;
-                image = `${baseUrl}/api/v1/og/project/${initialData.id}.png`;
+                image = `${BACKEND_URL}/api/v1/og/project/${initialData.id}.png`;
             }
 
             const appSchema = {
