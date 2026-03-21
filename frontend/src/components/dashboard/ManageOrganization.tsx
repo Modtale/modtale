@@ -239,8 +239,6 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         const member = selectedOrg.organizationMembers?.find(m => m.userId === user.id);
         if (!member) return false;
 
-        if (member.role === 'ADMIN') return true;
-
         if (member.roleId && selectedOrg.organizationRoles) {
             const role = selectedOrg.organizationRoles.find(r => r.id === member.roleId);
             if (role) {
@@ -344,7 +342,6 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
             const memberIdx = updatedOrg.organizationMembers?.findIndex(m => m.userId === userId);
             if (memberIdx !== undefined && memberIdx > -1 && updatedOrg.organizationMembers) {
                 updatedOrg.organizationMembers[memberIdx].roleId = newRoleId;
-                updatedOrg.organizationMembers[memberIdx].role = undefined as any;
                 setSelectedOrg(updatedOrg);
             }
             await fetchMembers(selectedOrg.id);
@@ -546,6 +543,10 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
         return (
             <div className="space-y-6 relative">
+                {(inviteRoleDropdownOpen || memberRoleDropdownOpen) && (
+                    <div className="fixed inset-0 z-[90]" onClick={() => { setInviteRoleDropdownOpen(false); setMemberRoleDropdownOpen(null); }} />
+                )}
+
                 {status && createPortal(
                     <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />,
                     document.body
@@ -605,7 +606,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
                 {roleModalOpen && editingRole && createPortal(
                     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
                             <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
                                 <div>
                                     <h3 className="text-xl font-black text-slate-900 dark:text-white">{editingRole.id ? 'Edit Role' : 'Create Role'}</h3>
@@ -649,9 +650,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
                                     <div className="space-y-4">
                                         <h4 className="font-bold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-white/10 pb-2">Permissions</h4>
-                                        <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {PERMISSION_GROUPS.map((group, idx) => (
-                                                <div key={idx} className="break-inside-avoid bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                                                <div key={idx} className="bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden self-start">
                                                     <div className="bg-slate-100 dark:bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{group.group}</div>
                                                     <div className="p-2 space-y-1">
                                                         {group.permissions.map(perm => (
@@ -822,7 +823,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                         <button
                                             type="submit"
                                             disabled={!inviteUserId || !inviteRoleId}
-                                            className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+                                            className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg h-11"
                                         >
                                             <Plus className="w-4 h-4" /> Invite
                                         </button>
@@ -862,7 +863,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{role.name}</span>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-slate-100 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/10 dark:text-slate-400">Legacy {membership?.role}</span>
+                                                            <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-slate-100 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/10 dark:text-slate-400">Legacy Member</span>
                                                         )}
                                                         {isMe && <span className="text-[10px] text-slate-400 font-medium italic">(You)</span>}
                                                     </div>
@@ -875,7 +876,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                                         <button
                                                             onClick={() => setMemberRoleDropdownOpen(memberRoleDropdownOpen === member.id ? null : member.id)}
                                                             disabled={isOwner && !myRole?.isOwner}
-                                                            className={`flex items-center justify-between min-w-[140px] bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors ${isOwner && !myRole?.isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer shadow-sm'}`}
+                                                            className={`flex items-center justify-between min-w-[140px] bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors ${isOwner && !myRole?.isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer shadow-sm'}`}
                                                         >
                                                             <div className="flex items-center gap-2 truncate">
                                                                 {role && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
@@ -1206,7 +1207,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{role.name}</span>
                                     </div>
                                 ) : (
-                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200/50 dark:bg-white/10 border border-slate-200 dark:border-white/5 text-slate-500 px-2 py-1 rounded-md">{member?.role || 'MEMBER'}</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200/50 dark:bg-white/10 border border-slate-200 dark:border-white/5 text-slate-500 px-2 py-1 rounded-md">Legacy Member</span>
                                 )}
                             </div>
                             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{org.username}</h3>
