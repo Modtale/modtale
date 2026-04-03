@@ -255,6 +255,7 @@ const ProjectSidebar: React.FC<{
                         {orgMembers.map(member => {
                             const orgMembership = author.organizationMembers?.find(m => m.userId === member.id);
                             const role = author.organizationRoles?.find(r => r.id === orgMembership?.roleId);
+                            const roleName = role?.name || 'Member';
 
                             return (
                                 <Link
@@ -271,14 +272,7 @@ const ProjectSidebar: React.FC<{
                                     <div className="min-w-0">
                                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{member.username}</div>
                                         <div className="flex items-center gap-1.5 mt-0.5">
-                                            {role ? (
-                                                <>
-                                                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
-                                                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{role.name}</span>
-                                                </>
-                                            ) : (
-                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Member</span>
-                                            )}
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{roleName}</span>
                                         </div>
                                     </div>
                                 </Link>
@@ -309,10 +303,14 @@ const ProjectSidebar: React.FC<{
                                     />
                                     <div className="min-w-0">
                                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{contributor.username}</div>
-                                        {role && (
+                                        {role ? (
                                             <div className="flex items-center gap-1.5 mt-0.5">
                                                 <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
                                                 <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{role.name}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">Contributor</span>
                                             </div>
                                         )}
                                     </div>
@@ -887,15 +885,26 @@ export const ModDetail: React.FC<{
             if (!mod) return;
 
             try {
-                const authorRes = await api.get(`/user/profile/${mod.author}`);
-                const author = authorRes.data;
-                setAuthorProfile(author);
+                const authorIdToFetch = (mod as any).authorId;
+                let authorData;
 
-                if (author.accountType === 'ORGANIZATION') {
-                    const membersRes = await api.get(`/orgs/${author.id}/members`);
+                if (authorIdToFetch) {
+                    const authorRes = await api.get(`/user/profile/${authorIdToFetch}`);
+                    authorData = authorRes.data;
+                } else {
+                    const lookupRes = await api.get(`/users/lookup/${mod.author}`);
+                    const authorRes = await api.get(`/user/profile/${lookupRes.data.id}`);
+                    authorData = authorRes.data;
+                }
+
+                setAuthorProfile(authorData);
+
+                if (authorData.accountType === 'ORGANIZATION') {
+                    const membersRes = await api.get(`/orgs/${authorData.id}/members`);
                     setOrgMembers(membersRes.data);
                 }
             } catch (e) {
+                console.error("Failed to fetch author profile", e);
             }
 
             if (mod.teamMembers && mod.teamMembers.length > 0) {
@@ -904,6 +913,7 @@ export const ModDetail: React.FC<{
                     const res = await api.post('/users/batch', { userIds });
                     setContributors(res.data);
                 } catch (e) {
+                    console.error("Failed to fetch contributors", e);
                 }
             }
         };

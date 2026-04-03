@@ -241,27 +241,33 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                 Organization Members
                             </h2>
                             <div className="flex flex-wrap gap-4">
-                                {orgMembers.map(member => (
-                                    <Link
-                                        key={member.id}
-                                        to={`/creator/${member.username}`}
-                                        className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
-                                    >
-                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
-                                            {member.avatarUrl ? (
-                                                <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <span className="font-bold text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
-                                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                                {creator.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                                {orgMembers.map(member => {
+                                    const membership = creator.organizationMembers?.find(m => m.userId === member.id);
+                                    const role = creator.organizationRoles?.find(r => r.id === membership?.roleId);
+                                    const roleName = role?.name || 'Member';
+
+                                    return (
+                                        <Link
+                                            key={member.id}
+                                            to={`/creator/${member.username}`}
+                                            className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
+                                        >
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
+                                                {member.avatarUrl ? (
+                                                    <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="font-bold text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
+                                                )}
                                             </div>
-                                        </div>
-                                    </Link>
-                                ))}
+                                            <div>
+                                                <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
+                                                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                    {roleName}
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
