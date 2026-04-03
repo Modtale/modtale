@@ -8,6 +8,7 @@ import { ImageCropperModal } from '../ui/ImageCropperModal';
 import { Spinner } from '../ui/Spinner';
 import { OptimizedImage } from '../ui/OptimizedImage';
 import type { User } from '../../types';
+import { BACKEND_URL } from '../../utils/api';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
@@ -127,6 +128,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         }
     };
 
+    const resolveImageUrl = (url?: string | null) => {
+        if (!url || url === 'null') return null;
+        if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) return url;
+        return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
+
+    const resolvedAvatar = resolveImageUrl(user.avatarUrl);
+    const resolvedBanner = resolveImageUrl(user.bannerUrl);
+
     const SocialButton = ({ account, compact = false, isRightMost = false }: { account: any, compact?: boolean, isRightMost?: boolean }) => {
         const { icon: Icon, label, activeClass, iconBg, profileBtnBg } = getProviderDetails(account.provider);
         const displayUrl = account.profileUrl || '#';
@@ -182,9 +192,9 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const Avatar = ({ className, forceSizeClass }: { className?: string, forceSizeClass?: string }) => (
         <div className={`relative group ${className}`}>
             <div className={`w-full h-full ${forceSizeClass || ''} rounded-3xl border-[6px] md:border-[8px] border-white dark:border-slate-800 shadow-xl overflow-hidden bg-transparent relative z-20 backdrop-blur-md transition-colors`}>
-                {user.avatarUrl ? (
+                {resolvedAvatar ? (
                     <OptimizedImage
-                        src={user.avatarUrl}
+                        src={resolvedAvatar}
                         alt={`${user.username} Avatar`}
                         baseWidth={224}
                         priority={true}
@@ -219,9 +229,9 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 style={{ transform: `translateY(${parallaxOffset}px)` }}
             >
                 <div className="absolute inset-0 z-0 overflow-hidden">
-                    {user.bannerUrl ? (
+                    {resolvedBanner ? (
                         <OptimizedImage
-                            src={user.bannerUrl}
+                            src={resolvedBanner}
                             alt={`${user.username} Banner`}
                             baseWidth={1920}
                             priority={true}
@@ -239,12 +249,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
                 {isEditing && (
                     <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
-                        user.bannerUrl
+                        resolvedBanner
                             ? "absolute top-6 right-6 z-30 bg-white/80 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 text-slate-900 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/20 backdrop-blur-md shadow-sm hover:scale-105"
                             : "absolute inset-x-6 top-6 bottom-0 z-30 flex flex-col items-center justify-center rounded-t-3xl border-2 border-b-0 border-dashed border-slate-400/50 dark:border-white/20 hover:border-slate-500/60 dark:hover:border-white/40 bg-slate-100/50 dark:bg-white/5 hover:bg-slate-200/50 dark:hover:bg-white/10 group/banner backdrop-blur-sm pb-4 md:pb-28"
                     }`}>
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'banner')} disabled={uploadingBanner} />
-                        {user.bannerUrl ? (
+                        {resolvedBanner ? (
                             <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-2 drop-shadow-sm">
                                     {uploadingBanner ? <Spinner className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
