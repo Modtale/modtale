@@ -12,23 +12,30 @@ interface OptimizedImageProps {
 
 const FALLBACK_SRC = '/assets/favicon.svg';
 
+const loadedImageCache = new Set<string>();
+
 export const OptimizedImage: React.FC<OptimizedImageProps> = ({
                                                                   src, alt, className, baseWidth, priority = false, aspectRatio
                                                               }) => {
-    const [isLoaded, setIsLoaded] = useState(false);
     const hasFallenBack = useRef(false);
 
-    const { downlink, isSaveData } = useMemo(() => {
+    const { downlink, effectiveType, isSaveData } = useMemo(() => {
         const conn = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
         return {
-            downlink: conn?.downlink ?? 10,
+            downlink: conn?.downlink,
+            effectiveType: conn?.effectiveType,
             isSaveData: conn?.saveData ?? false,
         };
     }, []);
 
     const config = useMemo(() => {
-        const ultraSlow = downlink < 1 || isSaveData;
-        const fast = priority || (downlink >= 10 && !isSaveData);
+        const currentDownlink = downlink ?? 10;
+        const currentEffectiveType = effectiveType ?? '4g';
+
+        const ultraSlow = isSaveData || currentEffectiveType === 'slow-2g' || currentEffectiveType === '2g' || currentDownlink < 1;
+
+        const fast = priority || (!isSaveData && currentEffectiveType === '4g' && currentDownlink >= 3);
+
         return {
             placeholder: getCloudflareUrl(src, 32, 10),
             res1x: getCloudflareUrl(src, baseWidth, ultraSlow ? 50 : 80),
@@ -36,27 +43,35 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
             isUltraSlow: ultraSlow,
             isFast: fast,
         };
-    }, [src, baseWidth, priority, downlink, isSaveData]);
+    }, [src, baseWidth, priority, downlink, effectiveType, isSaveData]);
+
+    const [isLoaded, setIsLoaded] = useState(() => {
+        return config.isFast || loadedImageCache.has(config.res2x);
+    });
+
+    const wasLoadedInitially = useRef(isLoaded);
 
     useEffect(() => {
-        setIsLoaded(false);
+        const shouldBeLoaded = config.isFast || loadedImageCache.has(config.res2x);
+        setIsLoaded(shouldBeLoaded);
         hasFallenBack.current = false;
-    }, [src]);
+        wasLoadedInitially.current = shouldBeLoaded;
+    }, [src, config.res2x, config.isFast]);
 
     useEffect(() => {
-        if (config.isFast) {
-            setIsLoaded(true);
-            return;
-        }
+        if (isLoaded) return;
 
         const img = new Image();
         img.src = config.res2x;
-        img.onload = () => setIsLoaded(true);
+        img.onload = () => {
+            loadedImageCache.add(config.res2x);
+            setIsLoaded(true);
+        };
 
         return () => {
             img.onload = null;
         };
-    }, [config.res2x, config.isFast]);
+    }, [config.res2x, isLoaded]);
 
     const srcSet = useMemo(() => {
         if (!isLoaded) return undefined;
@@ -78,7 +93,9 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
                 loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
                 decoding="async"
-                className={`w-full h-full object-cover transition-all duration-700 ${
+                className={`w-full h-full object-cover ${
+                    !wasLoadedInitially.current ? 'transition-all duration-700' : ''
+                } ${
                     isLoaded ? 'blur-0 scale-100' : 'blur-2xl scale-110'
                 }`}
                 onError={(e) => {
