@@ -1241,7 +1241,7 @@ export const ModDetail: React.FC<{
                                 src={resolveUrl(mod.galleryImages[galleryIndex])}
                                 alt={`${mod.title} Gallery Image ${galleryIndex + 1}`}
                                 baseWidth={1200}
-                                className="max-w-full max-h-full shadow-lg"
+                                className="w-full h-full [&>img]:!object-contain shadow-lg"
                             />
                         </div>
                     </div>
