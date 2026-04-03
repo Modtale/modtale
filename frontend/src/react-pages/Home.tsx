@@ -10,7 +10,7 @@ import { LineChart } from '../components/ui/charts/LineChart';
 import { OptimizedImage } from '../components/ui/OptimizedImage';
 import type { Mod, User } from '../types';
 import { api, BACKEND_URL } from '../utils/api';
-import { createSlug } from '../utils/slug';
+import { getProjectUrl } from '../utils/slug';
 
 const GLASS_CARD = "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]";
 const GLASS_HEADER = "bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10";
@@ -62,7 +62,7 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
         ? (mod.bannerUrl.startsWith('/api') ? `${BACKEND_URL}${mod.bannerUrl}` : mod.bannerUrl)
         : null;
 
-    const projectUrl = `/${mod.classification === 'MODPACK' ? 'modpack' : mod.classification === 'SAVE' ? 'world' : 'mod'}/${createSlug(mod.title, mod.id)}`;
+    const projectUrl = getProjectUrl(mod);
 
     return (
         <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden isolate hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent">
