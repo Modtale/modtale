@@ -12,7 +12,8 @@ import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
     Download, Image, List, Globe, Bug, BookOpen, ExternalLink, Calendar, ChevronDown, Hash,
-    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Reply, Github
+    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Github,
+    ArrowBigUp, ArrowBigDown
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
@@ -79,16 +80,16 @@ const markdownComponents = {
         return <>{children}</>;
     },
     p({ node, children, ...props }: any) {
-        return <p className="my-4 leading-relaxed break-words" {...props}>{children}</p>;
+        return <p className="my-3 leading-relaxed break-words text-base" {...props}>{children}</p>;
     },
     li({ node, children, ...props }: any) {
-        return <li className="my-1 [&>p]:my-0 break-words" {...props}>{children}</li>;
+        return <li className="my-1.5 [&>p]:my-0 break-words text-base" {...props}>{children}</li>;
     },
     ul({ node, children, ...props }: any) {
-        return <ul className="list-disc pl-6 my-4 space-y-1" {...props}>{children}</ul>;
+        return <ul className="list-disc pl-6 my-3 space-y-1.5" {...props}>{children}</ul>;
     },
     ol({ node, children, ...props }: any) {
-        return <ol className="list-decimal pl-6 my-4 space-y-1" {...props}>{children}</ol>;
+        return <ol className="list-decimal pl-6 my-3 space-y-1.5" {...props}>{children}</ol>;
     },
 };
 
@@ -398,6 +399,37 @@ const ProjectSidebar: React.FC<{
 });
 ProjectSidebar.displayName = 'ProjectSidebar';
 
+interface VoteWidgetProps {
+    score: number;
+    userVote: 'up' | 'down' | null;
+    onVote: (up: boolean) => void;
+    vertical?: boolean;
+}
+
+const VoteWidget: React.FC<VoteWidgetProps> = ({ score, userVote, onVote, vertical = true }) => {
+    return (
+        <div className={`flex ${vertical ? 'flex-col items-center' : 'items-center gap-2'} shrink-0 mt-1`}>
+            <button
+                onClick={() => onVote(true)}
+                className={`p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors ${userVote === 'up' ? 'text-modtale-accent' : 'text-slate-400'}`}
+                aria-label="Helpful"
+            >
+                <ArrowBigUp className={`w-6 h-6 ${userVote === 'up' ? 'fill-current' : ''}`} />
+            </button>
+            <span className={`text-sm font-black min-w-[1.5rem] text-center ${userVote === 'up' ? 'text-modtale-accent' : userVote === 'down' ? 'text-orange-500' : 'text-slate-500'}`}>
+                {score > 0 ? `+${score}` : score}
+            </span>
+            <button
+                onClick={() => onVote(false)}
+                className={`p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors ${userVote === 'down' ? 'text-orange-500' : 'text-slate-400'}`}
+                aria-label="Not Helpful"
+            >
+                <ArrowBigDown className={`w-6 h-6 ${userVote === 'down' ? 'fill-current' : ''}`} />
+            </button>
+        </div>
+    );
+};
+
 interface CommentSectionProps {
     modId: string;
     comments: Comment[];
@@ -444,6 +476,27 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                 .catch(() => {});
         }
     }, [comments]);
+
+    const handleVote = async (commentId: string, isReply: boolean, upvote: boolean) => {
+        if (!currentUser) {
+            onError("Log in to vote on comments.");
+            return;
+        }
+        try {
+            const endpoint = isReply ? `/projects/${modId}/comments/${commentId}/reply/vote` : `/projects/${modId}/comments/${commentId}/vote`;
+            await api.post(`${endpoint}?upvote=${upvote}`);
+            const res = await api.get(`/projects/${modId}`);
+            onCommentSubmitted(res.data.comments || []);
+        } catch (err: any) {
+            onError("Failed to register vote.");
+        }
+    };
+
+    const resolveAvatar = (url?: string | null) => {
+        if (!url || url === 'null') return null;
+        if (url.startsWith('http')) return url;
+        return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
 
     const startEditing = useCallback((comment: Comment) => {
         setText(comment.content);
@@ -502,18 +555,14 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
         } catch (err: any) { onError(err.response?.data || 'Failed to post reply.'); } finally { setSubmitting(false); }
     };
 
-    const resolveAvatar = (url?: string | null) => {
-        if (!url || url === 'null') return null;
-        if (url.startsWith('http')) return url;
-        return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
-    };
-
     if (commentsDisabled && !isCreator) return null;
 
+    const currentUserAvatar = resolveAvatar(currentUser?.avatarUrl);
+
     return (
-        <div ref={innerRef} id="comments" className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10 scroll-mt-24">
+        <div ref={innerRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-                <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> Comments <span className="text-sm font-medium text-slate-500 dark:text-slate-400">({comments.length})</span>
+                <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> {comments.length} Comments
             </h2>
 
             {commentsDisabled && (
@@ -523,167 +572,195 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
             )}
 
             {currentUser ? (
-                <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
-                    <div className="flex justify-between mb-4">
-                        <h3 className="font-bold text-slate-900 dark:text-white m-0 text-base">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
-                        {editingCommentId && <button type="button" onClick={cancelEdit} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-500 font-bold">Cancel</button>}
-                    </div>
-                    <textarea aria-label="Comment content" value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[100px]" placeholder="Ask a question or share your thoughts..." required />
-                    <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 transition-colors">
-                        <Send className="w-4 h-4" aria-hidden="true" /> {editingCommentId ? 'Update Comment' : 'Post Comment'}
-                    </button>
-                </form>
-            ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-600 dark:text-slate-400 font-bold border border-slate-200 dark:border-white/5">Log in to post a comment.</div>}
+                <div className="mb-12 flex gap-4">
+                    <form onSubmit={submit} className="flex-1 bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm focus-within:border-modtale-accent focus-within:ring-2 focus-within:ring-modtale-accent/20 transition-all">
+                        <div className="p-4 bg-slate-50 dark:bg-black/20 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
+                            {/* Make title the accent color */}
+                            <h3 className="font-bold text-modtale-accent m-0 text-[11px] uppercase tracking-widest">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
+                            {editingCommentId && <button type="button" onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-red-500 font-bold uppercase tracking-widest transition-colors">Cancel</button>}
+                        </div>
+                        {/* Include preview of your own user's pfp */}
+                        <div className="flex items-start gap-3 p-5">
+                            <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0 shadow-sm border border-slate-200 dark:border-white/5 mt-1">
+                                {currentUserAvatar ? (
+                                    <OptimizedImage src={currentUserAvatar} alt={`${currentUser?.username} Avatar`} baseWidth={40} className="w-full h-full object-cover" />
+                                ) : (
+                                    currentUser?.username?.charAt(0).toUpperCase() || '?'
+                                )}
+                            </div>
+                            <textarea
+                                aria-label="Comment content"
+                                value={text}
+                                onChange={e => setText(e.target.value)}
+                                className="w-full bg-transparent border-none text-slate-900 dark:text-white outline-none font-medium text-base min-h-[100px] resize-y"
+                                placeholder="What are your thoughts?"
+                                required
+                            />
+                        </div>
+                        <div className="px-4 py-3 bg-slate-50 dark:bg-black/20 border-t border-slate-200 dark:border-white/10 flex justify-end">
+                            <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 transition-colors text-sm shadow-md">
+                                <Send className="w-4 h-4" aria-hidden="true" /> {editingCommentId ? 'Update' : 'Post Comment'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            ) : <div className="mb-10 p-8 bg-white dark:bg-slate-900/40 rounded-2xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/10 shadow-sm">Log in to join the conversation.</div>}
 
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {comments?.length > 0 ? comments.map((comment) => {
                     const anyC = comment as any;
                     const authorId = anyC.authorId || anyC.userId;
+                    const profile = userProfiles[authorId];
+                    const authorUsername = profile?.username || anyC.author?.username || 'Unknown';
 
-                    const authorUsername = (authorId && userProfiles[authorId]?.username)
-                        || anyC.author?.username || anyC.authorName || anyC.author || anyC.username || anyC.user || anyC.userId || 'Unknown';
-
-                    const rawAvatar = (authorId && userProfiles[authorId]?.avatarUrl)
-                        || anyC.author?.avatarUrl || anyC.authorAvatarUrl || anyC.avatarUrl || anyC.userAvatarUrl;
-
+                    // Strictly fetch avatar direct from mapped userProfile id
+                    const rawAvatar = authorId ? userProfiles[authorId]?.avatarUrl : null;
                     const authorAvatar = resolveAvatar(rawAvatar);
+
+                    const score = (anyC.upvotes?.length || 0) - (anyC.downvotes?.length || 0);
+                    const userVote = currentUser && anyC.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && anyC.downvotes?.includes(currentUser.id) ? 'down' : null);
 
                     const profileLink = `/creator/${authorUsername}`;
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
 
                     return (
-                        <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group relative overflow-hidden">
-                            <div className="flex justify-between items-start mb-3">
-                                <div className="flex items-center gap-4">
-                                    <Link to={profileLink} className="relative z-10 shrink-0">
-                                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all">
+                        <div key={comment.id} className="p-4 sm:p-5 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm group relative flex gap-3 sm:gap-4">
+                            {/* Reddit-style Gutter */}
+                            <VoteWidget score={score} userVote={userVote} onVote={(up) => handleVote(comment.id, false, up)} />
+
+                            <div className="flex-1 min-w-0">
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Link to={profileLink} className="shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all shadow-sm border border-slate-200 dark:border-white/5">
                                             {authorAvatar ? (
-                                                <OptimizedImage
-                                                    src={authorAvatar}
-                                                    alt={`${authorUsername} Avatar`}
-                                                    baseWidth={40}
-                                                    className="w-full h-full"
-                                                />
+                                                <OptimizedImage src={authorAvatar} alt={`${authorUsername} Avatar`} baseWidth={40} className="w-full h-full object-cover" />
                                             ) : (
                                                 authorUsername.charAt(0).toUpperCase()
                                             )}
                                         </div>
                                     </Link>
-                                    <div className="relative z-10">
-                                        <Link to={profileLink} className="font-bold text-slate-900 dark:text-white block hover:text-modtale-accent transition-colors">
+                                    <div className="flex flex-col">
+                                        <Link to={profileLink} className="font-bold text-sm sm:text-base text-slate-900 dark:text-white hover:text-modtale-accent transition-colors">
                                             {authorUsername}
                                         </Link>
+                                        <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                            {formatTimeAgo(comment.date)}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-end gap-1">
-                                    <div suppressHydrationWarning className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                        {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                                    </div>
-                                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
-                                        {currentUser && (
-                                            <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
-                                                <Flag className="w-3 h-3" aria-hidden="true"/> Report
-                                            </button>
-                                        )}
-                                        {isCommentOwner && (
-                                            <button aria-label="Edit comment" onClick={() => startEditing(comment)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-modtale-accent font-bold flex items-center gap-1">
-                                                <Edit className="w-3 h-3" aria-hidden="true"/> Edit
-                                            </button>
-                                        )}
-                                        {(isCreator || isCommentOwner) && (
-                                            <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
-                                                <Trash className="w-3 h-3" aria-hidden="true"/> Delete
-                                            </button>
-                                        )}
-                                        {isCreator && (
-                                            <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs text-modtale-accent font-bold hover:underline">
-                                                {comment.developerReply ? 'Edit Reply' : 'Reply'}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap leading-relaxed prose-code:before:hidden prose-code:after:hidden">
-                                {comment.content}
-                            </div>
 
-                            {replyingCommentId === comment.id && (
-                                <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
-                                    <textarea
-                                        aria-label="Developer reply content"
-                                        value={replyText}
-                                        onChange={e => setReplyText(e.target.value)}
-                                        className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-modtale-accent text-slate-900 dark:text-white transition-all shadow-inner"
-                                        placeholder="Write a reply..."
-                                        rows={3}
-                                    />
-                                    <div className="flex justify-end gap-2">
-                                        <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Cancel</button>
-                                        <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-4 py-2 rounded-lg flex items-center gap-1.5 hover:bg-modtale-accentHover transition-colors shadow-md">
-                                            <CornerDownRight className="w-3 h-3" aria-hidden="true"/> Post Reply
+                                {/* Body */}
+                                <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed prose-code:before:hidden prose-code:after:hidden break-words">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{comment.content}</ReactMarkdown>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                                    {isCreator && !comment.developerReply && (
+                                        <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(''); }} className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 transition-colors">
+                                            <MessageSquare className="w-4 h-4" aria-hidden="true"/> Reply
                                         </button>
-                                    </div>
-                                </form>
-                            )}
+                                    )}
+                                    {isCreator && comment.developerReply && (
+                                        <button aria-label="Edit reply" onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 transition-colors">
+                                            <MessageSquare className="w-4 h-4" aria-hidden="true"/> Edit Reply
+                                        </button>
+                                    )}
+                                    {currentUser && (
+                                        <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
+                                            <Flag className="w-4 h-4" aria-hidden="true"/> Report
+                                        </button>
+                                    )}
+                                    {isCommentOwner && (
+                                        <button aria-label="Edit comment" onClick={() => startEditing(comment)} className="text-xs font-bold text-slate-500 hover:text-modtale-accent flex items-center gap-1.5 transition-colors">
+                                            <Edit className="w-4 h-4" aria-hidden="true"/> Edit
+                                        </button>
+                                    )}
+                                    {(isCreator || isCommentOwner) && (
+                                        <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
+                                            <Trash className="w-4 h-4" aria-hidden="true"/> Delete
+                                        </button>
+                                    )}
+                                </div>
 
-                            {comment.developerReply && !replyingCommentId && (() => {
-                                const devReply = comment.developerReply as any;
-                                const replyId = devReply.authorId || devReply.userId;
-
-                                const replyUsername = (replyId && userProfiles[replyId]?.username)
-                                    || devReply.author?.username || devReply.authorName || devReply.author || devReply.username || devReply.user || devReply.userId || 'Developer';
-
-                                const rawReplyAvatar = (replyId && userProfiles[replyId]?.avatarUrl)
-                                    || devReply.author?.avatarUrl || devReply.authorAvatarUrl || devReply.avatarUrl || devReply.userAvatarUrl;
-
-                                const replyAvatar = resolveAvatar(rawReplyAvatar);
-                                const replyProfileLink = `/creator/${replyUsername}`;
-
-                                return (
-                                    <div className="mt-6 ml-6 md:ml-12 pl-6 border-l-2 border-slate-200 dark:border-white/10 relative">
-                                        <div className="absolute -left-3.5 top-0 bg-slate-100 dark:bg-slate-800 p-1 rounded-full text-slate-400 dark:text-slate-500">
-                                            <Reply className="w-4 h-4 transform rotate-180" />
+                                {/* Inline Reply Form */}
+                                {replyingCommentId === comment.id && (
+                                    <form onSubmit={submitReply} className="mt-4 pl-4 border-l-2 border-slate-200 dark:border-white/10 relative">
+                                        <textarea
+                                            aria-label="Developer reply content"
+                                            value={replyText}
+                                            onChange={e => setReplyText(e.target.value)}
+                                            className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-base focus:outline-none focus:ring-2 focus:ring-modtale-accent text-slate-900 dark:text-white transition-all shadow-inner resize-y"
+                                            placeholder="Write a reply..."
+                                            rows={3}
+                                        />
+                                        <div className="mt-2 flex justify-end gap-2">
+                                            <button type="button" onClick={() => setReplyingCommentId(null)} className="text-sm font-bold px-4 py-2 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">Cancel</button>
+                                            <button type="submit" disabled={submitting} className="text-sm font-bold bg-modtale-accent text-white px-5 py-2 rounded-lg flex items-center gap-2 hover:bg-modtale-accentHover transition-colors shadow-sm">
+                                                <CornerDownRight className="w-4 h-4" aria-hidden="true"/> Post Reply
+                                            </button>
                                         </div>
-                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-white/5">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div className="flex items-center gap-3">
-                                                    <Link to={replyProfileLink} className="relative z-10 shrink-0">
-                                                        <div className="w-8 h-8 rounded-full bg-modtale-accent text-white flex items-center justify-center font-black overflow-hidden shrink-0 shadow-sm hover:ring-2 hover:ring-white transition-all">
+                                    </form>
+                                )}
+
+                                {/* Threaded Developer Reply */}
+                                {comment.developerReply && !replyingCommentId && (() => {
+                                    const devReply = comment.developerReply as any;
+                                    const replyId = devReply.authorId || devReply.userId;
+
+                                    const replyProfile = userProfiles[replyId];
+                                    const replyUsername = replyProfile?.username || devReply.author?.username || 'Developer';
+
+                                    // Strictly fetch avatar direct from mapped userProfile id
+                                    const rawReplyAvatar = replyId ? replyProfile?.avatarUrl : null;
+                                    const replyAvatar = resolveAvatar(rawReplyAvatar);
+
+                                    const replyProfileLink = `/creator/${replyUsername}`;
+
+                                    const replyScore = (devReply.upvotes?.length || 0) - (devReply.downvotes?.length || 0);
+                                    const replyUserVote = currentUser && devReply.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && devReply.downvotes?.includes(currentUser.id) ? 'down' : null);
+
+                                    return (
+                                        <div className="mt-3 flex gap-3 relative">
+                                            <div className="absolute -left-[1.75rem] sm:-left-[2.25rem] top-0 bottom-4 w-px bg-slate-200 dark:bg-white/10"></div>
+                                            <div className="absolute -left-[1.75rem] sm:-left-[2.25rem] top-4 w-4 h-px bg-slate-200 dark:bg-white/10"></div>
+
+                                            <VoteWidget score={replyScore} userVote={replyUserVote} onVote={(up) => handleVote(comment.id, true, up)} />
+
+                                            <div className="flex-1 min-w-0 bg-modtale-accent/5 dark:bg-modtale-accent/[0.02] rounded-2xl p-4 border border-modtale-accent/10 dark:border-modtale-accent/20">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Link to={replyProfileLink} className="shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-black overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all shadow-sm border border-slate-200 dark:border-white/5">
                                                             {replyAvatar ? (
-                                                                <OptimizedImage
-                                                                    src={replyAvatar}
-                                                                    alt={`${replyUsername} Avatar`}
-                                                                    baseWidth={32}
-                                                                    className="w-full h-full"
-                                                                />
+                                                                <OptimizedImage src={replyAvatar} alt={`${replyUsername} Avatar`} baseWidth={32} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <Crown className="w-4 h-4" aria-hidden="true" />
+                                                                <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
                                                             )}
                                                         </div>
                                                     </Link>
-                                                    <div className="flex flex-col relative z-10">
-                                                        <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1">
-                                                            <Link to={replyProfileLink} className="hover:text-modtale-accent transition-colors">{replyUsername}</Link>
-                                                            <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-widest ml-1 flex items-center gap-1">
-                                                                <Crown className="w-2.5 h-2.5" /> Creator
-                                                            </span>
-                                                        </span>
-                                                        <span suppressHydrationWarning className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                                                            {new Date(comment.developerReply.date).toLocaleDateString()}
+                                                    <div className="flex flex-col">
+                                                        <Link to={replyProfileLink} className="font-bold text-sm text-slate-900 dark:text-white hover:text-modtale-accent transition-colors flex items-center gap-1.5">
+                                                            {replyUsername}
+                                                            <span className="bg-modtale-accent/10 text-modtale-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest flex items-center gap-1"><Crown className="w-2.5 h-2.5"/> Creator</span>
+                                                        </Link>
+                                                        <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                                            {formatTimeAgo(comment.developerReply.date)}
                                                         </span>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed prose-code:before:hidden prose-code:after:hidden">
-                                                {comment.developerReply.content}
+
+                                                <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed prose-code:before:hidden prose-code:after:hidden break-words">
+                                                    <ReactMarkdown components={markdownComponents}>{comment.developerReply.content}</ReactMarkdown>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })()}
+                                    );
+                                })()}
+                            </div>
                         </div>
                     );
-                }) : <div className="text-center py-12 text-slate-600 dark:text-slate-400 font-medium bg-white/50 dark:bg-white/[0.02] rounded-2xl border border-slate-200 dark:border-white/5 border-dashed">No comments yet. Be the first to share your thoughts!</div>}
+                }) : <div className="text-center py-16 text-slate-500 font-medium bg-white dark:bg-white/[0.02] rounded-2xl border border-slate-200 dark:border-white/5 border-dashed">No comments yet. Be the first to share your thoughts!</div>}
             </div>
         </div>
     );

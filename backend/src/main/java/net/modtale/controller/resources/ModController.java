@@ -604,6 +604,22 @@ public class ModController {
         }
     }
 
+    @PostMapping("/projects/{id}/comments/{commentId}/vote")
+    public ResponseEntity<?> voteComment(@PathVariable String id, @PathVariable String commentId, @RequestParam boolean upvote) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        modService.voteComment(id, commentId, user.getId(), upvote);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/projects/{id}/comments/{commentId}/reply/vote")
+    public ResponseEntity<?> voteReply(@PathVariable String id, @PathVariable String commentId, @RequestParam boolean upvote) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        modService.voteReply(id, commentId, user.getId(), upvote);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/projects")
     @PreAuthorize("@apiSecurity.hasCreateProjectPerm(#owner, authentication)")
     public ResponseEntity<?> createProject(

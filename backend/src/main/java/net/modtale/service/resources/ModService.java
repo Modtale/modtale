@@ -471,13 +471,9 @@ public class ModService {
 
             if (mod.getComments() != null && !mod.getComments().isEmpty()) {
                 for (Comment c : mod.getComments()) {
-                    if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
-                        if (c.getUserId() != null) userIdsToFetch.add(c.getUserId());
-                    }
+                    if (c.getUserId() != null) userIdsToFetch.add(c.getUserId());
                     if (c.getDeveloperReply() != null) {
-                        if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
-                            if (c.getDeveloperReply().getUserId() != null) userIdsToFetch.add(c.getDeveloperReply().getUserId());
-                        }
+                        if (c.getDeveloperReply().getUserId() != null) userIdsToFetch.add(c.getDeveloperReply().getUserId());
                     }
                 }
             }
@@ -515,21 +511,6 @@ public class ModService {
                                 m.setAvatarUrl(u.getAvatarUrl());
                             }
                         });
-                    }
-
-                    if (mod.getComments() != null) {
-                        for (Comment c : mod.getComments()) {
-                            if (c.getUserAvatarUrl() == null || c.getUserAvatarUrl().isEmpty()) {
-                                User u = userMapById.get(c.getUserId());
-                                if (u != null && u.getAvatarUrl() != null) c.setUserAvatarUrl(u.getAvatarUrl());
-                            }
-                            if (c.getDeveloperReply() != null) {
-                                if (c.getDeveloperReply().getUserAvatarUrl() == null || c.getDeveloperReply().getUserAvatarUrl().isEmpty()) {
-                                    User u = userMapById.get(c.getDeveloperReply().getUserId());
-                                    if (u != null && u.getAvatarUrl() != null) c.getDeveloperReply().setUserAvatarUrl(u.getAvatarUrl());
-                                }
-                            }
-                        }
                     }
                 } catch (Exception e) {
                     logger.warn("Failed to batch load data for mod details", e);
@@ -2339,7 +2320,7 @@ public class ModService {
 
             User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-            Comment comment = new Comment(user.getId(), user.getAvatarUrl(), sanitizer.sanitizePlainText(content));
+            Comment comment = new Comment(user.getId(), sanitizer.sanitizePlainText(content));
 
             if (mod.getComments() == null) mod.setComments(new ArrayList<>());
             mod.getComments().add(0, comment);
@@ -2424,7 +2405,7 @@ public class ModService {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
-            Comment.Reply reply = new Comment.Reply(user.getId(), user.getAvatarUrl(), sanitizer.sanitizePlainText(replyContent));
+            Comment.Reply reply = new Comment.Reply(user.getId(), sanitizer.sanitizePlainText(replyContent));
 
             comment.setDeveloperReply(reply);
 
@@ -2446,6 +2427,67 @@ public class ModService {
                 );
             }
         }
+    }
+
+    public void voteComment(String modId, String commentId, String userId, boolean upvote) {
+        Mod mod = getRawModById(modId);
+        if (mod == null || mod.getComments() == null) return;
+
+        Comment comment = mod.getComments().stream()
+                .filter(c -> c.getId().equals(commentId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+
+        if (upvote) {
+            if (comment.getUpvotes().contains(userId)) {
+                comment.getUpvotes().remove(userId);
+            } else {
+                comment.getUpvotes().add(userId);
+                comment.getDownvotes().remove(userId);
+            }
+        } else {
+            if (comment.getDownvotes().contains(userId)) {
+                comment.getDownvotes().remove(userId);
+            } else {
+                comment.getDownvotes().add(userId);
+                comment.getUpvotes().remove(userId);
+            }
+        }
+
+        modRepository.save(mod);
+        evictProjectDetails(mod);
+    }
+
+    public void voteReply(String modId, String commentId, String userId, boolean upvote) {
+        Mod mod = getRawModById(modId);
+        if (mod == null || mod.getComments() == null) return;
+
+        Comment comment = mod.getComments().stream()
+                .filter(c -> c.getId().equals(commentId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+
+        Comment.Reply reply = comment.getDeveloperReply();
+        if (reply == null) return;
+
+        if (upvote) {
+            if (reply.getUpvotes().contains(userId)) {
+                reply.getUpvotes().remove(userId);
+            } else {
+                reply.getUpvotes().add(userId);
+                reply.getDownvotes().remove(userId);
+            }
+        } else {
+            if (reply.getDownvotes().contains(userId)) {
+                reply.getDownvotes().remove(userId);
+            } else {
+                reply.getDownvotes().add(userId);
+                reply.getUpvotes().remove(userId);
+            }
+        }
+
+        modRepository.save(mod);
+        evictProjectDetails(mod);
     }
 
     public void addGalleryImage(String id, String imageUrl) {
