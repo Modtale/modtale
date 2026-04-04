@@ -493,9 +493,9 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
     const currentUserAvatar = resolveAvatar(currentUser?.avatarUrl);
 
     return (
-        <div ref={innerRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-                <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> {comments.length} Comments
+        <div ref={innerRef} id="comments" className="mt-10 p-6 sm:p-8 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm scroll-mt-24">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-3">
+                <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-modtale-accent" aria-hidden="true" /> {comments.length} Comments
             </h2>
 
             {commentsDisabled && (
@@ -505,16 +505,16 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
             )}
 
             {currentUser ? (
-                <div className="mb-12 flex gap-4">
-                    <form onSubmit={submit} className="flex-1 bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm focus-within:border-modtale-accent focus-within:ring-2 focus-within:ring-modtale-accent/20 transition-all">
-                        <div className="p-4 bg-slate-50 dark:bg-black/20 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
+                <div className="mb-8 flex gap-4">
+                    <form onSubmit={submit} className="flex-1 bg-slate-50 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
+                        <div className="flex justify-between items-center">
                             <h3 className="font-bold text-modtale-accent m-0 text-[11px] uppercase tracking-widest">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
                             {editingCommentId && <button type="button" onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-red-500 font-bold uppercase tracking-widest transition-colors">Cancel</button>}
                         </div>
-                        <div className="flex items-start gap-3 p-5">
-                            <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0 shadow-sm border border-slate-200 dark:border-white/5 mt-1">
+                        <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0 shadow-sm border border-slate-200 dark:border-white/5 mt-0.5">
                                 {currentUserAvatar ? (
-                                    <OptimizedImage src={currentUserAvatar} alt={`${currentUser?.username} Avatar`} baseWidth={40} className="w-full h-full object-cover" />
+                                    <OptimizedImage src={currentUserAvatar} alt={`${currentUser?.username} Avatar`} baseWidth={36} className="w-full h-full object-cover" />
                                 ) : (
                                     currentUser?.username?.charAt(0).toUpperCase() || '?'
                                 )}
@@ -523,21 +523,21 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                 aria-label="Comment content"
                                 value={text}
                                 onChange={e => setText(e.target.value)}
-                                className="w-full bg-transparent border-none text-slate-900 dark:text-white outline-none font-medium text-base min-h-[100px] resize-y"
+                                className="w-full bg-transparent border-none text-slate-900 dark:text-white outline-none font-medium text-sm min-h-[60px] resize-y placeholder-slate-400 dark:placeholder-slate-500 pt-1.5"
                                 placeholder="What are your thoughts?"
                                 required
                             />
                         </div>
-                        <div className="px-4 py-3 bg-slate-50 dark:bg-black/20 border-t border-slate-200 dark:border-white/10 flex justify-end">
-                            <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 transition-colors text-sm shadow-md">
-                                <Send className="w-4 h-4" aria-hidden="true" /> {editingCommentId ? 'Update' : 'Post Comment'}
+                        <div className="flex justify-end">
+                            <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors text-xs shadow-md">
+                                <Send className="w-3.5 h-3.5" aria-hidden="true" /> {editingCommentId ? 'Update' : 'Post Comment'}
                             </button>
                         </div>
                     </form>
                 </div>
-            ) : <div className="mb-10 p-8 bg-white dark:bg-slate-900/40 rounded-2xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/10 shadow-sm">Log in to join the conversation.</div>}
+            ) : <div className="mb-8 p-6 bg-slate-50 dark:bg-black/20 rounded-xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/5 shadow-sm">Log in to join the conversation.</div>}
 
-            <div className="space-y-6">
+            <div className="space-y-4">
                 {comments?.length > 0 ? comments.map((comment) => {
                     const anyC = comment as any;
                     const authorId = anyC.authorId || anyC.userId;
@@ -554,7 +554,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
 
                     return (
-                        <div key={comment.id} className="p-4 sm:p-5 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm group relative flex gap-3 sm:gap-4">
+                        <div key={comment.id} className="p-4 sm:p-5 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-slate-200 dark:border-white/5 shadow-sm group relative flex gap-3 sm:gap-4">
                             <VoteWidget score={score} userVote={userVote} onVote={(up) => handleVote(comment.id, false, up)} />
 
                             <div className="flex-1 min-w-0">
@@ -1041,7 +1041,7 @@ export const ModDetail: React.FC<{
                     setShowPostDownloadModal(true);
                 }
 
-                if (location.pathname.endsWith('/download')) navigate(projectUrl, { replace: true });
+                if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
                 return;
             }
 
@@ -1059,7 +1059,7 @@ export const ModDetail: React.FC<{
                 setShowPostDownloadModal(true);
             }
 
-            if (location.pathname.endsWith('/download')) navigate(projectUrl, { replace: true });
+            if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
         } catch (error) {
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
