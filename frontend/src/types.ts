@@ -99,7 +99,6 @@ export interface Reply {
 export interface Comment {
     id: string;
     user: string;
-    userAvatarUrl?: string;
     content: string;
     date: string;
     updatedAt?: string;
