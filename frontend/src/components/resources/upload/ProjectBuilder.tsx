@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { darcula } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { useDropzone } from 'react-dropzone';
 import {
     Save, UploadCloud, Link as LinkIcon, Tag,
@@ -27,6 +21,7 @@ import type { Mod, User, ProjectVersion, ProjectRole, ProjectMember } from '../.
 import { ModCard } from '../ModCard';
 import { VersionFields, ThemedInput } from './FormShared';
 import type { MetadataFormData, VersionFormData } from './FormShared';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 
 const PERMISSION_GROUPS = [
     {
@@ -104,68 +99,6 @@ interface ProjectBuilderProps {
     onShowStatus: (type: 'success' | 'error', title: string, msg: string) => void;
     readOnly?: boolean;
 }
-
-const markdownComponents = {
-    code({ node, inline, className, children, ...props }: any) {
-        const match = /language-(\w+)/.exec(className || '');
-        const isBlock = !inline && (match || String(children).includes('\n'));
-
-        if (isBlock) {
-            const lang = match ? match[1] : 'text';
-            const content = String(children).replace(/\n$/, '');
-
-            return (
-                <div className="relative w-full my-4 rounded-xl overflow-hidden bg-[#2b2b2b] ring-1 ring-slate-300 dark:ring-white/10 shadow-lg [&+&]:-mt-[17px] [&+&]:rounded-t-none [&+&]:!border-t-0 z-10">
-                    {match && (
-                        <div className="px-4 py-1.5 bg-[#3c3f41] border-b border-[#1e1e1e] text-xs font-sans text-slate-300 select-none flex items-center">
-                            {lang}
-                        </div>
-                    )}
-                    <SyntaxHighlighter
-                        {...props}
-                        style={darcula}
-                        language={lang}
-                        PreTag="div"
-                        className="!bg-transparent !m-0 !p-4 text-[13px] leading-relaxed"
-                        customStyle={{
-                            margin: 0,
-                            padding: match ? '1rem' : '1.25rem',
-                            background: 'transparent',
-                            fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace',
-                        }}
-                    >
-                        {content}
-                    </SyntaxHighlighter>
-                </div>
-            );
-        }
-
-        return (
-            <code
-                className={`${className || ''} !before:hidden !after:hidden bg-slate-200/70 dark:bg-slate-800 px-1.5 py-0.5 rounded-md text-[0.85em] font-mono text-slate-800 dark:text-slate-300 border border-slate-300/50 dark:border-slate-700/50 break-words`}
-                style={{ fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace' }}
-                {...props}
-            >
-                {children}
-            </code>
-        );
-    },
-    pre({ node, children, ...props }: any) {
-        return <>{children}</>;
-    },
-    p({ node, children, ...props }: any) {
-        return <p className="my-4 leading-relaxed break-words" {...props}>{children}</p>;
-    },
-    li({ node, children, ...props }: any) {
-        return <li className="my-1 [&>p]:my-0 break-words" {...props}>{children}</li>;
-    },
-    ul({ node, children, ...props }: any) {
-        return <ul className="list-disc pl-6 my-4 space-y-1" {...props}>{children}</ul>;
-    },
-    ol({ node, children, ...props }: any) {
-        return <ol className="list-decimal pl-6 my-4 space-y-1" {...props}>{children}</ol>;
-    },
-};
 
 export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                                   modData, setModData, metaData, setMetaData, versionData, setVersionData,
@@ -1031,19 +964,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                 ) : (
                                     <div className="prose dark:prose-invert prose-lg max-w-none min-h-[400px] prose-code:before:hidden prose-code:after:hidden">
                                         {metaData.description ? (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                                                    ...defaultSchema,
-                                                    attributes: {
-                                                        ...defaultSchema.attributes,
-                                                        code: ['className']
-                                                    }
-                                                }]]}
-                                                components={markdownComponents}
-                                            >
-                                                {metaData.description}
-                                            </ReactMarkdown>
+                                            <MarkdownRenderer content={metaData.description} />
                                         ) : (
                                             <p className="text-slate-500 italic">No description.</p>
                                         )}
