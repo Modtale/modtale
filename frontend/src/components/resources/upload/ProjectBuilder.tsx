@@ -5,7 +5,7 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import { darcula } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { useDropzone } from 'react-dropzone';
 import {
     Save, UploadCloud, Link as LinkIcon, Tag,
@@ -108,35 +108,50 @@ interface ProjectBuilderProps {
 const markdownComponents = {
     code({ node, inline, className, children, ...props }: any) {
         const match = /language-(\w+)/.exec(className || '');
-        const raw = Array.isArray(children) ? children.join('') : String(children ?? '');
-        const content = raw.replace(/\n$/, '');
+        const isBlock = !inline && (match || String(children).includes('\n'));
 
-        return !inline && match ? (
-            <div className="relative w-full my-6 rounded-xl overflow-hidden bg-[#1e1e1e] ring-1 ring-white/10 shadow-2xl">
-                <SyntaxHighlighter
-                    {...props}
-                    style={vscDarkPlus}
-                    language={match[1]}
-                    PreTag="div"
-                    className="!bg-transparent !m-0 !p-5 text-sm font-mono leading-relaxed"
-                    customStyle={{
-                        margin: 0,
-                        padding: '1.25rem',
-                        background: 'transparent',
-                        whiteSpace: 'pre-wrap',
-                    }}
-                >
-                    {content}
-                </SyntaxHighlighter>
-            </div>
-        ) : (
+        if (isBlock) {
+            const lang = match ? match[1] : 'text';
+            const content = String(children).replace(/\n$/, '');
+
+            return (
+                <div className="relative w-full my-4 rounded-xl overflow-hidden bg-[#2b2b2b] ring-1 ring-slate-300 dark:ring-white/10 shadow-lg [&+&]:-mt-[17px] [&+&]:rounded-t-none [&+&]:!border-t-0 z-10">
+                    {match && (
+                        <div className="px-4 py-1.5 bg-[#3c3f41] border-b border-[#1e1e1e] text-xs font-sans text-slate-300 select-none flex items-center">
+                            {lang}
+                        </div>
+                    )}
+                    <SyntaxHighlighter
+                        {...props}
+                        style={darcula}
+                        language={lang}
+                        PreTag="div"
+                        className="!bg-transparent !m-0 !p-4 text-[13px] leading-relaxed"
+                        customStyle={{
+                            margin: 0,
+                            padding: match ? '1rem' : '1.25rem',
+                            background: 'transparent',
+                            fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace',
+                        }}
+                    >
+                        {content}
+                    </SyntaxHighlighter>
+                </div>
+            );
+        }
+
+        return (
             <code
-                className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[0.9em] font-bold font-mono text-blue-600 dark:text-blue-400`}
+                className={`${className || ''} !before:hidden !after:hidden bg-slate-200/70 dark:bg-slate-800 px-1.5 py-0.5 rounded-md text-[0.85em] font-mono text-slate-800 dark:text-slate-300 border border-slate-300/50 dark:border-slate-700/50 break-words`}
+                style={{ fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace' }}
                 {...props}
             >
-                {raw}
+                {children}
             </code>
         );
+    },
+    pre({ node, children, ...props }: any) {
+        return <>{children}</>;
     },
     p({ node, children, ...props }: any) {
         return <p className="my-4 leading-relaxed break-words" {...props}>{children}</p>;
@@ -149,13 +164,6 @@ const markdownComponents = {
     },
     ol({ node, children, ...props }: any) {
         return <ol className="list-decimal pl-6 my-4 space-y-1" {...props}>{children}</ol>;
-    },
-    pre({ node, children, ...props }: any) {
-        return (
-            <pre className="w-full overflow-x-auto rounded-xl bg-transparent p-0 m-0" {...props}>
-                {children}
-            </pre>
-        );
     },
 };
 
@@ -1021,7 +1029,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                 {editorMode === 'write' && !readOnly && hasProjectPermission('PROJECT_EDIT_METADATA') ? (
                                     <textarea value={metaData.description} onChange={e => { markDirty(); setMetaData({...metaData, description: e.target.value}); }} className="flex-1 w-full h-full min-h-[400px] bg-transparent border-none outline-none text-slate-900 dark:text-slate-300 font-mono text-sm resize-none" placeholder="# Description..." />
                                 ) : (
-                                    <div className="prose dark:prose-invert prose-lg max-w-none min-h-[400px]">
+                                    <div className="prose dark:prose-invert prose-lg max-w-none min-h-[400px] prose-code:before:hidden prose-code:after:hidden">
                                         {metaData.description ? (
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
