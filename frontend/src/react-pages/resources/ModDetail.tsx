@@ -1,11 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { darcula } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Helmet } from 'react-helmet-async';
 import type { Mod, User, ProjectVersion, Comment, ModDependency } from '../../types';
 import {
@@ -30,68 +24,7 @@ import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
 import { useMobile } from '../../context/MobileContext';
 import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
-
-const markdownComponents = {
-    code({ node, inline, className, children, ...props }: any) {
-        const match = /language-(\w+)/.exec(className || '');
-        const isBlock = !inline && (match || String(children).includes('\n'));
-
-        if (isBlock) {
-            const lang = match ? match[1] : 'text';
-            const content = String(children).replace(/\n$/, '');
-
-            return (
-                <div className="relative w-full my-4 rounded-xl overflow-hidden bg-[#2b2b2b] ring-1 ring-slate-300 dark:ring-white/10 shadow-lg [&+&]:-mt-[17px] [&+&]:rounded-t-none [&+&]:!border-t-0 z-10">
-                    {match && (
-                        <div className="px-4 py-1.5 bg-[#3c3f41] border-b border-[#1e1e1e] text-xs font-sans text-slate-300 select-none flex items-center">
-                            {lang}
-                        </div>
-                    )}
-                    <SyntaxHighlighter
-                        {...props}
-                        style={darcula}
-                        language={lang}
-                        PreTag="div"
-                        className="!bg-transparent !m-0 !p-4 text-[13px] leading-relaxed"
-                        customStyle={{
-                            margin: 0,
-                            padding: match ? '1rem' : '1.25rem',
-                            background: 'transparent',
-                            fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace',
-                        }}
-                    >
-                        {content}
-                    </SyntaxHighlighter>
-                </div>
-            );
-        }
-
-        return (
-            <code
-                className={`${className || ''} !before:hidden !after:hidden bg-slate-200/70 dark:bg-slate-800 px-1.5 py-0.5 rounded-md text-[0.85em] font-mono text-slate-800 dark:text-slate-300 border border-slate-300/50 dark:border-slate-700/50 break-words`}
-                style={{ fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace' }}
-                {...props}
-            >
-                {children}
-            </code>
-        );
-    },
-    pre({ node, children, ...props }: any) {
-        return <>{children}</>;
-    },
-    p({ node, children, ...props }: any) {
-        return <p className="my-3 leading-relaxed break-words text-base" {...props}>{children}</p>;
-    },
-    li({ node, children, ...props }: any) {
-        return <li className="my-1.5 [&>p]:my-0 break-words text-base" {...props}>{children}</li>;
-    },
-    ul({ node, children, ...props }: any) {
-        return <ul className="list-disc pl-6 my-3 space-y-1.5" {...props}>{children}</ul>;
-    },
-    ol({ node, children, ...props }: any) {
-        return <ol className="list-decimal pl-6 my-3 space-y-1.5" {...props}>{children}</ol>;
-    },
-};
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 
 const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boolean = false) => {
     const [modData, setModData] = useState<any>(null);
@@ -575,11 +508,9 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                 <div className="mb-12 flex gap-4">
                     <form onSubmit={submit} className="flex-1 bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm focus-within:border-modtale-accent focus-within:ring-2 focus-within:ring-modtale-accent/20 transition-all">
                         <div className="p-4 bg-slate-50 dark:bg-black/20 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
-                            {/* Make title the accent color */}
                             <h3 className="font-bold text-modtale-accent m-0 text-[11px] uppercase tracking-widest">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
                             {editingCommentId && <button type="button" onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-red-500 font-bold uppercase tracking-widest transition-colors">Cancel</button>}
                         </div>
-                        {/* Include preview of your own user's pfp */}
                         <div className="flex items-start gap-3 p-5">
                             <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0 shadow-sm border border-slate-200 dark:border-white/5 mt-1">
                                 {currentUserAvatar ? (
@@ -613,7 +544,6 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                     const profile = userProfiles[authorId];
                     const authorUsername = profile?.username || anyC.author?.username || 'Unknown';
 
-                    // Strictly fetch avatar direct from mapped userProfile id
                     const rawAvatar = authorId ? userProfiles[authorId]?.avatarUrl : null;
                     const authorAvatar = resolveAvatar(rawAvatar);
 
@@ -625,11 +555,9 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
 
                     return (
                         <div key={comment.id} className="p-4 sm:p-5 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm group relative flex gap-3 sm:gap-4">
-                            {/* Reddit-style Gutter */}
                             <VoteWidget score={score} userVote={userVote} onVote={(up) => handleVote(comment.id, false, up)} />
 
                             <div className="flex-1 min-w-0">
-                                {/* Header */}
                                 <div className="flex items-center gap-3 mb-2">
                                     <Link to={profileLink} className="shrink-0">
                                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all shadow-sm border border-slate-200 dark:border-white/5">
@@ -650,12 +578,10 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                     </div>
                                 </div>
 
-                                {/* Body */}
                                 <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed prose-code:before:hidden prose-code:after:hidden break-words">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{comment.content}</ReactMarkdown>
+                                    <MarkdownRenderer content={comment.content} />
                                 </div>
 
-                                {/* Actions */}
                                 <div className="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
                                     {isCreator && !comment.developerReply && (
                                         <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(''); }} className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 transition-colors">
@@ -684,7 +610,6 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                     )}
                                 </div>
 
-                                {/* Inline Reply Form */}
                                 {replyingCommentId === comment.id && (
                                     <form onSubmit={submitReply} className="mt-4 pl-4 border-l-2 border-slate-200 dark:border-white/10 relative">
                                         <textarea
@@ -704,7 +629,6 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                     </form>
                                 )}
 
-                                {/* Threaded Developer Reply */}
                                 {comment.developerReply && !replyingCommentId && (() => {
                                     const devReply = comment.developerReply as any;
                                     const replyId = devReply.authorId || devReply.userId;
@@ -712,7 +636,6 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                     const replyProfile = userProfiles[replyId];
                                     const replyUsername = replyProfile?.username || devReply.author?.username || 'Developer';
 
-                                    // Strictly fetch avatar direct from mapped userProfile id
                                     const rawReplyAvatar = replyId ? replyProfile?.avatarUrl : null;
                                     const replyAvatar = resolveAvatar(rawReplyAvatar);
 
@@ -751,7 +674,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                                 </div>
 
                                                 <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed prose-code:before:hidden prose-code:after:hidden break-words">
-                                                    <ReactMarkdown components={markdownComponents}>{comment.developerReply.content}</ReactMarkdown>
+                                                    <MarkdownRenderer content={comment.developerReply.content} />
                                                 </div>
                                             </div>
                                         </div>
@@ -867,26 +790,6 @@ export const ModDetail: React.FC<{
             }
         }
     }, [isWikiRoute, wikiPageSlug, wikiData?.mod, navigate, projectUrl]);
-
-    const memoizedDescription = useMemo(() => {
-        if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
-
-        return (
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                    ...defaultSchema,
-                    attributes: {
-                        ...defaultSchema.attributes,
-                        code: ['className']
-                    }
-                }]]}
-                components={markdownComponents}
-            >
-                {mod.about}
-            </ReactMarkdown>
-        );
-    }, [mod?.about]);
 
     const handleCommentSubmitted = useCallback((c: Comment[]) => {
         setMod(prev => prev ? {...prev, comments: c} : null);
@@ -1138,7 +1041,7 @@ export const ModDetail: React.FC<{
                     setShowPostDownloadModal(true);
                 }
 
-                if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
+                if (location.pathname.endsWith('/download')) navigate(projectUrl, { replace: true });
                 return;
             }
 
@@ -1156,7 +1059,7 @@ export const ModDetail: React.FC<{
                 setShowPostDownloadModal(true);
             }
 
-            if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
+            if (location.pathname.endsWith('/download')) navigate(projectUrl, { replace: true });
         } catch (error) {
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
@@ -1586,19 +1489,7 @@ export const ModDetail: React.FC<{
                                     {wikiData.content?.content ? (
                                         <>
                                             <h1 className="text-4xl font-black mb-6">{wikiData.content.title || wikiData.mod.name}</h1>
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                                                    ...defaultSchema,
-                                                    attributes: {
-                                                        ...defaultSchema.attributes,
-                                                        code: ['className']
-                                                    }
-                                                }]]}
-                                                components={markdownComponents}
-                                            >
-                                                {wikiData.content.content}
-                                            </ReactMarkdown>
+                                            <MarkdownRenderer content={wikiData.content.content} />
                                         </>
                                     ) : (
                                         <div className="text-slate-500 italic">Page content is empty.</div>
@@ -1625,7 +1516,7 @@ export const ModDetail: React.FC<{
                     ) : (
                         <>
                             <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
-                                {memoizedDescription}
+                                <MarkdownRenderer content={mod?.about || "*No description.*"} />
                             </div>
                             <CommentSection
                                 modId={mod.id}
