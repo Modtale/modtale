@@ -7,6 +7,12 @@ export const DEFAULT_SEO = {
 };
 
 export const ROUTE_SEO: Record<string, { title: string, description: string, h1: string, keywords: string }> = {
+    '/mods': {
+        title: "Hytale Mods | Modtale",
+        h1: "Hytale Mods",
+        description: "Browse and download the best Hytale mods. Enhance your gameplay with custom items, blocks, creatures, and new mechanics.",
+        keywords: "hytale mods, download hytale mods, best hytale mods, hytale addons, custom items, hytale modding"
+    },
     '/plugins': {
         title: "Hytale Plugins & Server Scripts | Modtale",
         h1: "Hytale Plugins",
