@@ -560,12 +560,30 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             )}
                         </div>
 
+                        {isDownloadSort && (
+                            <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shadow-sm shrink-0">
+                                {[
+                                    { label: '7d', val: 7 },
+                                    { label: '30d', val: 30 },
+                                    { label: '90d', val: 90 },
+                                    { label: 'All', val: 0 }
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.label}
+                                        onClick={() => handleDownloadTimeframe(opt.val)}
+                                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={handleSortOpen} isMobile={isMobile} />
                     </div>
                 </div>
 
                 {isDownloadSort && (
-                    <div className="md:hidden flex justify-center h-10 w-full">
+                    <div className="md:hidden flex justify-center h-10 w-full mt-3">
                         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full justify-between shadow-sm">
                             {[
                                 { label: '7 Days', val: 7 },
@@ -577,27 +595,6 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                     key={opt.label}
                                     onClick={() => handleDownloadTimeframe(opt.val)}
                                     className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {isDownloadSort && (
-                    <div className="hidden md:flex lg:hidden justify-end h-10 w-full">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex items-center animate-in fade-in slide-in-from-right-4 duration-200 shadow-sm">
-                            {[
-                                { label: '7d', val: 7 },
-                                { label: '30d', val: 30 },
-                                { label: '90d', val: 90 },
-                                { label: 'All', val: 0 }
-                            ].map((opt) => (
-                                <button
-                                    key={opt.label}
-                                    onClick={() => handleDownloadTimeframe(opt.val)}
-                                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center h-full ${isDownloadPresetActive(opt.val) ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/[0.02]'}`}
                                 >
                                     {opt.label}
                                 </button>
