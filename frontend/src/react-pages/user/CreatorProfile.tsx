@@ -213,25 +213,29 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         projects: totalItems
     };
 
+    const isSelf = currentUser?.id === creator.id;
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
-            <ReportModal
-                isOpen={showReportModal}
-                onClose={() => setShowReportModal(false)}
-                targetId={creator.id}
-                targetType="USER"
-                targetTitle={creator.username}
-            />
+            {creator && (
+                <ReportModal
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    targetId={creator.id}
+                    targetType="USER"
+                    targetTitle={creator.username}
+                />
+            )}
 
             <ProfileLayout
                 user={creator}
                 stats={stats}
                 isFollowing={actualIsFollowing}
                 onToggleFollow={handleToggleFollow}
-                isSelf={currentUser?.id === creator.id}
+                isSelf={isSelf}
                 isLoggedIn={!!currentUser}
                 onBack={onBack}
-                onReport={() => setShowReportModal(true)}
+                onReport={!isSelf ? () => setShowReportModal(true) : undefined}
             >
                 <div className="w-full">
                     {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (

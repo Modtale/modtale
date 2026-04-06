@@ -493,9 +493,9 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
     const currentUserAvatar = resolveAvatar(currentUser?.avatarUrl);
 
     return (
-        <div ref={innerRef} id="comments" className="mt-10 p-6 sm:p-8 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm scroll-mt-24">
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-3">
-                <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-modtale-accent" aria-hidden="true" /> {comments.length} Comments
+        <div ref={innerRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
+                <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> {comments.length} Comments
             </h2>
 
             {commentsDisabled && (
@@ -505,7 +505,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
             )}
 
             {currentUser ? (
-                <div className="mb-8 flex gap-4">
+                <div className="mb-12 flex gap-4">
                     <form onSubmit={submit} className="flex-1 bg-slate-50 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-modtale-accent m-0 text-[11px] uppercase tracking-widest">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
@@ -528,7 +528,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                 required
                             />
                         </div>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end pt-1">
                             <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors text-xs shadow-md">
                                 <Send className="w-3.5 h-3.5" aria-hidden="true" /> {editingCommentId ? 'Update' : 'Post Comment'}
                             </button>
@@ -593,7 +593,7 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
                                             <MessageSquare className="w-4 h-4" aria-hidden="true"/> Edit Reply
                                         </button>
                                     )}
-                                    {currentUser && (
+                                    {currentUser && !isCommentOwner && (
                                         <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
                                             <Flag className="w-4 h-4" aria-hidden="true"/> Report
                                         </button>
@@ -675,6 +675,14 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
 
                                                 <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed prose-code:before:hidden prose-code:after:hidden break-words">
                                                     <MarkdownRenderer content={comment.developerReply.content} />
+                                                </div>
+
+                                                <div className="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                                                    {currentUser && currentUser.id !== replyId && (
+                                                        <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
+                                                            <Flag className="w-4 h-4" aria-hidden="true"/> Report
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -1254,9 +1262,11 @@ export const ModDetail: React.FC<{
                         <button onClick={handleShare} aria-label="Share" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-blue-500 hover:border-blue-500/30 transition-all" title="Share">
                             <Share2 className="w-5 h-5" aria-hidden="true" />
                         </button>
-                        <button onClick={() => setReportTarget({id: mod.id, type: 'PROJECT', title: mod.title})} aria-label="Report Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
-                            <Flag className="w-5 h-5" aria-hidden="true" />
-                        </button>
+                        {(!currentUser || currentUser.id !== mod.authorId) && (
+                            <button onClick={() => setReportTarget({id: mod.id, type: 'PROJECT', title: mod.title})} aria-label="Report Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
+                                <Flag className="w-5 h-5" aria-hidden="true" />
+                            </button>
+                        )}
                         {Boolean(canEdit) && (
                             <Link to={`${projectUrl}/edit`} aria-label="Edit Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all block" title="Edit Project">
                                 <Edit className="w-5 h-5" aria-hidden="true" />
