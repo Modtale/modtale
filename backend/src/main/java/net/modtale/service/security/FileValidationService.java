@@ -38,6 +38,7 @@ public class FileValidationService {
     private static final double MAX_COMPRESSION_RATIO = 100.0;
     private static final long MIN_RATIO_CHECK_SIZE = 100L * 1024 * 1024;
     private static final String PLUGIN_MANIFEST_PATH = "manifest.json";
+    private static final long MAX_IMAGE_FILE_SIZE = 5L * 1024 * 1024; // 5MB
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -185,20 +186,29 @@ public class FileValidationService {
 
     public void validateIcon(MultipartFile file) {
         if (file == null || file.isEmpty()) return;
-        validateImageStructure(file);
-        validateDimensions(file, 1.0, "Icon", "1:1");
+        validateImage(file, 1.0, "Icon", "1:1");
     }
 
     public void validateBanner(MultipartFile file) {
         if (file == null || file.isEmpty()) return;
-        validateImageStructure(file);
-        validateDimensions(file, 3.0, "Banner", "3:1");
+        validateImage(file, 3.0, "Banner", "3:1");
     }
 
-    private void validateImageStructure(MultipartFile file) {
+    public void validateGalleryImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) return;
+        validateImage(file, 16.0 / 9.0, "Gallery", "16:9");
+    }
+
+    private void validateImage(MultipartFile file, double targetRatio, String type, String ratioLabel) {
+        if (file.getSize() > MAX_IMAGE_FILE_SIZE) {
+            throw new IllegalArgumentException(type + " image size must not exceed 5MB.");
+        }
+
         try (InputStream is = file.getInputStream()) {
             byte[] header = new byte[12];
+            is.mark(13);
             if (is.read(header) < 12) throw new IllegalArgumentException("Invalid image file.");
+            is.reset();
 
             boolean isPng = Arrays.equals(Arrays.copyOfRange(header, 0, 4), PNG_HEADER);
             boolean isJpeg = header[0] == JPEG_HEADER[0] && header[1] == JPEG_HEADER[1] && header[2] == JPEG_HEADER[2];
@@ -209,22 +219,20 @@ public class FileValidationService {
             if (!isPng && !isJpeg && !isWebP) {
                 throw new IllegalArgumentException("Image must be a valid PNG, JPEG, or WebP file.");
             }
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to inspect image header.", e);
-        }
-    }
 
-    private void validateDimensions(MultipartFile file, double targetRatio, String type, String ratioLabel) {
-        try (InputStream is = file.getInputStream()) {
             BufferedImage image = ImageIO.read(is);
             if (image == null) throw new IllegalArgumentException("Could not decode image data.");
+
+            if (image.getWidth() > 3840 || image.getHeight() > 2160) {
+                throw new IllegalArgumentException(type + " image dimensions cannot exceed 4K (3840x2160).");
+            }
 
             double actualRatio = (double) image.getWidth() / image.getHeight();
             if (Math.abs(actualRatio - targetRatio) > 0.05) {
                 throw new IllegalArgumentException(String.format("%s image must have an aspect ratio of %s (Uploaded: %.2f).", type, ratioLabel, actualRatio));
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to validate image dimensions.", e);
+            throw new RuntimeException("Failed to validate image.", e);
         }
     }
 }

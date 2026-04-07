@@ -822,10 +822,13 @@ public class ModController {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
+            validationService.validateGalleryImage(file);
             String path = storageService.upload(file, "gallery");
             String url = storageService.getPublicUrl(path);
             modService.addGalleryImage(id, url);
             return ResponseEntity.ok(url);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) { return ResponseEntity.status(500).build(); }
     }
 
