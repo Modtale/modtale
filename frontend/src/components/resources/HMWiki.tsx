@@ -1,6 +1,7 @@
+// components/resources/HMWiki.tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, ExternalLink } from 'lucide-react';
+import { BookOpen, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '@/utils/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
@@ -62,46 +63,89 @@ export const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boole
     };
 };
 
-export const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate }) => {
-    const renderNodes = (pages: any[]) => {
+const WikiNode: React.FC<{
+    node: any;
+    projectUrl: string;
+    currentSlug?: string;
+    indexSlug?: string;
+    onNavigate?: (slug: string) => void;
+    depth: number;
+    isFirst: boolean;
+}> = ({ node, projectUrl, currentSlug, indexSlug, onNavigate, depth, isFirst }) => {
+    const hasChildren = node.children && node.children.length > 0;
+    const [isOpen, setIsOpen] = useState(true);
+
+    const isActive = !hasChildren && (currentSlug === node.slug || (!currentSlug && (indexSlug === node.slug || (isFirst && depth === 0))));
+
+    if (hasChildren) {
         return (
-            <ul className="space-y-1">
-                {pages.map(p => {
-                    const isCategory = !p.slug;
-                    const isActive = !isCategory && (currentSlug === p.slug || (!currentSlug && (indexSlug === p.slug || p.slug === tree[0]?.slug)));
-                    const className = `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-modtale-accent text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`;
-
-                    return (
-                        <li key={p.id}>
-                            {isCategory ? (
-                                <div className="px-3 pt-3 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                    {p.title}
-                                </div>
-                            ) : (
-                                onNavigate ? (
-                                    <button onClick={() => onNavigate(p.slug)} className={className}>{p.title}</button>
-                                ) : (
-                                    <Link to={`${projectUrl}/wiki/${p.slug}`} preventScrollReset={true} className={className}>{p.title}</Link>
-                                )
-                            )}
-
-                            {p.children && p.children.length > 0 && (
-                                <div className={isCategory ? "mt-1 space-y-1" : "pl-3 mt-1 border-l border-slate-200 dark:border-white/10 ml-3"}>
-                                    {renderNodes(p.children)}
-                                </div>
-                            )}
-                        </li>
-                    )
-                })}
-            </ul>
+            <li key={node.id}>
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors ${depth > 0 ? 'mt-2' : ''}`}
+                >
+                    <span className="truncate pr-2">{node.title}</span>
+                    {isOpen ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+                </button>
+                {isOpen && (
+                    <ul className="space-y-1 mt-1 ml-3 pl-3 border-l border-slate-200 dark:border-white/10">
+                        {node.children.map((child: any, idx: number) => (
+                            <WikiNode
+                                key={child.id}
+                                node={child}
+                                projectUrl={projectUrl}
+                                currentSlug={currentSlug}
+                                indexSlug={indexSlug}
+                                onNavigate={onNavigate}
+                                depth={depth + 1}
+                                isFirst={false}
+                            />
+                        ))}
+                    </ul>
+                )}
+            </li>
         );
-    };
+    }
 
+    const className = `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-modtale-accent text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`;
+
+    return (
+        <li key={node.id}>
+            {onNavigate ? (
+                <button onClick={() => {
+                    onNavigate(node.slug);
+                    const wikiContainer = document.getElementById('wiki-preview-container');
+                    if (wikiContainer) {
+                        const y = wikiContainer.getBoundingClientRect().top + window.scrollY - 120;
+                        window.scrollTo({ top: y, behavior: 'smooth' });
+                    }
+                }} className={className}>{node.title}</button>
+            ) : (
+                <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} className={className}>{node.title}</Link>
+            )}
+        </li>
+    );
+};
+
+export const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate }) => {
     if (!tree || tree.length === 0) return null;
 
     return (
         <SidebarSection title="Wiki Navigation" icon={BookOpen} defaultOpen={true}>
-            {renderNodes(tree)}
+            <ul className="space-y-1">
+                {tree.map((p, idx) => (
+                    <WikiNode
+                        key={p.id}
+                        node={p}
+                        projectUrl={projectUrl}
+                        currentSlug={currentSlug}
+                        indexSlug={indexSlug}
+                        onNavigate={onNavigate}
+                        depth={0}
+                        isFirst={idx === 0}
+                    />
+                ))}
+            </ul>
         </SidebarSection>
     );
 };
@@ -128,7 +172,7 @@ export const WikiContent: React.FC<{
     }
 
     return (
-        <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
+        <div id="wiki-preview-container" className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
             {wikiData.content?.content ? (
                 <>
                     <h1 className="text-4xl font-black mb-6">{wikiData.content.title || wikiData.mod.name}</h1>
