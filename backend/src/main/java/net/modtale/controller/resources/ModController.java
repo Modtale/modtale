@@ -326,6 +326,106 @@ public class ModController {
         }
     }
 
+    @GetMapping("/projects/{id}/versions/{version}/download-bundle-url")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_DOWNLOAD', authentication)")
+    public ResponseEntity<?> getDownloadBundleUrl(@PathVariable String id, @PathVariable String version) {
+        try {
+            Mod mod = modService.getModById(id);
+            if (mod == null) return ResponseEntity.notFound().build();
+
+            if ("DRAFT".equals(mod.getStatus()) || "PENDING".equals(mod.getStatus())) {
+                User user = userService.getCurrentUser();
+                if (!isAdminOrSuper(user)) {
+                    if (user == null || !modService.hasProjectPermission(mod, user, "VERSION_DOWNLOAD")) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                    }
+                }
+            }
+
+            ModVersion targetVersion = mod.getVersions().stream()
+                    .filter(v -> v.getVersionNumber().equalsIgnoreCase(version))
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetVersion == null) return ResponseEntity.notFound().build();
+
+            String token = downloadTokenService.generateToken(id, version);
+            String downloadUrl = "/download-bundle/" + token;
+
+            return ResponseEntity.ok(Map.of(
+                    "downloadUrl", downloadUrl,
+                    "expiresIn", 300
+            ));
+        } catch (Exception e) {
+            logger.error("Error generating download bundle URL", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/download-bundle/{token}")
+    public ResponseEntity<Resource> downloadBundleWithToken(@PathVariable String token, HttpServletRequest request) {
+        try {
+            DownloadTokenService.DownloadToken downloadToken = downloadTokenService.validateAndConsume(token);
+
+            if (downloadToken == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(null);
+            }
+
+            String id = downloadToken.getProjectId();
+            String version = downloadToken.getVersion();
+
+            Mod mod = modService.getModById(id);
+            if (mod == null) return ResponseEntity.notFound().build();
+
+            boolean isApi = false;
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+            if (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) {
+                isApi = true;
+            } else {
+                String referer = request.getHeader("Referer");
+                if (referer == null || !referer.startsWith(frontendUrl)) {
+                    isApi = true;
+                }
+            }
+
+            String clientIp = getClientIp(request);
+
+            ModVersion targetVersion = mod.getVersions().stream()
+                    .filter(v -> v.getVersionNumber().equalsIgnoreCase(version))
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetVersion == null) return ResponseEntity.notFound().build();
+
+            // Track main mod download
+            modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
+            analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
+
+            // Track dependency downloads
+            if (targetVersion.getDependencies() != null) {
+                for (ModDependency dep : targetVersion.getDependencies()) {
+                    modService.incrementDownloadCount(dep.getModId());
+                    analyticsService.logDownload(dep.getModId(), null, null, isApi, clientIp);
+                }
+            }
+
+            byte[] zipData = modService.generateBundleZip(mod, targetVersion);
+            ByteArrayResource resource = new ByteArrayResource(zipData);
+            String zipFilename = mod.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-" + targetVersion.getVersionNumber() + "-bundle.zip";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFilename + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(resource);
+
+        } catch (Exception e) {
+            logger.error("Error processing bundle download", e);
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping("/projects")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
     public ResponseEntity<Page<ModDTO>> getProjects(

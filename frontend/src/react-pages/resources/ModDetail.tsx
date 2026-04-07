@@ -943,11 +943,11 @@ export const ModDetail: React.FC<{
             setPendingDownloadVer({ url, ver: ver || '', deps });
             setShowDownloadModal(false);
         } else {
-            executeDownload(url, ver);
+            executeDownload(url, ver, false);
         }
     }, [mod?.classification]);
 
-    const executeDownload = async (fileUrl: string, ver?: string) => {
+    const executeDownload = async (fileUrl: string, ver?: string, asBundle: boolean = false) => {
         try {
             if (!ver) {
                 const targetUrl = `${API_BASE_URL}/files/download/${encodeURI(fileUrl)}`;
@@ -966,7 +966,11 @@ export const ModDetail: React.FC<{
                 return;
             }
 
-            const response = await api.get(`/projects/${mod?.id}/versions/${ver}/download-url`);
+            const endpoint = asBundle
+                ? `/projects/${mod?.id}/versions/${ver}/download-bundle-url`
+                : `/projects/${mod?.id}/versions/${ver}/download-url`;
+
+            const response = await api.get(endpoint);
             const { downloadUrl } = response.data;
 
             window.open(`${API_BASE_URL}${downloadUrl}`, '_blank');
@@ -1076,7 +1080,7 @@ export const ModDetail: React.FC<{
                 <DependencyModal
                     dependencies={pendingDownloadVer.deps}
                     onClose={() => setPendingDownloadVer(null)}
-                    onConfirm={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver)}
+                    onConfirm={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, true)}
                 />
             )}
 
