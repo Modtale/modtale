@@ -15,6 +15,7 @@ import { LICENSES, GLOBAL_TAGS } from '../../../data/categories';
 import type { Classification } from '../../../data/categories';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
 import { createSlug } from '../../../utils/slug';
 import type { Mod, User, ProjectVersion, ProjectRole, ProjectMember } from '../../../types';
@@ -145,6 +146,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [editVersionData, setEditVersionData] = useState<VersionFormData | null>(null);
     const [isSavingVersion, setIsSavingVersion] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
+    const [galleryCropImage, setGalleryCropImage] = useState<string | null>(null);
 
     const [wikiPreviewSlug, setWikiPreviewSlug] = useState<string | undefined>();
     const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(modData?.hmWikiSlug, wikiPreviewSlug, activeTab === 'wiki' && modData?.hmWikiEnabled === true);
@@ -188,7 +190,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const isPublishable = publishRequirements.every(r => r.met);
     const metCount = publishRequirements.filter(r => r.met).length;
 
-    const isModalOpen = roleModalOpen || showSlugPrompt || showPublishConfirm || showCardPreview || editingVersion !== null || memberToRemove !== null;
+    const isModalOpen = roleModalOpen || showSlugPrompt || showPublishConfirm || showCardPreview || editingVersion !== null || memberToRemove !== null || galleryCropImage !== null;
 
     useEffect(() => {
         if (isModalOpen) {
@@ -501,8 +503,10 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     };
 
     const onGalleryDrop = useCallback((acceptedFiles: File[]) => {
-        if (acceptedFiles[0] && !readOnly) handleGalleryUpload(acceptedFiles[0]);
-    }, [readOnly, handleGalleryUpload]);
+        if (acceptedFiles[0] && !readOnly) {
+            setGalleryCropImage(URL.createObjectURL(acceptedFiles[0]));
+        }
+    }, [readOnly]);
 
     const { getRootProps: getGalleryRootProps, getInputProps: getGalleryInputProps, isDragActive: isGalleryDragActive } = useDropzone({
         onDrop: onGalleryDrop,
@@ -639,6 +643,19 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
     return (
         <div className="relative">
+            {galleryCropImage && createPortal(
+                <ImageCropperModal
+                    imageSrc={galleryCropImage}
+                    aspect={16 / 9}
+                    onCancel={() => setGalleryCropImage(null)}
+                    onCropComplete={(file) => {
+                        setGalleryCropImage(null);
+                        handleGalleryUpload(file);
+                    }}
+                />,
+                document.body
+            )}
+
             {modData?.status === 'PENDING' && (
                 <div className="bg-blue-500/10 border-b border-blue-500/20 backdrop-blur-sm sticky top-0 z-50">
                     <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-3 flex items-center justify-between">
