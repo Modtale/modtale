@@ -2003,6 +2003,75 @@ public class ModService {
         }
     }
 
+    public byte[] generateBundleZip(Mod mainMod, ModVersion mainVersion) throws IOException {
+        User user = userService.getCurrentUser();
+
+        // Share the same bucket limit logic as modpacks to prevent ZIP abuse
+        if (user != null) {
+            Bucket bucket = modpackGenBuckets.computeIfAbsent(user.getId() + "_bundle",
+                    k -> Bucket.builder()
+                            .addLimit(Bandwidth.classic(modpackGenLimitPerHour, Refill.greedy(modpackGenLimitPerHour, Duration.ofHours(1))))
+                            .build());
+
+            if (!bucket.tryConsume(1)) {
+                throw new IllegalStateException("Bundle generation limit reached. Please wait a while before trying again.");
+            }
+        }
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+
+            // Add main mod file to the root of the ZIP
+            if (mainVersion.getFileUrl() != null) {
+                try {
+                    byte[] mainData = storageService.download(mainVersion.getFileUrl());
+                    String originalFilename = mainVersion.getFileUrl().substring(mainVersion.getFileUrl().lastIndexOf('/') + 1);
+                    if (originalFilename.length() > 37 && originalFilename.charAt(36) == '-') {
+                        originalFilename = originalFilename.substring(37);
+                    }
+                    ZipEntry entry = new ZipEntry(originalFilename);
+                    zos.putNextEntry(entry);
+                    zos.write(mainData);
+                    zos.closeEntry();
+                } catch (Exception e) {
+                    logger.error("Failed to include main mod in bundle: " + mainMod.getId(), e);
+                }
+            }
+
+            // Add dependencies to a "dependencies/" subfolder
+            if (mainVersion.getDependencies() != null) {
+                for (ModDependency dep : mainVersion.getDependencies()) {
+                    Mod depMod = getRawModById(dep.getModId());
+                    if (depMod == null) continue;
+
+                    ModVersion depVer = depMod.getVersions().stream()
+                            .filter(v -> v.getVersionNumber().equals(dep.getVersionNumber()))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (depVer != null && depVer.getFileUrl() != null) {
+                        try {
+                            byte[] fileData = storageService.download(depVer.getFileUrl());
+                            String originalFilename = depVer.getFileUrl().substring(depVer.getFileUrl().lastIndexOf('/') + 1);
+                            if (originalFilename.length() > 37 && originalFilename.charAt(36) == '-') {
+                                originalFilename = originalFilename.substring(37);
+                            }
+
+                            ZipEntry entry = new ZipEntry("dependencies/" + originalFilename);
+                            zos.putNextEntry(entry);
+                            zos.write(fileData);
+                            zos.closeEntry();
+                        } catch (Exception e) {
+                            logger.error("Failed to include dependency in bundle: " + dep.getModId(), e);
+                        }
+                    }
+                }
+            }
+        }
+
+        return baos.toByteArray();
+    }
+
     public byte[] generateModpackZip(Mod pack, ModVersion version) throws IOException {
         User user = userService.getCurrentUser();
 
