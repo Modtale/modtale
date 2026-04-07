@@ -67,18 +67,26 @@ export const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlu
         return (
             <ul className="space-y-1">
                 {pages.map(p => {
-                    const isActive = currentSlug === p.slug || (!currentSlug && (indexSlug === p.slug || p.slug === tree[0]?.slug));
+                    const isCategory = !p.slug;
+                    const isActive = !isCategory && (currentSlug === p.slug || (!currentSlug && (indexSlug === p.slug || p.slug === tree[0]?.slug)));
                     const className = `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-modtale-accent text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`;
 
                     return (
                         <li key={p.id}>
-                            {onNavigate ? (
-                                <button onClick={() => onNavigate(p.slug)} className={className}>{p.title}</button>
+                            {isCategory ? (
+                                <div className="px-3 pt-3 pb-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    {p.title}
+                                </div>
                             ) : (
-                                <Link to={`${projectUrl}/wiki/${p.slug}`} className={className}>{p.title}</Link>
+                                onNavigate ? (
+                                    <button onClick={() => onNavigate(p.slug)} className={className}>{p.title}</button>
+                                ) : (
+                                    <Link to={`${projectUrl}/wiki/${p.slug}`} preventScrollReset={true} className={className}>{p.title}</Link>
+                                )
                             )}
+
                             {p.children && p.children.length > 0 && (
-                                <div className="pl-3 mt-1 border-l border-slate-200 dark:border-white/10 ml-3">
+                                <div className={isCategory ? "mt-1 space-y-1" : "pl-3 mt-1 border-l border-slate-200 dark:border-white/10 ml-3"}>
                                     {renderNodes(p.children)}
                                 </div>
                             )}
