@@ -729,8 +729,9 @@ public class ModService {
 
         if (mod.getVersions() != null) {
             mod.getVersions().forEach(v -> {
-                if (v.getReviewStatus() == ModVersion.ReviewStatus.PENDING) {
+                if (v.getReviewStatus() == ModVersion.ReviewStatus.PENDING || v.getReviewStatus() == ModVersion.ReviewStatus.SCHEDULED) {
                     v.setReviewStatus(ModVersion.ReviewStatus.APPROVED);
+                    v.setScheduledPublishDate(null);
                 }
             });
         }
@@ -1672,6 +1673,7 @@ public class ModService {
                     long delayMinutes = ThreadLocalRandom.current().nextLong(30, 1440);
                     LocalDateTime scheduledTime = LocalDateTime.now().plusMinutes(delayMinutes);
                     update.set("versions.$.scheduledPublishDate", scheduledTime.toString());
+                    update.set("versions.$.reviewStatus", ModVersion.ReviewStatus.SCHEDULED);
                     logger.info("Clean version {} for project {} scheduled for release at {}", versionId, modId, scheduledTime);
                 }
             } else {
@@ -1714,7 +1716,7 @@ public class ModService {
     @Scheduled(fixedDelayString = "${app.scheduler.release-check:900000}")
     public void processScheduledReleases() {
         Query query = new Query(Criteria.where("versions").elemMatch(
-                Criteria.where("reviewStatus").is("PENDING")
+                Criteria.where("reviewStatus").is("SCHEDULED")
                         .and("scheduledPublishDate").lte(LocalDateTime.now().toString())
         ));
 
@@ -1725,7 +1727,7 @@ public class ModService {
             List<String> releasedVersions = new ArrayList<>();
 
             for (ModVersion version : mod.getVersions()) {
-                if (version.getReviewStatus() == ModVersion.ReviewStatus.PENDING &&
+                if (version.getReviewStatus() == ModVersion.ReviewStatus.SCHEDULED &&
                         version.getScheduledPublishDate() != null &&
                         LocalDateTime.parse(version.getScheduledPublishDate()).isBefore(LocalDateTime.now())) {
 

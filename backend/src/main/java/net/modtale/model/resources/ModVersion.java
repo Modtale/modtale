@@ -22,7 +22,7 @@ public class ModVersion {
     private String scheduledPublishDate;
 
     public enum Channel { RELEASE, BETA, ALPHA }
-    public enum ReviewStatus { PENDING, APPROVED, REJECTED }
+    public enum ReviewStatus { PENDING, SCHEDULED, APPROVED, REJECTED }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
