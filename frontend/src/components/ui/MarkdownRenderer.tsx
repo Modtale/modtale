@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { darcula } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Check, Copy } from 'lucide-react';
+import mermaid from 'mermaid';
 
 const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
     const [copied, setCopied] = useState(false);
@@ -15,6 +16,10 @@ const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
     if (isBlock) {
         const lang = match ? match[1] : 'text';
         const content = String(children).replace(/\n$/, '');
+
+        if (lang === 'mermaid') {
+            return <MermaidChart chart={content} />;
+        }
 
         const handleCopy = () => {
             navigator.clipboard.writeText(content);
@@ -66,6 +71,45 @@ const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
         >
             {children}
         </code>
+    );
+};
+
+const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
+    const [svg, setSvg] = useState<string>('');
+    const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+
+    useEffect(() => {
+        const isDark = document.documentElement.classList.contains('dark');
+
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: isDark ? 'dark' : 'default',
+            securityLevel: 'loose',
+            fontFamily: 'inherit'
+        });
+
+        const renderChart = async () => {
+            try {
+                const { svg: renderedSvg } = await mermaid.render(id, chart);
+                setSvg(renderedSvg);
+            } catch (e) {
+                console.error('Mermaid rendering failed', e);
+                setSvg(`<div class="text-red-500 bg-red-50 p-4 rounded-lg border border-red-200 text-sm">Failed to render diagram</div>`);
+            }
+        };
+
+        renderChart();
+    }, [chart, id]);
+
+    if (!svg) {
+        return <div className="animate-pulse h-32 bg-slate-100 dark:bg-slate-800 rounded-xl my-4"></div>;
+    }
+
+    return (
+        <div
+            className="my-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm overflow-x-auto flex justify-center mermaid-container"
+            dangerouslySetInnerHTML={{ __html: svg }}
+        />
     );
 };
 
