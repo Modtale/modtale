@@ -1440,7 +1440,24 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1 mb-2 block">Wiki Project Slug / ID</label>
                                             <input
                                                 value={modData.hmWikiSlug || ''}
-                                                onChange={e => { markDirty(); setModData(prev => prev ? {...prev, hmWikiSlug: e.target.value} : null); }}
+                                                onChange={e => {
+                                                    markDirty();
+                                                    const newSlug = e.target.value;
+                                                    setModData(prev => prev ? {...prev, hmWikiSlug: newSlug} : null);
+                                                    setMetaData(prev => {
+                                                        const currentWiki = prev.links.WIKI || '';
+                                                        if (!currentWiki || /^https?:\/\/wiki\.hytalemodding\.dev\/mods?\//i.test(currentWiki)) {
+                                                            return {
+                                                                ...prev,
+                                                                links: {
+                                                                    ...prev.links,
+                                                                    WIKI: newSlug ? `https://wiki.hytalemodding.dev/mod/${newSlug}` : ''
+                                                                }
+                                                            };
+                                                        }
+                                                        return prev;
+                                                    });
+                                                }}
                                                 disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
                                                 placeholder="e.g., my-awesome-mod"
                                                 className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all"
@@ -1572,7 +1589,25 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         <SidebarSection title="External Links" icon={LinkIcon} defaultOpen={false}>
                             <div className="space-y-3">
                                 {['WEBSITE', 'WIKI', 'ISSUE_TRACKER', 'DISCORD'].map(k => (
-                                    <ThemedInput key={k} disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} label={k.replace('_', ' ')} value={metaData.links[k] || ''} onChange={(e:any) => { markDirty(); setMetaData({...metaData, links: {...metaData.links, [k]: e.target.value}}); }} placeholder="https://..." />
+                                    <ThemedInput
+                                        key={k}
+                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        label={k.replace('_', ' ')}
+                                        value={metaData.links[k] || ''}
+                                        onChange={(e:any) => {
+                                            markDirty();
+                                            const newVal = e.target.value;
+                                            setMetaData(prev => ({...prev, links: {...prev.links, [k]: newVal}}));
+
+                                            if (k === 'WIKI') {
+                                                const match = newVal.match(/^https?:\/\/wiki\.hytalemodding\.dev\/mods?\/([a-zA-Z0-9-]+)\/?/i);
+                                                if (match) {
+                                                    setModData(prev => prev ? { ...prev, hmWikiEnabled: true, hmWikiSlug: match[1] } : null);
+                                                }
+                                            }
+                                        }}
+                                        placeholder="https://..."
+                                    />
                                 ))}
                             </div>
                         </SidebarSection>
