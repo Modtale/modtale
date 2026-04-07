@@ -6,7 +6,7 @@ import {
     GitMerge, Settings, Plus,
     ToggleLeft, ToggleRight, Trash2, FileText, LayoutTemplate,
     UserPlus, Scale, Check, Copy, Link2, Edit2, X, ChevronDown, RefreshCw, Loader2, CheckCircle2, Eye, Maximize2,
-    AlertCircle, Clock, Archive, Globe, EyeOff, Image as ImageIcon, MessageSquare, ExternalLink, Sparkles, Users, Palette, ShieldCheck, Shield
+    AlertCircle, Clock, Archive, Globe, EyeOff, Image as ImageIcon, MessageSquare, ExternalLink, Sparkles, Users, Palette, ShieldCheck, Shield, BookOpen
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -22,6 +22,7 @@ import { ModCard } from '../ModCard';
 import { VersionFields, ThemedInput } from './FormShared';
 import type { MetadataFormData, VersionFormData } from './FormShared';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
+import { useHMWiki, WikiSidebar, WikiContent } from '../HMWiki';
 
 const PERMISSION_GROUPS = [
     {
@@ -94,8 +95,8 @@ interface ProjectBuilderProps {
     isLoading: boolean;
     classification: Classification | string;
     currentUser: User | null;
-    activeTab: 'details' | 'files' | 'gallery' | 'team' | 'settings';
-    setActiveTab: (tab: 'details' | 'files' | 'gallery' | 'team' | 'settings') => void;
+    activeTab: 'details' | 'files' | 'gallery' | 'team' | 'settings' | 'wiki' | string;
+    setActiveTab: (tab: any) => void;
     onShowStatus: (type: 'success' | 'error', title: string, msg: string) => void;
     readOnly?: boolean;
 }
@@ -144,6 +145,9 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
     const [editVersionData, setEditVersionData] = useState<VersionFormData | null>(null);
     const [isSavingVersion, setIsSavingVersion] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
+
+    const [wikiPreviewSlug, setWikiPreviewSlug] = useState<string | undefined>();
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(modData?.hmWikiSlug, wikiPreviewSlug, activeTab === 'wiki' && modData?.hmWikiEnabled === true);
 
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
@@ -621,6 +625,18 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         }
     };
 
+    const availableTabs = [
+        {id: 'details', icon: FileText, label: 'Details'},
+        {id: 'files', icon: UploadCloud, label: `Files (${modData?.versions?.length||0})`},
+        {id: 'gallery', icon: ImageIcon, label: `Gallery (${modData?.galleryImages?.length||0})`},
+        {id: 'team', icon: Users, label: `Team (${(modData?.teamMembers?.length||0) + 1})`},
+        {id: 'settings', icon: Settings, label: 'Settings'}
+    ];
+
+    if (modData?.hmWikiEnabled) {
+        availableTabs.push({id: 'wiki', icon: BookOpen, label: 'Wiki Preview'});
+    }
+
     return (
         <div className="relative">
             {modData?.status === 'PENDING' && (
@@ -954,7 +970,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 }
                 tabs={
                     <div className="flex items-center gap-1">
-                        {[{id: 'details', icon: FileText, label: 'Details'}, {id: 'files', icon: UploadCloud, label: `Files (${modData?.versions?.length||0})`}, {id: 'gallery', icon: ImageIcon, label: `Gallery (${modData?.galleryImages?.length||0})`}, {id: 'team', icon: Users, label: `Team (${(modData?.teamMembers?.length||0) + 1})`}, {id: 'settings', icon: Settings, label: 'Settings'}].map(t => (
+                        {availableTabs.map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                                 <t.icon className="w-4 h-4"/> {t.label}
                             </button>
@@ -980,6 +996,15 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         )}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === 'wiki' && (
+                            <div className="h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-200 dark:border-white/5">
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2"><BookOpen className="w-3 h-3"/> Wiki Preview</h3>
+                                </div>
+                                <WikiContent wikiLoading={wikiLoading} wikiError={wikiError} wikiData={wikiData} wikiPageSlug={wikiPreviewSlug} mod={modData} />
                             </div>
                         )}
 
@@ -1478,6 +1503,9 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                 }
                 sidebarContent={
                     <>
+                        {activeTab === 'wiki' && wikiData && !wikiLoading && !wikiError && (
+                            <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} />
+                        )}
                         <SidebarSection title="Card Preview" icon={Eye}>
                             <div className="w-full max-w-[340px] mx-auto relative group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm" onClick={() => setShowCardPreview(true)}>
                                 <div className="pointer-events-none select-none">
