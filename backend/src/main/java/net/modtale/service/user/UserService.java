@@ -378,6 +378,13 @@ public class UserService {
         user.setGitlabRefreshToken(null);
 
         userRepository.save(user);
+
+        if (user.getAccountType() == User.AccountType.ORGANIZATION) {
+            analyticsService.logDeletedOrg(user.getId());
+        } else {
+            analyticsService.logDeletedUser(user.getId());
+        }
+
         logger.info("Soft deleted user account: " + user.getUsername() + " (" + userId + ")");
     }
 
@@ -386,6 +393,13 @@ public class UserService {
         if (!user.isDeleted()) return;
         user.setDeletedAt(null);
         userRepository.save(user);
+
+        if (user.getAccountType() == User.AccountType.ORGANIZATION) {
+            analyticsService.logNewOrg(user.getId());
+        } else {
+            analyticsService.logNewUser(user.getId());
+        }
+
         logger.info("Recovered user account: " + user.getUsername() + " (" + userId + ")");
     }
 

@@ -51,6 +51,9 @@ public class AnalyticsService {
     private final ConcurrentLinkedQueue<String> newProjectBuffer = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<String> newUserBuffer = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<String> newOrgBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> deletedProjectBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> deletedUserBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> deletedOrgBuffer = new ConcurrentLinkedQueue<>();
 
     private final Cache<String, Boolean> debounceCache = Caffeine.newBuilder()
             .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -410,17 +413,29 @@ public class AnalyticsService {
         newProjectBuffer.add(projectId);
     }
 
+    public void logDeletedProject(String projectId) {
+        deletedProjectBuffer.add(projectId);
+    }
+
     public void logNewUser(String userId) {
         newUserBuffer.add(userId);
+    }
+
+    public void logDeletedUser(String userId) {
+        deletedUserBuffer.add(userId);
     }
 
     public void logNewOrg(String orgId) {
         newOrgBuffer.add(orgId);
     }
 
+    public void logDeletedOrg(String orgId) {
+        deletedOrgBuffer.add(orgId);
+    }
+
     @Scheduled(fixedRate = 10000)
     public void flushAnalyticsBuffer() {
-        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty() && newUserBuffer.isEmpty() && newOrgBuffer.isEmpty()) return;
+        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty() && newUserBuffer.isEmpty() && newOrgBuffer.isEmpty() && deletedProjectBuffer.isEmpty() && deletedUserBuffer.isEmpty() && deletedOrgBuffer.isEmpty()) return;
 
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
@@ -539,54 +554,51 @@ public class AnalyticsService {
             }
         }
 
-        int newProjectCount = 0;
-        while(newProjectBuffer.poll() != null) {
-            newProjectCount++;
-        }
+        int netProjectCount = 0;
+        while(newProjectBuffer.poll() != null) netProjectCount++;
+        while(deletedProjectBuffer.poll() != null) netProjectCount--;
 
-        if (newProjectCount > 0) {
+        if (netProjectCount != 0) {
             try {
                 Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
                 Update pu = new Update()
-                        .inc("newProjects", newProjectCount)
-                        .inc("days." + day + ".n", newProjectCount);
+                        .inc("newProjects", netProjectCount)
+                        .inc("days." + day + ".n", netProjectCount);
                 mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
             } catch (Exception e) {
-                logger.error("Failed to flush new project stats", e);
+                logger.error("Failed to flush net project stats", e);
             }
         }
 
-        int newUserCount = 0;
-        while(newUserBuffer.poll() != null) {
-            newUserCount++;
-        }
+        int netUserCount = 0;
+        while(newUserBuffer.poll() != null) netUserCount++;
+        while(deletedUserBuffer.poll() != null) netUserCount--;
 
-        if (newUserCount > 0) {
+        if (netUserCount != 0) {
             try {
                 Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
                 Update pu = new Update()
-                        .inc("newUsers", newUserCount)
-                        .inc("days." + day + ".u", newUserCount);
+                        .inc("newUsers", netUserCount)
+                        .inc("days." + day + ".u", netUserCount);
                 mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
             } catch (Exception e) {
-                logger.error("Failed to flush new user stats", e);
+                logger.error("Failed to flush net user stats", e);
             }
         }
 
-        int newOrgCount = 0;
-        while(newOrgBuffer.poll() != null) {
-            newOrgCount++;
-        }
+        int netOrgCount = 0;
+        while(newOrgBuffer.poll() != null) netOrgCount++;
+        while(deletedOrgBuffer.poll() != null) netOrgCount--;
 
-        if (newOrgCount > 0) {
+        if (netOrgCount != 0) {
             try {
                 Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
                 Update pu = new Update()
-                        .inc("newOrgs", newOrgCount)
-                        .inc("days." + day + ".o", newOrgCount);
+                        .inc("newOrgs", netOrgCount)
+                        .inc("days." + day + ".o", netOrgCount);
                 mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
             } catch (Exception e) {
-                logger.error("Failed to flush new org stats", e);
+                logger.error("Failed to flush net org stats", e);
             }
         }
     }
