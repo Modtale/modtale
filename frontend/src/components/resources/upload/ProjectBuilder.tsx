@@ -878,12 +878,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             {showCardPreview && createPortal(
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowCardPreview(false)}>
                     <div className="relative w-full max-w-[380px] flex flex-col items-center" onClick={e => e.stopPropagation()}>
-                        <button
-                            onClick={() => setShowCardPreview(false)}
-                            className="absolute -top-16 md:-top-20 right-0 md:-right-8 text-white/50 hover:text-white transition-colors z-20 p-2"
-                        >
-                            <X className="w-8 h-8" />
-                        </button>
                         <div
                             className="cursor-default pointer-events-none select-none shadow-2xl w-full rounded-2xl overflow-hidden scale-110 sm:scale-125 md:scale-150 transform-gpu origin-center bg-white dark:bg-modtale-card"
                             onClickCapture={(e) => { e.preventDefault(); e.stopPropagation(); }}
