@@ -147,22 +147,38 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
     const isPlugin = classification === 'PLUGIN';
     const isModpack = classification === 'MODPACK';
+    const hasTitle = metaData.title && metaData.title.trim().length > 0;
     const hasTags = metaData.tags.length > 0;
-    const hasSummary = metaData.summary && metaData.summary.length >= 10;
+    const hasSummary = metaData.summary && metaData.summary.length >= 10 && metaData.summary.length <= 250;
+    const hasValidDescription = !metaData.description || metaData.description.length <= 50000;
     const hasVersion = (modData?.versions?.length || 0) > 0;
 
     const hasLicense = isModpack || (!!metaData.license && (!isCustomLicense || !!metaData.links.LICENSE));
+    const hasValidSlug = !metaData.slug || !slugError;
 
     const publishRequirements = [
-        { label: 'Short Summary (10+ chars)', met: hasSummary },
-        { label: 'At least one Tag', met: hasTags },
-        { label: 'At least one Version uploaded', met: hasVersion },
-        { label: 'License selected', met: hasLicense },
-        { label: 'All changes saved', met: !isDirty }
+        { label: 'Project Title', met: !!hasTitle },
+        { label: 'Short Summary (10-250 chars)', met: !!hasSummary },
+        { label: 'At least one Tag', met: hasTags }
     ];
+
+    if (!isModpack) {
+        publishRequirements.push({ label: 'At least one Version uploaded', met: hasVersion });
+    }
+
+    publishRequirements.push({ label: 'License selected', met: hasLicense });
+    publishRequirements.push({ label: 'All changes saved', met: !isDirty });
+
+    if (!hasValidDescription) {
+        publishRequirements.push({ label: 'Description under 50k chars', met: hasValidDescription });
+    }
 
     if (metaData.repositoryUrl) {
         publishRequirements.push({ label: 'Valid Repository URL', met: repoValid });
+    }
+
+    if (metaData.slug) {
+        publishRequirements.push({ label: 'Valid URL Slug', met: hasValidSlug });
     }
 
     const isPublishable = publishRequirements.every(r => r.met);
