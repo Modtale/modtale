@@ -481,7 +481,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
             {results.length > 0 && !disabled && (
                 <div className="max-h-56 overflow-y-auto custom-scrollbar bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-lg divide-y divide-slate-100 dark:divide-white/5">
                     {results.map(mod => (
-                        <button key={mod.id} onClick={() => setSelectedModForVersion(mod)} className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex justify-between items-center text-sm transition-colors group">
+                        <button key={mod.id} onClick={(e) => { e.preventDefault(); setSelectedModForVersion(mod); }} className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex justify-between items-center text-sm transition-colors group">
                             <div className="flex items-center gap-3">
                                 <img src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded-md bg-slate-200 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
                                 <div>
@@ -527,11 +527,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                                     </div>
                                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                         {!isModpack && (
-                                            <button disabled={disabled} onClick={() => toggleOptionalExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${isOpt ? 'border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400'} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
+                                            <button type="button" disabled={disabled} onClick={() => toggleOptionalExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${isOpt ? 'border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400'} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
                                                 {isOpt ? 'Optional' : 'Required'}
                                             </button>
                                         )}
-                                        <button disabled={disabled} onClick={() => removeDep(idx)} className={`text-slate-400 p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}><X className="w-4 h-4" /></button>
+                                        <button type="button" disabled={disabled} onClick={() => removeDep(idx)} className={`text-slate-400 p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}><X className="w-4 h-4" /></button>
                                     </div>
                                 </div>
                             );
