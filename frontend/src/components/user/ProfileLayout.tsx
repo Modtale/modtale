@@ -62,9 +62,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const displayTitle = user.username;
     const linkedAccounts = (user.connectedAccounts || []).filter(a => a.visible);
 
-    const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto";
+    const containerClasses = isEditing
+        ? "w-full px-6"
+        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto";
+
+    const glassCardMargin = isEditing ? "-mt-8 md:-mt-16" : "-mt-2 md:-mt-32";
+    const avatarMargin = isEditing ? "md:-mt-12" : "md:-mt-24";
 
     useEffect(() => {
+        if (isEditing) return;
         let ticking = false;
         const handleScroll = () => {
             if (!ticking) {
@@ -79,7 +85,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         window.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll();
         return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [isEditing]);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
@@ -191,7 +197,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const Avatar = ({ className, forceSizeClass }: { className?: string, forceSizeClass?: string }) => (
         <div className={`relative group ${className}`}>
-            <div className={`w-full h-full ${forceSizeClass || ''} rounded-3xl border-[6px] md:border-[8px] border-white dark:border-slate-800 shadow-xl overflow-hidden bg-transparent relative z-20 backdrop-blur-md transition-colors`}>
+            <div className={`w-full h-full ${forceSizeClass || ''} rounded-3xl border-[6px] md:border-[8px] border-white dark:border-slate-800 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative z-20 backdrop-blur-md transition-colors`}>
                 {resolvedAvatar ? (
                     <OptimizedImage
                         src={resolvedAvatar}
@@ -217,7 +223,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         </div>
     );
 
-    const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
+    const parallaxOffset = isEditing ? 0 : 500 * (1 - Math.exp(-scrollY / 600));
 
     return (
         <div className={`relative z-0 overflow-x-hidden ${isEditing ? '' : 'mb-6 md:mb-16'}`}>
@@ -225,10 +231,10 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
 
             <div
-                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] bg-slate-800 z-0 will-change-transform ${isEditing ? 'md:rounded-3xl' : 'md:rounded-b-3xl'}`}
+                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] bg-slate-800 z-0 will-change-transform overflow-hidden ${isEditing ? 'rounded-2xl md:rounded-3xl' : 'md:rounded-b-3xl'}`}
                 style={{ transform: `translateY(${parallaxOffset}px)` }}
             >
-                <div className="absolute inset-0 z-0 overflow-hidden">
+                <div className="absolute inset-0 z-0">
                     {resolvedBanner ? (
                         <OptimizedImage
                             src={resolvedBanner}
@@ -251,7 +257,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                     <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                         resolvedBanner
                             ? "absolute top-6 right-6 z-30 bg-white/80 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 text-slate-900 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/20 backdrop-blur-md shadow-sm hover:scale-105"
-                            : "absolute inset-x-6 top-6 bottom-0 z-30 flex flex-col items-center justify-center rounded-t-3xl border-2 border-b-0 border-dashed border-slate-400/50 dark:border-white/20 hover:border-slate-500/60 dark:hover:border-white/40 bg-slate-100/50 dark:bg-white/5 hover:bg-slate-200/50 dark:hover:bg-white/10 group/banner backdrop-blur-sm pb-4 md:pb-28"
+                            : "absolute inset-x-6 top-6 bottom-0 z-30 flex flex-col items-center justify-center rounded-t-3xl border-2 border-b-0 border-dashed border-slate-400/50 dark:border-white/20 hover:border-slate-500/60 dark:hover:border-white/40 bg-slate-100/50 dark:bg-white/5 hover:bg-slate-200/50 dark:hover:bg-white/10 group/banner backdrop-blur-sm pb-4 md:pb-16"
                     }`}>
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'banner')} disabled={uploadingBanner} />
                         {resolvedBanner ? (
@@ -278,7 +284,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             <div className="w-full aspect-[3/1] pointer-events-none relative z-0" />
 
             {onBack && (
-                <div className={`absolute top-0 left-0 right-0 z-40 mx-auto w-full ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
+                <div className={`absolute top-0 left-0 right-0 z-40 w-full ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
                     <div className="pt-6 pointer-events-auto w-fit">
                         <button onClick={onBack} className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group">
                             <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover:-translate-x-1 transition-transform" />
@@ -289,12 +295,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             )}
 
             {/* GLASS CARD */}
-            <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300 -mt-2 md:-mt-32`}>
-                <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl md:px-10 md:pb-6 flex flex-col md:flex-row gap-4 md:gap-10 items-start transition-colors ${
-                    isEditing ? 'md:pt-6' : 'md:pt-10'
+            <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300 ${glassCardMargin}`}>
+                <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl p-6 md:px-10 md:pb-6 flex flex-col md:flex-row gap-4 md:gap-10 items-start transition-colors ${
+                    isEditing ? 'md:pt-8' : 'md:pt-10'
                 }`}>
 
-                    <div className="hidden md:block flex-shrink-0 self-start relative z-20 md:-mt-24">
+                    <div className={`hidden md:block flex-shrink-0 self-start relative z-20 ${avatarMargin}`}>
                         <Avatar className="w-48 h-48" />
                     </div>
 
@@ -309,35 +315,44 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                 <div className="w-full flex-1 min-w-0">
                                     <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
-                                            <div className="flex gap-1.5 flex-wrap items-center">
-                                                {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
-                                                {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
+                                            {headerInput ? headerInput : (
+                                                <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
+                                            )}
 
-                                                <div className="md:hidden flex items-center gap-1.5">
-                                                    {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} compact={true} />)}
+                                            {!isEditing && (
+                                                <div className="flex gap-1.5 flex-wrap items-center mt-1 md:mt-0">
+                                                    {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
+                                                    {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
+
+                                                    <div className="md:hidden flex items-center gap-1.5">
+                                                        {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} compact={true} />)}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                                 <div className={`items-center gap-2 relative z-20 ${isEditing ? 'flex mt-2 md:mt-0' : 'hidden md:flex mt-1'}`}>
-                                    {isSelf ? (
-                                        <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 backdrop-blur-md">
-                                            <Settings className="w-5 h-5" /> Manage Profile
-                                        </a>
-                                    ) : (
-                                        <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
-                                            {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
-                                        </button>
-                                    )}
-                                    <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
-                                        {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                                    </button>
-                                    {onReport && (
-                                        <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-600 hover:border-red-500/20 transition-all backdrop-blur-md" title="Report User">
-                                            <Flag className="w-5 h-5" />
-                                        </button>
+                                    {actionInput ? actionInput : (
+                                        <>
+                                            {isSelf ? (
+                                                <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 backdrop-blur-md">
+                                                    <Settings className="w-5 h-5" /> Manage Profile
+                                                </a>
+                                            ) : (
+                                                <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
+                                                    {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
+                                                </button>
+                                            )}
+                                            <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
+                                                {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                                            </button>
+                                            {onReport && (
+                                                <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-600 hover:border-red-500/20 transition-all backdrop-blur-md" title="Report User">
+                                                    <Flag className="w-5 h-5" />
+                                                </button>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -383,7 +398,9 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         )}
 
                         <div className="mb-4 md:mb-6 relative z-10">
-                            {user.bio && <p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p>}
+                            {bioInput ? bioInput : (
+                                user.bio && <p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p>
+                            )}
                         </div>
 
                         {!isEditing && stats && (
@@ -422,7 +439,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             </div>
 
             {children && (
-                <div className={`${containerClasses} transition-[max-width,padding] duration-300 mt-0 md:mt-16 relative z-10`}>
+                <div className={`${containerClasses} transition-[max-width,padding] duration-300 ${isEditing ? 'mt-8' : 'mt-0 md:mt-16'} relative z-10`}>
                     {children}
                 </div>
             )}
