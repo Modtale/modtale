@@ -227,6 +227,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
         const account = accounts.find(a => a.provider === provider);
         const isLinked = !!account;
         const canBeVisible = provider !== 'google';
+        const isLastAuthMethod = isLinked && accounts.length <= 1 && !(user as any).hasPassword;
 
         return (
             <div className={`flex flex-col justify-between p-4 rounded-2xl border transition-all h-full ${isLinked ? 'bg-white/80 dark:bg-slate-900/40 border-modtale-accent/40 shadow-md' : 'bg-slate-50/80 dark:bg-white/[0.02] border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`}>
@@ -264,8 +265,9 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                             )}
                             <button
                                 onClick={() => setShowUnlinkModal({ provider, label })}
-                                className="px-3 py-2 text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/50 rounded-lg transition-colors"
-                                title="Unlink Account"
+                                disabled={isLastAuthMethod}
+                                className={`px-3 py-2 rounded-lg transition-colors ${isLastAuthMethod ? 'text-slate-300 dark:text-slate-600 bg-slate-50 dark:bg-white/[0.02] cursor-not-allowed' : 'text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/50'}`}
+                                title={isLastAuthMethod ? "Cannot remove your only sign-in method. Set a password first." : "Unlink Account"}
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
