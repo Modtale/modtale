@@ -17,6 +17,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteConfirmUsername, setDeleteConfirmUsername] = useState('');
+    const [deleteUserReason, setDeleteUserReason] = useState('');
 
     const [bannedEmails, setBannedEmails] = useState<any[]>([]);
     const [banEmailInput, setBanEmailInput] = useState('');
@@ -90,8 +91,6 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         setLoading(true);
         try {
             await api.post('/admin/users/bans', { email: foundUser.email, reason: banUserReason || "Banned from user management" });
-
-            await api.delete(`/admin/users/${foundUser.username}`);
 
             setStatus({ type: 'success', title: 'User Banned', msg: `Email ${foundUser.email} banned and account deleted.` });
             setFoundUser(null);
@@ -211,12 +210,13 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
         if (!foundUser || deleteConfirmUsername !== foundUser.username) return;
         setLoading(true);
         try {
-            await api.delete(`/admin/users/${foundUser.username}`);
+            await api.delete(`/admin/users/${foundUser.username}`, { params: { reason: deleteUserReason } });
             setStatus({ type: 'success', title: 'User Deleted', msg: `User ${foundUser.username} has been permanently deleted.` });
             setFoundUser(null);
             setUsername('');
             setShowDeleteConfirm(false);
             setDeleteConfirmUsername('');
+            setDeleteUserReason('');
         } catch (e: any) {
             setStatus({ type: 'error', title: 'Delete Failed', msg: e.response?.data || 'Could not delete user.' });
         } finally {
@@ -359,6 +359,16 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-red-500">Danger Zone</h3>
                                 <p className="text-slate-500 mb-6">You are about to delete <strong>{foundUser.username}</strong>. This is irreversible. Type the username to confirm.</p>
 
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Reason</label>
+                                <input
+                                    type="text"
+                                    value={deleteUserReason}
+                                    onChange={e => setDeleteUserReason(e.target.value)}
+                                    placeholder="Explain why this account is being deleted..."
+                                    className="w-full p-3 mb-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium dark:text-white"
+                                />
+
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Confirm Username</label>
                                 <input
                                     type="text"
                                     value={deleteConfirmUsername}
@@ -374,7 +384,7 @@ export const UserManagement: React.FC<{ setStatus: (s: any) => void }> = ({ setS
                                     >Cancel</button>
                                     <button
                                         onClick={handleDeleteUser}
-                                        disabled={deleteConfirmUsername !== foundUser.username || loading}
+                                        disabled={deleteConfirmUsername !== foundUser.username || loading || !deleteUserReason}
                                         className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50"
                                     >Delete User</button>
                                 </div>
