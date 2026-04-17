@@ -183,6 +183,17 @@ public class ModService {
         return null;
     }
 
+    private String extractId(String slugOrId) {
+        if (slugOrId == null) return null;
+        if (slugOrId.length() >= 36) {
+            String possibleId = slugOrId.substring(slugOrId.length() - 36);
+            if (possibleId.matches("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")) {
+                return possibleId;
+            }
+        }
+        return slugOrId;
+    }
+
     public List<String> validateTags(List<String> tags) {
         if (tags == null || tags.isEmpty()) {
             throw new IllegalArgumentException("At least one tag is required.");
@@ -400,13 +411,17 @@ public class ModService {
     }
 
     public Mod getRawModById(String identifier) {
+        String extracted = extractId(identifier);
         Optional<Mod> direct = Optional.empty();
-        if (identifier != null) {
-            direct = modRepository.findById(identifier);
+
+        if (extracted != null) {
+            direct = modRepository.findById(extracted);
         }
+
         if (direct.isEmpty() && identifier != null) {
             direct = modRepository.findBySlug(identifier.toLowerCase());
         }
+
         return direct.orElse(null);
     }
 
@@ -423,10 +438,11 @@ public class ModService {
 
     @Cacheable(value = "projectDetails", key = "#identifier")
     public Mod getModById(String identifier) {
+        String extracted = extractId(identifier);
         Optional<Mod> direct = Optional.empty();
 
-        if (identifier != null) {
-            direct = modRepository.findById(identifier);
+        if (extracted != null) {
+            direct = modRepository.findById(extracted);
         }
 
         if (direct.isEmpty() && identifier != null) {

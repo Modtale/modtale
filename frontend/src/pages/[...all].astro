@@ -1,12 +1,12 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import App from '../App';
-import { extractId, getProjectUrl } from '../utils/slug';
+import { getProjectUrl } from '../utils/slug';
 import { isBotUserAgent } from '../utils/seo';
 import { DEFAULT_SEO, ROUTE_SEO, generateDynamicSEO } from '../data/seo-constants';
 import { generateProjectMeta } from '../utils/meta';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
-import {BACKEND_URL} from "@/utils/api.ts";
+import { BACKEND_URL } from "@/utils/api.ts";
 
 const { all } = Astro.params;
 const url = Astro.url;
@@ -17,7 +17,6 @@ const searchParams = url.searchParams;
 let title = DEFAULT_SEO.title;
 let description = DEFAULT_SEO.description;
 let keywords = DEFAULT_SEO.keywords;
-let image = "https://modtale.net/assets/favicon.svg";
 let jsonLd: any = undefined;
 let initialData: any = null;
 let ssrSuccessfullyCompleted = false;
@@ -50,9 +49,13 @@ if (cleanPath === '' || cleanPath === '/') {
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
-const id = extractId(all || '');
+const identifier = all ? all.split('/').pop() : '';
 
 const isProjectRoute = cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
+
+let image = (isProjectRoute && identifier)
+    ? `${BACKEND_URL}/api/v1/og/project/${identifier}.png`
+    : "https://modtale.net/assets/favicon.svg";
 
 let classification = null;
 let isHome = false;
@@ -199,9 +202,9 @@ if (classification) {
         } catch (e) {}
     }
 }
-else if (isBot && id && isProjectRoute) {
+else if (isBot && identifier && isProjectRoute) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${id}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${identifier}`);
 
         if (res.ok) {
             const modData = await res.json();
@@ -217,10 +220,6 @@ else if (isBot && id && isProjectRoute) {
             if (meta) {
                 title = meta.title;
                 description = meta.description;
-            }
-
-            if (modData.imageUrl) {
-                image = `${BACKEND_URL}/api/v1/og/project/${initialData.id}.png`;
             }
 
             const appSchema = {

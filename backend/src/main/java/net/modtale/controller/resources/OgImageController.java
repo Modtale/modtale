@@ -105,13 +105,13 @@ public class OgImageController {
         }
     }
 
-    @GetMapping(value = {"/project/{id}", "/project/{id}.png"})
+    @GetMapping(value = {"/project/{identifier}", "/project/{identifier}.png"})
     public ResponseEntity<ByteArrayResource> generateOgImage(
-            @PathVariable String id,
+            @PathVariable String identifier,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch
     ) {
         try {
-            Mod mod = modService.getModById(id);
+            Mod mod = modService.getModById(identifier);
             if (mod == null) return ResponseEntity.notFound().build();
 
             String versionKey = generateEtag(mod);
