@@ -4,6 +4,7 @@ import { Trash2, Plus, Copy, Key, Check, Shield, Info, ExternalLink, Github, Arr
 import { StatusModal } from '../ui/StatusModal.tsx';
 import { Link } from 'react-router-dom';
 import type { User, Mod } from '../../types.ts';
+import { PermissionSelector, ALL_PERMISSION_GROUPS, getPermissionLabel, TOTAL_PERMISSIONS } from '../ui/PermissionSelector.tsx';
 
 interface ApiKey {
     id: string;
@@ -14,84 +15,6 @@ interface ApiKey {
     createdAt: string;
     lastUsed: string | null;
 }
-
-const PERMISSION_GROUPS = [
-    {
-        group: 'Organization Settings',
-        permissions: [
-            { id: 'ORG_READ', label: 'Read Org' },
-            { id: 'ORG_EDIT_METADATA', label: 'Edit Profile' },
-            { id: 'ORG_EDIT_AVATAR', label: 'Edit Avatar' },
-            { id: 'ORG_EDIT_BANNER', label: 'Edit Banner' },
-            { id: 'ORG_DELETE', label: 'Delete Org' },
-            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
-            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
-            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
-            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
-            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Connections' }
-        ]
-    },
-    {
-        group: 'Project Management',
-        permissions: [
-            { id: 'PROJECT_READ', label: 'Read Projects' },
-            { id: 'PROJECT_CREATE', label: 'Create Projects' },
-            { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
-            { id: 'PROJECT_EDIT_ICON', label: 'Edit Icon' },
-            { id: 'PROJECT_EDIT_BANNER', label: 'Edit Banner' },
-            { id: 'PROJECT_DELETE', label: 'Delete Projects' }
-        ]
-    },
-    {
-        group: 'Versions & Releases',
-        permissions: [
-            { id: 'VERSION_READ', label: 'Read Versions' },
-            { id: 'VERSION_CREATE', label: 'Upload Versions' },
-            { id: 'VERSION_EDIT', label: 'Edit Versions' },
-            { id: 'VERSION_DELETE', label: 'Delete Versions' },
-            { id: 'VERSION_DOWNLOAD', label: 'Download Files' }
-        ]
-    },
-    {
-        group: 'Visibility & Publishing',
-        permissions: [
-            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
-            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
-            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Project' },
-            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Project' },
-            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
-        ]
-    },
-    {
-        group: 'Community & Media',
-        permissions: [
-            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
-            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
-            { id: 'COMMENT_DELETE', label: 'Delete Comments' },
-            { id: 'COMMENT_REPLY', label: 'Reply as Developer' }
-        ]
-    },
-    {
-        group: 'Team Management',
-        permissions: [
-            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
-            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' },
-            { id: 'PROJECT_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
-            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' },
-            { id: 'PROJECT_TRANSFER_RESOLVE', label: 'Resolve Transfer' }
-        ]
-    }
-];
-
-const TOTAL_PERMISSIONS = PERMISSION_GROUPS.reduce((acc, group) => acc + group.permissions.length, 0);
-
-const getPermissionLabel = (id: string) => {
-    for (const group of PERMISSION_GROUPS) {
-        const p = group.permissions.find(p => p.id === id);
-        if (p) return p.label;
-    }
-    return id;
-};
 
 const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ', 'NOTIFICATION_READ'];
 
@@ -235,35 +158,10 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
 
     const activePerms = contextPerms[activeTab] || [];
 
-    const togglePerm = (id: string) => {
-        setContextPerms(prev => {
-            const current = prev[activeTab] || [];
-            return {
-                ...prev,
-                [activeTab]: current.includes(id) ? current.filter(p => p !== id) : [...current, id]
-            };
-        });
-    };
-
-    const toggleAllInGroup = (groupPermissions: {id: string}[]) => {
-        const groupIds = groupPermissions.map(p => p.id);
-        const allSelected = groupIds.every(id => activePerms.includes(id));
-
-        setContextPerms(prev => {
-            const current = prev[activeTab] || [];
-            return {
-                ...prev,
-                [activeTab]: allSelected
-                    ? current.filter(id => !groupIds.includes(id))
-                    : Array.from(new Set([...current, ...groupIds]))
-            };
-        });
-    };
-
     const toggleAllPerms = () => {
         setContextPerms(prev => ({
             ...prev,
-            [activeTab]: activePerms.length === TOTAL_PERMISSIONS ? [] : PERMISSION_GROUPS.flatMap(g => g.permissions.map(p => p.id))
+            [activeTab]: activePerms.length === TOTAL_PERMISSIONS ? [] : ALL_PERMISSION_GROUPS.flatMap(g => g.permissions.map(p => p.id))
         }));
     };
 
@@ -448,35 +346,12 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
                                         </div>
                                     </div>
 
-                                    <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-4 custom-scrollbar bg-slate-100/50 dark:bg-black/20 rounded-2xl p-4">
-                                        {PERMISSION_GROUPS.map((group, idx) => (
-                                            <div key={idx} className="break-inside-avoid flex flex-col bg-white dark:bg-[#1a1f2e] rounded-xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
-                                                <div className="flex items-center justify-between bg-slate-50 dark:bg-white/5 px-3 py-2.5 border-b border-slate-200 dark:border-white/10">
-                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-widest">{group.group}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleAllInGroup(group.permissions)}
-                                                        className="text-[10px] text-modtale-accent hover:text-modtale-accentHover transition-colors font-bold uppercase tracking-wider"
-                                                    >
-                                                        Toggle
-                                                    </button>
-                                                </div>
-                                                <div className="p-2 space-y-0.5">
-                                                    {group.permissions.map(perm => (
-                                                        <label key={perm.id} className="flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors group/label border border-transparent hover:border-slate-100 dark:hover:border-white/5">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={activePerms.includes(perm.id)}
-                                                                onChange={() => togglePerm(perm.id)}
-                                                                className="w-4 h-4 shrink-0 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent focus:ring-offset-0 bg-white dark:bg-black/40 transition-all cursor-pointer"
-                                                            />
-                                                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover/label:text-slate-900 dark:group-hover/label:text-white transition-colors select-none">{perm.label}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <PermissionSelector
+                                        groups={ALL_PERMISSION_GROUPS}
+                                        selectedPermissions={activePerms}
+                                        onChange={(perms) => setContextPerms(prev => ({ ...prev, [activeTab]: perms }))}
+                                        variant="panel"
+                                    />
                                 </div>
 
                                 <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-white/10">

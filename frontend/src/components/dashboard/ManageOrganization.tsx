@@ -8,6 +8,7 @@ import { StatusModal } from '../ui/StatusModal.tsx';
 import { ImageCropperModal } from '../ui/ImageCropperModal.tsx';
 import { ProjectListItem } from '@/components/dashboard/manage-projects/ProjectListItem.tsx';
 import { TransferProjectModal } from '@/components/dashboard/manage-projects/TransferProjectModal.tsx';
+import { PermissionSelector, ALL_PERMISSION_GROUPS } from '../ui/PermissionSelector.tsx';
 
 const GitLabIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -20,74 +21,6 @@ const BlueskyIcon = ({ className }: { className?: string }) => (
         <path d="M123.121 33.664C188.241 83.564 263.357 167.332 284 200.793C304.643 167.332 379.759 83.564 444.879 33.664C497.868 -6.932 568 -22.108 568 46.54V218.456C568 243.66 550.05 266.304 525.669 271.936L429.574 294.116C408.665 298.944 397.697 323.76 411.39 340.948C447.869 386.724 513.799 432.892 531.867 447.668C564.128 474.056 544.721 526 502.981 526H463.317C433.09 526 404.931 513.292 386.324 490.308C363.393 461.98 322.99 401.7 284 345.244C245.01 401.7 204.607 461.98 181.676 490.308C163.069 513.292 134.91 526 104.683 526H65.019C23.279 526 3.872 474.056 36.133 447.668C54.201 432.892 120.131 386.724 156.61 340.948C170.303 323.76 159.335 298.944 138.426 294.116L42.331 271.936C17.95 266.304 0 243.66 0 218.456V46.54C0 -22.108 70.132 -6.932 123.121 33.664Z" transform="scale(0.85) translate(10, -20)"/>
     </svg>
 );
-
-const PERMISSION_GROUPS = [
-    {
-        group: 'Organization Settings',
-        permissions: [
-            { id: 'ORG_READ', label: 'Read Org' },
-            { id: 'ORG_EDIT_METADATA', label: 'Edit Profile' },
-            { id: 'ORG_EDIT_AVATAR', label: 'Edit Avatar' },
-            { id: 'ORG_EDIT_BANNER', label: 'Edit Banner' },
-            { id: 'ORG_DELETE', label: 'Delete Org' },
-            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
-            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
-            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
-            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
-            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Connections' }
-        ]
-    },
-    {
-        group: 'Project Management',
-        permissions: [
-            { id: 'PROJECT_READ', label: 'Read Projects' },
-            { id: 'PROJECT_CREATE', label: 'Create Projects' },
-            { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
-            { id: 'PROJECT_EDIT_ICON', label: 'Edit Icon' },
-            { id: 'PROJECT_EDIT_BANNER', label: 'Edit Banner' },
-            { id: 'PROJECT_DELETE', label: 'Delete Projects' }
-        ]
-    },
-    {
-        group: 'Versions & Releases',
-        permissions: [
-            { id: 'VERSION_READ', label: 'Read Versions' },
-            { id: 'VERSION_CREATE', label: 'Upload Versions' },
-            { id: 'VERSION_EDIT', label: 'Edit Versions' },
-            { id: 'VERSION_DELETE', label: 'Delete Versions' },
-            { id: 'VERSION_DOWNLOAD', label: 'Download Files' }
-        ]
-    },
-    {
-        group: 'Visibility & Publishing',
-        permissions: [
-            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
-            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
-            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Project' },
-            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Project' },
-            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
-        ]
-    },
-    {
-        group: 'Community & Media',
-        permissions: [
-            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
-            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
-            { id: 'COMMENT_DELETE', label: 'Delete Comments' },
-            { id: 'COMMENT_REPLY', label: 'Reply as Developer' }
-        ]
-    },
-    {
-        group: 'Team Management',
-        permissions: [
-            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
-            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' },
-            { id: 'PROJECT_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
-            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' },
-            { id: 'PROJECT_TRANSFER_RESOLVE', label: 'Resolve Transfer' }
-        ]
-    }
-];
 
 interface ManageOrganizationProps {
     user: User;
@@ -650,32 +583,12 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
                                     <div className="space-y-4">
                                         <h4 className="font-bold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-white/10 pb-2">Permissions</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {PERMISSION_GROUPS.map((group, idx) => (
-                                                <div key={idx} className="bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden self-start">
-                                                    <div className="bg-slate-100 dark:bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{group.group}</div>
-                                                    <div className="p-2 space-y-1">
-                                                        {group.permissions.map(perm => (
-                                                            <label key={perm.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer group/label border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-colors">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={(editingRole.permissions || []).includes(perm.id)}
-                                                                    onChange={(e) => {
-                                                                        const cur = editingRole.permissions || [];
-                                                                        setEditingRole({
-                                                                            ...editingRole,
-                                                                            permissions: e.target.checked ? [...cur, perm.id] : cur.filter(p => p !== perm.id)
-                                                                        });
-                                                                    }}
-                                                                    className="w-4 h-4 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent focus:ring-offset-0 bg-white dark:bg-black/40 cursor-pointer"
-                                                                />
-                                                                <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300 group-hover/label:text-slate-900 dark:group-hover/label:text-white transition-colors">{perm.label}</span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                        <PermissionSelector
+                                            groups={ALL_PERMISSION_GROUPS}
+                                            selectedPermissions={editingRole.permissions || []}
+                                            onChange={(perms) => setEditingRole({ ...editingRole, permissions: perms })}
+                                            variant="card"
+                                        />
                                     </div>
                                 </div>
 

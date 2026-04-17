@@ -24,53 +24,7 @@ import { VersionFields, ThemedInput } from './FormShared';
 import type { MetadataFormData, VersionFormData } from './FormShared';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { useHMWiki, WikiSidebar, WikiContent } from '../HMWiki';
-
-const PERMISSION_GROUPS = [
-    {
-        group: 'Project Management',
-        permissions: [
-            { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
-            { id: 'PROJECT_EDIT_ICON', label: 'Edit Icon' },
-            { id: 'PROJECT_EDIT_BANNER', label: 'Edit Banner' },
-            { id: 'PROJECT_DELETE', label: 'Delete Project' }
-        ]
-    },
-    {
-        group: 'Versions & Releases',
-        permissions: [
-            { id: 'VERSION_CREATE', label: 'Upload Versions' },
-            { id: 'VERSION_EDIT', label: 'Edit Versions' },
-            { id: 'VERSION_DELETE', label: 'Delete Versions' }
-        ]
-    },
-    {
-        group: 'Visibility & Publishing',
-        permissions: [
-            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
-            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
-            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Project' },
-            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Project' }
-        ]
-    },
-    {
-        group: 'Community & Media',
-        permissions: [
-            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
-            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
-            { id: 'COMMENT_DELETE', label: 'Delete Comments' },
-            { id: 'COMMENT_REPLY', label: 'Reply as Developer' }
-        ]
-    },
-    {
-        group: 'Team Management',
-        permissions: [
-            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
-            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' },
-            { id: 'PROJECT_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
-            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' }
-        ]
-    }
-];
+import { PermissionSelector, PROJECT_PERMISSION_GROUPS } from '../../ui/PermissionSelector.tsx';
 
 interface ProjectBuilderProps {
     modData: Mod | null;
@@ -479,7 +433,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;
         if (!slugRegex.test(val)) return "Must be 3-50 chars, lowercase alphanumeric, no start/end dash.";
         return null;
-    };
+    }
 
     const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         markDirty();
@@ -492,7 +446,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         if (classification === 'MODPACK') return 'modtale.net/modpack/';
         if (classification === 'SAVE') return 'modtale.net/world/';
         return 'modtale.net/mod/';
-    };
+    }
 
     const getProjectLink = () => {
         if (!modData?.id) return '#';
@@ -759,32 +713,12 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
 
                                 <div className="space-y-4">
                                     <h4 className="font-bold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-white/10 pb-2">Permissions</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {PERMISSION_GROUPS.map((group, idx) => (
-                                            <div key={idx} className="bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden self-start">
-                                                <div className="bg-slate-100 dark:bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{group.group}</div>
-                                                <div className="p-2 space-y-1">
-                                                    {group.permissions.map(perm => (
-                                                        <label key={perm.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer group/label border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-colors">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={(editingRole.permissions || []).includes(perm.id)}
-                                                                onChange={(e) => {
-                                                                    const cur = editingRole.permissions || [];
-                                                                    setEditingRole({
-                                                                        ...editingRole,
-                                                                        permissions: e.target.checked ? [...cur, perm.id] : cur.filter(p => p !== perm.id)
-                                                                    });
-                                                                }}
-                                                                className="w-4 h-4 text-modtale-accent border-slate-300 dark:border-slate-600 rounded focus:ring-modtale-accent focus:ring-offset-0 bg-white dark:bg-black/40 cursor-pointer"
-                                                            />
-                                                            <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300 group-hover/label:text-slate-900 dark:group-hover/label:text-white transition-colors">{perm.label}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <PermissionSelector
+                                        groups={PROJECT_PERMISSION_GROUPS}
+                                        selectedPermissions={editingRole.permissions || []}
+                                        onChange={(perms) => setEditingRole({ ...editingRole, permissions: perms })}
+                                        variant="card"
+                                    />
                                 </div>
                             </div>
 
@@ -1248,7 +1182,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                                             className={`flex items-center justify-between min-w-[120px] bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors cursor-pointer shadow-sm`}
                                                                         >
                                                                             <div className="flex items-center gap-2 truncate">
-                                                                                {role && <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
+                                                                                {role && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
                                                                                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate">
                                                                                     {role ? role.name : 'Select Role'}
                                                                                 </span>
