@@ -450,6 +450,11 @@ public class UserService {
             User user = existingUser.get();
             if (!user.isDeleted()) {
                 deleteUser(user.getId());
+                try {
+                    emailService.sendAccountDeletionEmail(email, user.getUsername(), "Account associated with a banned email address. Reason: " + reason);
+                } catch (Exception e) {
+                    logger.error("Failed to send ban email to " + email, e);
+                }
                 logger.info("Automatically deleted user " + user.getUsername() + " due to email ban on " + email);
             }
         }

@@ -7,7 +7,9 @@ import net.modtale.model.admin.BannedEmail;
 import net.modtale.model.resources.Mod;
 import net.modtale.model.resources.ModVersion;
 import net.modtale.model.admin.AdminLog;
+import net.modtale.service.user.NotificationService;
 import net.modtale.service.user.UserService;
+import net.modtale.service.auth.EmailService;
 import net.modtale.service.resources.ModService;
 import net.modtale.service.resources.StorageService;
 import net.modtale.repository.user.UserRepository;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,6 +48,8 @@ public class AdminController {
     @Autowired private ModRepository modRepository;
     @Autowired private StorageService storageService;
     @Autowired private AdminLogRepository adminLogRepository;
+    @Autowired private NotificationService notificationService;
+    @Autowired private EmailService emailService;
 
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
@@ -188,7 +193,10 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{username}")
-    public ResponseEntity<?> deleteUser(@PathVariable String username) {
+    public ResponseEntity<?> deleteUser(
+            @PathVariable String username,
+            @RequestParam(required = false, defaultValue = "Administrative enforcement action.") String reason
+    ) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -202,7 +210,14 @@ public class AdminController {
 
         try {
             userService.deleteUser(target.getId());
-            logAction(currentUser.getId(), "DELETE_USER", target.getId(), "USER", "Username: " + target.getUsername());
+            try {
+                if (target.getEmail() != null && !target.getEmail().isEmpty()) {
+                    emailService.sendAccountDeletionEmail(target.getEmail(), target.getUsername(), reason);
+                }
+            } catch (Exception e) {
+                // Ignore email failure
+            }
+            logAction(currentUser.getId(), "DELETE_USER", target.getId(), "USER", "Username: " + target.getUsername() + ", Reason: " + reason);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -395,12 +410,27 @@ public class AdminController {
     }
 
     @DeleteMapping("/projects/{id}")
-    public ResponseEntity<?> deleteProject(@PathVariable String id) {
+    public ResponseEntity<?> deleteProject(
+            @PathVariable String id,
+            @RequestParam(required = false, defaultValue = "Administrative action.") String reason
+    ) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
+            Mod targetMod = modService.getRawModById(id);
+            if (targetMod == null) return ResponseEntity.notFound().build();
+
             modService.adminDeleteProject(id);
-            logAction(currentUser.getId(), "DELETE_PROJECT", id, "PROJECT", null);
+
+            notificationService.sendNotification(
+                    List.of(targetMod.getAuthorId()),
+                    "Project Deleted",
+                    "Your project '" + targetMod.getTitle() + "' was deleted by an administrator. Reason: " + reason,
+                    URI.create("/"),
+                    null
+            );
+
+            logAction(currentUser.getId(), "DELETE_PROJECT", id, "PROJECT", "Reason: " + reason);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -410,12 +440,27 @@ public class AdminController {
     }
 
     @DeleteMapping("/projects/{id}/hard")
-    public ResponseEntity<?> hardDeleteProject(@PathVariable String id) {
+    public ResponseEntity<?> hardDeleteProject(
+            @PathVariable String id,
+            @RequestParam(required = false, defaultValue = "Administrative action.") String reason
+    ) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
+            Mod targetMod = modService.getRawModById(id);
+            if (targetMod == null) return ResponseEntity.notFound().build();
+
             modService.adminHardDeleteProject(id);
-            logAction(currentUser.getId(), "HARD_DELETE_PROJECT", id, "PROJECT", null);
+
+            notificationService.sendNotification(
+                    List.of(targetMod.getAuthorId()),
+                    "Project Permanently Deleted",
+                    "Your project '" + targetMod.getTitle() + "' was permanently removed by an administrator. Reason: " + reason,
+                    URI.create("/"),
+                    null
+            );
+
+            logAction(currentUser.getId(), "HARD_DELETE_PROJECT", id, "PROJECT", "Reason: " + reason);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
@@ -438,12 +483,25 @@ public class AdminController {
     }
 
     @PostMapping("/projects/{id}/unlist")
-    public ResponseEntity<?> unlistProject(@PathVariable String id) {
+    public ResponseEntity<?> unlistProject(@PathVariable String id, @RequestBody(required = false) Map<String, String> body) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
+            String reason = (body != null && body.containsKey("reason")) ? body.get("reason") : "Administrative action.";
+            Mod targetMod = modService.getRawModById(id);
+            if (targetMod == null) return ResponseEntity.notFound().build();
+
             modService.adminUnlistProject(id);
-            logAction(currentUser.getId(), "UNLIST_PROJECT", id, "PROJECT", null);
+
+            notificationService.sendNotification(
+                    List.of(targetMod.getAuthorId()),
+                    "Project Unlisted",
+                    "Your project '" + targetMod.getTitle() + "' was unlisted from the public directory by an administrator. Reason: " + reason,
+                    URI.create("/mod/" + targetMod.getSlug()),
+                    null
+            );
+
+            logAction(currentUser.getId(), "UNLIST_PROJECT", id, "PROJECT", "Reason: " + reason);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
