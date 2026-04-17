@@ -1,15 +1,14 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
-import { extractId, getProjectUrl } from '../../utils/slug';
+import { getProjectUrl } from '../../utils/slug';
 import { isBotUserAgent } from '../../utils/seo';
 import { generateProjectMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
 import { generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../../utils/schema';
-import {BACKEND_URL} from "@/utils/api.ts";
+import { BACKEND_URL } from "@/utils/api.ts";
 
 const { slug } = Astro.params;
-const id = extractId(slug || '');
 const path = Astro.url.pathname;
 const cleanPath = path.replace(/\/$/, "");
 
@@ -19,13 +18,13 @@ const isBot = isBotUserAgent(userAgent);
 let modData = null;
 let title = ROUTE_SEO['/worlds'].title;
 let description = ROUTE_SEO['/worlds'].description;
-let image = undefined;
+let image = slug ? `${BACKEND_URL}/api/v1/og/project/${slug}.png` : "https://modtale.net/assets/favicon.svg";
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 
-if (isBot) {
+if (isBot && slug) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${id}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${slug}`);
         if (res.ok) {
             modData = await res.json();
             modData.classification = 'SAVE';

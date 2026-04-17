@@ -19,7 +19,7 @@ const {
     title = DEFAULT_SEO.title,
     description = DEFAULT_SEO.description,
     keywords = DEFAULT_SEO.keywords,
-    image: propImage,
+    image = "https://modtale.net/assets/favicon.svg",
     jsonLd,
     initialData,
     canonicalOverride,
@@ -29,16 +29,8 @@ const {
 
 const canonicalUrl = canonicalOverride || new URL(Astro.url.pathname, "https://modtale.net").toString();
 
-const defaultImage = "https://modtale.net/assets/og-default.png";
-let image = propImage || defaultImage;
-
-if (initialData && initialData.id && initialData.classification) {
-    const baseUrl = new URL(BACKEND_URL).origin;
-    image = `${baseUrl}/api/v1/og/project/${initialData.id}.png`;
-}
-
-const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
-const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
+const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
+const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
 ---
 
 <!DOCTYPE html>
