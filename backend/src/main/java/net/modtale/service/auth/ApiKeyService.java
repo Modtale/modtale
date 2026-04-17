@@ -85,7 +85,18 @@ public class ApiKeyService {
                     if (project != null) {
                         Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
 
-                        if (project.getAuthorId() != null && project.getAuthorId().equals(userId)) {
+                        boolean isAuthor = project.getAuthorId() != null && project.getAuthorId().equals(userId);
+                        boolean isOrgAdmin = false;
+
+                        if (!isAuthor && project.getAuthorId() != null) {
+                            User authorUser = userRepository.findById(project.getAuthorId()).orElse(null);
+                            if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
+                                isOrgAdmin = authorUser.getOrganizationMembers().stream()
+                                        .anyMatch(m -> m.getUserId().equals(userId) && "ADMIN".equals(m.getRole()));
+                            }
+                        }
+
+                        if (isAuthor || isOrgAdmin) {
                             allowedPerms.addAll(requestedPerms);
                         } else {
                             Mod.ProjectMember member = project.getTeamMembers() != null ?
@@ -126,17 +137,23 @@ public class ApiKeyService {
     }
 
     public void syncUserOrgPermissions(String userId, String orgId, Set<ApiKey.ApiPermission> allowedPerms) {
-        List<ApiKey> keys = apiKeyRepository.findByUserIdAndContext(userId, orgId);
+        List<ApiKey> keys = apiKeyRepository.findByUserId(userId);
 
         for (ApiKey key : keys) {
-            if (key.getContextPermissions() != null) {
-                Set<ApiKey.ApiPermission> currentPerms = key.getContextPermissions().get(orgId);
-                if (currentPerms != null) {
-                    boolean changed = currentPerms.retainAll(allowedPerms);
-                    if (changed) {
-                        if (currentPerms.isEmpty()) {
-                            key.getContextPermissions().remove(orgId);
-                        }
+            if (key.getContextPermissions() != null && key.getContextPermissions().containsKey(orgId)) {
+                Set<ApiKey.ApiPermission> currentPerms = new HashSet<>(key.getContextPermissions().get(orgId));
+                int originalSize = currentPerms.size();
+
+                if (allowedPerms == null || allowedPerms.isEmpty()) {
+                    key.getContextPermissions().remove(orgId);
+                    apiKeyRepository.save(key);
+                } else {
+                    currentPerms.retainAll(allowedPerms);
+                    if (currentPerms.isEmpty()) {
+                        key.getContextPermissions().remove(orgId);
+                        apiKeyRepository.save(key);
+                    } else if (currentPerms.size() != originalSize) {
+                        key.getContextPermissions().put(orgId, currentPerms);
                         apiKeyRepository.save(key);
                     }
                 }
@@ -154,20 +171,125 @@ public class ApiKeyService {
             }
         }
 
-        List<ApiKey> keys = apiKeyRepository.findByUserIdAndContext(userId, projectId);
+        List<ApiKey> keys = apiKeyRepository.findByUserId(userId);
         for (ApiKey key : keys) {
-            if (key.getContextPermissions() != null) {
-                Set<ApiKey.ApiPermission> currentPerms = key.getContextPermissions().get(projectId);
-                if (currentPerms != null) {
-                    boolean changed = currentPerms.retainAll(allowedPerms);
-                    if (changed) {
-                        if (currentPerms.isEmpty()) {
-                            key.getContextPermissions().remove(projectId);
-                        }
+            if (key.getContextPermissions() != null && key.getContextPermissions().containsKey(projectId)) {
+                Set<ApiKey.ApiPermission> currentPerms = new HashSet<>(key.getContextPermissions().get(projectId));
+                int originalSize = currentPerms.size();
+
+                if (allowedPerms.isEmpty()) {
+                    key.getContextPermissions().remove(projectId);
+                    apiKeyRepository.save(key);
+                } else {
+                    currentPerms.retainAll(allowedPerms);
+                    if (currentPerms.isEmpty()) {
+                        key.getContextPermissions().remove(projectId);
+                        apiKeyRepository.save(key);
+                    } else if (currentPerms.size() != originalSize) {
+                        key.getContextPermissions().put(projectId, currentPerms);
                         apiKeyRepository.save(key);
                     }
                 }
             }
+        }
+    }
+
+    private void cleanInvalidContexts(ApiKey apiKey) {
+        if (apiKey.getContextPermissions() == null) return;
+        boolean changed = false;
+
+        Iterator<Map.Entry<String, Set<ApiKey.ApiPermission>>> it = apiKey.getContextPermissions().entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Set<ApiKey.ApiPermission>> entry = it.next();
+            String contextId = entry.getKey();
+            if ("PERSONAL".equals(contextId)) continue;
+
+            Set<ApiKey.ApiPermission> currentKeyPerms = new HashSet<>(entry.getValue());
+            Set<ApiKey.ApiPermission> maxAllowedPerms = new HashSet<>();
+            boolean hasAccess = false;
+
+            User org = userRepository.findById(contextId).orElse(null);
+            if (org != null && !org.isDeleted() && org.getAccountType() == User.AccountType.ORGANIZATION) {
+                if (org.getOrganizationMembers() != null) {
+                    User.OrganizationMember membership = org.getOrganizationMembers().stream()
+                            .filter(m -> m.getUserId().equals(apiKey.getUserId()))
+                            .findFirst().orElse(null);
+
+                    if (membership != null) {
+                        hasAccess = true;
+                        if ("ADMIN".equals(membership.getRole())) {
+                            maxAllowedPerms.addAll(EnumSet.allOf(ApiKey.ApiPermission.class));
+                        } else if (membership.getRoleId() != null) {
+                            User.OrganizationRole role = org.getOrganizationRoles().stream()
+                                    .filter(r -> r.getId().equals(membership.getRoleId())).findFirst().orElse(null);
+                            if (role != null) {
+                                if (role.isOwner()) {
+                                    maxAllowedPerms.addAll(EnumSet.allOf(ApiKey.ApiPermission.class));
+                                } else if (role.getPermissions() != null) {
+                                    maxAllowedPerms.addAll(role.getPermissions());
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Mod mod = modRepository.findById(contextId).orElse(null);
+                if (mod != null && !"DELETED".equals(mod.getStatus())) {
+                    boolean isAuthor = mod.getAuthorId() != null && mod.getAuthorId().equals(apiKey.getUserId());
+                    boolean isOrgAdmin = false;
+
+                    if (!isAuthor && mod.getAuthorId() != null) {
+                        User authorUser = userRepository.findById(mod.getAuthorId()).orElse(null);
+                        if (authorUser != null && !authorUser.isDeleted() && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
+                            isOrgAdmin = authorUser.getOrganizationMembers() != null && authorUser.getOrganizationMembers().stream()
+                                    .anyMatch(m -> m.getUserId().equals(apiKey.getUserId()) && "ADMIN".equals(m.getRole()));
+                        }
+                    }
+
+                    if (isAuthor || isOrgAdmin) {
+                        hasAccess = true;
+                        maxAllowedPerms.addAll(EnumSet.allOf(ApiKey.ApiPermission.class));
+                    } else if (mod.getTeamMembers() != null) {
+                        Mod.ProjectMember member = mod.getTeamMembers().stream()
+                                .filter(m -> m.getUserId().equals(apiKey.getUserId()))
+                                .findFirst().orElse(null);
+
+                        if (member != null) {
+                            hasAccess = true;
+                            Mod.ProjectRole role = mod.getProjectRoles() != null && member.getRoleId() != null ?
+                                    mod.getProjectRoles().stream().filter(r -> r.getId().equals(member.getRoleId())).findFirst().orElse(null) : null;
+
+                            if (role != null && role.getPermissions() != null) {
+                                for (String p : role.getPermissions()) {
+                                    try {
+                                        maxAllowedPerms.add(ApiKey.ApiPermission.valueOf(p));
+                                    } catch (IllegalArgumentException ignored) {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!hasAccess) {
+                it.remove();
+                changed = true;
+            } else {
+                int originalSize = currentKeyPerms.size();
+                currentKeyPerms.retainAll(maxAllowedPerms);
+
+                if (currentKeyPerms.isEmpty()) {
+                    it.remove();
+                    changed = true;
+                } else if (currentKeyPerms.size() != originalSize) {
+                    entry.setValue(currentKeyPerms);
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) {
+            taskExecutor.execute(() -> apiKeyRepository.save(apiKey));
         }
     }
 
@@ -180,6 +302,7 @@ public class ApiKeyService {
         if (apiKey == null) return null;
 
         if (encoder.matches(plainKey, apiKey.getKeyHash())) {
+            cleanInvalidContexts(apiKey);
             updateLastUsed(apiKey);
             return apiKey;
         }
