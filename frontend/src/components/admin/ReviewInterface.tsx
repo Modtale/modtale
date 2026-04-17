@@ -33,7 +33,7 @@ const WIZARD_STEPS: WizardStep[] = [
         id: 'content',
         title: 'Content',
         icon: <FileText className="w-4 h-4" />,
-        rejectReasons: ["Inappropriate imagery", "Description contains spam/links", "Low quality assets", "Insufficient description", "Changelog missing or irrelevant"]
+        rejectReasons: ["Inappropriate imagery", "Description contains spam/links", "Low quality assets", "Insufficient description", "Changelog missing or irrelevant", "Gallery images violate guidelines"]
     },
     {
         id: 'files',
@@ -403,6 +403,30 @@ export const ReviewInterface: React.FC<ReviewInterfaceProps> = ({ reviewingProje
                                         <p className="text-lg text-slate-700 dark:text-slate-200 font-medium leading-relaxed mt-1">{mod.description}</p>
                                     </div>
                                 </div>
+
+                                {mod.galleryImages?.length > 0 && (
+                                    <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-4 flex items-center gap-2">
+                                            <ImageIcon className="w-3 h-3" /> Project Gallery
+                                        </label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                            {mod.galleryImages.map((url: string, index: number) => (
+                                                <a
+                                                    key={index}
+                                                    href={url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="aspect-video rounded-xl overflow-hidden bg-slate-200 dark:bg-white/10 border border-slate-200 dark:border-white/5 relative group block"
+                                                >
+                                                    <img src={url} className="w-full h-full object-cover" alt={`Gallery ${index + 1}`} />
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <ExternalLink className="w-6 h-6 text-white" />
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/5">
                                     <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Version Changelog</label>
