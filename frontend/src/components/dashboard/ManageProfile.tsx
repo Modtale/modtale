@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { api, BACKEND_URL } from '../../utils/api';
-import { Save, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link, AlertTriangle, Edit3, XCircle, Mail, ShieldCheck, ShieldAlert, Key, Smartphone, Lock } from 'lucide-react';
+import { Save, Github, Twitter, Check, Eye, EyeOff, Trash2, Plus, Link as LinkIcon, AlertTriangle, Edit3, XCircle, Mail, ShieldCheck, ShieldAlert, Key, Smartphone, Lock, ExternalLink } from 'lucide-react';
 import type { User as UserType } from '../../types';
 import { Spinner } from '../ui/Spinner';
 import { ErrorBanner } from '../ui/error/ErrorBanner.tsx';
@@ -310,6 +310,11 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
     const actionContent = (
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
             {isDirty && <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 animate-pulse uppercase tracking-widest bg-amber-100 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-3 py-1.5 rounded-lg whitespace-nowrap order-first md:order-none">Unsaved Changes</div>}
+
+            <Link to={`/creator/${user.username}`} target="_blank" className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm w-full md:w-auto whitespace-nowrap shadow-sm">
+                <ExternalLink className="w-4 h-4" /> View Profile
+            </Link>
+
             <button onClick={handleSave} disabled={saving} className="bg-modtale-accent text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-modtale-accent/20 active:scale-95 hover:bg-modtale-accentHover disabled:opacity-70 text-sm flex-shrink-0 w-full md:w-auto whitespace-nowrap">
                 {saving ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : (saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
                 {saved ? 'Saved' : 'Save Changes'}
@@ -516,7 +521,7 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
 
                     <div className="bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm backdrop-blur-xl">
                         <div className="flex items-center gap-4 mb-8 border-b border-slate-200 dark:border-white/10 pb-6">
-                            <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-2xl text-slate-500"><Link className="w-5 h-5 text-modtale-accent" /></div>
+                            <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-2xl text-slate-500"><LinkIcon className="w-5 h-5 text-modtale-accent" /></div>
                             <div>
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Connected Accounts</h3>
                                 <p className="text-xs text-slate-500 font-medium mt-1">Link accounts to sign in easily and display them on your profile.</p>
