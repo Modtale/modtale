@@ -146,13 +146,18 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
 
     const fetchProjects = async () => {
         try {
-            const res = await api.get('/projects/user/contributed?size=100');
-            const contribProjects = (res.data.content || []).filter((p: Mod) => p.authorId !== user.id && !p.isOwner);
-            setProjects(contribProjects);
+            const contribRes = await api.get('/projects/user/contributed?size=100');
+            const ownedRes = await api.get(`/creators/${user.id}/projects?size=100`);
+
+            const allProjects = [...(contribRes.data.content || []), ...(ownedRes.data.content || [])];
+
+            const uniqueProjects = Array.from(new Map(allProjects.map(p => [p.id, p])).values());
+
+            setProjects(uniqueProjects);
 
             setContextPerms(prev => {
                 const updated = { ...prev };
-                contribProjects.forEach((proj: Mod) => {
+                uniqueProjects.forEach((proj: Mod) => {
                     if (!updated[proj.id]) updated[proj.id] = [];
                 });
                 return updated;
