@@ -1063,6 +1063,18 @@ public class ModService {
             User oldOwner = getAuthorUser(mod);
             User newOwner = userRepository.findByUsernameIgnoreCase(mod.getPendingTransferTo()).orElseThrow();
 
+            if (oldOwner != null) {
+                if (oldOwner.getAccountType() == User.AccountType.ORGANIZATION) {
+                    if (oldOwner.getOrganizationMembers() != null) {
+                        for (User.OrganizationMember m : oldOwner.getOrganizationMembers()) {
+                            apiKeyService.syncUserProjectPermissions(m.getUserId(), mod.getId(), new ArrayList<>());
+                        }
+                    }
+                } else {
+                    apiKeyService.syncUserProjectPermissions(oldOwner.getId(), mod.getId(), new ArrayList<>());
+                }
+            }
+
             mod.setAuthorId(newOwner.getId());
             mod.setAuthor(null);
             mod.setPendingTransferTo(null);
