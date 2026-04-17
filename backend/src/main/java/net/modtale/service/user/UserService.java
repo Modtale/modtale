@@ -1151,9 +1151,19 @@ public class UserService {
 
     public void unlinkAccount(String userId, String provider) {
         User user = userRepository.findById(userId).orElseThrow();
-        if (user.getConnectedAccounts().size() <= 1 && user.getPassword() == null) {
-            throw new IllegalArgumentException("You must have at least one connected account or a password to sign in.");
+
+        boolean isTargetLinked = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider().equals(provider));
+
+        if (isTargetLinked && !user.getHasPassword()) {
+            long remainingAuthMethods = user.getConnectedAccounts().stream()
+                    .filter(a -> !a.getProvider().equals(provider))
+                    .count();
+
+            if (remainingAuthMethods == 0) {
+                throw new IllegalArgumentException("You must have at least one connected account or a password to sign in.");
+            }
         }
+
         boolean removed = user.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
         if (removed) {
             if ("github".equals(provider)) user.setGithubAccessToken(null);
