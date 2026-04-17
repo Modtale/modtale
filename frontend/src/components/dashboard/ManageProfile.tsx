@@ -533,7 +533,6 @@ export const ManageProfile: React.FC<ManageProfileProps> = ({ user, onUpdate }) 
                     </div>
 
                     <div className="border border-red-200 dark:border-red-900/30 bg-red-50/60 dark:bg-red-900/10 p-6 md:p-8 rounded-[2rem] backdrop-blur-xl shadow-sm relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 w-2 h-full bg-red-500"></div>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pl-2">
                             <div>
                                 <div className="flex items-center gap-3 mb-2">
