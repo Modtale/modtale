@@ -185,13 +185,19 @@ public class ModService {
 
     private String extractId(String slugOrId) {
         if (slugOrId == null) return null;
-        if (slugOrId.length() >= 36) {
-            String possibleId = slugOrId.substring(slugOrId.length() - 36);
+
+        String clean = slugOrId;
+        if (clean.toLowerCase().endsWith(".png")) clean = clean.substring(0, clean.length() - 4);
+        if (clean.toLowerCase().endsWith(".jpg")) clean = clean.substring(0, clean.length() - 4);
+        if (clean.toLowerCase().endsWith(".jpeg")) clean = clean.substring(0, clean.length() - 5);
+
+        if (clean.length() >= 36) {
+            String possibleId = clean.substring(clean.length() - 36);
             if (possibleId.matches("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")) {
                 return possibleId;
             }
         }
-        return slugOrId;
+        return clean;
     }
 
     public List<String> validateTags(List<String> tags) {
@@ -412,14 +418,12 @@ public class ModService {
 
     public Mod getRawModById(String identifier) {
         String extracted = extractId(identifier);
-        Optional<Mod> direct = Optional.empty();
+        if (extracted == null) return null;
 
-        if (extracted != null) {
-            direct = modRepository.findById(extracted);
-        }
+        Optional<Mod> direct = modRepository.findById(extracted);
 
-        if (direct.isEmpty() && identifier != null) {
-            direct = modRepository.findBySlug(identifier.toLowerCase());
+        if (direct.isEmpty()) {
+            direct = modRepository.findBySlug(extracted.toLowerCase());
         }
 
         return direct.orElse(null);
@@ -439,14 +443,12 @@ public class ModService {
     @Cacheable(value = "projectDetails", key = "#identifier")
     public Mod getModById(String identifier) {
         String extracted = extractId(identifier);
-        Optional<Mod> direct = Optional.empty();
+        if (extracted == null) return null;
 
-        if (extracted != null) {
-            direct = modRepository.findById(extracted);
-        }
+        Optional<Mod> direct = modRepository.findById(extracted);
 
-        if (direct.isEmpty() && identifier != null) {
-            direct = modRepository.findBySlug(identifier.toLowerCase());
+        if (direct.isEmpty()) {
+            direct = modRepository.findBySlug(extracted.toLowerCase());
         }
 
         if (direct.isPresent()) {
