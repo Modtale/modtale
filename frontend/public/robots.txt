@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /api/v1/og/
 Disallow: /api/
 Disallow: /oauth2/
 Disallow: /upload
