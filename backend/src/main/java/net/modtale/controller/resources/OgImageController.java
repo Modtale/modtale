@@ -105,7 +105,7 @@ public class OgImageController {
         }
     }
 
-    @GetMapping(value = {"/project/{identifier}", "/project/{identifier}.png"})
+    @GetMapping(value = {"/project/{identifier}", "/project/{identifier}.png", "/project/{identifier}.jpg"})
     public ResponseEntity<ByteArrayResource> generateOgImage(
             @PathVariable String identifier,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch
@@ -169,7 +169,7 @@ public class OgImageController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
                 .eTag(etag)
-                .contentType(MediaType.IMAGE_PNG)
+                .contentType(MediaType.IMAGE_JPEG)
                 .contentLength(bytes.length)
                 .body(new ByteArrayResource(bytes));
     }
@@ -202,7 +202,7 @@ public class OgImageController {
     private byte[] renderImage(Mod mod, BufferedImage banner, BufferedImage icon) throws Exception {
         int width = 1200;
         int height = 950;
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = image.createGraphics();
 
         setupRenderingHints(g2d);
@@ -223,7 +223,7 @@ public class OgImageController {
         g2d.dispose();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(image, "png", baos);
+        ImageIO.write(image, "jpeg", baos);
         return baos.toByteArray();
     }
 
