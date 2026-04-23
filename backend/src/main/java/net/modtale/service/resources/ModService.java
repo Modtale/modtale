@@ -854,6 +854,10 @@ public class ModService {
                 body.put("modLink", frontendUrl + getProjectLink(mod));
                 body.put("developerName", authorName != null ? authorName : "Unknown");
 
+                String apiUrl = frontendUrl.replaceFirst("^(https?://)", "$1api.");
+                String ogUrl = apiUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
+                body.put("ogImageLink", ogUrl);
+
                 HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
                 restTemplate.postForEntity(webhookUrl, request, String.class);
             } catch (Exception e) {
@@ -891,11 +895,15 @@ public class ModService {
                     embed.put("author", authorMap);
                 }
 
-                if (mod.getImageUrl() != null && !mod.getImageUrl().isEmpty()) {
-                    Map<String, String> thumbnailMap = new HashMap<>();
-                    thumbnailMap.put("url", mod.getImageUrl());
-                    embed.put("thumbnail", thumbnailMap);
-                }
+                Map<String, String> thumbnailMap = new HashMap<>();
+                thumbnailMap.put("url", frontendUrl + "/assets/favicon.png");
+                embed.put("thumbnail", thumbnailMap);
+
+                Map<String, String> imageMap = new HashMap<>();
+                String apiUrl = frontendUrl.replaceFirst("^(https?://)", "$1api.");
+                String ogUrl = apiUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
+                imageMap.put("url", ogUrl);
+                embed.put("image", imageMap);
 
                 Map<String, Object> body = new HashMap<>();
                 body.put("content", "A new project has been published!");
