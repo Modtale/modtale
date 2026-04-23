@@ -268,7 +268,7 @@ public class OgImageController {
         g2d.setClip(null);
 
         String type = mod.getClassification() != null ? mod.getClassification() : "PROJECT";
-        int badgeX = x + w - 118;
+        int badgeX = x + w - 30;
         int badgeY = y + 30;
         drawCategoryBadge(g2d, type, badgeX, badgeY);
 
