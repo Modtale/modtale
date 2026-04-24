@@ -187,10 +187,10 @@ const ProjectSidebar: React.FC<{
                             const path = mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`;
 
                             return (
-                                <button
+                                <Link
                                     key={idx}
-                                    onClick={() => navigate(path)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left"
+                                    to={path}
+                                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left block"
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden shrink-0">
                                         {iconUrl ? (
@@ -209,7 +209,7 @@ const ProjectSidebar: React.FC<{
                                             <span className="font-mono opacity-75">v{dep.versionNumber}</span>
                                         </div>
                                     </div>
-                                </button>
+                                </Link>
                             );
                         })}
                     </div>
