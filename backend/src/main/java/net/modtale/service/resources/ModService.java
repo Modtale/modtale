@@ -680,7 +680,19 @@ public class ModService {
         modRepository.save(mod);
         evictProjectDetails(mod);
 
-        triggerAdminDiscordWebhook(mod);
+        boolean isScanning = false;
+        if (mod.getVersions() != null) {
+            for (ModVersion v : mod.getVersions()) {
+                if (v.getScanResult() != null && "SCANNING".equals(v.getScanResult().getStatus())) {
+                    isScanning = true;
+                    break;
+                }
+            }
+        }
+
+        if (!isScanning) {
+            triggerAdminNewProjectWebhook(mod);
+        }
     }
 
     public void revertModToDraft(String id, String username) {
@@ -862,6 +874,10 @@ public class ModService {
                 body.put("modLink", frontendUrl + getProjectLink(mod));
                 body.put("developerName", authorName != null ? authorName : "Unknown");
 
+                String apiUrl = frontendUrl.replaceFirst("^(https?://)", "$1api.");
+                String ogUrl = apiUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
+                body.put("ogImageLink", ogUrl);
+
                 HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
                 restTemplate.postForEntity(webhookUrl, request, String.class);
             } catch (Exception e) {
@@ -908,7 +924,7 @@ public class ModService {
         });
     }
 
-    private void triggerAdminDiscordWebhook(Mod mod) {
+    private void triggerAdminNewProjectWebhook(Mod mod) {
         if (adminDiscordWebhookUrl == null || adminDiscordWebhookUrl.isEmpty()) {
             return;
         }
@@ -929,7 +945,7 @@ public class ModService {
                 embed.put("title", "New Project Submitted: " + mod.getTitle());
                 embed.put("url", frontendUrl + getProjectLink(mod));
                 embed.put("color", 16753920);
-                embed.put("description", "A new project requires verification.\n\n**Author:** " + (authorName != null ? authorName : "Unknown") + "\n**Classification:** " + mod.getClassification());
+                embed.put("description", "A new project has been submitted and is awaiting verification.\n\n**Author:** " + (authorName != null ? authorName : "Unknown") + "\n**Classification:** " + mod.getClassification());
 
                 Map<String, Object> body = new HashMap<>();
                 body.put("username", "Modtale Admin Bot");
@@ -943,6 +959,58 @@ public class ModService {
                 restTemplate.postForEntity(adminDiscordWebhookUrl, request, String.class);
             } catch (Exception e) {
                 logger.error("Failed to trigger Admin Discord webhook", e);
+            }
+        });
+    }
+
+    private void triggerAdminFlaggedVersionWebhook(Mod mod, ModVersion version, ScanResult scanResult) {
+        if (adminDiscordWebhookUrl == null || adminDiscordWebhookUrl.isEmpty()) {
+            return;
+        }
+
+        taskExecutor.execute(() -> {
+            try {
+                String authorName = mod.getAuthor();
+                if (authorName == null && mod.getAuthorId() != null) {
+                    User u = userRepository.findById(mod.getAuthorId()).orElse(null);
+                    if (u != null) authorName = u.getUsername();
+                }
+
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                Map<String, Object> embed = new HashMap<>();
+                embed.put("title", "Flagged Version: " + mod.getTitle());
+                embed.put("url", frontendUrl + getProjectLink(mod));
+                embed.put("color", 16711680); // Red
+
+                String issues = "";
+                if (scanResult != null && scanResult.getIssues() != null && !scanResult.getIssues().isEmpty()) {
+                    issues = "\n**Issues Detected:** " + scanResult.getIssues().size();
+                }
+
+                String vNum = version != null ? version.getVersionNumber() : "Unknown";
+                String sStatus = scanResult != null && scanResult.getStatus() != null ? scanResult.getStatus() : "FAILED";
+
+                embed.put("description", "**Author:** " + (authorName != null ? authorName : "Unknown") +
+                        "\n**Version:** " + vNum +
+                        "\n**Status:** " + sStatus +
+                        issues +
+                        "\n\n*This file requires immediate manual review.*");
+
+                Map<String, Object> body = new HashMap<>();
+                body.put("username", "Modtale Warden");
+                body.put("avatar_url", frontendUrl + "/assets/favicon.png");
+                body.put("content", "🚨 **Malicious or Flagged File Detected**");
+                body.put("embeds", List.of(embed));
+
+                logger.info("Triggering Admin Discord Webhook for flagged version {}", version != null ? version.getId() : "unknown");
+
+                HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+                restTemplate.postForEntity(adminDiscordWebhookUrl, request, String.class);
+            } catch (Exception e) {
+                logger.error("Failed to trigger Admin Discord webhook for flagged version", e);
             }
         });
     }
@@ -1761,12 +1829,25 @@ public class ModService {
             mongoTemplate.updateFirst(query, update, Mod.class);
             evictProjectDetails(mod);
 
-            if (approvedImmediately && "PUBLISHED".equals(mod.getStatus())) {
-                ModVersion ver = mod.getVersions().stream()
-                        .filter(v -> v.getId().equals(versionId))
-                        .findFirst()
-                        .orElse(null);
+            ModVersion ver = mod.getVersions().stream()
+                    .filter(v -> v.getId().equals(versionId))
+                    .findFirst()
+                    .orElse(null);
 
+            if (!"CLEAN".equals(scanResult.getStatus())) {
+                triggerAdminFlaggedVersionWebhook(mod, ver, scanResult);
+            }
+
+            if ("PENDING".equals(mod.getStatus())) {
+                boolean stillScanning = mod.getVersions().stream().anyMatch(v ->
+                        !v.getId().equals(versionId) && v.getScanResult() != null && "SCANNING".equals(v.getScanResult().getStatus())
+                );
+                if (!stillScanning) {
+                    triggerAdminNewProjectWebhook(mod);
+                }
+            }
+
+            if (approvedImmediately && "PUBLISHED".equals(mod.getStatus())) {
                 if (ver != null) {
                     notifyUpdates(mod, ver.getVersionNumber());
                     notifyDependents(mod, ver.getVersionNumber());
@@ -1785,6 +1866,21 @@ public class ModService {
 
             Mod mod = modRepository.findById(modId).orElse(null);
             evictProjectDetails(mod);
+
+            if (mod != null) {
+                ModVersion ver = mod.getVersions().stream()
+                        .filter(v -> v.getId().equals(versionId))
+                        .findFirst()
+                        .orElse(null);
+                triggerAdminFlaggedVersionWebhook(mod, ver, failed);
+
+                if ("PENDING".equals(mod.getStatus())) {
+                    boolean stillScanning = mod.getVersions().stream().anyMatch(v ->
+                            !v.getId().equals(versionId) && v.getScanResult() != null && "SCANNING".equals(v.getScanResult().getStatus())
+                    );
+                    if (!stillScanning) triggerAdminNewProjectWebhook(mod);
+                }
+            }
         }
     }
 
