@@ -2323,7 +2323,7 @@ public class ModService {
                                 originalFilename = originalFilename.substring(37);
                             }
 
-                            ZipEntry entry = new ZipEntry("dependencies/" + originalFilename);
+                            ZipEntry entry = new ZipEntry(originalFilename);
                             zos.putNextEntry(entry);
                             zos.write(fileData);
                             zos.closeEntry();

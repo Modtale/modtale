@@ -413,7 +413,7 @@ public class ModController {
 
             byte[] zipData = modService.generateBundleZip(mod, targetVersion);
             ByteArrayResource resource = new ByteArrayResource(zipData);
-            String zipFilename = mod.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-" + targetVersion.getVersionNumber() + "-bundle.zip";
+            String zipFilename = mod.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-UNZIP-ME.zip";
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFilename + "\"")
