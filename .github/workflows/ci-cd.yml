@@ -39,7 +39,7 @@ jobs:
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-            
+          
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-dev" >> $GITHUB_ENV
@@ -51,7 +51,7 @@ jobs:
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-            
+          
           else
             SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
@@ -82,6 +82,7 @@ jobs:
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
             "--allow-unauthenticated"
+            "--use-http2"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
             "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
             "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
