@@ -205,7 +205,7 @@ public class ModService {
 
     public List<String> validateTags(List<String> tags) {
         if (tags == null || tags.isEmpty()) {
-            throw new IllegalArgumentException("At least one tag is required.");
+            return new ArrayList<>();
         }
 
         List<String> normalized = new ArrayList<>();
