@@ -884,7 +884,7 @@ public class ModService {
                 Map<String, String> imageMap = new HashMap<>();
 
                 String cleanBackendUrl = backendUrl.endsWith("/") ? backendUrl.substring(0, backendUrl.length() - 1) : backendUrl;
-                String ogUrl = cleanBackendUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
+                String ogUrl = cleanBackendUrl + "/api/v1/og/project/" + mod.getId() + ".png";
 
                 imageMap.put("url", ogUrl);
                 embed.put("image", imageMap);
@@ -892,8 +892,6 @@ public class ModService {
                 Map<String, Object> body = new HashMap<>();
                 body.put("content", "A new project has been published!");
                 body.put("embeds", List.of(embed));
-
-                logger.info("Triggering Discord Webhook for project {}. Image URL: {}", mod.getId(), ogUrl);
 
                 HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
                 restTemplate.postForEntity(discordWebhookUrl, request, String.class);
