@@ -83,6 +83,7 @@ jobs:
             "--region" "$REGION"
             "--allow-unauthenticated"
             "--use-http2"
+            "--memory" "1Gi"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
             "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
             "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
@@ -95,6 +96,9 @@ jobs:
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
+            ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
+            ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
+            ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
           else
             ARGS+=("--update-secrets" "MONGODB_URI=MONGODB_URI:latest")
             ARGS+=("--update-secrets" "R2_ACCESS_KEY=R2_ACCESS_KEY:latest")
@@ -104,8 +108,6 @@ jobs:
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
             ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
             ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
-            ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
-            ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
             ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
