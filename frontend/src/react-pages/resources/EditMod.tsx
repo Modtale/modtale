@@ -151,7 +151,8 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             return true;
         } catch (e: any) {
             console.error(e);
-            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: e.response?.data?.message || "Failed to save changes."});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to save changes.");
+            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: errorMsg});
             return false;
         }
         finally { if(!silent) setIsLoading(false); }
@@ -176,9 +177,6 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
 
         setIsLoading(true);
         try {
-            const saved = await handleSaveMetadata(true);
-            if (!saved) return;
-
             const fd = new FormData();
             fd.append('versionNumber', versionData.versionNumber);
             fd.append('gameVersions', versionData.gameVersions[0]);
@@ -274,9 +272,14 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 }
             }
 
-            await handleSaveMetadata(true);
+            const saved = await handleSaveMetadata(false);
+            if (!saved) {
+                setIsLoading(false);
+                return;
+            }
+
             await api.post(`/projects/${currentProject.id}/submit`);
-            onShowStatus('success', 'Submitted', 'Project submitted for verification.');
+            setStatusModal({type:'success', title: 'Submitted', msg: 'Project submitted for verification.'});
             const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
         } catch (e: any) {
@@ -294,9 +297,9 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             await api.post(`/projects/${currentProject.id}/revert`);
             const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
-            onShowStatus('success', 'Reverted', 'Project reverted to draft.');
+            setStatusModal({type: 'success', title: 'Reverted', msg: 'Project reverted to draft.'});
         } catch(e: any) {
-            onShowStatus('error', 'Revert Failed', e.response?.data || "Failed to revert.");
+            setStatusModal({type: 'error', title: 'Revert Failed', msg: e.response?.data || "Failed to revert."});
         } finally {
             setIsLoading(false);
         }
@@ -310,9 +313,9 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             await api.post(`/projects/${currentProject.id}/archive`);
             const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
-            onShowStatus('success', 'Archived', 'Project is now archived.');
+            setStatusModal({type: 'success', title: 'Archived', msg: 'Project is now archived.'});
         } catch(e: any) {
-            onShowStatus('error', 'Archive Failed', e.response?.data || "Failed to archive.");
+            setStatusModal({type: 'error', title: 'Archive Failed', msg: e.response?.data || "Failed to archive."});
         } finally {
             setIsLoading(false);
         }
@@ -326,9 +329,9 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             await api.post(`/projects/${currentProject.id}/unlist`);
             const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
-            onShowStatus('success', 'Unlisted', 'Project is now unlisted.');
+            setStatusModal({type: 'success', title: 'Unlisted', msg: 'Project is now unlisted.'});
         } catch(e: any) {
-            onShowStatus('error', 'Unlist Failed', e.response?.data || "Failed to unlist.");
+            setStatusModal({type: 'error', title: 'Unlist Failed', msg: e.response?.data || "Failed to unlist."});
         } finally {
             setIsLoading(false);
         }
@@ -342,9 +345,9 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
             await api.post(`/projects/${currentProject.id}/publish`);
             const res = await api.get(`/projects/${currentProject.id}`);
             setProject(res.data);
-            onShowStatus('success', 'Restored', 'Project is now published.');
+            setStatusModal({type: 'success', title: 'Restored', msg: 'Project is now published.'});
         } catch(e: any) {
-            onShowStatus('error', 'Restore Failed', e.response?.data || "Failed to restore.");
+            setStatusModal({type: 'error', title: 'Restore Failed', msg: e.response?.data || "Failed to restore."});
         } finally {
             setIsLoading(false);
         }

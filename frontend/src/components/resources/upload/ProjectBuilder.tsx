@@ -52,7 +52,7 @@ interface ProjectBuilderProps {
     currentUser: User | null;
     activeTab: 'details' | 'files' | 'gallery' | 'team' | 'settings' | 'wiki' | string;
     setActiveTab: (tab: any) => void;
-    onShowStatus: (type: 'success' | 'error', title: string, msg: string) => void;
+    onShowStatus: (type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string) => void;
     readOnly?: boolean;
 }
 
