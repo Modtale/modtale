@@ -166,7 +166,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             });
             setStep(2);
         } catch (e: any) {
-            setError(e.response?.data || "Failed to create draft.");
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to create draft.");
+            setError(errorMsg);
         } finally {
             setIsLoading(false);
         }
@@ -209,7 +210,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             if(!silent) setStatusModal({type: 'success', title: 'Saved', msg: 'Draft saved successfully.'});
             return true;
         } catch (e: any) {
-            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: e.response?.data?.message || 'Failed to save draft.'});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || 'Failed to save draft.');
+            if(!silent) setStatusModal({type: 'error', title: 'Error', msg: errorMsg});
             return false;
         } finally {
             if(!silent) setIsLoading(false);
@@ -248,7 +250,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             setStatusModal({type: 'success', title: 'Success', msg: "Version uploaded successfully!"});
             setActiveTab('details');
         } catch(e: any) {
-            setStatusModal({type: 'error', title: 'Upload Failed', msg: e.response?.data || "Could not upload version."});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Could not upload version.");
+            setStatusModal({type: 'error', title: 'Upload Failed', msg: errorMsg});
         } finally {
             setIsLoading(false);
         }
@@ -267,7 +270,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             setModData(res.data);
             setVersionToDelete(null);
         } catch(e: any) {
-            setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete version."});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to delete version.");
+            setStatusModal({type: 'error', title: 'Error', msg: errorMsg});
         } finally {
             setIsLoading(false);
             setVersionToDelete(null);
@@ -285,7 +289,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             setModData(res.data);
             setStatusModal({type: 'success', title: 'Uploaded', msg: 'Image added to gallery.'});
         } catch (e: any) {
-            setStatusModal({type: 'error', title: 'Error', msg: e.response?.data?.message || 'Upload failed.'});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Upload failed.");
+            setStatusModal({type: 'error', title: 'Error', msg: errorMsg});
         } finally { setIsLoading(false); }
     };
 
@@ -297,7 +302,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             const res = await api.get(`/projects/${draftId}`);
             setModData(res.data);
         } catch (e: any) {
-            setStatusModal({type: 'error', title: 'Error', msg: 'Failed to delete image.'});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to delete image.");
+            setStatusModal({type: 'error', title: 'Error', msg: errorMsg});
         } finally { setIsLoading(false); }
     };
 
@@ -328,7 +334,12 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 }
             }
 
-            await handleSaveMetadata(true);
+            const saved = await handleSaveMetadata(true);
+            if (!saved) {
+                setIsLoading(false);
+                return;
+            }
+
             await api.post(`/projects/${draftId}/submit`);
             onRefresh();
             setStatusModal({type:'success', title: 'Submitted', msg: 'Project submitted for verification.'});
@@ -336,7 +347,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
                 navigate('/dashboard/projects');
             }, 1500);
         } catch (e: any) {
-            setStatusModal({type:'error', title:'Submission Failed', msg: e.response?.data || "Failed to submit."});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to submit.");
+            setStatusModal({type:'error', title:'Submission Failed', msg: errorMsg});
         } finally {
             setIsLoading(false);
         }
@@ -349,7 +361,8 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             await api.delete(`/projects/${draftId}`);
             navigate('/');
         } catch(e: any) {
-            setStatusModal({type: 'error', title: 'Error', msg: "Failed to delete project."});
+            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to delete project.");
+            setStatusModal({type: 'error', title: 'Error', msg: errorMsg});
             setIsLoading(false);
         }
     };
