@@ -7,6 +7,7 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { api, API_BASE_URL } from '../../../utils/api';
 import { Link } from 'react-router-dom';
+import { createSlug } from '../../../utils/slug';
 
 let scrollLockCount = 0;
 
@@ -405,19 +406,31 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                                             <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 flex items-center justify-center shrink-0 shadow-sm transition-colors group-hover:border-blue-400" />
                                         )}
 
-                                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1">
+                                        <Link
+                                            to={`/mod/${createSlug(meta?.title || dep.modTitle || dep.modId, dep.modId)}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                            }}
+                                            className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1 hover:border-modtale-accent/50 hover:shadow-md transition-all"
+                                        >
                                             <img
                                                 src={getIconUrl(meta?.icon)}
                                                 alt=""
                                                 className="w-full h-full object-cover rounded-lg"
                                                 onError={(e) => e.currentTarget.src='/assets/favicon.svg'}
                                             />
-                                        </div>
+                                        </Link>
 
                                         <div className="min-w-0">
-                                            <div className="font-bold text-slate-900 dark:text-white truncate">
+                                            <Link
+                                                to={`/mod/${createSlug(meta?.title || dep.modTitle || dep.modId, dep.modId)}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                }}
+                                                className="font-bold text-slate-900 dark:text-white truncate hover:text-modtale-accent transition-colors block"
+                                            >
                                                 {meta?.title || dep.modTitle || dep.modId}
-                                            </div>
+                                            </Link>
                                             <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1 flex items-center gap-1.5">
                                                 <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
                                                 <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
