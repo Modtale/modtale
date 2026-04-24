@@ -82,6 +82,7 @@ jobs:
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
             "--allow-unauthenticated"
+            "--use-http2"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
             "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
             "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
