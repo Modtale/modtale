@@ -644,6 +644,7 @@ export const ModDetail: React.FC<{
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [pendingDownloadVer, setPendingDownloadVer] = useState<{url: string, ver: string, deps: any[]} | null>(null);
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
+    const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
 
     const isWikiRoute = location.pathname.includes('/wiki');
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
@@ -958,6 +959,8 @@ export const ModDetail: React.FC<{
                 }
                 setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
 
+                setLastDownloadWasBundle(false);
+
                 if (localStorage.getItem('hideInstallInstructions') !== 'true') {
                     setShowPostDownloadModal(true);
                 }
@@ -979,6 +982,8 @@ export const ModDetail: React.FC<{
                 onDownload(mod.id);
             }
             setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
+
+            setLastDownloadWasBundle(asBundle);
 
             if (localStorage.getItem('hideInstallInstructions') !== 'true') {
                 setShowPostDownloadModal(true);
@@ -1066,6 +1071,7 @@ export const ModDetail: React.FC<{
                 onClose={() => setShowPostDownloadModal(false)}
                 classification={mod.classification}
                 title={mod.title}
+                isBundle={lastDownloadWasBundle}
             />
 
             <ReportModal
