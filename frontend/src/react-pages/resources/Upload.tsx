@@ -65,9 +65,10 @@ export const Upload: React.FC<UploadProps> = ({ onNavigate, onRefresh, currentUs
             }
 
             api.get('/user/orgs').then(res => {
-                const adminOrgs = res.data.filter((o: User) =>
-                    o.organizationMembers?.some(m => m.userId === currentUser.id && m.role === 'ADMIN')
-                );
+                const adminOrgs = res.data.filter((o: User) => {
+                    const adminRole = o.organizationRoles?.find(r => r.name.toLowerCase() === 'admin' || r.isOwner);
+                    return adminRole && o.organizationMembers?.some(m => m.userId === currentUser.id && m.roleId === adminRole.id);
+                });
                 setMyOrgs(adminOrgs);
             }).catch(console.error);
         }

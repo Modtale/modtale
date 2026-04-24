@@ -67,15 +67,15 @@ export const EditMod: React.FC<EditModProps> = ({ currentUser }) => {
                 const myOrgs: User[] = orgsRes.data || [];
 
                 const isOwner = data.author.toLowerCase() === currentUser.username.toLowerCase();
+                const isTeamMember = data.teamMembers?.some(m => m.userId === currentUser.id);
 
-                const isContributor = data.contributors?.some(c => c.toLowerCase() === currentUser.username.toLowerCase());
+                const isOrgAdmin = myOrgs.some(org => {
+                    if (org.username.toLowerCase() !== data.author.toLowerCase()) return false;
+                    const adminRole = org.organizationRoles?.find(r => r.name.toLowerCase() === 'admin' || r.isOwner);
+                    return adminRole && org.organizationMembers?.some(m => m.userId === currentUser.id && m.roleId === adminRole.id);
+                });
 
-                const isOrgAdmin = myOrgs.some(org =>
-                    org.username.toLowerCase() === data.author.toLowerCase() &&
-                    org.organizationMembers?.some(m => m.userId === currentUser.id && m.role === 'ADMIN')
-                );
-
-                if (!isOwner && !isContributor && !isOrgAdmin) {
+                if (!isOwner && !isTeamMember && !isOrgAdmin) {
                     setStatusModal({type: 'error', title: 'Unauthorized', msg: "You do not have permission to edit this project."});
                     setLoading(false);
                     return;
