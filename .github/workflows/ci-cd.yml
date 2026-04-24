@@ -154,8 +154,8 @@ jobs:
             echo "FINAL_FRONTEND_URL=${{ env.FRONTEND_DOMAIN }}" >> $GITHUB_ENV
           fi
 
-      - name: Update Backend CORS
+      - name: Update Backend CORS and Self-Awareness
         run: |
           gcloud run services update ${{ env.BACKEND_SERVICE }} \
             --region $REGION \
-            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }}
+            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }},BACKEND_URL=$(cat backend/backend_url.txt)
