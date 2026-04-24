@@ -123,6 +123,9 @@ public class ModService {
     @Value("${app.discord-webhook.url}")
     private String discordWebhookUrl;
 
+    @Value("${app.admin-discord-webhook.url}")
+    private String adminDiscordWebhookUrl;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
@@ -676,6 +679,8 @@ public class ModService {
 
         modRepository.save(mod);
         evictProjectDetails(mod);
+
+        triggerAdminDiscordWebhook(mod);
     }
 
     public void revertModToDraft(String id, String username) {
@@ -882,10 +887,8 @@ public class ModService {
                 embed.put("color", 3447003);
 
                 Map<String, String> imageMap = new HashMap<>();
-
                 String cleanBackendUrl = backendUrl.endsWith("/") ? backendUrl.substring(0, backendUrl.length() - 1) : backendUrl;
                 String ogUrl = cleanBackendUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
-
                 imageMap.put("url", ogUrl);
                 embed.put("image", imageMap);
 
@@ -901,6 +904,45 @@ public class ModService {
                 restTemplate.postForEntity(discordWebhookUrl, request, String.class);
             } catch (Exception e) {
                 logger.error("Failed to trigger Discord webhook", e);
+            }
+        });
+    }
+
+    private void triggerAdminDiscordWebhook(Mod mod) {
+        if (adminDiscordWebhookUrl == null || adminDiscordWebhookUrl.isEmpty()) {
+            return;
+        }
+
+        taskExecutor.execute(() -> {
+            try {
+                String authorName = mod.getAuthor();
+                if (authorName == null && mod.getAuthorId() != null) {
+                    User u = userRepository.findById(mod.getAuthorId()).orElse(null);
+                    if (u != null) authorName = u.getUsername();
+                }
+
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                Map<String, Object> embed = new HashMap<>();
+                embed.put("title", "New Project Submitted: " + mod.getTitle());
+                embed.put("url", frontendUrl + getProjectLink(mod));
+                embed.put("color", 16753920);
+                embed.put("description", "A new project requires verification.\n\n**Author:** " + (authorName != null ? authorName : "Unknown") + "\n**Classification:** " + mod.getClassification());
+
+                Map<String, Object> body = new HashMap<>();
+                body.put("username", "Modtale Admin Bot");
+                body.put("avatar_url", frontendUrl + "/assets/favicon.png");
+                body.put("content", "⚠️ **Verification Required**");
+                body.put("embeds", List.of(embed));
+
+                logger.info("Triggering Admin Discord Webhook for pending project {}", mod.getId());
+
+                HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+                restTemplate.postForEntity(adminDiscordWebhookUrl, request, String.class);
+            } catch (Exception e) {
+                logger.error("Failed to trigger Admin Discord webhook", e);
             }
         });
     }
