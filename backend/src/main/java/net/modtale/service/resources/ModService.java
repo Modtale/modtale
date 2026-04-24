@@ -1250,7 +1250,14 @@ public class ModService {
             if (!isModpack) {
                 try {
                     MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                    byte[] encodedhash = digest.digest(file.getBytes());
+                    try (InputStream is = file.getInputStream()) {
+                        byte[] buffer = new byte[8192];
+                        int read;
+                        while ((read = is.read(buffer)) > 0) {
+                            digest.update(buffer, 0, read);
+                        }
+                    }
+                    byte[] encodedhash = digest.digest();
                     StringBuilder hexString = new StringBuilder(2 * encodedhash.length);
                     for (byte b : encodedhash) {
                         String hex = Integer.toHexString(0xff & b);
