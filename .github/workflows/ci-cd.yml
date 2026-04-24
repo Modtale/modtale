@@ -83,6 +83,7 @@ jobs:
             "--region" "$REGION"
             "--allow-unauthenticated"
             "--use-http2"
+            "--memory" "1Gi"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
             "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
             "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
