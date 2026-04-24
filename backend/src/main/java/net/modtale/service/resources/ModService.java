@@ -857,9 +857,6 @@ public class ModService {
                 body.put("modLink", frontendUrl + getProjectLink(mod));
                 body.put("developerName", authorName != null ? authorName : "Unknown");
 
-                String ogUrl = backendUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
-                body.put("ogImageLink", ogUrl);
-
                 HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
                 restTemplate.postForEntity(webhookUrl, request, String.class);
             } catch (Exception e) {
@@ -875,12 +872,6 @@ public class ModService {
 
         taskExecutor.execute(() -> {
             try {
-                String authorName = mod.getAuthor();
-                if (authorName == null && mod.getAuthorId() != null) {
-                    User u = userRepository.findById(mod.getAuthorId()).orElse(null);
-                    if (u != null) authorName = u.getUsername();
-                }
-
                 RestTemplate restTemplate = new RestTemplate();
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
@@ -890,20 +881,19 @@ public class ModService {
                 embed.put("url", frontendUrl + getProjectLink(mod));
                 embed.put("color", 3447003);
 
-                if (authorName != null) {
-                    Map<String, String> authorMap = new HashMap<>();
-                    authorMap.put("name", authorName);
-                    embed.put("author", authorMap);
-                }
-
                 Map<String, String> imageMap = new HashMap<>();
-                String ogUrl = backendUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
+
+                String cleanBackendUrl = backendUrl.endsWith("/") ? backendUrl.substring(0, backendUrl.length() - 1) : backendUrl;
+                String ogUrl = cleanBackendUrl + "/api/v1/og/project/" + mod.getId() + ".jpg";
+
                 imageMap.put("url", ogUrl);
                 embed.put("image", imageMap);
 
                 Map<String, Object> body = new HashMap<>();
                 body.put("content", "A new project has been published!");
                 body.put("embeds", List.of(embed));
+
+                logger.info("Triggering Discord Webhook for project {}. Image URL: {}", mod.getId(), ogUrl);
 
                 HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
                 restTemplate.postForEntity(discordWebhookUrl, request, String.class);
