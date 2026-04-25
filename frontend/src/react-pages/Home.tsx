@@ -86,8 +86,8 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
                 )}
             </div>
 
-            <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-16 h-16 rounded-2xl absolute -top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
+            <div className="px-4 sm:px-6 pb-4 sm:pb-6 relative flex flex-col flex-1 bg-transparent">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl absolute -top-6 sm:-top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
                     <OptimizedImage
                         src={iconUrl}
                         alt={`${mod.title} Icon`}
@@ -97,11 +97,11 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
                     />
                 </div>
 
-                <div className="mt-10 flex-1 relative z-20">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
+                <div className="mt-8 sm:mt-10 flex-1 relative z-20">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
                         {mod.title}
                     </h3>
-                    <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
+                    <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
                         <Link
                             to={`/creator/${mod.author}`}
@@ -114,9 +114,9 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
                     </div>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 relative z-20 text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
-                    <Download className="w-4 h-4 shrink-0" aria-hidden="true" />
-                    <span className="text-[13px] leading-none translate-y-[1px]">{mod.downloadCount?.toLocaleString() || 0}</span>
+                <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-20 text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+                    <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" aria-hidden="true" />
+                    <span className="text-[11px] sm:text-[13px] leading-none translate-y-[1px]">{mod.downloadCount?.toLocaleString() || 0}</span>
                 </div>
             </div>
         </article>
@@ -129,6 +129,30 @@ const MarqueeColumn = ({ mods, duration }: { mods: Mod[], duration: string }) =>
             {[...mods, ...mods].map((mod, index) => (
                 <FeaturedModCard key={`${mod.id}-${index}`} mod={mod} priority={index < 2} />
             ))}
+        </div>
+    </div>
+);
+
+const MarqueeRow = ({ mods, duration, reverse = false }: { mods: Mod[], duration: string, reverse?: boolean }) => (
+    <div className="flex w-full overflow-hidden shrink-0" style={{
+        maskImage: 'linear-gradient(to right, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(to right, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)'
+    }}>
+        <div className={`flex w-max ${reverse ? 'animate-marquee-right' : 'animate-marquee-left'} will-change-transform`} style={{ '--marquee-duration': duration } as any}>
+            <div className="flex gap-4 pr-4">
+                {mods.map((mod, index) => (
+                    <div key={`row1-${mod.id}-${index}`} className="w-[220px] sm:w-[280px] shrink-0">
+                        <FeaturedModCard mod={mod} priority={index < 2 && !reverse} />
+                    </div>
+                ))}
+            </div>
+            <div className="flex gap-4 pr-4" aria-hidden="true">
+                {mods.map((mod, index) => (
+                    <div key={`row2-${mod.id}-${index}`} className="w-[220px] sm:w-[280px] shrink-0">
+                        <FeaturedModCard mod={mod} priority={false} />
+                    </div>
+                ))}
+            </div>
         </div>
     </div>
 );
@@ -149,40 +173,40 @@ const InlineDependencyUI = ({ randomMod }: { randomMod?: Mod }) => {
             </div>
             <div className="p-6 space-y-4 overflow-hidden relative flex-1 flex flex-col">
                 <div className={`flex items-center justify-between p-4 rounded-2xl border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 border shadow-sm transition-all hover:bg-emerald-50 dark:hover:bg-emerald-500/20`}>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                         <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
                             <Check className="w-3.5 h-3.5" aria-hidden="true" />
                         </div>
-                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                             <img src="/assets/favicon.svg" alt="Hytale Core Library Icon" className="w-full h-full object-cover p-2" loading="lazy" />
                         </div>
-                        <div>
-                            <div className="font-bold text-slate-900 dark:text-white">Hytale Core Library</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">v1.2.0</div>
+                        <div className="min-w-0">
+                            <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">Hytale Core Library</div>
+                            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v1.2.0</div>
                         </div>
                     </div>
-                    <span className="text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-500/30">Required</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-500/30 shrink-0 ml-2">Required</span>
                 </div>
 
                 <div className={`flex items-center justify-between p-4 rounded-2xl border-rose-500/20 bg-rose-50/30 dark:bg-rose-500/5 border shadow-sm transition-all hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer`}>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                         <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 flex items-center justify-center shrink-0 shadow-sm" />
-                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                            <Box className="w-6 h-6 text-slate-400" />
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                            <Box className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400" />
                         </div>
-                        <div>
-                            <div className="font-bold text-slate-900 dark:text-white">MathLib</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">v2.1.0</div>
+                        <div className="min-w-0">
+                            <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">MathLib</div>
+                            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v2.1.0</div>
                         </div>
                     </div>
-                    <span className="text-[10px] font-bold uppercase bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 px-2.5 py-1 rounded-md border border-rose-200 dark:border-rose-500/30">Required</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 px-2 py-1 rounded-md border border-rose-200 dark:border-rose-500/30 shrink-0 ml-2">Required</span>
                 </div>
 
                 {randomMod ? (
                     <div className={`flex items-center justify-between p-4 rounded-2xl ${GLASS_ITEM}`}>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                             <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 shrink-0" />
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/10 shrink-0">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/10 shrink-0">
                                 {randomIconUrl ? (
                                     <OptimizedImage
                                         src={randomIconUrl}
@@ -190,14 +214,14 @@ const InlineDependencyUI = ({ randomMod }: { randomMod?: Mod }) => {
                                         baseWidth={48}
                                         className="w-full h-full"
                                     />
-                                ) : <Box className="w-6 h-6 text-slate-400" />}
+                                ) : <Box className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400" />}
                             </div>
                             <div className="min-w-0">
-                                <div className="font-bold text-slate-900 dark:text-white truncate">{randomMod.title}</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">v{randomVersion}</div>
+                                <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">{randomMod.title}</div>
+                                <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v{randomVersion}</div>
                             </div>
                         </div>
-                        <span className="text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 shrink-0 ml-2">Optional</span>
+                        <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-md border border-slate-200 dark:border-white/10 shrink-0 ml-2">Optional</span>
                     </div>
                 ) : (
                     <div className="h-20 w-full animate-pulse bg-slate-100/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-white/5" />
@@ -205,7 +229,7 @@ const InlineDependencyUI = ({ randomMod }: { randomMod?: Mod }) => {
 
                 <div className="mt-auto flex items-start gap-3 text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/20 shadow-sm">
                     <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
-                    <p className="font-medium">Some <span className="font-black">Required</span> dependencies are currently unselected.</p>
+                    <p className="font-medium text-xs sm:text-sm">Some <span className="font-black">Required</span> dependencies are currently unselected.</p>
                 </div>
             </div>
         </div>
@@ -251,40 +275,40 @@ const InlineDownloadUI = () => {
     if (view === 'changelog') {
         return (
             <div className={`${GLASS_CARD} w-full overflow-hidden flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
-                <div className={`p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
+                <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
                     <div>
-                        <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2"><List className="w-5 h-5 text-modtale-accent" aria-hidden="true" /> Changelog</h3>
+                        <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2"><List className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Changelog</h3>
                         <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowExperimental(!showExperimental)}>
-                            <div className={`w-8 h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-4' : ''}`} />
+                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
+                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
                             </div>
-                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
                         </div>
                     </div>
-                    <button onClick={() => setView('download')} aria-label="Close Changelog" className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors backdrop-blur-md"><X className="w-5 h-5" /></button>
+                    <button onClick={() => setView('download')} aria-label="Close Changelog" className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors backdrop-blur-md"><X className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                 </div>
 
-                <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 relative">
+                <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 relative">
                     {visibleVersions.length > 0 ? (
                         visibleVersions.map(ver => (
-                            <div key={ver.id} className={`${GLASS_ITEM} rounded-xl p-4 hover:border-modtale-accent/40 transition-colors`}>
-                                <div className="flex items-center justify-between gap-4 mb-3 border-b border-white/40 dark:border-white/10 pb-3">
+                            <div key={ver.id} className={`${GLASS_ITEM} rounded-xl p-3 sm:p-4 hover:border-modtale-accent/40 transition-colors`}>
+                                <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-4 mb-3 border-b border-white/40 dark:border-white/10 pb-3 flex-col sm:flex-row">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-base font-black text-slate-900 dark:text-white">v{ver.versionNumber}</span>
-                                            {ver.channel !== 'RELEASE' && <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border backdrop-blur-md shadow-sm ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
+                                            <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">v{ver.versionNumber}</span>
+                                            {ver.channel !== 'RELEASE' && <span className={`text-[8px] sm:text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border backdrop-blur-md shadow-sm ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
                                         </div>
-                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                                             <span>{ver.date}</span>
-                                            <span className="w-1 h-1 rounded-full bg-slate-400/50 dark:bg-slate-600/50"></span>
-                                            <span>{ver.gameVersion}</span>
+                                            <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-400/50 dark:bg-slate-600/50"></span>
+                                            <span className="truncate max-w-[120px] sm:max-w-none">{ver.gameVersion}</span>
                                         </div>
                                     </div>
-                                    <button aria-label={`Download version ${ver.versionNumber}`} className="p-2 bg-white/50 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-700 dark:text-slate-300 rounded-lg transition-all shrink-0 shadow-sm border border-white/30 dark:border-white/5">
+                                    <button aria-label={`Download version ${ver.versionNumber}`} className="p-2 sm:p-2.5 bg-white/50 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-700 dark:text-slate-300 rounded-lg transition-all shrink-0 shadow-sm border border-white/30 dark:border-white/5 w-full sm:w-auto flex justify-center">
                                         <Download className="w-4 h-4" />
                                     </button>
                                 </div>
-                                <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                <div className="text-[11px] sm:text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                                     {ver.changelog}
                                 </div>
                             </div>
@@ -292,7 +316,7 @@ const InlineDownloadUI = () => {
                     ) : (
                         <div className="flex flex-col items-center justify-center text-slate-500 h-full gap-2">
                             <AlertCircle className="w-8 h-8 opacity-50" aria-hidden="true" />
-                            <p className="font-medium text-sm">No compatible versions for this game version.</p>
+                            <p className="font-medium text-xs sm:text-sm">No compatible versions.</p>
                         </div>
                     )}
                 </div>
@@ -302,37 +326,37 @@ const InlineDownloadUI = () => {
 
     return (
         <div className={`${GLASS_CARD} w-full overflow-hidden relative flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
-            <div className={`p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
+            <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
                 <div>
-                    <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <Download className="w-5 h-5 text-modtale-accent" aria-hidden="true" /> Download
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <Download className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Download
                     </h3>
                     <div className="mt-1 flex items-center gap-2 group cursor-pointer" onClick={() => setShowExperimental(!showExperimental)}>
-                        <div className={`w-8 h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                            <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-4' : ''}`} />
+                        <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
+                            <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
+                        <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
                     </div>
                 </div>
             </div>
 
-            <div className="p-5 overflow-visible relative flex-1 flex flex-col justify-center">
+            <div className="p-4 sm:p-5 overflow-visible relative flex-1 flex flex-col justify-center">
                 <div className="mb-5 relative z-20 shrink-0">
-                    <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
+                    <label className="block text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
                     <div className="relative">
                         <div
-                            className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-sm cursor-pointer ${GLASS_ITEM} ${isDropdownOpen ? 'ring-2 ring-modtale-accent border-transparent' : ''}`}
+                            className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer ${GLASS_ITEM} ${isDropdownOpen ? 'ring-2 ring-modtale-accent border-transparent' : ''}`}
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         >
-                            <span>{selectedVersion}</span>
-                            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                            <span className="truncate pr-2">{selectedVersion}</span>
+                            <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                         </div>
                         {isDropdownOpen && (
                             <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
                                 {versions.map(v => (
                                     <div
                                         key={v}
-                                        className={`px-4 py-2.5 text-sm font-bold cursor-pointer transition-colors ${selectedVersion === v ? 'text-modtale-accent bg-blue-50/50 dark:bg-blue-500/10' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                        className={`px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate ${selectedVersion === v ? 'text-modtale-accent bg-blue-50/50 dark:bg-blue-500/10' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                         onClick={() => {
                                             setSelectedVersion(v);
                                             setIsDropdownOpen(false);
@@ -347,27 +371,27 @@ const InlineDownloadUI = () => {
                 </div>
 
                 {latestVer ? (
-                    <button className={`w-full backdrop-blur-xl p-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-2 relative z-0 group overflow-hidden shrink-0 border ${themeClass}`}>
-                        <div className="font-black text-lg flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-5 h-5" aria-hidden="true" /> Download Latest</div>
-                        <div className={`text-[10px] font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-1.5 z-10 backdrop-blur-md shadow-sm ${getVersionBadgeColor(latestVer.channel)}`}>
+                    <button className={`w-full backdrop-blur-xl p-3 sm:p-4 rounded-2xl flex flex-col items-center justify-center gap-1 sm:gap-1.5 transition-all active:scale-95 mb-2 relative z-0 group overflow-hidden shrink-0 border ${themeClass}`}>
+                        <div className="font-black text-base sm:text-lg flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" /> Download Latest</div>
+                        <div className={`text-[9px] sm:text-[10px] font-bold font-mono px-2 sm:px-3 py-1 rounded-full border flex items-center gap-1.5 z-10 backdrop-blur-md shadow-sm ${getVersionBadgeColor(latestVer.channel)}`}>
                             v{latestVer.versionNumber} {latestVer.channel !== 'RELEASE' && <span className="uppercase opacity-80">{latestVer.channel}</span>}
                         </div>
                     </button>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-                        <AlertCircle className="w-8 h-8 opacity-50 mb-2" aria-hidden="true" />
-                        <p className="font-medium text-sm">No compatible versions.</p>
+                        <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-50 mb-2" aria-hidden="true" />
+                        <p className="font-medium text-xs sm:text-sm text-center">No compatible versions.</p>
                         {!showExperimental && currentVersions.length > 0 && (
-                            <button onClick={() => setShowExperimental(true)} className="mt-2 text-[11px] font-bold text-modtale-accent hover:underline">
-                                Show experimental versions
+                            <button onClick={() => setShowExperimental(true)} className="mt-2 text-[10px] sm:text-[11px] font-bold text-modtale-accent hover:underline">
+                                Show experimental
                             </button>
                         )}
                     </div>
                 )}
             </div>
 
-            <div className="p-4 bg-white/20 dark:bg-black/10 border-t border-white/40 dark:border-white/10 shrink-0 z-10 backdrop-blur-md">
-                <button onClick={() => setView('changelog')} className="text-[11px] text-slate-500 dark:text-slate-500 hover:text-modtale-accent dark:hover:text-modtale-accent font-bold uppercase tracking-wider flex items-center justify-start gap-1 w-full transition-colors">
+            <div className="p-3 sm:p-4 bg-white/20 dark:bg-black/10 border-t border-white/40 dark:border-white/10 shrink-0 z-10 backdrop-blur-md">
+                <button onClick={() => setView('changelog')} className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-500 hover:text-modtale-accent dark:hover:text-modtale-accent font-bold uppercase tracking-wider flex items-center justify-start gap-1 w-full transition-colors">
                     View Full Changelog <ChevronRight className="w-3 h-3" aria-hidden="true" />
                 </button>
             </div>
@@ -377,38 +401,38 @@ const InlineDownloadUI = () => {
 
 const InlineNotificationUI = () => (
     <div className={`${GLASS_CARD} w-full flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
-        <div className={`p-6 flex justify-between items-center ${GLASS_HEADER}`}>
-            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2.5 text-lg">
-                <Bell className="w-5 h-5 text-amber-500" aria-hidden="true" /> Notifications
+        <div className={`p-4 sm:p-6 flex justify-between items-center ${GLASS_HEADER}`}>
+            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" aria-hidden="true" /> Notifications
             </h3>
-            <span className="text-xs text-amber-600 dark:text-amber-500 font-bold cursor-pointer hover:underline uppercase tracking-wider">Clear All</span>
+            <span className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-500 font-bold cursor-pointer hover:underline uppercase tracking-wider">Clear All</span>
         </div>
         <div className="divide-y divide-slate-100 dark:divide-white/5 relative flex-1 overflow-hidden">
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white dark:from-slate-900 to-transparent z-10 pointer-events-none opacity-80" />
 
-            <div className="p-6 bg-blue-50/40 dark:bg-white/[0.02] flex items-start gap-4 hover:bg-blue-50/80 dark:hover:bg-white/[0.04] transition-colors">
-                <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm">
+            <div className="p-4 sm:p-6 bg-blue-50/40 dark:bg-white/[0.02] flex items-start gap-3 sm:gap-4 hover:bg-blue-50/80 dark:hover:bg-white/[0.04] transition-colors">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm">
                     <img src="https://cdn.modtale.net/images/d813b136-35aa-46c6-bb9e-359c20f7c146-cropped.png" alt="LevelingCore Update Icon" className="w-full h-full object-cover" loading="lazy" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="font-bold text-base text-slate-900 dark:text-white mb-1 flex items-center">
-                        Update: LevelingCore <span className="inline-block w-2 h-2 bg-blue-500 rounded-full ml-2 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                    <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white mb-1 flex items-center truncate">
+                        Update: LevelingCore <span className="inline-block w-2 h-2 bg-blue-500 rounded-full ml-2 shadow-[0_0_8px_rgba(59,130,246,0.6)] shrink-0" />
                     </div>
-                    <div className="text-sm text-slate-600 dark:text-slate-300 font-medium">Version 2.0 is now available.</div>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-2 font-mono uppercase tracking-wider">10 mins ago</div>
+                    <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium truncate">Version 2.0 is now available.</div>
+                    <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-1.5 sm:mt-2 font-mono uppercase tracking-wider">10 mins ago</div>
                 </div>
             </div>
 
-            <div className="p-6 flex items-start gap-4 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
-                <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm p-1">
+            <div className="p-4 sm:p-6 flex items-start gap-3 sm:gap-4 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-white/10 overflow-hidden shadow-sm p-1">
                     <img src="https://cdn.modtale.net/avatars/AzureDoom/83c01443-6302-4aff-beb9-7d6f656f994c-cropped.png" alt="AzureDoom Profile Picture" className="w-full h-full object-cover rounded-lg" loading="lazy" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="font-bold text-base text-slate-800 dark:text-slate-200 mb-1">
+                    <div className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-200 mb-1 truncate">
                         Developer Reply
                     </div>
-                    <div className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed">AzureDoom replied to your comment on LevelingCore.</div>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-2 font-mono uppercase tracking-wider">2 hours ago</div>
+                    <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed truncate">AzureDoom replied to your comment.</div>
+                    <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-1.5 sm:mt-2 font-mono uppercase tracking-wider">2 hours ago</div>
                 </div>
             </div>
         </div>
@@ -511,80 +535,96 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         animation: marquee-up var(--marquee-duration, 40s) linear infinite;
                         will-change: transform;
                     }
+                    @keyframes marquee-left {
+                        from { transform: translateX(0); }
+                        to { transform: translateX(-50%); }
+                    }
+                    .animate-marquee-left {
+                        animation: marquee-left var(--marquee-duration, 35s) linear infinite;
+                        will-change: transform;
+                    }
+                    @keyframes marquee-right {
+                        from { transform: translateX(-50%); }
+                        to { transform: translateX(0); }
+                    }
+                    .animate-marquee-right {
+                        animation: marquee-right var(--marquee-duration, 35s) linear infinite;
+                        will-change: transform;
+                    }
                 `}</style>
             </Helmet>
 
             <main className="relative z-10">
-                <section className="relative w-full min-h-[85vh] 2xl:min-h-[90vh] flex flex-col items-center justify-center pt-16 lg:pt-16 2xl:pt-36 pb-16 lg:pb-20 border-b border-slate-200 dark:border-white/5 overflow-hidden">
+                <section className="relative w-full min-h-[85vh] 2xl:min-h-[90vh] flex flex-col items-center justify-center pt-12 sm:pt-16 lg:pt-16 2xl:pt-36 pb-16 lg:pb-20 border-b border-slate-200 dark:border-white/5 overflow-hidden">
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
 
-                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-12 2xl:gap-20 items-stretch">
+                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 2xl:gap-20 items-stretch">
 
-                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center">
+                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center mx-auto lg:mx-0">
                             <img
                                 src="/assets/logo_light.svg"
                                 alt="Modtale Logo"
-                                className="h-16 md:h-20 lg:h-24 mb-10 object-contain drop-shadow-[0_0_30px_rgba(59,130,246,0.2)] hidden dark:block"
+                                className="h-14 sm:h-16 md:h-20 lg:h-24 mb-6 sm:mb-10 object-contain drop-shadow-[0_0_30px_rgba(59,130,246,0.2)] hidden dark:block"
                                 fetchPriority="high"
                             />
                             <img
                                 src="/assets/logo.svg"
                                 alt="Modtale Logo"
-                                className="h-16 md:h-20 lg:h-24 mb-10 object-contain drop-shadow-sm block dark:hidden"
+                                className="h-14 sm:h-16 md:h-20 lg:h-24 mb-6 sm:mb-10 object-contain drop-shadow-sm block dark:hidden"
                                 fetchPriority="high"
                             />
 
-                            <h1 className="text-4xl sm:text-5xl lg:text-6xl 2xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-6 2xl:mb-8">
+                            <h1 className="text-4xl sm:text-5xl lg:text-6xl 2xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-4 sm:mb-6 2xl:mb-8">
                                 The Hytale <br className="hidden lg:block" />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                     Community Repository.
                                 </span>
                             </h1>
 
-                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 max-w-2xl lg:max-w-lg 2xl:max-w-xl mb-10 2xl:mb-12 font-medium leading-relaxed">
+                            <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 max-w-2xl lg:max-w-lg 2xl:max-w-xl mb-8 sm:mb-10 2xl:mb-12 font-medium leading-relaxed">
                                 Discover, download, and seamlessly share Hytale mods, worlds, plugins, asset packs, and modpacks.
                             </p>
 
-                            <nav aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5 w-full sm:w-auto mb-10 2xl:mb-14">
+                            <nav aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mb-8 sm:mb-10 2xl:mb-14">
                                 <Link
                                     to="/mods"
-                                    className="flex items-center justify-center px-10 h-16 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto text-lg ring-1 ring-blue-500"
+                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto text-base sm:text-lg ring-1 ring-blue-500"
                                 >
-                                    <Search className="w-5 h-5 mr-3" aria-hidden="true" />
+                                    <Search className="w-5 h-5 mr-2 sm:mr-3" aria-hidden="true" />
                                     Discover Projects
                                 </Link>
                                 <Link
                                     to="/upload"
-                                    className="flex items-center justify-center px-10 h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-base sm:text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5"
                                 >
-                                    <Upload className="w-5 h-5 mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                                    <Upload className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                     Publish Work
                                 </Link>
                             </nav>
 
-                            <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-6 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-6 sm:p-8 shadow-sm lg:-ml-1.5`}>
-                                <div className="flex flex-col items-center lg:items-start">
-                                    <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                            <div className={`${GLASS_CARD} flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-4 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5`}>
+                                <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
+                                    <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalProjects} />
                                     </span>
-                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Projects</span>
+                                    <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
-                                <div className="w-px h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
-                                <div className="flex flex-col items-center lg:items-start">
-                                    <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
+                                <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
+                                    <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalDownloads} />
                                     </span>
-                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Downloads</span>
+                                    <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
-                                <div className="w-px h-12 bg-slate-200 dark:bg-white/10 hidden sm:block" aria-hidden="true" />
-                                <div className="flex flex-col items-center lg:items-start hidden sm:flex">
-                                    <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
+                                <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
+                                    <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalUsers} />
                                     </span>
-                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Creators</span>
+                                    <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
                                 </div>
                             </div>
                         </div>
@@ -606,77 +646,76 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         )}
 
                         {displayFeaturedMods.length > 0 && (
-                            <div className="w-full flex flex-col gap-6 lg:hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 mt-10">
-                                {displayFeaturedMods.slice(0, 3).map((mod, index) => (
-                                    <FeaturedModCard key={`mobile-${mod.id}-${index}`} mod={mod} priority={index === 0} />
-                                ))}
+                            <div className="-mx-6 sm:-mx-12 md:-mx-16 flex flex-col gap-4 lg:hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 mt-8 sm:mt-12 mb-4">
+                                <MarqueeRow mods={col1Mods} duration="35s" />
+                                <MarqueeRow mods={col2Mods} duration="45s" reverse={true} />
                             </div>
                         )}
                     </div>
                 </section>
 
-                <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 space-y-24 lg:space-y-32 2xl:space-y-40 py-24 lg:py-32 2xl:py-40 relative z-20">
+                <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 space-y-16 sm:space-y-24 lg:space-y-32 2xl:space-y-40 py-16 sm:py-24 lg:py-32 2xl:py-40 relative z-20">
 
-                    <section className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-                        <div className="flex-1 space-y-6 2xl:space-y-8">
-                            <span className="text-blue-600 dark:text-blue-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-blue-50 dark:bg-blue-500/10 w-fit px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20">Version Management</span>
-                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Mods with Confidence.</h2>
-                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                    <section className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
+                            <span className="text-blue-600 dark:text-blue-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-blue-50 dark:bg-blue-500/10 w-fit px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20 mx-auto lg:mx-0">Version Management</span>
+                            <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Mods with Confidence.</h2>
+                            <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
                                 Finding the right file shouldn't be a puzzle. Modtale automatically matches game servers and client projects to your game version and makes it easy to review changelogs before you hit download.
                             </p>
-                            <Link to="/mods" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-lg">
+                            <Link to="/mods" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
                                 Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
                             </Link>
                         </div>
-                        <div className="flex-1 w-full relative">
+                        <div className="flex-1 w-full relative mt-4 lg:mt-0">
                             <div className="absolute -inset-10 bg-gradient-to-tr from-blue-400/20 to-transparent dark:from-blue-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
-                            <div className="relative z-10 w-full max-w-lg ml-auto">
+                            <div className="relative z-10 w-full max-w-lg mx-auto lg:ml-auto">
                                 <InlineDownloadUI />
                             </div>
                         </div>
                     </section>
 
-                    <section className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-                        <div className="flex-1 space-y-6 2xl:space-y-8">
-                            <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-emerald-50 dark:bg-emerald-500/10 w-fit px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20">Library Resolution</span>
-                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Mod Dependencies.</h2>
-                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                    <section className="flex flex-col lg:flex-row-reverse items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-emerald-50 dark:bg-emerald-500/10 w-fit px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20 mx-auto lg:mx-0">Library Resolution</span>
+                            <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Mod Dependencies.</h2>
+                            <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
                                 Forget hunting down core libraries or confusing modpacks. Modtale analyzes scripting requirements and allows you to seamlessly download required plugins and optional maps in one swift action.
                             </p>
                         </div>
-                        <div className="flex-1 w-full relative">
+                        <div className="flex-1 w-full relative mt-4 lg:mt-0">
                             <div className="absolute -inset-10 bg-gradient-to-tl from-emerald-400/20 to-transparent dark:from-emerald-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
-                            <div className="relative z-10 w-full max-w-lg mr-auto">
+                            <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
                                 <InlineDependencyUI randomMod={randomDisplayMod} />
                             </div>
                         </div>
                     </section>
 
-                    <section className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-                        <div className="flex-1 space-y-6 2xl:space-y-8">
-                            <span className="text-purple-600 dark:text-purple-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-purple-50 dark:bg-purple-500/10 w-fit px-3 py-1 rounded-full border border-purple-100 dark:border-purple-500/20">Creator Tools</span>
-                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Advanced Creator Analytics.</h2>
-                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                    <section className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
+                            <span className="text-purple-600 dark:text-purple-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-purple-50 dark:bg-purple-500/10 w-fit px-3 py-1 rounded-full border border-purple-100 dark:border-purple-500/20 mx-auto lg:mx-0">Creator Tools</span>
+                            <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Advanced Creator Analytics.</h2>
+                            <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
                                 Creators get access to powerful, privacy-respecting analytics. Track your daily modpack downloads, world page views, and week-over-week asset growth metrics instantly from your dashboard.
                             </p>
-                            <Link to="/upload" className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-lg">
+                            <Link to="/upload" className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
                                 Publish your project <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
                             </Link>
                         </div>
-                        <div className="flex-1 w-full relative">
+                        <div className="flex-1 w-full relative mt-4 lg:mt-0">
                             <div className="absolute -inset-10 bg-gradient-to-tr from-purple-400/20 to-transparent dark:from-purple-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
 
-                            <div className={`${GLASS_CARD} flex flex-col h-[500px] transform transition-transform hover:scale-[1.01] duration-500 ml-auto w-full max-w-xl relative z-10`}>
-                                <div className="flex items-center gap-4 shrink-0 px-6 pt-6 mb-4">
-                                    <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-purple-500">
-                                        <TrendingUp className="w-5 h-5" aria-hidden="true" />
+                            <div className={`${GLASS_CARD} flex flex-col h-[400px] sm:h-[500px] transform transition-transform hover:scale-[1.01] duration-500 w-full max-w-xl mx-auto lg:ml-auto relative z-10`}>
+                                <div className="flex items-center gap-4 shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 mb-2 sm:mb-4">
+                                    <div className="p-2 sm:p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-purple-500">
+                                        <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
                                     </div>
                                     <div>
-                                        <h3 className="font-black text-lg text-slate-900 dark:text-white leading-tight">Project Growth</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform-wide reach and momentum.</p>
+                                        <h3 className="font-black text-base sm:text-lg text-slate-900 dark:text-white leading-tight">Project Growth</h3>
+                                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">Platform-wide reach and momentum.</p>
                                     </div>
                                 </div>
-                                <div className="flex-1 min-h-0 px-6 pb-6">
+                                <div className="flex-1 min-h-0 px-4 sm:px-6 pb-4 sm:pb-6">
                                     <LineChart
                                         datasets={chartDatasets}
                                         onToggle={toggleDataset}
@@ -686,17 +725,17 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
                     </section>
 
-                    <section className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-                        <div className="flex-1 space-y-6 2xl:space-y-8">
-                            <span className="text-amber-600 dark:text-amber-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-amber-50 dark:bg-amber-500/10 w-fit px-3 py-1 rounded-full border border-amber-100 dark:border-amber-500/20">Community Hub</span>
-                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
-                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                    <section className="flex flex-col lg:flex-row-reverse items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
+                            <span className="text-amber-600 dark:text-amber-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-amber-50 dark:bg-amber-500/10 w-fit px-3 py-1 rounded-full border border-amber-100 dark:border-amber-500/20 mx-auto lg:mx-0">Community Hub</span>
+                            <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
+                            <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
                                 Modtale keeps the Hytale community connected. Receive real-time alerts when tracked texture packs drop new updates, or when plugin developers reply directly to your feedback.
                             </p>
                         </div>
-                        <div className="flex-1 w-full relative">
+                        <div className="flex-1 w-full relative mt-4 lg:mt-0">
                             <div className="absolute -inset-10 bg-gradient-to-tl from-amber-400/20 to-transparent dark:from-amber-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
-                            <div className="relative z-10 w-full max-w-lg mr-auto">
+                            <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
                                 <InlineNotificationUI />
                             </div>
                         </div>
@@ -704,21 +743,21 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
 
                 </div>
 
-                <section className="py-20 lg:py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl relative z-20">
+                <section className="py-16 sm:py-20 lg:py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl relative z-20">
                     <div className="max-w-4xl mx-auto px-6 text-center">
-                        <div className="w-20 h-20 bg-slate-200 dark:bg-slate-800 rounded-3xl mx-auto mb-8 flex items-center justify-center shadow-inner border border-slate-300/50 dark:border-white/5">
-                            <Code className="w-10 h-10 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl sm:rounded-3xl mx-auto mb-6 sm:mb-8 flex items-center justify-center shadow-inner border border-slate-300/50 dark:border-white/5">
+                            <Code className="w-8 h-8 sm:w-10 sm:h-10 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         </div>
-                        <h2 className="text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tight">Built by the community, for the community.</h2>
-                        <p className="text-xl text-slate-600 dark:text-slate-300 mb-12 font-medium max-w-3xl mx-auto leading-relaxed">
+                        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-tight">Built by the community,<br className="sm:hidden" /> for the community.</h2>
+                        <p className="text-base sm:text-lg lg:text-xl text-slate-600 dark:text-slate-300 mb-8 sm:mb-12 font-medium max-w-3xl mx-auto leading-relaxed">
                             Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests. Explore our source code or utilize our public API to build your own tools.
                         </p>
-                        <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                            <a href="https://github.com/Modtale/modtale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-8 h-16 text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5">
-                                <Github className="w-6 h-6" aria-hidden="true" /> View Source Code
+                        <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+                            <a href="https://github.com/Modtale/modtale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5">
+                                <Github className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View Source Code
                             </a>
-                            <Link to="/api-docs" className="inline-flex items-center justify-center px-8 h-16 text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/20 hover:-translate-y-0.5">
-                                <Code className="w-6 h-6" aria-hidden="true" /> View API Docs
+                            <Link to="/api-docs" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/20 hover:-translate-y-0.5">
+                                <Code className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View API Docs
                             </Link>
                         </nav>
                     </div>
