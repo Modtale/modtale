@@ -1,4 +1,4 @@
-name: Modtale CI/CD
+name: Modtale CI/CD 
 
 on:
   push:
