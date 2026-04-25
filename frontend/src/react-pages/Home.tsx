@@ -661,7 +661,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             <span className="text-blue-600 dark:text-blue-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-blue-50 dark:bg-blue-500/10 w-fit px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20 mx-auto lg:mx-0">Version Management</span>
                             <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Mods with Confidence.</h2>
                             <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                Finding the right file shouldn't be a puzzle. Modtale automatically matches game servers and client projects to your game version and makes it easy to review changelogs before you hit download.
+                                Finding the right file shouldn't be a puzzle. Modtale makes it easy to find mods for your game version and review changelogs before you hit download.
                             </p>
                             <Link to="/mods" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
                                 Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
@@ -680,7 +680,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-emerald-50 dark:bg-emerald-500/10 w-fit px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20 mx-auto lg:mx-0">Library Resolution</span>
                             <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Mod Dependencies.</h2>
                             <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                Forget hunting down core libraries or confusing modpacks. Modtale analyzes scripting requirements and allows you to seamlessly download required plugins and optional maps in one swift action.
+                                Forget hunting down core libraries or confusing modpacks. Modtale allows you to seamlessly download all required mods in one swift action.
                             </p>
                         </div>
                         <div className="flex-1 w-full relative mt-4 lg:mt-0">
@@ -696,7 +696,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             <span className="text-purple-600 dark:text-purple-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-purple-50 dark:bg-purple-500/10 w-fit px-3 py-1 rounded-full border border-purple-100 dark:border-purple-500/20 mx-auto lg:mx-0">Creator Tools</span>
                             <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Advanced Creator Analytics.</h2>
                             <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                Creators get access to powerful, privacy-respecting analytics. Track your daily modpack downloads, world page views, and week-over-week asset growth metrics instantly from your dashboard.
+                                Creators get access to powerful, privacy-respecting analytics. Track your daily downloads, page views, and week-over-week or month-over-month growth metrics instantly from your dashboard.
                             </p>
                             <Link to="/upload" className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
                                 Publish your project <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
@@ -730,7 +730,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             <span className="text-amber-600 dark:text-amber-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-amber-50 dark:bg-amber-500/10 w-fit px-3 py-1 rounded-full border border-amber-100 dark:border-amber-500/20 mx-auto lg:mx-0">Community Hub</span>
                             <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
                             <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                Modtale keeps the Hytale community connected. Receive real-time alerts when tracked texture packs drop new updates, or when plugin developers reply directly to your feedback.
+                                Modtale keeps the Hytale community connected. Receive real-time alerts when tracked mods drop new updates, or when developers reply directly to your feedback.
                             </p>
                         </div>
                         <div className="flex-1 w-full relative mt-4 lg:mt-0">
