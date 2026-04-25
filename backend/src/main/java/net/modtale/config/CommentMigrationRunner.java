@@ -8,8 +8,7 @@ import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Component
-public class CommentMigrationRunner {
+public class CommentMigrationRunner implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(CommentMigrationRunner.class);
 
@@ -31,14 +30,15 @@ public class CommentMigrationRunner {
 
     private final Map<String, String> usernameToIdCache = new HashMap<>();
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void migrateCommentsOnStartup() {
+    @Override
+    public void run(String... args) {
         logger.info("Starting non-destructive comment migration...");
 
         MongoCollection<Document> collection = mongoTemplate.getCollection("projects");
 
         Document query = new Document("comments", new Document("$exists", true).append("$not", new Document("$size", 0)));
 
+        int processedCount = 0;
         int updatedCount = 0;
 
         try (MongoCursor<Document> cursor = collection.find(query).iterator()) {
@@ -47,29 +47,29 @@ public class CommentMigrationRunner {
                 boolean modified = false;
 
                 List<Document> comments = projectDoc.getList("comments", Document.class);
-                if (comments == null) continue;
+                if (comments != null) {
+                    for (Document comment : comments) {
+                        // Migrate main comment
+                        if (!comment.containsKey("userId") && comment.containsKey("user")) {
+                            String username = comment.getString("user");
+                            String resolvedId = resolveUserId(username);
 
-                for (Document comment : comments) {
-                    // Migrate main comment
-                    if (!comment.containsKey("userId") && comment.containsKey("user")) {
-                        String username = comment.getString("user");
-                        String resolvedId = resolveUserId(username);
-
-                        if (resolvedId != null) {
-                            comment.put("userId", resolvedId);
-                            modified = true;
+                            if (resolvedId != null) {
+                                comment.put("userId", resolvedId);
+                                modified = true;
+                            }
                         }
-                    }
 
-                    // Migrate developer reply if present
-                    Document reply = (Document) comment.get("developerReply");
-                    if (reply != null && !reply.containsKey("userId") && reply.containsKey("user")) {
-                        String replyUsername = reply.getString("user");
-                        String resolvedReplyId = resolveUserId(replyUsername);
+                        // Migrate developer reply if present
+                        Document reply = (Document) comment.get("developerReply");
+                        if (reply != null && !reply.containsKey("userId") && reply.containsKey("user")) {
+                            String replyUsername = reply.getString("user");
+                            String resolvedReplyId = resolveUserId(replyUsername);
 
-                        if (resolvedReplyId != null) {
-                            reply.put("userId", resolvedReplyId);
-                            modified = true;
+                            if (resolvedReplyId != null) {
+                                reply.put("userId", resolvedReplyId);
+                                modified = true;
+                            }
                         }
                     }
                 }
@@ -82,12 +82,20 @@ public class CommentMigrationRunner {
                     );
                     updatedCount++;
                 }
+
+                processedCount++;
+
+                if (processedCount % 50 == 0) {
+                    logger.info("Migration progress: {} projects processed, {} projects updated so far...", processedCount, updatedCount);
+                }
             }
         } catch (Exception e) {
             logger.error("Error occurred during comment migration", e);
         }
 
-        logger.info("Comment migration complete. Projects updated: {}", updatedCount);
+        logger.info("Comment migration complete");
+        logger.info("Total projects processed: {}", processedCount);
+        logger.info("Total projects updated: {}", updatedCount);
     }
 
     private String resolveUserId(String username) {
