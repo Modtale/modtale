@@ -633,7 +633,6 @@ public class ModService {
         }
 
         mod.setStatus("DRAFT");
-        mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
         mod.setUpdatedAt(LocalDateTime.now().toString());
         mod.setVersions(new ArrayList<>());
         mod.setAllowModpacks(true);
@@ -705,7 +704,6 @@ public class ModService {
         }
 
         mod.setStatus("DRAFT");
-        mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
         modRepository.save(mod);
         evictProjectDetails(mod);
     }
@@ -1064,7 +1062,6 @@ public class ModService {
         if(mod == null) throw new IllegalArgumentException("Project not found.");
 
         mod.setStatus("DRAFT");
-        mod.setExpiresAt(LocalDate.now().plusDays(30).toString());
         modRepository.save(mod);
         evictProjectDetails(mod);
 
@@ -1123,12 +1120,6 @@ public class ModService {
         List<Mod> result = new ArrayList<>(combined);
         result.sort(Comparator.comparing(Mod::getUpdatedAt));
         return result;
-    }
-
-    @Scheduled(cron = "0 0 0 * * ?")
-    public void cleanupExpiredDrafts() {
-        String today = LocalDate.now().toString();
-        modRepository.deleteByStatusAndExpiresAtBefore("DRAFT", today);
     }
 
     public void requestTransfer(String modId, String targetUserId, User requester) {
@@ -2096,9 +2087,6 @@ public class ModService {
                 logger.error("Failed to cleanup expired project " + mod.getId(), e);
             }
         }
-
-        String today = LocalDate.now().toString();
-        modRepository.deleteByStatusAndExpiresAtBefore("DRAFT", today);
     }
 
     private void performHardDelete(Mod mod) {
