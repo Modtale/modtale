@@ -63,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     const browsePages = ['mods', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const isBrowseActive = browsePages.includes(currentPage);
 
-    const widthClass = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+    const widthClass = "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
