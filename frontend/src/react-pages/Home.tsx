@@ -124,7 +124,7 @@ const FeaturedModCard = ({ mod, priority = false }: { mod: Mod, priority?: boole
 };
 
 const MarqueeColumn = ({ mods, duration }: { mods: Mod[], duration: string }) => (
-    <div className="flex flex-col w-[320px] shrink-0">
+    <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0">
         <div className="flex flex-col gap-6 animate-marquee-up will-change-transform" style={{ '--marquee-duration': duration } as any}>
             {[...mods, ...mods].map((mod, index) => (
                 <FeaturedModCard key={`${mod.id}-${index}`} mod={mod} priority={index < 2} />
@@ -515,15 +515,15 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
             </Helmet>
 
             <main className="relative z-10">
-                <section className="relative w-full min-h-[90vh] flex flex-col items-center justify-center pt-28 lg:pt-36 pb-20 border-b border-slate-200 dark:border-white/5 overflow-hidden">
+                <section className="relative w-full min-h-[85vh] 2xl:min-h-[90vh] flex flex-col items-center justify-center pt-16 lg:pt-16 2xl:pt-36 pb-16 lg:pb-20 border-b border-slate-200 dark:border-white/5 overflow-hidden">
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
 
-                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-stretch">
+                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 lg:px-16 2xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-12 2xl:gap-20 items-stretch">
 
-                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-4xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center">
+                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center">
                             <img
                                 src="/assets/logo_light.svg"
                                 alt="Modtale Logo"
@@ -537,18 +537,18 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 fetchPriority="high"
                             />
 
-                            <h1 className="text-5xl md:text-7xl xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-8">
-                                The Hytale <br className="hidden md:block" />
+                            <h1 className="text-4xl sm:text-5xl lg:text-6xl 2xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-6 2xl:mb-8">
+                                The Hytale <br className="hidden lg:block" />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                     Community Repository.
                                 </span>
                             </h1>
 
-                            <p className="text-xl text-slate-600 dark:text-slate-300 max-w-2xl lg:max-w-xl mb-12 font-medium leading-relaxed">
+                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 max-w-2xl lg:max-w-lg 2xl:max-w-xl mb-10 2xl:mb-12 font-medium leading-relaxed">
                                 Discover, download, and seamlessly share Hytale mods, worlds, plugins, asset packs, and modpacks.
                             </p>
 
-                            <nav aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-5 w-full sm:w-auto mb-14">
+                            <nav aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5 w-full sm:w-auto mb-10 2xl:mb-14">
                                 <Link
                                     to="/mods"
                                     className="flex items-center justify-center px-10 h-16 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto text-lg ring-1 ring-blue-500"
@@ -565,23 +565,23 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 </Link>
                             </nav>
 
-                            <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-10 sm:gap-14 w-fit p-8 shadow-sm lg:-ml-1.5`}>
+                            <div className={`${GLASS_CARD} flex flex-wrap items-center justify-center lg:justify-start gap-6 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-6 sm:p-8 shadow-sm lg:-ml-1.5`}>
                                 <div className="flex flex-col items-center lg:items-start">
-                                    <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalProjects} />
                                     </span>
                                     <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Projects</span>
                                 </div>
                                 <div className="w-px h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start">
-                                    <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalDownloads} />
                                     </span>
                                     <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Downloads</span>
                                 </div>
                                 <div className="w-px h-12 bg-slate-200 dark:bg-white/10 hidden sm:block" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start hidden sm:flex">
-                                    <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         <AnimatedCounter value={stats.totalUsers} />
                                     </span>
                                     <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-2">Creators</span>
@@ -590,9 +590,9 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
 
                         {displayFeaturedMods.length > 0 && (
-                            <div className="relative hidden md:block w-full min-h-[600px] lg:min-h-[750px]">
+                            <div className="relative hidden lg:block w-full lg:min-h-[600px] 2xl:min-h-[750px]">
                                 <aside
-                                    className="absolute -inset-x-8 inset-y-0 px-8 flex gap-10 justify-end overflow-hidden animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
+                                    className="absolute -inset-x-4 2xl:-inset-x-8 inset-y-0 px-4 2xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
                                     style={{
                                         maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
                                         WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
@@ -606,7 +606,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         )}
 
                         {displayFeaturedMods.length > 0 && (
-                            <div className="w-full flex flex-col gap-6 md:hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 mt-10">
+                            <div className="w-full flex flex-col gap-6 lg:hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 mt-10">
                                 {displayFeaturedMods.slice(0, 3).map((mod, index) => (
                                     <FeaturedModCard key={`mobile-${mod.id}-${index}`} mod={mod} priority={index === 0} />
                                 ))}
@@ -615,13 +615,13 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     </div>
                 </section>
 
-                <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-28 space-y-40 py-40 relative z-20">
+                <div className="max-w-[112rem] mx-auto px-6 sm:px-12 lg:px-16 2xl:px-28 space-y-24 lg:space-y-32 2xl:space-y-40 py-24 lg:py-32 2xl:py-40 relative z-20">
 
-                    <section className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
-                        <div className="flex-1 space-y-8">
+                    <section className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-6 2xl:space-y-8">
                             <span className="text-blue-600 dark:text-blue-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-blue-50 dark:bg-blue-500/10 w-fit px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20">Version Management</span>
-                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Mods with Confidence.</h2>
-                            <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Mods with Confidence.</h2>
+                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                                 Finding the right file shouldn't be a puzzle. Modtale automatically matches game servers and client projects to your game version and makes it easy to review changelogs before you hit download.
                             </p>
                             <Link to="/mods" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-lg">
@@ -636,11 +636,11 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
                     </section>
 
-                    <section className="flex flex-col lg:flex-row-reverse items-center gap-16 lg:gap-24">
-                        <div className="flex-1 space-y-8">
+                    <section className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-6 2xl:space-y-8">
                             <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-emerald-50 dark:bg-emerald-500/10 w-fit px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20">Library Resolution</span>
-                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Mod Dependencies.</h2>
-                            <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Mod Dependencies.</h2>
+                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                                 Forget hunting down core libraries or confusing modpacks. Modtale analyzes scripting requirements and allows you to seamlessly download required plugins and optional maps in one swift action.
                             </p>
                         </div>
@@ -652,11 +652,11 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
                     </section>
 
-                    <section className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
-                        <div className="flex-1 space-y-8">
+                    <section className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-6 2xl:space-y-8">
                             <span className="text-purple-600 dark:text-purple-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-purple-50 dark:bg-purple-500/10 w-fit px-3 py-1 rounded-full border border-purple-100 dark:border-purple-500/20">Creator Tools</span>
-                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Advanced Creator Analytics.</h2>
-                            <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Advanced Creator Analytics.</h2>
+                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                                 Creators get access to powerful, privacy-respecting analytics. Track your daily modpack downloads, world page views, and week-over-week asset growth metrics instantly from your dashboard.
                             </p>
                             <Link to="/upload" className="inline-flex items-center font-bold text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 transition-colors group text-lg">
@@ -686,11 +686,11 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         </div>
                     </section>
 
-                    <section className="flex flex-col lg:flex-row-reverse items-center gap-16 lg:gap-24">
-                        <div className="flex-1 space-y-8">
+                    <section className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+                        <div className="flex-1 space-y-6 2xl:space-y-8">
                             <span className="text-amber-600 dark:text-amber-400 font-bold tracking-widest uppercase text-sm mb-2 block bg-amber-50 dark:bg-amber-500/10 w-fit px-3 py-1 rounded-full border border-amber-100 dark:border-amber-500/20">Community Hub</span>
-                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
-                            <p className="text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                            <h2 className="text-3xl md:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
+                            <p className="text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                                 Modtale keeps the Hytale community connected. Receive real-time alerts when tracked texture packs drop new updates, or when plugin developers reply directly to your feedback.
                             </p>
                         </div>
@@ -704,7 +704,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
 
                 </div>
 
-                <section className="py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl relative z-20">
+                <section className="py-20 lg:py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl relative z-20">
                     <div className="max-w-4xl mx-auto px-6 text-center">
                         <div className="w-20 h-20 bg-slate-200 dark:bg-slate-800 rounded-3xl mx-auto mb-8 flex items-center justify-center shadow-inner border border-slate-300/50 dark:border-white/5">
                             <Code className="w-10 h-10 text-slate-500 dark:text-slate-400" aria-hidden="true" />
