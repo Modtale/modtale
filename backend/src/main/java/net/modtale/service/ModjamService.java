@@ -180,8 +180,8 @@ public class ModjamService {
         for (Mod p : projectMap.values()) {
             if (visibleProjectIds.contains(p.getId()) && p.getComments() != null) {
                 for (net.modtale.model.resources.Comment c : p.getComments()) {
-                    if (!c.getUser().equals(p.getAuthor())) {
-                        userCommentCount.put(c.getUser(), userCommentCount.getOrDefault(c.getUser(), 0) + 1);
+                    if (!c.getUserId().equals(p.getAuthorId())) {
+                        userCommentCount.put(c.getUserId(), userCommentCount.getOrDefault(c.getUserId(), 0) + 1);
                     }
                 }
             }

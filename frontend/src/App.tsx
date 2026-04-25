@@ -39,10 +39,8 @@ import { ResetPassword } from './react-pages/auth/ResetPassword.tsx';
 import { MfaVerify } from './react-pages/auth/MfaVerify';
 import { Analytics } from './components/dashboard/Analytics.tsx';
 import NotFound from './components/ui/error/NotFound.tsx';
-
-const JamsList = lazy(() => import('./react-pages/jams/JamsList').then(module => ({ default: module.JamsList })));
-const JamDetail = lazy(() => import('./react-pages/jams/JamDetail').then(module => ({ default: module.JamDetail })));
-
+import { JamsList } from './react-pages/jams/JamsList';
+import { JamDetail } from './react-pages/jams/JamDetail';
 const ScrollToTop = () => {
     const { pathname } = useLocation();
     useEffect(() => {

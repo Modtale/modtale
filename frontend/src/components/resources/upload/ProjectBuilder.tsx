@@ -473,9 +473,8 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
         } catch (e: any) {
             let errorMsg = typeof e.response?.data === 'string'
                 ? e.response.data
-                : e.response?.data?.message || 'Failed to remove contributor.';
-            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
                 : e.response?.data?.message || e.message || 'Failed to remove contributor.';
+            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             onShowStatus('error', 'Error', errorMsg);
         } finally {
             setMemberToRemove(null);
@@ -775,22 +774,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
             )}
 
             {modData?.status === 'ARCHIVED' && (
-                <div className="bg-slate-800 border-b border-slate-700 px-8 py-3 flex items-center justify-between backdrop-blur-sm sticky top-0 z-50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-70 flex items-center justify-center">
-                            <Archive className="w-5 h-5 text-slate-400" />
-                        </div>
-                        <div>
-                            <div className="font-bold text-slate-300 leading-tight">Archived</div>
-                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Project is read-only</div>
-                        </div>
-                    </div>
-                    {handleRestore && (
-                        <button onClick={handleRestore} disabled={isLoading} className="bg-slate-700 hover:bg-slate-600 text-white w-40 h-9 rounded-lg text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
-                            {isLoading ? <Spinner className="w-3 h-3 text-white"/> : <RefreshCw className="w-3 h-3"/>}
-                            Restore Project
-                        </button>
-                    )}
                 <div className="bg-slate-800 border-b border-slate-700 backdrop-blur-sm sticky top-0 z-50">
                     <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1076,17 +1059,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                         </div>
                     </div>
                 </div>
-            {showPublishConfirm && handlePublish && createPortal(
-                <StatusModal
-                    type="info"
-                    title="Ready to publish?"
-                    message="Your project will be submitted for verification. Once approved, it will be live on Modtale."
-                    onClose={() => setShowPublishConfirm(false)}
-                    actionLabel="Submit Now"
-                    onAction={() => { setShowPublishConfirm(false); handlePublish(); }}
-                    secondaryLabel="Cancel"
-                />,
-                document.body
             )}
 
             {showCardPreview && createPortal(
@@ -1654,6 +1626,46 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         <div>
                                             <h3 className="text-sm font-bold text-slate-900 dark:text-white">HytaleModding Wiki</h3>
                                             <p className="text-xs text-slate-500 mt-0.5">Embed your <a href="https://wiki.hytalemodding.dev" target="_blank" rel="noopener noreferrer" className="text-modtale-accent hover:underline font-bold">HytaleModding Wiki</a> directly on your project page.</p>
+                                        </div>
+                                        <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, hmWikiEnabled: !prev.hmWikiEnabled} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA') ? 'opacity-50' : modData?.hmWikiEnabled ? 'text-green-500' : 'text-slate-600'}`}>{modData?.hmWikiEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                                    </div>
+
+                                    {modData?.hmWikiEnabled && (
+                                        <div className="mb-6 p-4 bg-slate-100 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-white/10 animate-in slide-in-from-top-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1 mb-2 block">Wiki Project Slug / ID</label>
+                                            <input
+                                                value={modData.hmWikiSlug || ''}
+                                                onChange={e => {
+                                                    markDirty();
+                                                    const newSlug = e.target.value;
+                                                    setModData(prev => prev ? {...prev, hmWikiSlug: newSlug} : null);
+                                                    setMetaData(prev => {
+                                                        const currentWiki = prev.links.WIKI || '';
+                                                        if (!currentWiki || /^https?:\/\/wiki\.hytalemodding\.dev\/mods?\//i.test(currentWiki)) {
+                                                            return {
+                                                                ...prev,
+                                                                links: {
+                                                                    ...prev.links,
+                                                                    WIKI: newSlug ? `https://wiki.hytalemodding.dev/mod/${newSlug}` : ''
+                                                                }
+                                                            };
+                                                        }
+                                                        return prev;
+                                                    });
+                                                }}
+                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                                placeholder="e.g., my-awesome-mod"
+                                                className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all"
+                                            />
+                                            <div className="mt-3 flex items-start gap-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 p-3 rounded-lg border border-blue-500/20 text-xs leading-relaxed">
+                                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                <div>
+                                                    Don't have a wiki yet? <a href="https://wiki.hytalemodding.dev" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-blue-500 transition-colors">Create one on HytaleModding first</a>, then link the URL slug here to display it on Modtale!
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {modData?.modjamIds && modData.modjamIds.length > 0 && (
                                         <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
                                             <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1"><Trophy className="w-4 h-4 inline mr-2 text-slate-500" /> Displayed Modjams</h3>
@@ -1695,51 +1707,6 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                                         </div>
                                                     );
                                                 })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="pt-2">
-                                        <h3 className="text-sm font-bold mb-2">Contributors</h3>
-                                        <div className="flex gap-2 mb-4">
-                                            <input disabled={readOnly} value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} placeholder="Username" className="flex-1 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm" />
-                                            <button onClick={handleInvite} disabled={readOnly || isInviting || !inviteUsername} className="bg-modtale-accent text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2"><UserPlus className="w-3 h-3" /> Invite</button>
-                                        </div>
-                                        <button disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} onClick={() => { markDirty(); setModData(prev => prev ? {...prev, hmWikiEnabled: !prev.hmWikiEnabled} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA') ? 'opacity-50' : modData?.hmWikiEnabled ? 'text-green-500' : 'text-slate-600'}`}>{modData?.hmWikiEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
-                                    </div>
-
-                                    {modData?.hmWikiEnabled && (
-                                        <div className="mb-4 p-4 bg-slate-100 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-white/10 animate-in slide-in-from-top-2">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1 mb-2 block">Wiki Project Slug / ID</label>
-                                            <input
-                                                value={modData.hmWikiSlug || ''}
-                                                onChange={e => {
-                                                    markDirty();
-                                                    const newSlug = e.target.value;
-                                                    setModData(prev => prev ? {...prev, hmWikiSlug: newSlug} : null);
-                                                    setMetaData(prev => {
-                                                        const currentWiki = prev.links.WIKI || '';
-                                                        if (!currentWiki || /^https?:\/\/wiki\.hytalemodding\.dev\/mods?\//i.test(currentWiki)) {
-                                                            return {
-                                                                ...prev,
-                                                                links: {
-                                                                    ...prev.links,
-                                                                    WIKI: newSlug ? `https://wiki.hytalemodding.dev/mod/${newSlug}` : ''
-                                                                }
-                                                            };
-                                                        }
-                                                        return prev;
-                                                    });
-                                                }}
-                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
-                                                placeholder="e.g., my-awesome-mod"
-                                                className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all"
-                                            />
-                                            <div className="mt-3 flex items-start gap-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 p-3 rounded-lg border border-blue-500/20 text-xs leading-relaxed">
-                                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                                <div>
-                                                    Don't have a wiki yet? <a href="https://wiki.hytalemodding.dev" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-blue-500 transition-colors">Create one on HytaleModding first</a>, then link the URL slug here to display it on Modtale!
-                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1869,7 +1836,7 @@ export const ProjectBuilder: React.FC<ProjectBuilderProps> = ({
                                         key={k}
                                         disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
                                         label={k.replace('_', ' ')}
-                                        value={metaData.links[k] || ''}
+                                        value={metaData.links[k as keyof typeof metaData.links] || ''}
                                         onChange={(e:any) => {
                                             markDirty();
                                             const newVal = e.target.value;
