@@ -11,6 +11,7 @@ import { SEOHead } from './components/SEOHead';
 import { Spinner } from './components/ui/Spinner';
 import { StatusModal } from './components/ui/StatusModal';
 import { OnboardingModal } from './components/user/OnboardingModal';
+import { ErrorBoundary } from './components/ui/error/ErrorBoundary'; // Added ErrorBoundary
 
 import type { Mod, Modpack, World, User } from './types';
 import { createSlug } from './utils/slug';
@@ -94,9 +95,11 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const fetchUser = async () => {
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
-            setUser(res.data);
-            if (res.data && (res.data as any).is_new_account) {
-                setShowOnboarding(true);
+            if (res.data) {
+                setUser(res.data);
+                if ((res.data as any).is_new_account) {
+                    setShowOnboarding(true);
+                }
             }
         } catch (e: any) {
             setUser(null);
@@ -192,113 +195,115 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                 />
 
                 <div className="flex-1">
-                    <Suspense fallback={<div className="p-20 flex justify-center"><Spinner /></div>}>
-                        <Routes>
-                            <Route path="/" element={<Home user={user} />} />
+                    <ErrorBoundary>
+                        <Suspense fallback={<div className="p-20 flex justify-center"><Spinner /></div>}>
+                            <Routes>
+                                <Route path="/" element={<Home user={user} />} />
 
-                            <Route path="/mods" element={renderBrowse()} />
-                            <Route path="/projects" element={<Navigate to="/mods" replace />} />
-                            <Route path="/plugins" element={renderBrowse('PLUGIN')} />
-                            <Route path="/modpacks" element={renderBrowse('MODPACK')} />
-                            <Route path="/worlds" element={renderBrowse('SAVE')} />
-                            <Route path="/art" element={renderBrowse('ART')} />
-                            <Route path="/data" element={renderBrowse('DATA')} />
+                                <Route path="/mods" element={renderBrowse()} />
+                                <Route path="/projects" element={<Navigate to="/mods" replace />} />
+                                <Route path="/plugins" element={renderBrowse('PLUGIN')} />
+                                <Route path="/modpacks" element={renderBrowse('MODPACK')} />
+                                <Route path="/worlds" element={renderBrowse('SAVE')} />
+                                <Route path="/art" element={renderBrowse('ART')} />
+                                <Route path="/data" element={renderBrowse('DATA')} />
 
-                            <Route path="/upload" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
-                            } />
+                                <Route path="/upload" element={
+                                    loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                        <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
+                                } />
 
-                            <Route path="/dashboard/*" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
-                                        <Navigate to="/" />
-                            } />
+                                <Route path="/dashboard/*" element={
+                                    loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                        user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
+                                            <Navigate to="/" />
+                                } />
 
-                            <Route path="/analytics/project/:id" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <Analytics /> :
-                                        <Navigate to="/" />
-                            } />
+                                <Route path="/analytics/project/:id" element={
+                                    loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                        user ? <Analytics /> :
+                                            <Navigate to="/" />
+                                } />
 
-                            <Route path="/mod/:id" element={renderModDetail()} />
-                            <Route path="/mod/:id/download" element={renderModDetail()} />
-                            <Route path="/mod/:id/changelog" element={renderModDetail()} />
-                            <Route path="/mod/:id/gallery" element={renderModDetail()} />
-                            <Route path="/mod/:id/wiki/*" element={renderModDetail()} />
-                            <Route path="/mod/:id/edit" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <EditMod currentUser={user} /> :
-                                        <Navigate to="/" />
-                            } />
+                                <Route path="/mod/:id" element={renderModDetail()} />
+                                <Route path="/mod/:id/download" element={renderModDetail()} />
+                                <Route path="/mod/:id/changelog" element={renderModDetail()} />
+                                <Route path="/mod/:id/gallery" element={renderModDetail()} />
+                                <Route path="/mod/:id/wiki/*" element={renderModDetail()} />
+                                <Route path="/mod/:id/edit" element={
+                                    loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                        user ? <EditMod currentUser={user} /> :
+                                            <Navigate to="/" />
+                                } />
 
-                            <Route path="/modpack/:id" element={renderModDetail()} />
-                            <Route path="/modpack/:id/download" element={renderModDetail()} />
-                            <Route path="/modpack/:id/changelog" element={renderModDetail()} />
-                            <Route path="/modpack/:id/gallery" element={renderModDetail()} />
-                            <Route path="/modpack/:id/wiki/*" element={renderModDetail()} />
-                            <Route path="/modpack/:id/edit" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <EditMod currentUser={user} /> :
-                                        <Navigate to="/" />
-                            } />
+                                <Route path="/modpack/:id" element={renderModDetail()} />
+                                <Route path="/modpack/:id/download" element={renderModDetail()} />
+                                <Route path="/modpack/:id/changelog" element={renderModDetail()} />
+                                <Route path="/modpack/:id/gallery" element={renderModDetail()} />
+                                <Route path="/modpack/:id/wiki/*" element={renderModDetail()} />
+                                <Route path="/modpack/:id/edit" element={
+                                    loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                        user ? <EditMod currentUser={user} /> :
+                                            <Navigate to="/" />
+                                } />
 
-                            <Route path="/world/:id" element={renderModDetail()} />
-                            <Route path="/world/:id/download" element={renderModDetail()} />
-                            <Route path="/world/:id/changelog" element={renderModDetail()} />
-                            <Route path="/world/:id/gallery" element={renderModDetail()} />
-                            <Route path="/world/:id/wiki/*" element={renderModDetail()} />
+                                <Route path="/world/:id" element={renderModDetail()} />
+                                <Route path="/world/:id/download" element={renderModDetail()} />
+                                <Route path="/world/:id/changelog" element={renderModDetail()} />
+                                <Route path="/world/:id/gallery" element={renderModDetail()} />
+                                <Route path="/world/:id/wiki/*" element={renderModDetail()} />
 
-                            <Route path="/creator/:username" element={
-                                <CreatorProfile
-                                    onModClick={handleModClick}
-                                    onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
-                                    onBack={() => handleNavigate('home')}
-                                    likedModIds={user?.likedModIds || []}
-                                    onToggleFavorite={handleToggleFavorite}
-                                    onToggleFavoriteModpack={handleToggleFavorite}
-                                    currentUser={user}
-                                    onRefreshUser={fetchUser}
-                                />
-                            } />
+                                <Route path="/creator/:username" element={
+                                    <CreatorProfile
+                                        onModClick={handleModClick}
+                                        onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
+                                        onBack={() => handleNavigate('home')}
+                                        likedModIds={user?.likedModIds || []}
+                                        onToggleFavorite={handleToggleFavorite}
+                                        onToggleFavoriteModpack={handleToggleFavorite}
+                                        currentUser={user}
+                                        onRefreshUser={fetchUser}
+                                    />
+                                } />
 
-                            <Route path="/verify" element={
-                                <VerifyEmail
-                                    user={user}
-                                    isDarkMode={isDarkMode}
-                                    toggleDarkMode={toggleDarkMode}
-                                    onLogout={handleLogout}
-                                    onNavigate={handleNavigate}
-                                    currentPage={location.pathname.replace('/', '')}
-                                    onAuthorClick={handleAuthorClick}
-                                />
-                            } />
+                                <Route path="/verify" element={
+                                    <VerifyEmail
+                                        user={user}
+                                        isDarkMode={isDarkMode}
+                                        toggleDarkMode={toggleDarkMode}
+                                        onLogout={handleLogout}
+                                        onNavigate={handleNavigate}
+                                        currentPage={location.pathname.replace('/', '')}
+                                        onAuthorClick={handleAuthorClick}
+                                    />
+                                } />
 
-                            <Route path="/reset-password" element={<ResetPassword />} />
+                                <Route path="/reset-password" element={<ResetPassword />} />
 
-                            <Route path="/mfa" element={
-                                <MfaVerify
-                                    user={user}
-                                    isDarkMode={isDarkMode}
-                                    toggleDarkMode={toggleDarkMode}
-                                    onLogout={handleLogout}
-                                    onNavigate={handleNavigate}
-                                    currentPage={location.pathname.replace('/', '')}
-                                    onAuthorClick={handleAuthorClick}
-                                />
-                            } />
+                                <Route path="/mfa" element={
+                                    <MfaVerify
+                                        user={user}
+                                        isDarkMode={isDarkMode}
+                                        toggleDarkMode={toggleDarkMode}
+                                        onLogout={handleLogout}
+                                        onNavigate={handleNavigate}
+                                        currentPage={location.pathname.replace('/', '')}
+                                        onAuthorClick={handleAuthorClick}
+                                    />
+                                } />
 
-                            <Route path="/terms" element={<TermsOfService />} />
-                            <Route path="/privacy" element={<PrivacyPolicy />} />
-                            <Route path="/api-docs" element={<ApiDocs />} />
-                            <Route path="/admin" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <AdminPanel currentUser={user} /> :
-                                        <Navigate to="/" />
-                            } />
-                            <Route path="*" element={<NotFound />} />
-                        </Routes>
-                    </Suspense>
+                                <Route path="/terms" element={<TermsOfService />} />
+                                <Route path="/privacy" element={<PrivacyPolicy />} />
+                                <Route path="/api-docs" element={<ApiDocs />} />
+                                <Route path="/admin" element={
+                                    loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                        user ? <AdminPanel currentUser={user} /> :
+                                            <Navigate to="/" />
+                                } />
+                                <Route path="*" element={<NotFound />} />
+                            </Routes>
+                        </Suspense>
+                    </ErrorBoundary>
                 </div>
                 <Footer isDarkMode={isDarkMode} />
             </div>
@@ -308,7 +313,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
 export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData }) => {
     return (
-        <SSRProvider data={ssrData}>
+        <SSRProvider data={ssrData || null}>
             <HelmetProvider>
                 <MobileProvider>
                     <ExternalLinkProvider>
@@ -318,7 +323,7 @@ export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData
                                     <AppContent initialClassification={initialClassification} />
                                 </StaticRouter>
                             ) : (
-                                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                                <BrowserRouter>
                                     <AppContent initialClassification={initialClassification} />
                                 </BrowserRouter>
                             )}
