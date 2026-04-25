@@ -49,7 +49,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
 
     return (
         <footer className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-white/5 py-12 mt-auto relative z-50">
-            <div className="max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto">
+            <div className="max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
 
                     <div className="col-span-2 md:col-span-1">

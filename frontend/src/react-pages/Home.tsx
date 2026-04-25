@@ -521,7 +521,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
 
-                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 lg:px-16 2xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-12 2xl:gap-20 items-stretch">
+                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-12 2xl:gap-20 items-stretch">
 
                         <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl animate-in fade-in duration-1000 py-4 lg:py-8 justify-center">
                             <img
@@ -592,7 +592,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         {displayFeaturedMods.length > 0 && (
                             <div className="relative hidden lg:block w-full lg:min-h-[600px] 2xl:min-h-[750px]">
                                 <aside
-                                    className="absolute -inset-x-4 2xl:-inset-x-8 inset-y-0 px-4 2xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
+                                    className="absolute -inset-x-4 xl:-inset-x-8 inset-y-0 px-4 xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden animate-in fade-in slide-in-from-right-12 duration-1000 delay-300"
                                     style={{
                                         maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
                                         WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
@@ -615,7 +615,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     </div>
                 </section>
 
-                <div className="max-w-[112rem] mx-auto px-6 sm:px-12 lg:px-16 2xl:px-28 space-y-24 lg:space-y-32 2xl:space-y-40 py-24 lg:py-32 2xl:py-40 relative z-20">
+                <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 space-y-24 lg:space-y-32 2xl:space-y-40 py-24 lg:py-32 2xl:py-40 relative z-20">
 
                     <section className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
                         <div className="flex-1 space-y-6 2xl:space-y-8">
