@@ -909,7 +909,6 @@ public class ModService {
                 Map<String, Object> body = new HashMap<>();
                 body.put("username", "Modtale");
                 body.put("avatar_url", frontendUrl + "/assets/favicon.png");
-                body.put("content", "A new project has been published!");
                 body.put("embeds", List.of(embed));
 
                 logger.info("Triggering Discord Webhook for project {}. Image URL: {}", mod.getId(), ogUrl);
