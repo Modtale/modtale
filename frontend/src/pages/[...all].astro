@@ -144,7 +144,7 @@ if (classification) {
                 const unique = Array.from(uniqueMap.values()).sort((a, b) => a.id.localeCompare(b.id));
 
                 initialData = {
-                    homeMods: unique,
+                    homeMods: unique || [],
                     stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }
                 };
 
@@ -197,9 +197,17 @@ if (classification) {
 
                     jsonLd = schemas;
                     ssrSuccessfullyCompleted = true;
+                } else {
+                    initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
                 }
             }
-        } catch (e) {}
+        } catch (e) {
+            if (isHome) {
+                initialData = { homeMods: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
+            } else {
+                initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
+            }
+        }
     }
 }
 else if (isBot && identifier && isProjectRoute) {
@@ -245,8 +253,12 @@ else if (isBot && identifier && isProjectRoute) {
             const schemas: any[] = [websiteSchema, appSchema, breadcrumbSchema];
             jsonLd = schemas;
             ssrSuccessfullyCompleted = true;
+        } else {
+            initialData = null;
         }
-    } catch (e) {}
+    } catch (e) {
+        initialData = null;
+    }
 }
 
 if (ssrSuccessfullyCompleted) {
