@@ -50,7 +50,6 @@ if (cleanPath === '' || cleanPath === '/') {
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
 const identifier = all ? all.split('/').pop() : '';
-
 const isProjectRoute = cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
 
 let image = (isProjectRoute && identifier)
@@ -103,11 +102,7 @@ function getSecondsUntilNextUpdate() {
     const now = new Date();
     const nextUpdate = new Date(now);
     nextUpdate.setUTCHours(0, 35, 0, 0);
-
-    if (now > nextUpdate) {
-        nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
-    }
-
+    if (now > nextUpdate) nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
     return Math.max(60, Math.floor((nextUpdate.getTime() - now.getTime()) / 1000));
 }
 
@@ -140,7 +135,6 @@ if (classification) {
 
                 const uniqueMap = new Map();
                 combined.forEach(m => uniqueMap.set(m.id, m));
-
                 const unique = Array.from(uniqueMap.values()).sort((a, b) => a.id.localeCompare(b.id));
 
                 initialData = {
@@ -152,7 +146,6 @@ if (classification) {
                 const schemas: any[] = [websiteSchema];
                 if (homeListSchema) schemas.push(homeListSchema);
                 jsonLd = schemas;
-
                 ssrSuccessfullyCompleted = true;
 
             } else {
@@ -167,11 +160,10 @@ if (classification) {
                 else if (view === 'trending') categoryParam = '&category=trending';
 
                 const searchParamStr = qParam ? `&search=${encodeURIComponent(qParam)}` : '';
-
                 const tagsVal = searchParams.get('tags') || '';
                 const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
-
                 const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
+
                 const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
 
                 const res = await fetch(endpoint, {
@@ -202,28 +194,24 @@ if (classification) {
                 }
             }
         } catch (e) {
-            if (isHome) {
-                initialData = { homeMods: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
-            } else {
-                initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
-            }
+            console.error("[SSR] List Fetch Error:", e);
+            initialData = isHome
+                ? { homeMods: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } }
+                : { browseData: { content: [], totalElements: 0, totalPages: 0 } };
         }
     }
-}
-else if (isBot && identifier && isProjectRoute) {
+} else if (isBot && identifier && isProjectRoute) {
     try {
         const res = await fetch(`${BACKEND_URL}/api/v1/projects/${identifier}`);
-
         if (res.ok) {
             const modData = await res.json();
-
             const projectUrl = getProjectUrl(modData);
+
             if (cleanPath !== projectUrl.replace(/\/$/, "")) {
                 return Astro.redirect(projectUrl, 301);
             }
 
             initialData = modData;
-
             const meta = generateProjectMeta(modData);
             if (meta) {
                 title = meta.title;
@@ -250,70 +238,11 @@ else if (isBot && identifier && isProjectRoute) {
             const fullCrumbs = [...crumbs, { name: modData.title, url: projectUrl }];
             const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
 
-                jsonLd = [appSchema, breadcrumbSchema];
-            }
-        } catch (e) {
-            console.error("[SSR] Bot Fetch Error:", e);
-        }
-    } else {
-        try {
-            let classification = null;
-            let isHome = false;
-            let isJams = false;
-
-            if (cleanPath === '/plugins') classification = 'PLUGIN';
-            else if (cleanPath === '/modpacks') classification = 'MODPACK';
-            else if (cleanPath === '/worlds') classification = 'SAVE';
-            else if (cleanPath === '/art') classification = 'ART';
-            else if (cleanPath === '/data') classification = 'DATA';
-            else if (cleanPath === '/jams') isJams = true;
-            else if (cleanPath === '' || cleanPath === '/') {
-                classification = 'ALL';
-                isHome = true;
-            }
-
-            if (classification) {
-                const endpoint = classification === 'ALL'
-                    ? `${API_URL}/projects?size=12&sort=relevance`
-                    : `${API_URL}/projects?classification=${classification}&size=12&sort=relevance`;
-
-                const res = await fetch(endpoint);
-
-                if (res.ok) {
-                    const data = await res.json();
-                    const items = data.content || [];
-
-                    const listSchema = generateItemListSchema(items);
-                    const crumbs = isHome ? [] : getBreadcrumbsForClassification(classification);
-                    const breadcrumbSchema = isHome ? null : generateBreadcrumbSchema(crumbs);
-
-                    const schemas = [];
-                    if (isHome) schemas.push(websiteSchema);
-                    if (listSchema) schemas.push(listSchema);
-                    if (breadcrumbSchema) schemas.push(breadcrumbSchema);
-
-                    if (schemas.length > 0) jsonLd = schemas;
-                }
-            } else if (isJams) {
-                const res = await fetch(`${API_URL}/modjams`);
-                if (res.ok) {
-                    const jams = await res.json();
-                    const listSchema = generateItemListSchema(jams.map((j: any) => ({...j, classification: 'JAM'})));
-                    if (listSchema) jsonLd = [websiteSchema, listSchema];
-                }
-            }
-        } catch (e) {
-            console.error("[SSR] Bot List Fetch Error:", e);
-        }
-    }
-            const schemas: any[] = [websiteSchema, appSchema, breadcrumbSchema];
-            jsonLd = schemas;
+            jsonLd = [websiteSchema, appSchema, breadcrumbSchema];
             ssrSuccessfullyCompleted = true;
-        } else {
-            initialData = null;
         }
     } catch (e) {
-        initialData = null;
+        console.error("[SSR] Bot Project Fetch Error:", e);
     }
 }
 
