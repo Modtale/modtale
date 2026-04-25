@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +41,8 @@ public class CommentMigrationRunner implements CommandLineRunner {
 
         int processedCount = 0;
         int updatedCount = 0;
+        int deletedCommentsCount = 0;
+        int deletedRepliesCount = 0;
 
         try (MongoCursor<Document> cursor = collection.find(query).iterator()) {
             while (cursor.hasNext()) {
@@ -48,26 +51,57 @@ public class CommentMigrationRunner implements CommandLineRunner {
 
                 List<Document> comments = projectDoc.getList("comments", Document.class);
                 if (comments != null) {
-                    for (Document comment : comments) {
-                        // Migrate main comment
-                        if (!comment.containsKey("userId") && comment.containsKey("user")) {
-                            String username = comment.getString("user");
-                            String resolvedId = resolveUserId(username);
+                    Iterator<Document> iterator = comments.iterator();
 
-                            if (resolvedId != null) {
-                                comment.put("userId", resolvedId);
-                                modified = true;
+                    while (iterator.hasNext()) {
+                        Document comment = iterator.next();
+                        boolean keepComment = true;
+
+                        // Migrate main comment
+                        if (!comment.containsKey("userId")) {
+                            if (comment.containsKey("user") && comment.getString("user") != null) {
+                                String username = comment.getString("user");
+                                String resolvedId = resolveUserId(username);
+
+                                if (resolvedId != null) {
+                                    comment.put("userId", resolvedId);
+                                    modified = true;
+                                } else {
+                                    keepComment = false; // Cannot resolve user, must delete.
+                                }
+                            } else {
+                                keepComment = false; // Missing user context entirely.
                             }
+                        }
+
+                        if (!keepComment) {
+                            iterator.remove();
+                            deletedCommentsCount++;
+                            modified = true;
+                            continue; // Skip to next comment, this one is purged
                         }
 
                         // Migrate developer reply if present
                         Document reply = (Document) comment.get("developerReply");
-                        if (reply != null && !reply.containsKey("userId") && reply.containsKey("user")) {
-                            String replyUsername = reply.getString("user");
-                            String resolvedReplyId = resolveUserId(replyUsername);
+                        if (reply != null && !reply.containsKey("userId")) {
+                            boolean keepReply = true;
+                            if (reply.containsKey("user") && reply.getString("user") != null) {
+                                String replyUsername = reply.getString("user");
+                                String resolvedReplyId = resolveUserId(replyUsername);
 
-                            if (resolvedReplyId != null) {
-                                reply.put("userId", resolvedReplyId);
+                                if (resolvedReplyId != null) {
+                                    reply.put("userId", resolvedReplyId);
+                                    modified = true;
+                                } else {
+                                    keepReply = false;
+                                }
+                            } else {
+                                keepReply = false;
+                            }
+
+                            if (!keepReply) {
+                                comment.remove("developerReply");
+                                deletedRepliesCount++;
                                 modified = true;
                             }
                         }
@@ -85,8 +119,10 @@ public class CommentMigrationRunner implements CommandLineRunner {
 
                 processedCount++;
 
+                // Semi-regular logging to track progress
                 if (processedCount % 50 == 0) {
-                    logger.info("Migration progress: {} projects processed, {} projects updated so far...", processedCount, updatedCount);
+                    logger.info("Migration progress: {} projects processed, {} updated. Deleted {} comments, {} replies.",
+                            processedCount, updatedCount, deletedCommentsCount, deletedRepliesCount);
                 }
             }
         } catch (Exception e) {
@@ -96,6 +132,9 @@ public class CommentMigrationRunner implements CommandLineRunner {
         logger.info("Comment migration complete");
         logger.info("Total projects processed: {}", processedCount);
         logger.info("Total projects updated: {}", updatedCount);
+        logger.info("Total invalid comments deleted: {}", deletedCommentsCount);
+        logger.info("Total invalid replies deleted: {}", deletedRepliesCount);
+        logger.info("=======================================================");
     }
 
     private String resolveUserId(String username) {
