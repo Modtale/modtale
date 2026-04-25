@@ -206,7 +206,6 @@ export const ApiDocs: React.FC = () => {
                             <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
                                 All authenticated API requests must be directed to <code>https://api.modtale.net</code>.
                                 Include your API key in the request header to identify your client and get higher limits.
-
                             </p>
 
                             <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 border border-white/10 overflow-x-auto mb-8 max-w-full">
@@ -262,7 +261,7 @@ export const ApiDocs: React.FC = () => {
 
                     <section className="w-full">
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <Database className="w-6 h-6 text-slate-400" /> Metadata & Enums
+                            <Database className="w-6 h-6 text-slate-400" /> Metadata & System
                         </h2>
                         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
                             <Endpoint
@@ -320,6 +319,7 @@ export const ApiDocs: React.FC = () => {
                                 method="GET"
                                 path="/api/v1/projects"
                                 desc="Search projects with advanced filtering. Authentication is required only for specific 'category' filters like Favorites."
+                                auth={false}
                                 params={{
                                     "search": "string (Keywords)",
                                     "page": "int (0-based, default 0)",
@@ -331,6 +331,8 @@ export const ApiDocs: React.FC = () => {
                                     "category": "string ('Favorites' | 'Your Projects' - Requires Auth)",
                                     "author": "string (Filter by Author Username)",
                                     "creator": "string (Alias for author)",
+                                    "minDownloads": "int",
+                                    "minFavorites": "int",
                                     "dateRange": "enum (7d, 30d, 90d, 1y, all)"
                                 }}
                                 response={`{
@@ -381,16 +383,58 @@ export const ApiDocs: React.FC = () => {
 
                             <Endpoint
                                 method="GET"
+                                path="/api/v1/projects/{id}/meta"
+                                desc="Get a lightweight metadata payload for a project."
+                                response={`{
+  "title": "Super Tools",
+  "description": "Adds powerful tools...",
+  "icon": "https://cdn.modtale.net/...",
+  "author": "ModDev123",
+  "classification": "PLUGIN",
+  "downloads": 15420,
+  "repositoryUrl": "https://github.com/...",
+  "slug": "super-tools"
+}`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/{id}/versions/{version}/dependencies"
+                                desc="Get dependencies mapped to a specific project version."
+                                params={{
+                                    "id": "string (Project UUID or Slug)",
+                                    "version": "string (SemVer)"
+                                }}
+                                response={`[
+  {
+    "modId": "dependency-uuid",
+    "title": "Library Mod",
+    "versionNumber": "1.2.0",
+    "optional": false
+  }
+]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
                                 path="/api/v1/projects/user/contributed"
                                 auth={true}
                                 desc="Get a paginated list of all projects the authenticated user owns or has contributed to."
+                                params={{
+                                    "page": "int (default 0)",
+                                    "size": "int (default 100)"
+                                }}
                                 response={`{ "content": [ ...projects ], "totalPages": 1 }`}
                             />
 
                             <Endpoint
                                 method="GET"
-                                path="/api/v1/creators/{username}/projects"
-                                desc="Get projects owned by a specific creator or organization."
+                                path="/api/v1/creators/{userId}/projects"
+                                desc="Get projects owned by a specific creator or organization by their ID."
+                                params={{
+                                    "page": "int (default 0)",
+                                    "size": "int (default 10)"
+                                }}
                                 response={`{ "content": [ ...projects ] }`}
                             />
                         </div>
@@ -398,7 +442,7 @@ export const ApiDocs: React.FC = () => {
 
                     <section className="w-full">
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <FileText className="w-6 h-6 text-slate-400" /> Project Management
+                            <FileText className="w-6 h-6 text-slate-400" /> Project Lifecycle & Management
                         </h2>
                         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
                             <div className="mb-8 p-4 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">
@@ -406,7 +450,14 @@ export const ApiDocs: React.FC = () => {
                                     <Code className="w-4 h-4"/> Project Lifecycle
                                 </h4>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Projects transition through these states:</p>
-
+                                <ul className="text-xs text-slate-500 dark:text-slate-400 list-disc list-inside">
+                                    <li><b>DRAFT</b>: Editable, invisible to public.</li>
+                                    <li><b>PENDING</b>: Locked, awaiting admin review.</li>
+                                    <li><b>PUBLISHED</b>: Publicly visible and searchable.</li>
+                                    <li><b>UNLISTED</b>: Publicly accessible via direct URL, hidden from search.</li>
+                                    <li><b>ARCHIVED</b>: Read-only, publicly visible, no longer receiving updates.</li>
+                                    <li><b>DELETED</b>: Pending permanent purge or soft-deleted if retained for dependencies.</li>
+                                </ul>
                             </div>
 
                             <Endpoint
@@ -458,9 +509,9 @@ export const ApiDocs: React.FC = () => {
 
                             <Endpoint
                                 method="POST"
-                                path="/api/v1/projects/{id}/publish"
+                                path="/api/v1/projects/{id}/submit"
                                 auth={true}
-                                desc="Submit a draft for publishing. This makes the project public."
+                                desc="Submit a draft for admin review."
                                 validation={[
                                     "Must have at least one Version uploaded (except Modpacks).",
                                     "Must have a valid License (except Modpacks).",
@@ -472,9 +523,17 @@ export const ApiDocs: React.FC = () => {
 
                             <Endpoint
                                 method="POST"
-                                path="/api/v1/projects/{id}/submit"
+                                path="/api/v1/projects/{id}/revert"
                                 auth={true}
-                                desc="Submit a project for admin review."
+                                desc="Revert a PENDING project back to DRAFT state."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/publish"
+                                auth={true}
+                                desc="Publish a project (Requires Admin, or restoring an Unlisted/Archived project)."
                                 response={`200 OK`}
                             />
 
@@ -499,52 +558,7 @@ export const ApiDocs: React.FC = () => {
                                 path="/api/v1/projects/{id}"
                                 auth={true}
                                 desc="Delete a project."
-                                note="If the project is a dependency for other active projects, it will be 'Soft Deleted' (metadata scrubbed, files kept) to prevent breaking modpacks. Otherwise, it is permanently purged."
-                                response={`200 OK`}
-                            />
-                        </div>
-                    </section>
-
-                    <section className="w-full">
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <Image className="w-6 h-6 text-slate-400" /> Media & Assets
-                        </h2>
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
-                            <Endpoint
-                                method="PUT"
-                                path="/api/v1/projects/{id}/icon"
-                                auth={true}
-                                desc="Upload project icon."
-                                validation={["Aspect Ratio: Exactly 1:1", "Formats: PNG, JPEG, WebP", "Max Size: 2MB"]}
-                                params={{ "file": "MultipartFile (Binary)" }}
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="PUT"
-                                path="/api/v1/projects/{id}/banner"
-                                auth={true}
-                                desc="Upload project banner."
-                                validation={["Aspect Ratio: Exactly 3:1", "Formats: PNG, JPEG, WebP", "Max Size: 4MB"]}
-                                params={{ "file": "MultipartFile (Binary)" }}
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="POST"
-                                path="/api/v1/projects/{id}/gallery"
-                                auth={true}
-                                desc="Add an image to the gallery."
-                                params={{ "file": "MultipartFile (Binary)" }}
-                                response={`"https://cdn.modtale.net/gallery/image.png"`}
-                            />
-
-                            <Endpoint
-                                method="DELETE"
-                                path="/api/v1/projects/{id}/gallery"
-                                auth={true}
-                                desc="Remove an image from the gallery."
-                                params={{ "imageUrl": "string (Full URL)" }}
+                                note="If the project is a dependency for other active projects, it will be 'Soft Deleted' (metadata scrubbed, files kept) to prevent breaking modpacks. Otherwise, it is permanently purged after 30 days."
                                 response={`200 OK`}
                             />
                         </div>
@@ -563,7 +577,6 @@ export const ApiDocs: React.FC = () => {
                                          When a user downloads a Modpack, the API dynamically generates a ZIP file containing the manifest and all dependent files.
                                      </span>
                                 </p>
-
                             </div>
 
                             <Endpoint
@@ -576,6 +589,7 @@ export const ApiDocs: React.FC = () => {
                                     "File is required for standard projects (JAR/ZIP).",
                                     "File is ignored for Modpacks.",
                                     "Modpacks must have at least 2 dependencies.",
+                                    "Max 5 versions per day, 30 per month."
                                 ]}
                                 params={{
                                     "versionNumber": "string (Required, X.Y.Z)",
@@ -616,16 +630,43 @@ export const ApiDocs: React.FC = () => {
                             <Endpoint
                                 method="GET"
                                 path="/api/v1/projects/{id}/versions/{version}/download-url"
+                                auth={true}
                                 desc="Generate a temporary, signed download link for a version."
                                 response={`{
-  "downloadUrl": "/download/token-uuid",
+  "downloadUrl": "/api/v1/download/token-uuid",
   "expiresIn": 300
 }`}
                             />
 
                             <Endpoint
                                 method="GET"
+                                path="/api/v1/download/{token}"
+                                desc="Download a file or modpack zip using a pre-signed token."
+                                response={`<Binary Stream>`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/{id}/versions/{version}/download-bundle-url"
+                                auth={true}
+                                desc="Generate a temporary, signed download link to download a mod and all its dependencies bundled."
+                                response={`{
+  "downloadUrl": "/api/v1/download-bundle/token-uuid",
+  "expiresIn": 300
+}`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/download-bundle/{token}"
+                                desc="Download a bundled zip using a pre-signed token."
+                                response={`<Binary Stream>`}
+                            />
+
+                            <Endpoint
+                                method="GET"
                                 path="/api/v1/version/{hash}"
+                                auth={true}
                                 desc="Lookup version details by file hash (SHA-256)."
                                 response={`{ "id": "v1", "versionNumber": "1.0.0", "projectId": "..." }`}
                             />
@@ -634,15 +675,172 @@ export const ApiDocs: React.FC = () => {
 
                     <section className="w-full">
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <ArrowRightLeft className="w-6 h-6 text-slate-400" /> Collaboration
+                            <Image className="w-6 h-6 text-slate-400" /> Media & Assets
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/icon"
+                                auth={true}
+                                desc="Upload project icon."
+                                validation={["Aspect Ratio: Exactly 1:1", "Formats: PNG, JPEG, WebP", "Max Size: 5MB"]}
+                                params={{ "file": "MultipartFile (Binary)" }}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/banner"
+                                auth={true}
+                                desc="Upload project banner."
+                                validation={["Aspect Ratio: Exactly 3:1", "Formats: PNG, JPEG, WebP", "Max Size: 5MB"]}
+                                params={{ "file": "MultipartFile (Binary)" }}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/gallery"
+                                auth={true}
+                                desc="Add an image to the gallery."
+                                validation={["Aspect Ratio: Exactly 16:9", "Formats: PNG, JPEG, WebP", "Max Size: 5MB", "Max 20 images per project"]}
+                                params={{ "file": "MultipartFile (Binary)" }}
+                                response={`"https://cdn.modtale.net/gallery/image.png"`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/gallery"
+                                auth={true}
+                                desc="Remove an image from the gallery."
+                                params={{ "imageUrl": "string (Full URL)" }}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/og/project/{identifier}"
+                                desc="Dynamically generate an Open Graph image for the project card."
+                                response={`<Image Stream (JPEG)>`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Activity className="w-6 h-6 text-slate-400" /> Comments & Social Actions
                         </h2>
                         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
                             <Endpoint
                                 method="POST"
+                                path="/api/v1/projects/{id}/favorite"
+                                auth={true}
+                                desc="Toggle favorite status for a project."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments"
+                                auth={true}
+                                desc="Post a comment on a project."
+                                body={`{
+  "content": "Amazing mod!"
+}`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/comments/{commentId}"
+                                auth={true}
+                                desc="Edit an existing comment."
+                                body={`{ "content": "Updated text" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/comments/{commentId}"
+                                auth={true}
+                                desc="Delete a comment."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments/{commentId}/reply"
+                                auth={true}
+                                desc="Developer reply to a comment."
+                                body={`{ "reply": "Thanks for playing!" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments/{commentId}/vote"
+                                auth={true}
+                                desc="Upvote or downvote a user comment."
+                                params={{ "upvote": "boolean" }}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments/{commentId}/reply/vote"
+                                auth={true}
+                                desc="Upvote or downvote a developer reply."
+                                params={{ "upvote": "boolean" }}
+                                response={`200 OK`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <ArrowRightLeft className="w-6 h-6 text-slate-400" /> Collaboration & Roles
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/roles"
+                                auth={true}
+                                desc="Create a custom role for a project."
+                                body={`{ "name": "Artist", "color": "#ff0000", "permissions": ["VERSION_CREATE"] }`}
+                                response={`{ ...projectObj }`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/roles/{roleId}"
+                                auth={true}
+                                desc="Update a project role."
+                                body={`{ "name": "Lead Artist", "color": "#00ff00", "permissions": ["VERSION_CREATE"] }`}
+                                response={`{ ...projectObj }`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/roles/{roleId}"
+                                auth={true}
+                                desc="Delete a project role (must have no assigned members)."
+                                response={`{ ...projectObj }`}
+                            />
+
+                            <Endpoint
+                                method="POST"
                                 path="/api/v1/projects/{id}/invite"
                                 auth={true}
-                                desc="Invite a contributor (Individual Project only, not Org)."
-                                params={{ "username": "string" }}
+                                desc="Invite a contributor."
+                                body={`{ "userId": "uuid", "roleId": "role-uuid" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/invites/{userId}"
+                                auth={true}
+                                desc="Cancel a pending invite."
                                 response={`200 OK`}
                             />
 
@@ -663,8 +861,17 @@ export const ApiDocs: React.FC = () => {
                             />
 
                             <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/contributors/{userId}"
+                                auth={true}
+                                desc="Update a team member's role."
+                                body={`{ "roleId": "new-role-uuid" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
                                 method="DELETE"
-                                path="/api/v1/projects/{id}/contributors/{username}"
+                                path="/api/v1/projects/{id}/contributors/{userId}"
                                 auth={true}
                                 desc="Remove a contributor."
                                 response={`200 OK`}
@@ -675,7 +882,7 @@ export const ApiDocs: React.FC = () => {
                                 path="/api/v1/projects/{id}/transfer"
                                 auth={true}
                                 desc="Initiate ownership transfer to another User or Organization."
-                                body={`{ "username": "TargetUsername" }`}
+                                body={`{ "userId": "TargetUserId" }`}
                                 response={`200 OK`}
                             />
 
@@ -692,112 +899,13 @@ export const ApiDocs: React.FC = () => {
 
                     <section className="w-full">
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <Users className="w-6 h-6 text-slate-400" /> Organizations
-                        </h2>
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
-                            <Endpoint
-                                method="POST"
-                                path="/api/v1/orgs"
-                                auth={true}
-                                desc="Create a new Organization."
-                                body={`{ "name": "MyStudio" }`}
-                                response={`{
-  "id": "org-uuid",
-  "username": "MyStudio",
-  "accountType": "ORGANIZATION",
-  "organizationMembers": [
-    { "userId": "your-id", "role": "ADMIN" }
-  ]
-}`}
-                            />
-
-                            <Endpoint
-                                method="GET"
-                                path="/api/v1/user/orgs"
-                                auth={true}
-                                desc="List organizations you belong to."
-                                response={`[ { "id": "...", "username": "MyStudio", "role": "ADMIN" } ]`}
-                            />
-
-                            <Endpoint
-                                method="GET"
-                                path="/api/v1/orgs/{username}/members"
-                                auth={true}
-                                desc="Get public members of an organization."
-                                response={`[ { "username": "User1", "roles": ["ADMIN"], "avatarUrl": "..." } ]`}
-                            />
-
-                            <Endpoint
-                                method="POST"
-                                path="/api/v1/orgs/{id}/members"
-                                auth={true}
-                                desc="Invite a user to the organization (Admin only)."
-                                body={`{ "username": "NewMember", "role": "MEMBER" }`}
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="PUT"
-                                path="/api/v1/orgs/{id}/members/{userId}"
-                                auth={true}
-                                desc="Update member role (ADMIN/MEMBER)."
-                                body={`{ "role": "ADMIN" }`}
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="DELETE"
-                                path="/api/v1/orgs/{id}/members/{userId}"
-                                auth={true}
-                                desc="Remove member / Leave organization."
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="PUT"
-                                path="/api/v1/orgs/{id}"
-                                auth={true}
-                                desc="Update organization profile."
-                                body={`{ "displayName": "My Studio", "bio": "We make mods." }`}
-                                response={`{ ...updatedUserObj }`}
-                            />
-
-                            <Endpoint
-                                method="DELETE"
-                                path="/api/v1/orgs/{id}"
-                                auth={true}
-                                desc="Delete organization."
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="POST"
-                                path="/api/v1/orgs/{id}/avatar"
-                                auth={true}
-                                desc="Upload organization avatar."
-                                params={{ "file": "MultipartFile" }}
-                                response={`"url"`}
-                            />
-
-                            <Endpoint
-                                method="POST"
-                                path="/api/v1/orgs/{id}/banner"
-                                auth={true}
-                                desc="Upload organization banner."
-                                params={{ "file": "MultipartFile" }}
-                                response={`"url"`}
-                            />
-                        </div>
-                    </section>
-
-                    <section className="w-full">
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                             <User className="w-6 h-6 text-slate-400" /> User Profile & Settings
                         </h2>
                         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
                             <Endpoint
                                 method="GET"
                                 path="/api/v1/users/search"
+                                auth={true}
                                 desc="Public user search."
                                 params={{ "query": "string" }}
                                 response={`[ { "username": "Modder", "avatarUrl": "..." } ]`}
@@ -806,9 +914,17 @@ export const ApiDocs: React.FC = () => {
                             <Endpoint
                                 method="POST"
                                 path="/api/v1/users/batch"
-                                desc="Batch retrieve user profiles by username."
-                                body={`{ "usernames": ["User1", "User2"] }`}
+                                auth={true}
+                                desc="Batch retrieve user profiles by IDs."
+                                body={`{ "userIds": ["id1", "id2"] }`}
                                 response={`[ { "username": "User1", ... }, { "username": "User2", ... } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/lookup/{username}"
+                                desc="Resolve a username to a user ID."
+                                response={`{ "id": "user-uuid" }`}
                             />
 
                             <Endpoint
@@ -826,6 +942,22 @@ export const ApiDocs: React.FC = () => {
   "followingIds": ["u2"],
   "notificationPreferences": { ... }
 }`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/user/me"
+                                auth={true}
+                                desc="Permanently delete user account."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/profile/{userId}"
+                                auth={true}
+                                desc="Get public user profile details."
+                                response={`{ "username": "Creator123", "bio": "...", "avatarUrl": "..." }`}
                             />
 
                             <Endpoint
@@ -859,20 +991,6 @@ export const ApiDocs: React.FC = () => {
                             />
 
                             <Endpoint
-                                method="GET"
-                                path="/api/v1/users/{username}/following"
-                                desc="Get list of users this user follows."
-                                response={`[ { "username": "..." } ]`}
-                            />
-
-                            <Endpoint
-                                method="GET"
-                                path="/api/v1/users/{username}/followers"
-                                desc="Get list of users following this user."
-                                response={`[ { "username": "..." } ]`}
-                            />
-
-                            <Endpoint
                                 method="PUT"
                                 path="/api/v1/user/settings/notifications"
                                 auth={true}
@@ -881,14 +999,15 @@ export const ApiDocs: React.FC = () => {
   "projectUpdates": "EMAIL",
   "newFollowers": "ON",
   "dependencyUpdates": "OFF",
-  "creatorUploads": "ON"
+  "creatorUploads": "ON",
+  "newComments": "ON"
 }`}
                                 response={`200 OK`}
                             />
 
                             <Endpoint
                                 method="POST"
-                                path="/api/v1/user/follow/{targetUsername}"
+                                path="/api/v1/user/follow/{targetId}"
                                 auth={true}
                                 desc="Follow a user."
                                 response={`200 OK`}
@@ -896,17 +1015,191 @@ export const ApiDocs: React.FC = () => {
 
                             <Endpoint
                                 method="POST"
-                                path="/api/v1/user/unfollow/{targetUsername}"
+                                path="/api/v1/user/unfollow/{targetId}"
                                 auth={true}
                                 desc="Unfollow a user."
                                 response={`200 OK`}
                             />
 
                             <Endpoint
-                                method="DELETE"
-                                path="/api/v1/user/me"
+                                method="GET"
+                                path="/api/v1/users/{userId}/following"
                                 auth={true}
-                                desc="Permanently delete user account."
+                                desc="Get list of users this user follows."
+                                response={`[ { "username": "..." } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/{userId}/followers"
+                                auth={true}
+                                desc="Get list of users following this user."
+                                response={`[ { "username": "..." } ]`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Users className="w-6 h-6 text-slate-400" /> Organizations
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs"
+                                auth={true}
+                                desc="Create a new Organization."
+                                body={`{ "name": "MyStudio" }`}
+                                response={`{
+  "id": "org-uuid",
+  "username": "MyStudio",
+  "accountType": "ORGANIZATION",
+  "organizationMembers": [
+    { "userId": "your-id", "roleId": "role-id" }
+  ]
+}`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/orgs"
+                                auth={true}
+                                desc="List organizations you belong to."
+                                response={`[ { "id": "...", "username": "MyStudio" } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/{userId}/organizations"
+                                auth={true}
+                                desc="List organizations another user belongs to."
+                                response={`[ { "id": "...", "username": "MyStudio" } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/orgs/{orgId}/members"
+                                auth={true}
+                                desc="Get members of an organization."
+                                response={`[ { "username": "User1", "roles": ["ADMIN"], "avatarUrl": "..." } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/orgs/{orgId}/invites"
+                                auth={true}
+                                desc="Get pending invites for an organization."
+                                response={`[ { "username": "InvitedUser", "id": "..." } ]`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/roles"
+                                auth={true}
+                                desc="Create a custom role for an organization."
+                                body={`{ "name": "Dev", "color": "#000", "permissions": ["PROJECT_CREATE"] }`}
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/orgs/{orgId}/roles/{roleId}"
+                                auth={true}
+                                desc="Update an organization role."
+                                body={`{ "name": "Lead Dev", "color": "#111", "permissions": ["PROJECT_CREATE"] }`}
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/roles/{roleId}"
+                                auth={true}
+                                desc="Delete an organization role."
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/members"
+                                auth={true}
+                                desc="Invite a user to the organization."
+                                body={`{ "userId": "TargetUserId", "roleId": "RoleId" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/members/{userId}"
+                                auth={true}
+                                desc="Remove member / Leave organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/orgs/{orgId}/members/{userId}"
+                                auth={true}
+                                desc="Update member role."
+                                body={`{ "roleId": "NewRoleId" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/orgs/{orgId}"
+                                auth={true}
+                                desc="Update organization profile."
+                                body={`{ "displayName": "My Studio", "bio": "We make mods." }`}
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}"
+                                auth={true}
+                                desc="Delete organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/avatar"
+                                auth={true}
+                                desc="Upload organization avatar."
+                                params={{ "file": "MultipartFile" }}
+                                response={`"url"`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/banner"
+                                auth={true}
+                                desc="Upload organization banner."
+                                params={{ "file": "MultipartFile" }}
+                                response={`"url"`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/invite/accept"
+                                auth={true}
+                                desc="Accept an invite to an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/invite/decline"
+                                auth={true}
+                                desc="Decline an invite to an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/invites/{userId}"
+                                auth={true}
+                                desc="Cancel a pending organization invite."
                                 response={`200 OK`}
                             />
                         </div>
@@ -914,7 +1207,86 @@ export const ApiDocs: React.FC = () => {
 
                     <section className="w-full">
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <Bell className="w-6 h-6 text-slate-400" /> Notifications & Analytics
+                            <Layers className="w-6 h-6 text-slate-400" /> Connections & Repositories
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/user/connections/{provider}/toggle-visibility"
+                                auth={true}
+                                desc="Toggle visibility of an OAuth connection on your profile."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/user/connections/{provider}"
+                                auth={true}
+                                desc="Unlink an OAuth connection."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/link/prepare"
+                                auth={true}
+                                desc="Prepare a session to link an OAuth account to an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/connections/{provider}/toggle-visibility"
+                                auth={true}
+                                desc="Toggle visibility of an organization connection."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/connections/{provider}"
+                                auth={true}
+                                desc="Unlink an OAuth connection from an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/repos/github"
+                                auth={true}
+                                desc="Get the authenticated user's GitHub repositories."
+                                response={`[ { "name": "my-repo", "url": "https://github.com/...", "private": false } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/repos/gitlab"
+                                auth={true}
+                                desc="Get the authenticated user's GitLab repositories."
+                                response={`[ { "name": "my-repo", "url": "https://gitlab.com/...", "private": false } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/repos"
+                                auth={true}
+                                desc="Alias for /api/v1/user/repos/github."
+                                response={`[ ...repos ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/orgs/{orgId}/repos/github"
+                                auth={true}
+                                desc="Get the organization's GitHub repositories."
+                                response={`[ { "name": "org-repo", "url": "https://github.com/...", "private": false } ]`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Bell className="w-6 h-6 text-slate-400" /> Notifications
                         </h2>
                         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
                             <Endpoint
@@ -945,6 +1317,14 @@ export const ApiDocs: React.FC = () => {
 
                             <Endpoint
                                 method="POST"
+                                path="/api/v1/notifications/{id}/unread"
+                                auth={true}
+                                desc="Mark notification as unread."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
                                 path="/api/v1/notifications/read-all"
                                 auth={true}
                                 desc="Mark all notifications as read."
@@ -952,58 +1332,23 @@ export const ApiDocs: React.FC = () => {
                             />
 
                             <Endpoint
-                                method="GET"
-                                path="/api/v1/projects/{id}/analytics"
-                                desc="Get public stats for a project."
-                                params={{ "range": "30d | 90d | 1y" }}
-                                response={`{ "views": 500, "downloads": 120, "history": [...] }`}
-                            />
-                        </div>
-                    </section>
-
-                    <section className="w-full">
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                            <Activity className="w-6 h-6 text-slate-400" /> Social Actions
-                        </h2>
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
-                            <Endpoint
-                                method="POST"
-                                path="/api/v1/projects/{id}/favorite"
+                                method="DELETE"
+                                path="/api/v1/notifications/{id}"
                                 auth={true}
-                                desc="Toggle favorite status for a project."
+                                desc="Delete a single notification."
                                 response={`200 OK`}
                             />
 
                             <Endpoint
-                                method="POST"
-                                path="/api/v1/projects/{id}/comments"
+                                method="DELETE"
+                                path="/api/v1/notifications/clear-all"
                                 auth={true}
-                                desc="Post a comment."
-                                body={`{
-  "content": "Amazing mod!"
-}`}
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="PUT"
-                                path="/api/v1/projects/{id}/comments/{commentId}"
-                                auth={true}
-                                desc="Edit your comment."
-                                body={`{ "content": "Updated text" }`}
-                                response={`200 OK`}
-                            />
-
-                            <Endpoint
-                                method="POST"
-                                path="/api/v1/projects/{id}/comments/{commentId}/reply"
-                                auth={true}
-                                desc="Developer reply to a comment."
-                                body={`{ "reply": "Thanks!" }`}
+                                desc="Delete all notifications."
                                 response={`200 OK`}
                             />
                         </div>
                     </section>
+
                 </div>
             </div>
         </div>
