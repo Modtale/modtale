@@ -76,19 +76,22 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
             setLoadingCreator(true);
             setNotFound(false);
             try {
-                const userRes = await api.get(`/user/profile/${username}`);
+                const lookupRes = await api.get(`/users/lookup/${username}`);
+                const userId = lookupRes.data.id;
+
+                const userRes = await api.get(`/user/profile/${userId}`);
                 const userData = userRes.data;
                 setCreator(userData);
 
                 if (userData.accountType === 'ORGANIZATION') {
                     try {
-                        const membersRes = await api.get(`/orgs/${username}/members`);
+                        const membersRes = await api.get(`/orgs/${userData.id}/members`);
                         setOrgMembers(membersRes.data);
                     } catch (e) {
                     }
                 } else {
                     try {
-                        const orgsRes = await api.get(`/users/${username}/organizations`);
+                        const orgsRes = await api.get(`/users/${userData.id}/organizations`);
                         setMemberOrgs(orgsRes.data);
                     } catch (e) {
                     }
@@ -105,18 +108,16 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
     }, [username]);
 
     const fetchProjects = useCallback(async () => {
-        if (!username) return;
+        if (!creator?.id) return;
 
         setLoadingProjects(true);
         try {
             const params = {
-                author: username,
                 page,
                 size: itemsPerPage,
-                sort: 'newest',
             };
 
-            const projectsRes = await api.get('/projects', { params });
+            const projectsRes = await api.get(`/creators/${creator.id}/projects`, { params });
 
             setProjects(projectsRes.data.content);
             setTotalPages(projectsRes.data.totalPages);
@@ -126,14 +127,15 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         } finally {
             setLoadingProjects(false);
         }
-    }, [username, page, itemsPerPage]);
+    }, [creator?.id, page, itemsPerPage]);
 
     useEffect(() => {
+        if (!creator?.id) return;
         const timer = setTimeout(() => {
             fetchProjects();
         }, 300);
         return () => clearTimeout(timer);
-    }, [fetchProjects]);
+    }, [fetchProjects, creator?.id]);
 
     const handleToggleFollow = async () => {
         if (!currentUser) { navigate('/login'); return; }
@@ -141,8 +143,8 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         const previousState = actualIsFollowing;
         setIsFollowingOptimistic(!previousState);
         try {
-            if (previousState) await api.post(`/user/unfollow/${creator.username}`);
-            else await api.post(`/user/follow/${creator.username}`);
+            if (previousState) await api.post(`/user/unfollow/${creator.id}`);
+            else await api.post(`/user/follow/${creator.id}`);
             if (onRefreshUser) onRefreshUser();
         } catch (e) {
             setIsFollowingOptimistic(previousState);
@@ -200,7 +202,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         return item.classification === 'MODPACK' ? `/modpack/${slug}` : (item.classification === 'SAVE' ? `/world/${slug}` : `/mod/${slug}`);
     };
 
-    if (loadingCreator) return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark"><Spinner fullScreen /></div>;
+    if (loadingCreator) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950"><Spinner fullScreen /></div>;
     if (notFound) return <NotFound />;
     if (!creator) return <div className="min-h-screen flex flex-col items-center justify-center"><h2 className="text-2xl font-bold">Creator not found</h2><button onClick={onBack}>Go Back</button></div>;
 
@@ -211,27 +213,31 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
         projects: totalItems
     };
 
+    const isSelf = currentUser?.id === creator.id;
+
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-20">
-            <ReportModal
-                isOpen={showReportModal}
-                onClose={() => setShowReportModal(false)}
-                targetId={creator.id}
-                targetType="USER"
-                targetTitle={creator.username}
-            />
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+            {creator && (
+                <ReportModal
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    targetId={creator.id}
+                    targetType="USER"
+                    targetTitle={creator.username}
+                />
+            )}
 
             <ProfileLayout
                 user={creator}
                 stats={stats}
                 isFollowing={actualIsFollowing}
                 onToggleFollow={handleToggleFollow}
-                isSelf={currentUser?.username === creator.username}
+                isSelf={isSelf}
                 isLoggedIn={!!currentUser}
                 onBack={onBack}
-                onReport={() => setShowReportModal(true)}
+                onReport={!isSelf ? () => setShowReportModal(true) : undefined}
             >
-                <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16">
+                <div className="w-full">
                     {creator.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
                         <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -239,27 +245,33 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                 Organization Members
                             </h2>
                             <div className="flex flex-wrap gap-4">
-                                {orgMembers.map(member => (
-                                    <Link
-                                        key={member.id}
-                                        to={`/creator/${member.username}`}
-                                        className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
-                                    >
-                                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
-                                            {member.avatarUrl ? (
-                                                <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <span className="font-bold text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
-                                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                                {creator.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                                {orgMembers.map(member => {
+                                    const membership = creator.organizationMembers?.find(m => m.userId === member.id);
+                                    const role = creator.organizationRoles?.find(r => r.id === membership?.roleId);
+                                    const roleName = role?.name || 'Member';
+
+                                    return (
+                                        <Link
+                                            key={member.id}
+                                            to={`/creator/${member.username}`}
+                                            className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
+                                        >
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
+                                                {member.avatarUrl ? (
+                                                    <img src={member.avatarUrl} alt={member.username} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="font-bold text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
+                                                )}
                                             </div>
-                                        </div>
-                                    </Link>
-                                ))}
+                                            <div>
+                                                <div className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent transition-colors text-sm">{member.username}</div>
+                                                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                    {roleName}
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -275,7 +287,7 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                                     <Link
                                         key={org.id}
                                         to={`/creator/${org.username}`}
-                                        className="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group"
+                                        className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
                                             {org.avatarUrl ? (
@@ -304,11 +316,18 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                     </h2>
 
                     {loadingProjects && page === 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                            {[...Array(itemsPerPage)].map((_, i) => <div key={i} className="h-[280px] bg-white dark:bg-white/5 rounded-xl animate-pulse border border-slate-200 dark:border-white/5" />)}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-4 md:gap-6 mt-4">
+                            {[...Array(itemsPerPage)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="h-[154px] bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-2xl animate-pulse border border-slate-200 dark:border-white/10 relative overflow-hidden"
+                                >
+                                    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                                </div>
+                            ))}
                         </div>
                     ) : projects.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 gap-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-4 md:gap-6 mt-4">
                             {projects.map((project) => (
                                 <div key={project.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <ModCard
@@ -345,8 +364,8 @@ export const CreatorProfile: React.FC<CreatorProfileProps> = ({
                             <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-white/10"></div>
                             <form onSubmit={handleJump} className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-slate-500 uppercase">Go to</span>
-                                <input type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-12 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-1 text-sm font-bold text-center dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent transition-all" placeholder="#" />
-                                <button type="submit" disabled={!jumpPage} className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white dark:hover:bg-modtale-accent text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-50"><CornerDownLeft className="w-4 h-4" /></button>
+                                <input type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-12 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 px-1 text-sm font-bold text-center dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent transition-all backdrop-blur-md" placeholder="#" />
+                                <button type="submit" disabled={!jumpPage} className="w-10 h-10 flex items-center justify-center rounded-lg bg-white/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white dark:hover:bg-modtale-accent text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-50 backdrop-blur-md"><CornerDownLeft className="w-4 h-4" /></button>
                             </form>
                         </div>
                     )}

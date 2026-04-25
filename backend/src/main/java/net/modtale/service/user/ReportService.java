@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class ReportService {
 
+    @Autowired private UserService userService;
     @Autowired private ReportRepository reportRepository;
     @Autowired private ModRepository modRepository;
     @Autowired private UserRepository userRepository;
@@ -35,7 +36,7 @@ public class ReportService {
 
     private final Map<String, Bucket> reportBuckets = new ConcurrentHashMap<>();
 
-    public void createReport(String targetId, Report.TargetType targetType, String reason, String description, User reporter) {
+    public Report createReport(String targetId, Report.TargetType targetType, String reason, String description, User reporter) {
         Bucket bucket = reportBuckets.computeIfAbsent(reporter.getId(),
                 k -> Bucket.builder()
                         .addLimit(Bandwidth.classic(reportsPerDay, Refill.greedy(reportsPerDay, Duration.ofDays(1))))
@@ -67,7 +68,7 @@ public class ReportService {
 
             if (commentOpt.isPresent()) {
                 String content = commentOpt.get().getContent();
-                targetSummary = "Comment by " + commentOpt.get().getUser() + ": " +
+                targetSummary = "Comment by " + userService.getPublicProfile(commentOpt.get().getId()).getUsername() + ": " +
                         (content.length() > 50 ? content.substring(0, 47) + "..." : content);
             }
         }
@@ -85,11 +86,15 @@ public class ReportService {
         report.setStatus(Report.ReportStatus.OPEN);
         report.setCreatedAt(LocalDateTime.now());
 
-        reportRepository.save(report);
+        return reportRepository.save(report);
     }
 
     public List<Report> getOpenReports() {
-        return reportRepository.findByStatus(Report.ReportStatus.OPEN);
+        return getReportsByStatus(Report.ReportStatus.OPEN);
+    }
+
+    public List<Report> getReportsByStatus(Report.ReportStatus status) {
+        return reportRepository.findByStatus(status);
     }
 
     public void resolveReport(String reportId, Report.ReportStatus status, String note, User admin) {
@@ -102,10 +107,18 @@ public class ReportService {
 
         reportRepository.save(report);
 
+        String message = "Your report regarding " + report.getTargetSummary() + " has been " + status.name().toLowerCase() + ".";
+
+        if (note != null && !note.trim().isEmpty()) {
+            message += "\n\nModerator response: " + note;
+        }
+
+        String title = status == Report.ReportStatus.RESOLVED ? "Report Resolved" : "Report Dismissed";
+
         notificationService.sendNotification(
                 List.of(report.getReporterId()),
-                "Report Resolved",
-                "Your report regarding " + report.getTargetSummary() + " has been resolved.",
+                title,
+                message,
                 URI.create("/dashboard"),
                 null
         );

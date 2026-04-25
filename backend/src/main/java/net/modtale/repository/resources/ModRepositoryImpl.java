@@ -179,23 +179,6 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
         pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
         pipeline.add(Aggregation.limit(pageable.getPageSize()));
 
-        pipeline.add(Aggregation.addFields()
-                .addField("versions")
-                .withValue(ArrayOperators.Slice.sliceArrayOf("versions").itemCount(1))
-                .build());
-
-        pipeline.add(Aggregation.project()
-                .andExclude(
-                        "about",
-                        "comments",
-                        "galleryImages",
-                        "contributors",
-                        "pendingInvites",
-                        "modIds",
-                        "childProjectIds"
-                )
-        );
-
         Aggregation mainAgg = Aggregation.newAggregation(Mod.class, pipeline);
         List<Mod> results = mongoTemplate.aggregate(mainAgg, Mod.class, Mod.class).getMappedResults();
 
@@ -230,18 +213,6 @@ public class ModRepositoryImpl implements ModRepositoryCustom {
                     Criteria.where("description").regex(regex, "i")
             ));
         }
-
-        query.fields()
-                .slice("versions", 1)
-                .exclude(
-                        "about",
-                        "comments",
-                        "galleryImages",
-                        "contributors",
-                        "pendingInvites",
-                        "modIds",
-                        "childProjectIds"
-                );
 
         query.with(pageable);
         List<Mod> list = mongoTemplate.find(query, Mod.class);

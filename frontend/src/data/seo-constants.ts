@@ -6,7 +6,13 @@ export const DEFAULT_SEO = {
     keywords: "hytale mods, hytale modding, download hytale mods, hytale plugins, hytale maps, hytale modpacks, hytale servers, modtale"
 };
 
-export const ROUTE_SEO: Record<string, { title: string, description: string, h1?: string, keywords: string }> = {
+export const ROUTE_SEO: Record<string, { title: string, description: string, h1: string, keywords: string }> = {
+    '/mods': {
+        title: "Hytale Mods | Modtale",
+        h1: "Hytale Mods",
+        description: "Browse and download the best Hytale mods. Enhance your gameplay with custom items, blocks, creatures, and new mechanics.",
+        keywords: "hytale mods, download hytale mods, best hytale mods, hytale addons, custom items, hytale modding"
+    },
     '/plugins': {
         title: "Hytale Plugins & Server Scripts | Modtale",
         h1: "Hytale Plugins",
@@ -52,6 +58,34 @@ export const getCategorySEO = (classification: Classification | 'All') => {
         case 'SAVE': return ROUTE_SEO['/worlds'];
         case 'ART': return ROUTE_SEO['/art'];
         case 'DATA': return ROUTE_SEO['/data'];
-        default: return { ...DEFAULT_SEO, h1: null };
+        default: return { ...DEFAULT_SEO, h1: 'Modtale - Hytale Mods, Maps & Plugins' };
     }
+};
+
+export const generateDynamicSEO = (baseSEO: { title: string, description: string }, page: number, sort: string, view: string, query: string) => {
+    let dynamicTitle = baseSEO.title;
+    let dynamicDesc = baseSEO.description;
+
+    let prefix = "";
+    if (sort === 'popular' || view === 'popular') prefix = "Popular ";
+    else if (sort === 'trending' || view === 'trending') prefix = "Trending ";
+    else if (sort === 'newest') prefix = "Newest ";
+    else if (sort === 'updated') prefix = "Recently Updated ";
+    else if (view === 'hidden_gems') prefix = "Hidden Gems: ";
+
+    if (prefix) {
+        dynamicTitle = `${prefix}${dynamicTitle.replace(' | Modtale', '')} | Modtale`;
+    }
+
+    if (query) {
+        dynamicTitle = `Search results for "${query}" - ${dynamicTitle}`;
+        dynamicDesc = `Search results for "${query}". ${dynamicDesc}`;
+    }
+
+    if (page > 0) {
+        dynamicTitle = `${dynamicTitle} - Page ${page + 1}`;
+        dynamicDesc = `${dynamicDesc} Page ${page + 1}.`;
+    }
+
+    return { title: dynamicTitle, description: dynamicDesc };
 };

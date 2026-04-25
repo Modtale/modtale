@@ -14,8 +14,8 @@ export const BROWSE_VIEWS = [
 
 export const GLOBAL_TAGS = [
     'Adventure', 'RPG', 'Sci-Fi', 'Fantasy', 'Survival', 'Magic', 'Tech', 'Exploration',
-    'Minigame', 'PvP', 'Parkour', 'Hardcore', 'Skyblock', 'Puzzle', 'Quests',
-    'Economy', 'Protection', 'Admin Tools', 'Chat', 'Anti-Cheat', 'Performance',
+    'Minigame', 'PvP', 'Parkour', 'Hardcore', 'Skyblock', 'Puzzle', 'Quests', 'Mobs',
+    'Economy', 'Protection', 'Admin Tools', 'Chat', 'Anti-Cheat', 'Performance', 'NPCs',
     'Library', 'API', 'Mechanics', 'World Gen', 'Recipes', 'Loot Tables', 'Functions',
     'Decoration', 'Vanilla+', 'Kitchen Sink', 'City', 'Landscape', 'Spawn', 'Lobby',
     'Medieval', 'Modern', 'Futuristic', 'Models', 'Textures', 'Animations', 'Particles'

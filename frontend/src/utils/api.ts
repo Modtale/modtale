@@ -1,7 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 
 const RAW_URL =
-    import.meta.env.PUBLIC_API_URL;
+    import.meta.env.PUBLIC_API_URL?.trim() || 'http://localhost:8080/api/v1';
 
 export const API_BASE_URL = RAW_URL.endsWith('/')
     ? RAW_URL.slice(0, -1)
@@ -27,7 +27,7 @@ export const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
     headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'Content-Type': 'application/json'
     }
 });

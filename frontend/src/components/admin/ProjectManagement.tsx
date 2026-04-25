@@ -22,6 +22,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
     const [restoreTargetStatus, setRestoreTargetStatus] = useState<string>('PUBLISHED');
     const [targetVersionId, setTargetVersionId] = useState<string | null>(null);
     const [confirmInput, setConfirmInput] = useState('');
+    const [actionReason, setActionReason] = useState('');
 
     const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
@@ -95,12 +96,23 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
         }
     };
 
-    const selectProject = (mod: Mod) => {
+    const selectProject = async (mod: Mod) => {
         setFoundProject(mod);
         setQuery(mod.title);
         setIdQuery(mod.id);
         setShowResults(false);
         setConfirmAction(null);
+        setActionReason('');
+
+        setLoading(true);
+        try {
+            const res = await api.get(`/admin/projects/${mod.id}`);
+            setFoundProject(res.data);
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch full project details.' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const openRawEdit = () => {
@@ -169,12 +181,12 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
         try {
             if (confirmAction === 'DELETE') {
                 if (confirmInput !== foundProject.id) return;
-                await api.delete(`/admin/projects/${foundProject.id}`);
+                await api.delete(`/admin/projects/${foundProject.id}`, { params: { reason: actionReason } });
                 setStatus({ type: 'success', title: 'Deleted', msg: 'Project soft-deleted. It will be permanently removed in 30 days.' });
                 setFoundProject({ ...foundProject, status: 'DELETED' });
             } else if (confirmAction === 'HARD_DELETE') {
                 if (confirmInput !== foundProject.id) return;
-                await api.delete(`/admin/projects/${foundProject.id}/hard`);
+                await api.delete(`/admin/projects/${foundProject.id}/hard`, { params: { reason: actionReason } });
                 setStatus({ type: 'success', title: 'Deleted', msg: 'Project permanently deleted.' });
                 setFoundProject(null);
                 setQuery('');
@@ -186,7 +198,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                     ...foundProject,
                     status: restoreTargetStatus as Mod['status']
                 });            } else if (confirmAction === 'UNLIST') {
-                await api.post(`/admin/projects/${foundProject.id}/unlist`);
+                await api.post(`/admin/projects/${foundProject.id}/unlist`, { reason: actionReason });
                 setStatus({ type: 'success', title: 'Unlisted', msg: 'Project is now unlisted.' });
                 setFoundProject({ ...foundProject, status: 'UNLISTED' });
             } else if (confirmAction === 'DELETE_VER' && targetVersionId) {
@@ -197,6 +209,7 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
             }
             setConfirmAction(null);
             setConfirmInput('');
+            setActionReason('');
             setTargetVersionId(null);
         } catch (e: any) {
             setStatus({ type: 'error', title: 'Action Failed', msg: e.response?.data || 'An error occurred.' });
@@ -496,6 +509,18 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
                                     </div>
                                 )}
 
+                                {(confirmAction === 'DELETE' || confirmAction === 'HARD_DELETE' || confirmAction === 'UNLIST') && (
+                                    <div className="mb-6">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Reason for User Notification</label>
+                                        <textarea
+                                            value={actionReason}
+                                            onChange={e => setActionReason(e.target.value)}
+                                            placeholder="Explain why this action is being taken..."
+                                            className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm outline-none resize-y min-h-[80px] font-medium text-slate-900 dark:text-white"
+                                        />
+                                    </div>
+                                )}
+
                                 {(confirmAction === 'DELETE' || confirmAction === 'HARD_DELETE') && (
                                     <div className="mb-6">
                                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
@@ -513,12 +538,12 @@ export const ProjectManagement: React.FC<{ setStatus: (s: any) => void }> = ({ s
 
                                 <div className="flex gap-3">
                                     <button
-                                        onClick={() => { setConfirmAction(null); setConfirmInput(''); setTargetVersionId(null); setRestoreTargetStatus('PUBLISHED'); }}
+                                        onClick={() => { setConfirmAction(null); setConfirmInput(''); setTargetVersionId(null); setRestoreTargetStatus('PUBLISHED'); setActionReason(''); }}
                                         className="flex-1 py-3 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
                                     >Cancel</button>
                                     <button
                                         onClick={handleAction}
-                                        disabled={((confirmAction === 'DELETE' || confirmAction === 'HARD_DELETE') && confirmInput !== foundProject.id) || loading}
+                                        disabled={((confirmAction === 'DELETE' || confirmAction === 'HARD_DELETE') && confirmInput !== foundProject.id) || loading || ((confirmAction === 'DELETE' || confirmAction === 'HARD_DELETE' || confirmAction === 'UNLIST') && !actionReason)}
                                         className={`flex-1 py-3 font-bold rounded-xl disabled:opacity-50 transition-colors shadow-lg ${
                                             confirmAction === 'RESTORE'
                                                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'

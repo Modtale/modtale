@@ -1,5 +1,5 @@
 import React from 'react';
-import { Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Activity } from 'lucide-react';
+import { Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
@@ -47,16 +47,9 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
 
     const linkClass = "flex items-center text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors";
 
-    const homeLikePages = ['/', '/plugins', '/modpacks', '/worlds', '/art', 'data'];
-    const isHomeLayout = homeLikePages.includes(path);
-
-    const containerClasses = isHomeLayout
-        ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
-        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
-
     return (
         <footer className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-white/5 py-12 mt-auto relative z-50">
-            <div className={`${containerClasses} mx-auto`}>
+            <div className="max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
 
                     <div className="col-span-2 md:col-span-1">

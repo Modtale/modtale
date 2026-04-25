@@ -173,6 +173,16 @@ Modtale is free software: you can redistribute it and/or modify it under the ter
 
 Please refer to [CONTRIBUTING.md](https://github.com/Modtale/modtale?tab=contributing-ov-file) for guidelines on submitting pull requests and reporting issues.
 
+---
+
+## Star History
+
+<div align="center">
+  <a href="https://www.star-history.com/#Modtale/modtale&Date">
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Modtale/modtale&type=Date" />
+  </a>
+</div>
+
 <div align="center">
 <p>© 2026 Modtale. The Hytale Community Repository.</p>
 </div>

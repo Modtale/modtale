@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.io.Serializable;
 
 @Document(collection = "users")
@@ -56,8 +57,9 @@ public class User implements Serializable {
     private List<String> roles;
 
     private AccountType accountType = AccountType.USER;
-    private List<OrganizationMember> organizationMembers = new ArrayList<>();
 
+    private List<OrganizationRole> organizationRoles = new ArrayList<>();
+    private List<OrganizationMember> organizationMembers = new ArrayList<>();
     private List<OrganizationMember> pendingOrgInvites = new ArrayList<>();
 
     private List<String> likedModIds = new ArrayList<>();
@@ -103,21 +105,52 @@ public class User implements Serializable {
         USER, ORGANIZATION
     }
 
+    public static class OrganizationRole implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private String id;
+        private String name;
+        private String color;
+        private Set<ApiKey.ApiPermission> permissions;
+        private boolean isOwner;
+
+        public OrganizationRole() {}
+        public OrganizationRole(String id, String name, String color, Set<ApiKey.ApiPermission> permissions) {
+            this.id = id;
+            this.name = name;
+            this.color = color;
+            this.permissions = permissions;
+        }
+
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getColor() { return color; }
+        public void setColor(String color) { this.color = color; }
+        public Set<ApiKey.ApiPermission> getPermissions() { return permissions; }
+        public void setPermissions(Set<ApiKey.ApiPermission> permissions) { this.permissions = permissions; }
+        public boolean isOwner() { return isOwner; }
+        public void setOwner(boolean owner) { isOwner = owner; }
+    }
+
     public static class OrganizationMember implements Serializable {
         private static final long serialVersionUID = 1L;
         private String userId;
         private String role;
+        private String roleId;
 
         public OrganizationMember() {}
-        public OrganizationMember(String userId, String role) {
+        public OrganizationMember(String userId, String roleId) {
             this.userId = userId;
-            this.role = role;
+            this.roleId = roleId;
         }
 
         public String getUserId() { return userId; }
         public void setUserId(String userId) { this.userId = userId; }
         public String getRole() { return role; }
         public void setRole(String role) { this.role = role; }
+        public String getRoleId() { return roleId; }
+        public void setRoleId(String roleId) { this.roleId = roleId; }
     }
 
     public static class NotificationPreferences implements Serializable {
@@ -223,6 +256,10 @@ public class User implements Serializable {
 
     public AccountType getAccountType() { return accountType; }
     public void setAccountType(AccountType accountType) { this.accountType = accountType; }
+
+    public List<OrganizationRole> getOrganizationRoles() { return organizationRoles; }
+    public void setOrganizationRoles(List<OrganizationRole> organizationRoles) { this.organizationRoles = organizationRoles; }
+
     public List<OrganizationMember> getOrganizationMembers() { return organizationMembers; }
     public void setOrganizationMembers(List<OrganizationMember> organizationMembers) { this.organizationMembers = organizationMembers; }
 

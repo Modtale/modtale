@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/user/api-keys")
@@ -21,6 +22,16 @@ public class ApiKeyController {
 
     @Autowired
     private UserService userService;
+
+    public static class CreateKeyRequest {
+        private String name;
+        private Map<String, Set<ApiKey.ApiPermission>> contextPermissions;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public Map<String, Set<ApiKey.ApiPermission>> getContextPermissions() { return contextPermissions; }
+        public void setContextPermissions(Map<String, Set<ApiKey.ApiPermission>> contextPermissions) { this.contextPermissions = contextPermissions; }
+    }
 
     @GetMapping
     public ResponseEntity<List<ApiKey>> getMyKeys() {
@@ -35,7 +46,7 @@ public class ApiKeyController {
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, String>> createKey(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> createKey(@RequestBody CreateKeyRequest payload) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
@@ -44,14 +55,19 @@ public class ApiKeyController {
                     .body(Map.of("error", "Email verification required."));
         }
 
-        String name = payload.get("name");
+        String name = payload.getName();
         if (name == null || name.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
 
-        String rawKey = apiKeyService.createApiKey(user.getId(), name);
-
-        return ResponseEntity.ok(Map.of("key", rawKey));
+        try {
+            String rawKey = apiKeyService.createApiKey(user.getId(), name, payload.getContextPermissions());
+            return ResponseEntity.ok(Map.of("key", rawKey));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/{id}")

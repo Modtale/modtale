@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Github, Mail, ArrowRight, Loader2, ArrowLeft, Smartphone } from 'lucide-react';
 import { BACKEND_URL, api } from '../../utils/api';
@@ -112,7 +112,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl max-w-sm w-full shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl max-w-sm w-full shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                     <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
                         <X className="w-5 h-5" />
@@ -164,9 +164,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                             </div>
 
                             <div className="relative mb-6 flex items-center gap-3">
-                                <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+                                <div className="flex-1 border-t border-slate-200 dark:border-white/10"></div>
                                 <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">or use email</span>
-                                <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+                                <div className="flex-1 border-t border-slate-200 dark:border-white/10"></div>
                             </div>
                         </>
                     )}
@@ -174,13 +174,13 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {mode === 'register' && (
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-white uppercase">Username</label>
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase pl-1">Username</label>
                                 <input
                                     type="text"
                                     required
                                     value={username}
                                     onChange={e => setUsername(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white"
+                                    className="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                     placeholder="Display name"
                                 />
                             </div>
@@ -188,7 +188,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
                         {(mode === 'signin' || mode === 'register' || mode === 'forgot-password') && (
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-white uppercase">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase pl-1">
                                     {mode === 'signin' ? 'Email or Username' : 'Email'}
                                 </label>
                                 <input
@@ -196,7 +196,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                                     required
                                     value={mode === 'signin' ? (username || email) : email}
                                     onChange={e => mode === 'signin' ? setUsername(e.target.value) : setEmail(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white"
+                                    className="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                     placeholder={mode === 'signin' ? "user@example.com" : "user@example.com"}
                                 />
                             </div>
@@ -204,13 +204,13 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
                         {(mode === 'signin' || mode === 'register') && (
                             <div className="space-y-1">
-                                <div className="flex justify-between items-center">
-                                    <label className="text-xs font-bold text-white uppercase">Password</label>
+                                <div className="flex justify-between items-center pl-1">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Password</label>
                                     {mode === 'signin' && (
                                         <button
                                             type="button"
                                             onClick={() => setMode('forgot-password')}
-                                            className="text-xs text-modtale-accent hover:text-modtale-accentHover font-medium"
+                                            className="text-xs text-modtale-accent hover:text-modtale-accentHover font-bold"
                                         >
                                             Forgot?
                                         </button>
@@ -222,7 +222,7 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
                                     minLength={6}
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white"
+                                    className="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                     placeholder="••••••••"
                                 />
                             </div>
@@ -230,59 +230,59 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => 
 
                         {mode === 'mfa' && (
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-white uppercase">Authentication Code</label>
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase pl-1">Authentication Code</label>
                                 <div className="relative">
                                     <input
                                         type="text"
                                         required
                                         value={mfaCode}
                                         onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                        className="w-full px-3 py-2.5 pl-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm font-mono tracking-widest text-center text-slate-900 dark:text-white"
+                                        className="w-full px-4 py-3 pl-12 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-xl font-mono tracking-widest text-center text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                         placeholder="000 000"
                                         autoFocus
                                     />
-                                    <Smartphone className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+                                    <Smartphone className="absolute left-4 top-3.5 w-6 h-6 text-slate-400" />
                                 </div>
                             </div>
                         )}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-white text-slate-900 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors active:scale-95 duration-200 shadow-lg"
-                    >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                            <>
-                                {mode === 'signin' ? 'Sign In' : (mode === 'register' ? 'Create Account' : (mode === 'mfa' ? 'Verify Code' : 'Send Reset Link'))}
-                                <ArrowRight className="w-4 h-4" />
-                            </>
-                        )}
-                    </button>
-                </form>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-modtale-accentHover transition-colors active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20 mt-2"
+                        >
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                                <>
+                                    {mode === 'signin' ? 'Sign In' : (mode === 'register' ? 'Create Account' : (mode === 'mfa' ? 'Verify Code' : 'Send Reset Link'))}
+                                    <ArrowRight className="w-5 h-5" />
+                                </>
+                            )}
+                        </button>
+                    </form>
 
-                <div className="mt-6 text-center">
-                    <button
-                        onClick={() => {
-                            if (mode === 'forgot-password' || mode === 'mfa') {
-                                setMode('signin');
-                            } else {
-                                setMode(mode === 'signin' ? 'register' : 'signin');
-                            }
-                            setMfaCode('');
-                        }}
-                        className="text-sm text-slate-500 hover:text-modtale-accent dark:text-slate-400 dark:hover:text-white transition-colors flex items-center justify-center gap-2 mx-auto"
-                    >
-                        {(mode === 'forgot-password' || mode === 'mfa') ? (
-                            <>
-                                <ArrowLeft className="w-3 h-3" /> Back to Sign In
-                            </>
-                        ) : (
-                            mode === 'signin' ? "Don't have an account? Sign up" : "Already have an account? Sign in"
-                        )}
-                    </button>
+                    <div className="mt-6 text-center">
+                        <button
+                            onClick={() => {
+                                if (mode === 'forgot-password' || mode === 'mfa') {
+                                    setMode('signin');
+                                } else {
+                                    setMode(mode === 'signin' ? 'register' : 'signin');
+                                }
+                                setMfaCode('');
+                            }}
+                            className="text-sm font-bold text-slate-500 hover:text-modtale-accent dark:text-slate-400 dark:hover:text-white transition-colors flex items-center justify-center gap-2 mx-auto"
+                        >
+                            {(mode === 'forgot-password' || mode === 'mfa') ? (
+                                <>
+                                    <ArrowLeft className="w-4 h-4" /> Back to Sign In
+                                </>
+                            ) : (
+                                mode === 'signin' ? "Don't have an account? Sign up" : "Already have an account? Sign in"
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
         </div>,
         document.body
     );

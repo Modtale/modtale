@@ -1,99 +1,254 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import App from '../App';
-import { extractId, getProjectUrl } from '../utils/slug';
+import { getProjectUrl } from '../utils/slug';
 import { isBotUserAgent } from '../utils/seo';
-import { DEFAULT_SEO, ROUTE_SEO } from '../data/seo-constants';
+import { DEFAULT_SEO, ROUTE_SEO, generateDynamicSEO } from '../data/seo-constants';
 import { generateProjectMeta } from '../utils/meta';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
+import { BACKEND_URL } from "@/utils/api.ts";
 
 const { all } = Astro.params;
-const path = Astro.url.pathname;
+const url = Astro.url;
+const path = url.pathname;
 const cleanPath = path.replace(/\/$/, "");
-
-const API_URL = import.meta.env.PUBLIC_API_URL;
-
-if (cleanPath === '/mods') {
-    return Astro.redirect('/', 301);
-}
+const searchParams = url.searchParams;
 
 let title = DEFAULT_SEO.title;
 let description = DEFAULT_SEO.description;
 let keywords = DEFAULT_SEO.keywords;
-let image = "https://modtale.net/assets/favicon.svg";
 let jsonLd: any = undefined;
-let initialData = null;
+let initialData: any = null;
+let ssrSuccessfullyCompleted = false;
 
+let canonicalOverride = `https://modtale.net${cleanPath === '' ? '/' : cleanPath}`;
+let pageNext = undefined;
+let pagePrev = undefined;
+
+let baseSEO = { title: DEFAULT_SEO.title, description: DEFAULT_SEO.description };
 if (ROUTE_SEO[cleanPath]) {
-    const seo = ROUTE_SEO[cleanPath];
-    title = seo.title;
-    description = seo.description;
-    if (seo.keywords) keywords = seo.keywords;
+    baseSEO = { title: ROUTE_SEO[cleanPath].title, description: ROUTE_SEO[cleanPath].description };
+    keywords = ROUTE_SEO[cleanPath].keywords;
 }
 
 const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Modtale",
-    "url": "https://modtale.net/"
+    "url": "https://modtale.net/",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://modtale.net/mods?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+    }
 };
 
 if (cleanPath === '' || cleanPath === '/') {
     jsonLd = websiteSchema;
 }
 
-const userAgent = Astro.request.headers.get('user-agent');
+const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
-const id = extractId(all || '');
+const identifier = all ? all.split('/').pop() : '';
 
-if (isBot) {
-    const isProjectRoute = cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
+const isProjectRoute = cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
 
-    if (id && isProjectRoute) {
+let image = (isProjectRoute && identifier)
+    ? `${BACKEND_URL}/api/v1/og/project/${identifier}.png`
+    : "https://modtale.net/assets/favicon.svg";
+
+let classification = null;
+let isHome = false;
+
+if (cleanPath === '/plugins') classification = 'PLUGIN';
+else if (cleanPath === '/modpacks') classification = 'MODPACK';
+else if (cleanPath === '/worlds') classification = 'SAVE';
+else if (cleanPath === '/art') classification = 'ART';
+else if (cleanPath === '/data') classification = 'DATA';
+else if (cleanPath === '/mods') classification = 'ALL';
+else if (cleanPath === '' || cleanPath === '/') {
+    classification = 'ALL';
+    isHome = true;
+}
+
+const pageParamStr = searchParams.get('page') || '0';
+const pageNum = parseInt(pageParamStr, 10);
+const styleParam = searchParams.get('style') || 'grid';
+const sortParam = searchParams.get('sort') || '';
+const viewParam = searchParams.get('view') || '';
+const qParam = searchParams.get('q') || '';
+
+if (classification && !isHome) {
+    const dynamicMeta = generateDynamicSEO(baseSEO, pageNum, sortParam, viewParam, qParam);
+    title = dynamicMeta.title;
+    description = dynamicMeta.description;
+
+    if (pageNum > 0) {
+        canonicalOverride = `https://modtale.net${cleanPath}?page=${pageNum}`;
+        pagePrev = `https://modtale.net${cleanPath}${pageNum === 1 ? '' : `?page=${pageNum - 1}`}`;
+    }
+}
+
+const isComplex =
+    searchParams.has('q') ||
+    searchParams.has('tags') ||
+    searchParams.has('version') ||
+    searchParams.has('minDl') ||
+    searchParams.has('minFav') ||
+    searchParams.has('date') ||
+    pageNum > 0 ||
+    styleParam !== 'grid';
+
+function getSecondsUntilNextUpdate() {
+    const now = new Date();
+    const nextUpdate = new Date(now);
+    nextUpdate.setUTCHours(0, 35, 0, 0);
+
+    if (now > nextUpdate) {
+        nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
+    }
+
+    return Math.max(60, Math.floor((nextUpdate.getTime() - now.getTime()) / 1000));
+}
+
+if (classification) {
+    if (!isComplex || isBot) {
         try {
-            console.log(`[SSR] Bot detected on project route (${id}). Fetching details...`);
-            const res = await fetch(`${API_URL}/projects/${id}`);
+            if (isHome) {
+                const [trendingRes, popularRes, gemsRes, relevanceRes, statsRes] = await Promise.allSettled([
+                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=trending`),
+                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=popular`),
+                    fetch(`${BACKEND_URL}/api/v1/projects?category=hidden_gems&size=20&sort=favorites`),
+                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=relevance`),
+                    fetch(`${BACKEND_URL}/api/v1/analytics/platform/stats`)
+                ]);
 
-            if (res.ok) {
-                const modData = await res.json();
+                const getJson = async (res: any) => res.status === 'fulfilled' && res.value.ok ? await res.value.json() : null;
 
-                const canonicalUrl = getProjectUrl(modData);
-                if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
-                    console.log(`[SEO] Bot Redirect: ${cleanPath} -> ${canonicalUrl}`);
-                    return Astro.redirect(canonicalUrl, 301);
-                }
+                const trending = await getJson(trendingRes);
+                const popular = await getJson(popularRes);
+                const gems = await getJson(gemsRes);
+                const relevance = await getJson(relevanceRes);
+                const stats = await getJson(statsRes);
 
-                initialData = modData;
+                const combined = [
+                    ...(trending?.content || []),
+                    ...(popular?.content || []),
+                    ...(gems?.content || []),
+                    ...(relevance?.content || [])
+                ];
 
-                const meta = generateProjectMeta(modData);
-                if (meta) {
-                    title = meta.title;
-                    description = meta.description;
-                }
+                const uniqueMap = new Map();
+                combined.forEach(m => uniqueMap.set(m.id, m));
 
-                if (modData.imageUrl) {
-                    image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
-                }
+                const unique = Array.from(uniqueMap.values()).sort((a, b) => a.id.localeCompare(b.id));
 
-                const appSchema = {
-                    "@context": "https://schema.org",
-                    "@type": "SoftwareApplication",
-                    "name": modData.title,
-                    "description": meta?.description || description,
-                    "image": image,
-                    "author": { "@type": "Person", "name": modData.author || 'Unknown' },
-                    "applicationCategory": "GameApplication",
-                    "operatingSystem": "Windows, macOS, Linux",
-                    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-                    "aggregateRating": modData.rating > 0 ? {
-                        "@type": "AggregateRating",
-                        "ratingValue": modData.rating,
-                    } : undefined
+                initialData = {
+                    homeMods: unique || [],
+                    stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }
                 };
 
-                const crumbs = getBreadcrumbsForClassification(modData.classification || 'PLUGIN');
-                const fullCrumbs = [...crumbs, { name: modData.title, url: canonicalUrl }];
-                const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
+                const homeListSchema = generateItemListSchema(unique.slice(0, 20));
+                const schemas: any[] = [websiteSchema];
+                if (homeListSchema) schemas.push(homeListSchema);
+                jsonLd = schemas;
+
+                ssrSuccessfullyCompleted = true;
+
+            } else {
+                const sort = searchParams.get('sort') || 'relevance';
+                const view = searchParams.get('view');
+                const page = searchParams.get('page') || '0';
+
+                let categoryParam = '';
+                if (view === 'favorites') categoryParam = '&category=Favorites';
+                else if (view === 'hidden_gems') categoryParam = '&category=hidden_gems';
+                else if (view === 'popular') categoryParam = '&category=popular';
+                else if (view === 'trending') categoryParam = '&category=trending';
+
+                const searchParamStr = qParam ? `&search=${encodeURIComponent(qParam)}` : '';
+
+                const tagsVal = searchParams.get('tags') || '';
+                const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
+
+                const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
+                const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
+
+                const res = await fetch(endpoint, {
+                    headers: { "Cache-Control": "public, s-maxage=300" }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    initialData = { browseData: data };
+
+                    if (data.totalPages > pageNum + 1) {
+                        pageNext = `https://modtale.net${cleanPath}?page=${pageNum + 1}`;
+                    }
+
+                    const items = data.content || [];
+                    const listSchema = generateItemListSchema(items);
+                    const crumbs = getBreadcrumbsForClassification(classification);
+                    const breadcrumbSchema = generateBreadcrumbSchema(crumbs);
+
+                    const schemas: any[] = [websiteSchema];
+                    if (listSchema) schemas.push(listSchema);
+                    if (breadcrumbSchema) schemas.push(breadcrumbSchema);
+
+                    jsonLd = schemas;
+                    ssrSuccessfullyCompleted = true;
+                } else {
+                    initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
+                }
+            }
+        } catch (e) {
+            if (isHome) {
+                initialData = { homeMods: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
+            } else {
+                initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
+            }
+        }
+    }
+}
+else if (isBot && identifier && isProjectRoute) {
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${identifier}`);
+
+        if (res.ok) {
+            const modData = await res.json();
+
+            const projectUrl = getProjectUrl(modData);
+            if (cleanPath !== projectUrl.replace(/\/$/, "")) {
+                return Astro.redirect(projectUrl, 301);
+            }
+
+            initialData = modData;
+
+            const meta = generateProjectMeta(modData);
+            if (meta) {
+                title = meta.title;
+                description = meta.description;
+            }
+
+            const appSchema = {
+                "@context": "https://schema.org",
+                "@type": "SoftwareApplication",
+                "name": modData.title,
+                "description": meta?.description || description,
+                "image": image,
+                "author": { "@type": "Person", "name": modData.author || 'Unknown' },
+                "applicationCategory": "GameApplication",
+                "operatingSystem": "Windows, macOS, Linux",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+                "aggregateRating": modData.rating > 0 ? {
+                    "@type": "AggregateRating",
+                    "ratingValue": modData.rating,
+                } : undefined
+            };
+
+            const crumbs = getBreadcrumbsForClassification(modData.classification || 'PLUGIN');
+            const fullCrumbs = [...crumbs, { name: modData.title, url: projectUrl }];
+            const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
 
                 jsonLd = [appSchema, breadcrumbSchema];
             }
@@ -151,9 +306,35 @@ if (isBot) {
             console.error("[SSR] Bot List Fetch Error:", e);
         }
     }
+            const schemas: any[] = [websiteSchema, appSchema, breadcrumbSchema];
+            jsonLd = schemas;
+            ssrSuccessfullyCompleted = true;
+        } else {
+            initialData = null;
+        }
+    } catch (e) {
+        initialData = null;
+    }
+}
+
+if (ssrSuccessfullyCompleted) {
+    const ttl = getSecondsUntilNextUpdate();
+    Astro.response.headers.set('Cache-Control', `public, max-age=60, s-maxage=${ttl}, stale-while-revalidate=86400`);
+} else {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 ---
 
-<BaseLayout title={title} description={description} keywords={keywords} image={image} jsonLd={jsonLd} initialData={initialData}>
+<BaseLayout
+        title={title}
+        description={description}
+        keywords={keywords}
+        image={image}
+        jsonLd={jsonLd}
+        initialData={initialData}
+        canonicalOverride={canonicalOverride}
+        pageNext={pageNext}
+        pagePrev={pagePrev}
+>
     <App client:load initialPath={path} ssrData={initialData} />
 </BaseLayout>

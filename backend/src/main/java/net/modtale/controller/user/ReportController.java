@@ -34,16 +34,21 @@ public class ReportController {
 
         try {
             Report.TargetType targetType = Report.TargetType.valueOf(targetTypeStr);
-            reportService.createReport(targetId, targetType, reason, description, user);
-            return ResponseEntity.ok().build();
+            Report report = reportService.createReport(targetId, targetType, reason, description, user);
+            return ResponseEntity.ok(Map.of("id", report.getId()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Invalid target type or data: " + e.getMessage());
         }
     }
 
     @GetMapping("/admin/reports/queue")
-    public ResponseEntity<List<Report>> getReportQueue() {
-        return ResponseEntity.ok(reportService.getOpenReports());
+    public ResponseEntity<List<Report>> getReportQueue(@RequestParam(defaultValue = "OPEN") String status) {
+        try {
+            Report.ReportStatus reportStatus = Report.ReportStatus.valueOf(status);
+            return ResponseEntity.ok(reportService.getReportsByStatus(reportStatus));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/admin/reports/{id}/resolve")

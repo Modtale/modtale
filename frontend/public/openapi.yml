@@ -26,6 +26,19 @@ components:
           enum: [PLUGIN, DATA, ART, SAVE, MODPACK]
         description:
           type: string
+        status:
+          type: string
+        author:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        avatarUrl:
+          type: string
     ErrorResponse:
       type: object
       properties:
@@ -65,6 +78,37 @@ paths:
           content:
             application/json:
               example: ["2026.01.13-dcad8778f", "2026.01.17-4b0f30090"]
+  /api/v1/wiki/{slug}:
+    get:
+      summary: Proxy request to the Hytale Modding Wiki API to fetch metadata
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/wiki/{slug}/{pagePath}:
+    get:
+      summary: Proxy request to the Hytale Modding Wiki API to fetch a specific page
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pagePath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/v1/status:
     get:
       summary: Get system health and latency statistics
@@ -134,6 +178,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: minDownloads
+          in: query
+          schema:
+            type: integer
+        - name: minFavorites
+          in: query
+          schema:
+            type: integer
         - name: dateRange
           in: query
           schema:
@@ -155,6 +207,7 @@ paths:
                   type: string
                 classification:
                   type: string
+                  enum: [PLUGIN, DATA, ART, SAVE, MODPACK]
                 description:
                   type: string
                 owner:
@@ -179,6 +232,7 @@ paths:
           description: OK
     put:
       summary: Update project metadata
+      description: Short Description max 250 chars. Full Description (about) max 50,000 chars. Repo URL must be valid HTTPS.
       parameters:
         - name: id
           in: path
@@ -190,6 +244,23 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                about:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                license:
+                  type: string
+                repositoryUrl:
+                  type: string
+                slug:
+                  type: string
       responses:
         "200":
           description: OK
@@ -205,18 +276,12 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/projects/user/contributed:
+  /api/v1/projects/{id}/meta:
     get:
-      summary: Get user contributed projects
-      responses:
-        "200":
-          description: OK
-  /api/v1/creators/{username}/projects:
-    get:
-      summary: Get creator projects
+      summary: Get a lightweight metadata payload for a project
       security: []
       parameters:
-        - name: username
+        - name: id
           in: path
           required: true
           schema:
@@ -224,9 +289,67 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/projects/{id}/versions/{version}/dependencies:
+    get:
+      summary: Get dependencies mapped to a specific project version
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/user/contributed:
+    get:
+      summary: Get user contributed projects
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: OK
+  /api/v1/creators/{userId}/projects:
+    get:
+      summary: Get creator projects
+      security: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: OK
   /api/v1/projects/{id}/publish:
     post:
-      summary: Submit a draft for publishing
+      summary: Publish a project (Requires Admin, or restoring an Unlisted/Archived project)
       parameters:
         - name: id
           in: path
@@ -239,6 +362,18 @@ paths:
   /api/v1/projects/{id}/submit:
     post:
       summary: Submit a project for admin review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/revert:
+    post:
+      summary: Revert a PENDING project back to DRAFT state
       parameters:
         - name: id
           in: path
@@ -351,9 +486,28 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/og/project/{identifier}:
+    get:
+      summary: Dynamically generate an Open Graph image for the project card
+      security: []
+      parameters:
+        - name: identifier
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
   /api/v1/projects/{id}/versions:
     post:
       summary: Upload a new version
+      description: Handles file uploads for mods/art/data and dependency linking for modpacks.
       parameters:
         - name: id
           in: path
@@ -365,6 +519,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required: [versionNumber, gameVersions]
               properties:
                 versionNumber:
                   type: string
@@ -377,6 +532,7 @@ paths:
                 channel:
                   type: string
                   enum: [RELEASE, BETA, ALPHA]
+                  default: RELEASE
                 file:
                   type: string
                   format: binary
@@ -406,6 +562,17 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                modIds:
+                  type: array
+                  items:
+                    type: string
+                gameVersions:
+                  type: array
+                  items:
+                    type: string
+                channel:
+                  type: string
       responses:
         "200":
           description: OK
@@ -428,7 +595,6 @@ paths:
   /api/v1/projects/{id}/versions/{version}/download-url:
     get:
       summary: Generate a temporary signed download link
-      security: []
       parameters:
         - name: id
           in: path
@@ -443,12 +609,137 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/download/{token}:
+    get:
+      summary: Download a file or modpack zip using a pre-signed token
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/projects/{id}/versions/{version}/download-bundle-url:
+    get:
+      summary: Generate a temporary signed download link to download a mod and all its dependencies bundled
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/download-bundle/{token}:
+    get:
+      summary: Download a bundled zip using a pre-signed token
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
   /api/v1/version/{hash}:
     get:
       summary: Lookup version details by file hash
-      security: []
       parameters:
         - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/roles:
+    post:
+      summary: Create a custom role for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/roles/{roleId}:
+    put:
+      summary: Update a project role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Delete a project role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: roleId
           in: path
           required: true
           schema:
@@ -465,8 +756,30 @@ paths:
           required: true
           schema:
             type: string
-        - name: username
-          in: query
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                roleId:
+                  type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/invites/{userId}:
+    delete:
+      summary: Cancel a pending invite
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
           required: true
           schema:
             type: string
@@ -497,7 +810,31 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/projects/{id}/contributors/{username}:
+  /api/v1/projects/{id}/contributors/{userId}:
+    put:
+      summary: Update a team member's role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                roleId:
+                  type: string
+      responses:
+        "200":
+          description: OK
     delete:
       summary: Remove a contributor
       parameters:
@@ -506,7 +843,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: username
+        - name: userId
           in: path
           required: true
           schema:
@@ -529,7 +866,7 @@ paths:
             schema:
               type: object
               properties:
-                username:
+                userId:
                   type: string
       responses:
         "200":
@@ -574,11 +911,11 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/orgs/{username}/members:
+  /api/v1/users/{userId}/organizations:
     get:
-      summary: Get public members of an organization
+      summary: List organizations another user belongs to
       parameters:
-        - name: username
+        - name: userId
           in: path
           required: true
           schema:
@@ -586,11 +923,35 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/orgs/{id}/members:
-    post:
-      summary: Invite a user to the organization
+  /api/v1/orgs/{orgId}/members:
+    get:
+      summary: Get members of an organization
       parameters:
-        - name: id
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/invites:
+    get:
+      summary: Get pending invites for an organization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/roles:
+    post:
+      summary: Create a custom role for an organization
+      parameters:
+        - name: orgId
           in: path
           required: true
           schema:
@@ -601,18 +962,91 @@ paths:
             schema:
               type: object
               properties:
-                username:
+                name:
                   type: string
-                role:
+                color:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/roles/{roleId}:
+    put:
+      summary: Update an organization role
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Delete an organization role
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/members:
+    post:
+      summary: Invite a user to the organization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                roleId:
                   type: string
       responses:
         "200":
           description: OK
-  /api/v1/orgs/{id}/members/{userId}:
+  /api/v1/orgs/{orgId}/members/{userId}:
     put:
       summary: Update member role
       parameters:
-        - name: id
+        - name: orgId
           in: path
           required: true
           schema:
@@ -628,15 +1062,15 @@ paths:
             schema:
               type: object
               properties:
-                role:
+                roleId:
                   type: string
       responses:
         "200":
           description: OK
     delete:
-      summary: Remove member
+      summary: Remove member / Leave organization
       parameters:
-        - name: id
+        - name: orgId
           in: path
           required: true
           schema:
@@ -649,11 +1083,11 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/orgs/{id}:
+  /api/v1/orgs/{orgId}:
     put:
       summary: Update organization profile
       parameters:
-        - name: id
+        - name: orgId
           in: path
           required: true
           schema:
@@ -663,13 +1097,18 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                displayName:
+                  type: string
+                bio:
+                  type: string
       responses:
         "200":
           description: OK
     delete:
       summary: Delete organization
       parameters:
-        - name: id
+        - name: orgId
           in: path
           required: true
           schema:
@@ -677,11 +1116,11 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/orgs/{id}/avatar:
+  /api/v1/orgs/{orgId}/avatar:
     post:
       summary: Upload organization avatar
       parameters:
-        - name: id
+        - name: orgId
           in: path
           required: true
           schema:
@@ -698,11 +1137,11 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/orgs/{id}/banner:
+  /api/v1/orgs/{orgId}/banner:
     post:
       summary: Upload organization banner
       parameters:
-        - name: id
+        - name: orgId
           in: path
           required: true
           schema:
@@ -716,6 +1155,105 @@ paths:
                 file:
                   type: string
                   format: binary
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/invite/accept:
+    post:
+      summary: Accept an invite to an organization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/invite/decline:
+    post:
+      summary: Decline an invite to an organization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/invites/{userId}:
+    delete:
+      summary: Cancel a pending organization invite
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/link/prepare:
+    post:
+      summary: Prepare a session to link an OAuth account to an organization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/connections/{provider}/toggle-visibility:
+    post:
+      summary: Toggle visibility of an organization connection
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/connections/{provider}:
+    delete:
+      summary: Unlink an OAuth connection from an organization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/orgs/{orgId}/repos/github:
+    get:
+      summary: Get the organization's GitHub repositories
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -742,10 +1280,23 @@ paths:
             schema:
               type: object
               properties:
-                usernames:
+                userIds:
                   type: array
                   items:
                     type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/users/lookup/{username}:
+    get:
+      summary: Resolve a username to a user ID
+      security: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -760,6 +1311,19 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/user/profile/{userId}:
+    get:
+      summary: Get public user profile details
+      security: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/v1/user/profile:
     put:
       summary: Update profile settings
@@ -768,6 +1332,11 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                username:
+                  type: string
+                bio:
+                  type: string
       responses:
         "200":
           description: OK
@@ -801,12 +1370,11 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/users/{username}/following:
-    get:
-      summary: Get list of users this user follows
-      security: []
+  /api/v1/user/connections/{provider}/toggle-visibility:
+    post:
+      summary: Toggle visibility of an OAuth connection on your profile
       parameters:
-        - name: username
+        - name: provider
           in: path
           required: true
           schema:
@@ -814,12 +1382,37 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/users/{username}/followers:
+  /api/v1/user/connections/{provider}:
+    delete:
+      summary: Unlink an OAuth connection
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/users/{userId}/following:
+    get:
+      summary: Get list of users this user follows
+      security: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/users/{userId}/followers:
     get:
       summary: Get list of users following this user
       security: []
       parameters:
-        - name: username
+        - name: userId
           in: path
           required: true
           schema:
@@ -835,14 +1428,25 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                projectUpdates:
+                  type: string
+                newFollowers:
+                  type: string
+                dependencyUpdates:
+                  type: string
+                creatorUploads:
+                  type: string
+                newComments:
+                  type: string
       responses:
         "200":
           description: OK
-  /api/v1/user/follow/{targetUsername}:
+  /api/v1/user/follow/{targetId}:
     post:
       summary: Follow a user
       parameters:
-        - name: targetUsername
+        - name: targetId
           in: path
           required: true
           schema:
@@ -850,15 +1454,33 @@ paths:
       responses:
         "200":
           description: OK
-  /api/v1/user/unfollow/{targetUsername}:
+  /api/v1/user/unfollow/{targetId}:
     post:
       summary: Unfollow a user
       parameters:
-        - name: targetUsername
+        - name: targetId
           in: path
           required: true
           schema:
             type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/repos/github:
+    get:
+      summary: Get the authenticated user's GitHub repositories
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/repos/gitlab:
+    get:
+      summary: Get the authenticated user's GitLab repositories
+      responses:
+        "200":
+          description: OK
+  /api/v1/user/repos:
+    get:
+      summary: Alias for /api/v1/user/repos/github
       responses:
         "200":
           description: OK
@@ -880,9 +1502,39 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/notifications/{id}/unread:
+    post:
+      summary: Mark notification as unread
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/v1/notifications/read-all:
     post:
       summary: Mark all notifications as read
+      responses:
+        "200":
+          description: OK
+  /api/v1/notifications/{id}:
+    delete:
+      summary: Delete a single notification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/notifications/clear-all:
+    delete:
+      summary: Delete all notifications
       responses:
         "200":
           description: OK
@@ -960,6 +1612,22 @@ paths:
       responses:
         "200":
           description: OK
+    delete:
+      summary: Delete a comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/v1/projects/{id}/comments/{commentId}/reply:
     post:
       summary: Developer reply to a comment
@@ -982,6 +1650,50 @@ paths:
               properties:
                 reply:
                   type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/comments/{commentId}/vote:
+    post:
+      summary: Upvote or downvote a user comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: upvote
+          in: query
+          required: true
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+  /api/v1/projects/{id}/comments/{commentId}/reply/vote:
+    post:
+      summary: Upvote or downvote a developer reply
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: upvote
+          in: query
+          required: true
+          schema:
+            type: boolean
       responses:
         "200":
           description: OK

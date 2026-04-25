@@ -15,7 +15,7 @@ interface NavbarProps {
     onNavigate: (page: string) => void;
     isDarkMode: boolean;
     toggleDarkMode: () => void;
-    onAuthorClick: (author: string) => void;
+    onAuthorClick: (authorUsername: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -60,13 +60,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         }
     }, [isMobile]);
 
-    const homeLikePages = ['home', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
-    const detailPrefixes = ['mod/', 'world/', 'modpack/'];
-    const isHomeLayout = homeLikePages.includes(currentPage) || detailPrefixes.some(prefix => currentPage.startsWith(prefix) && currentPage.split('/').length < 2);
+    const browsePages = ['mods', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
+    const isBrowseActive = browsePages.includes(currentPage);
 
-    const widthClass = isHomeLayout
-        ? "max-w-7xl min-[1800px]:max-w-[112rem] px-4 sm:px-6 lg:px-8"
-        : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+    const widthClass = "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
 
     const isJamPage = currentPage === 'jams' || currentPage.startsWith('jam/');
 
@@ -75,12 +72,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
 
             {isFollowingOpen && user && (
-                <FollowingModal username={user.username} onClose={() => setIsFollowingOpen(false)} />
+                <FollowingModal userId={user.id} onClose={() => setIsFollowingOpen(false)} />
             )}
 
             <div className="flex justify-center w-full h-full">
                 <div
-                    className={`${widthClass} w-full h-full transition-[max-width,padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)] transform-gpu will-change-[max-width,padding]`}
+                    className={`${widthClass} w-full h-full transition-[padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]`}
                 >
                     <div className="flex items-center justify-between h-full">
 
@@ -102,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     <button
                                         onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
                                         className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                            isHomeLayout && !isJamPage
+                                            isBrowseActive && !isJamPage
                                                 ? 'text-modtale-accent bg-modtale-accent/10'
                                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                         }`}
@@ -115,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     {isBrowseDropdownOpen && (
                                         <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
                                             <Link
-                                                to="/"
+                                                to="/mods"
                                                 onClick={() => setIsBrowseDropdownOpen(false)}
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
@@ -288,7 +285,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
                     <div className="space-y-1">
                         <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Browse</div>
-                        <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
+                        <Link to="/mods" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
                         <Link to="/plugins" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Plugins</Link>
                         <Link to="/modpacks" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Modpacks</Link>
                         <Link to="/worlds" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Worlds</Link>

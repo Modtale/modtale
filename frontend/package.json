@@ -20,6 +20,7 @@
     "axios": "^1.6.7",
     "jszip": "^3.10.1",
     "lucide-react": "^0.469.0",
+    "mermaid": "^11.14.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-dropzone": "^14.3.8",
@@ -35,7 +36,7 @@
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.10",
-    "@types/react": "^19.0.0",
+    "@types/react": "^19.2.14",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.3.3"
   }

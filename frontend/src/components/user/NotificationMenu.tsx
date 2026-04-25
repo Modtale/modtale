@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, Trash2, Check, X as XIcon, RefreshCw, Circle } from 'lucide-react';
+import { Bell, Trash2, Check, X as XIcon, RefreshCw, Circle } from 'lucide-react';
 import { api, BACKEND_URL } from '../../utils/api';
 import { useNotifications, type Notification } from '../../context/NotificationsContext.tsx';
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 export const NotificationMenu: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -70,26 +71,31 @@ export const NotificationMenu: React.FC = () => {
         markAsRead(id, currentReadStatus);
     };
 
+    const resolveUrl = (url?: string) => {
+        if (!url) return "https://modtale.net/assets/favicon.svg";
+        return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
+    };
+
     return (
         <div className="relative" ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`relative p-2 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 ${isIdle ? 'opacity-50' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}
+                className={`relative p-2 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 ${isIdle ? 'opacity-50' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}
                 title={isIdle ? "Notifications paused (Idle)" : "Notifications"}
             >
                 <Bell className="w-5 h-5" />
-                {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-modtale-card animate-pulse"></span>}
+                {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>}
             </button>
 
             {isOpen && (
-                <div className="fixed left-4 right-4 top-16 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-96 max-h-[80vh] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                    <div className="p-3 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-black/20">
+                <div className="fixed left-4 right-4 top-16 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-96 max-h-[80vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                    <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950 shrink-0">
                         <div className="flex items-center gap-2">
                             <h3 className="font-bold text-sm text-slate-900 dark:text-white">Notifications</h3>
                             <button
                                 onClick={handleRefresh}
                                 disabled={isRefreshing}
-                                className={`p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+                                className={`p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
                                 title="Refresh"
                             >
                                 <RefreshCw className="w-3 h-3" />
@@ -102,32 +108,28 @@ export const NotificationMenu: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-white/10 scrollbar-track-transparent custom-scrollbar">
+                    <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent custom-scrollbar flex-1">
                         {notifications.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs"><Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />No notifications</div>
                         ) : (
-                            <div className="divide-y divide-slate-100 dark:divide-white/5">
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                 {notifications.map(n => (
                                     <a
                                         href={n.link}
                                         key={n.id}
-                                        className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-white/10 ${n.read ? 'bg-white dark:bg-modtale-card' : 'bg-slate-50 dark:bg-white/5'}`}
+                                        className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 ${n.read ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}`}
                                     >
-                                        <img
-                                            src={n.iconUrl ? (n.iconUrl.startsWith('/api') ? `${BACKEND_URL}${n.iconUrl}` : n.iconUrl) : "https://modtale.net/assets/favicon.svg"}
+                                        <OptimizedImage
+                                            src={resolveUrl(n.iconUrl)}
                                             alt=""
-                                            className="w-10 h-10 rounded-md object-cover bg-slate-200 dark:bg-white/10 flex-shrink-0"
-                                            onError={(e) => {
-                                                const target = e.currentTarget;
-                                                target.onerror = null;
-                                                target.src = "https://modtale.net/assets/favicon.svg";
-                                            }}
+                                            baseWidth={40}
+                                            className="w-10 h-10 rounded-md shrink-0 border border-slate-200 dark:border-white/5 shadow-sm"
                                         />
                                         <div className="flex-1 min-w-0 pr-12">
                                             <div className={`font-bold text-sm text-slate-800 dark:text-slate-200 mb-0.5 truncate ${!n.read ? 'text-modtale-accent' : ''}`}>
                                                 {n.title} {!n.read && <span className="inline-block w-1.5 h-1.5 bg-red-500 rounded-full ml-1 mb-0.5"></span>}
                                             </div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{n.message}</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words">{n.message}</div>
 
                                             {(n.type === 'TRANSFER_REQUEST' || n.type === 'ORG_INVITE' || n.type === 'CONTRIBUTOR_INVITE') ? (
                                                 <div className="flex gap-2 mt-3">
@@ -148,14 +150,14 @@ export const NotificationMenu: React.FC = () => {
                                         <div className="absolute top-3 right-3 flex flex-col gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                             <button
                                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); dismiss(n.id); }}
-                                                className="p-1 text-slate-300 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-white/10 rounded-md transition-colors"
+                                                className="p-1 text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
                                                 title="Dismiss"
                                             >
                                                 <XIcon className="w-3.5 h-3.5" />
                                             </button>
                                             <button
                                                 onClick={(e) => toggleReadStatus(e, n.id, n.read)}
-                                                className="p-1 text-slate-300 hover:text-modtale-accent hover:bg-slate-100 dark:hover:bg-white/10 rounded-md transition-colors"
+                                                className="p-1 text-slate-400 hover:text-modtale-accent hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
                                                 title={n.read ? "Mark as unread" : "Mark as read"}
                                             >
                                                 <Circle className={`w-3.5 h-3.5 ${!n.read ? 'fill-modtale-accent text-modtale-accent' : ''}`} />
@@ -173,9 +175,9 @@ export const NotificationMenu: React.FC = () => {
                 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 20px; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.8); }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
             `}} />
         </div>
     );

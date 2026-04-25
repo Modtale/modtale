@@ -6,9 +6,17 @@ export interface ConnectedAccount {
     visible: boolean;
 }
 
+export interface OrganizationRole {
+    id: string;
+    name: string;
+    color: string;
+    permissions: string[];
+    isOwner?: boolean;
+}
+
 export interface OrganizationMember {
     userId: string;
-    role: 'ADMIN' | 'MEMBER';
+    roleId: string;
 }
 
 export interface User {
@@ -38,6 +46,8 @@ export interface User {
     tier?: string;
     accountType?: 'USER' | 'ORGANIZATION';
     organizationMembers?: OrganizationMember[];
+    organizationRoles?: OrganizationRole[];
+    pendingOrgInvites?: OrganizationMember[];
 }
 
 export interface ModDependency {
@@ -90,11 +100,24 @@ export interface Reply {
 export interface Comment {
     id: string;
     user: string;
-    userAvatarUrl?: string;
     content: string;
     date: string;
     updatedAt?: string;
     developerReply?: Reply;
+}
+
+export interface ProjectRole {
+    id: string;
+    name: string;
+    color: string;
+    permissions: string[];
+}
+
+export interface ProjectMember {
+    userId: string;
+    roleId: string;
+    username?: string;
+    avatarUrl?: string;
 }
 
 export interface Mod {
@@ -123,11 +146,16 @@ export interface Mod {
     versions: ProjectVersion[];
     galleryImages: string[];
     repositoryUrl?: string;
-    contributors?: string[];
-    pendingInvites?: string[];
+
+    projectRoles?: ProjectRole[];
+    teamMembers?: ProjectMember[];
+    teamInvites?: ProjectMember[];
+
     lastTrendingNotification?: string;
     allowModpacks?: boolean;
     allowComments?: boolean;
+    hmWikiEnabled?: boolean;
+    hmWikiSlug?: string;
     status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;
@@ -160,6 +188,8 @@ export interface Report {
     description: string;
     status: 'OPEN' | 'RESOLVED' | 'DISMISSED';
     createdAt: string;
+    resolvedBy?: string;
+    resolutionNote?: string;
 }
 
 export interface ModjamCategory {
