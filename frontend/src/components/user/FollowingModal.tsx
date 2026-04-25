@@ -1,23 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, User as UserIcon, Loader2, ExternalLink } from 'lucide-react';
 import { api } from '../../utils/api';
 import type {User} from '../../types';
 import { Link } from 'react-router-dom';
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 interface FollowingModalProps {
-    username: string;
+    userId: string;
     onClose: () => void;
 }
 
-export const FollowingModal: React.FC<FollowingModalProps> = ({ username, onClose }) => {
+export const FollowingModal: React.FC<FollowingModalProps> = ({ userId, onClose }) => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchFollowing = async () => {
             try {
-                const res = await api.get(`/users/${username}/following`);
+                const res = await api.get(`/users/${userId}/following`);
                 setUsers(res.data);
             } catch (e) {
                 console.error("Failed to load following list", e);
@@ -26,13 +27,13 @@ export const FollowingModal: React.FC<FollowingModalProps> = ({ username, onClos
             }
         };
         fetchFollowing();
-    }, [username]);
+    }, [userId]);
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={onClose}></div>
 
-            <div className="relative bg-white dark:bg-modtale-card w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[80dvh]">
+            <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[80dvh]">
 
                 <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
                     <h3 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
@@ -67,10 +68,11 @@ export const FollowingModal: React.FC<FollowingModalProps> = ({ username, onClos
                                     className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <img
+                                        <OptimizedImage
                                             src={u.avatarUrl || '/assets/default-avatar.png'}
                                             alt={u.username}
-                                            className="w-10 h-10 rounded-full bg-slate-200 dark:bg-black/20 object-cover border border-slate-200 dark:border-white/10"
+                                            baseWidth={40}
+                                            className="w-10 h-10 rounded-full shrink-0 border border-slate-200 dark:border-white/10 shadow-sm"
                                         />
                                         <div>
                                             <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors">{u.username}</div>

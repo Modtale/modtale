@@ -4,8 +4,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import net.modtale.model.dto.UserDTO;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.model.user.GitRepository;
+import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.UserService;
 import net.modtale.service.user.GithubService;
 import net.modtale.service.resources.StorageService;
@@ -13,6 +15,7 @@ import net.modtale.service.security.FileValidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -40,8 +44,10 @@ public class UserController {
     @Autowired private StorageService storageService;
     @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
     @Autowired private FileValidationService validationService;
+    @Autowired private UserRepository userRepository;
 
     @GetMapping("/users/search")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
     public ResponseEntity<List<UserDTO>> searchUsers(@RequestParam String query) {
         List<User> users = userService.searchUsers(query);
         return ResponseEntity.ok(users.stream()
@@ -50,30 +56,27 @@ public class UserController {
     }
 
     @PostMapping("/users/batch")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
     public ResponseEntity<List<UserDTO>> getUsersBatch(@RequestBody Map<String, List<String>> body) {
-        List<String> usernames = body.get("usernames");
-        if (usernames == null || usernames.isEmpty()) {
+        List<String> userIds = body.get("userIds");
+        if (userIds == null || userIds.isEmpty()) {
             return ResponseEntity.ok(List.of());
         }
-        List<User> users = userService.getPublicProfilesByUsernames(usernames);
+        List<User> users = userService.getPublicProfilesByIds(userIds);
         return ResponseEntity.ok(users.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
     }
 
-    @PostMapping("/users/batch/ids")
-    public ResponseEntity<List<UserDTO>> getUsersBatchByIds(@RequestBody Map<String, List<String>> body) {
-        List<String> ids = body.get("ids");
-        if (ids == null || ids.isEmpty()) {
-            return ResponseEntity.ok(List.of());
-        }
-        List<User> users = userService.getPublicProfilesByIds(ids);
-        return ResponseEntity.ok(users.stream()
-                .map(u -> UserDTO.fromEntity(u, false))
-                .collect(Collectors.toList()));
+    @GetMapping("/users/lookup/{username}")
+    public ResponseEntity<Map<String, String>> lookupUserId(@PathVariable String username) {
+        Optional<User> target = userRepository.findByUsernameIgnoreCase(username);
+        if (target.isEmpty()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(Map.of("id", target.get().getId()));
     }
 
     @PostMapping("/orgs")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_CREATE', authentication)")
     public ResponseEntity<?> createOrganization(@RequestBody Map<String, String> payload) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -92,6 +95,7 @@ public class UserController {
     }
 
     @GetMapping("/user/orgs")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('ORG_READ', authentication)")
     public ResponseEntity<List<UserDTO>> getMyOrganizations() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -101,33 +105,105 @@ public class UserController {
                 .collect(Collectors.toList()));
     }
 
-    @GetMapping("/users/{username}/organizations")
-    public ResponseEntity<List<UserDTO>> getUserOrganizations(@PathVariable String username) {
-        List<User> orgs = userService.getUserOrganizationsByUsername(username);
+    @GetMapping("/users/{userId}/organizations")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('ORG_READ', authentication)")
+    public ResponseEntity<List<UserDTO>> getUserOrganizations(@PathVariable String userId) {
+        List<User> orgs = userService.getUserOrganizations(userId);
         return ResponseEntity.ok(orgs.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
     }
 
-    @GetMapping("/orgs/{username}/members")
-    public ResponseEntity<?> getOrgMembers(@PathVariable String username) {
+    @GetMapping("/orgs/{orgId}/members")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_READ', authentication)")
+    public ResponseEntity<?> getOrgMembers(@PathVariable String orgId) {
         try {
-            return ResponseEntity.ok(userService.getOrganizationMembers(username));
+            return ResponseEntity.ok(userService.getOrganizationMembers(orgId));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
+    @GetMapping("/orgs/{orgId}/invites")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_READ', authentication)")
+    public ResponseEntity<?> getOrgInvites(@PathVariable String orgId) {
+        try {
+            List<User> invites = userService.getOrganizationInvites(orgId);
+            return ResponseEntity.ok(invites.stream()
+                    .map(u -> UserDTO.fromEntity(u, false))
+                    .collect(Collectors.toList()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/orgs/{orgId}/roles")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
+    public ResponseEntity<?> createOrgRole(@PathVariable String orgId, @RequestBody User.OrganizationRole payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+
+        if (payload.getName() == null || payload.getName().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Role name is required.");
+        }
+
+        try {
+            User updated = userService.createOrganizationRole(orgId, payload.getName(), payload.getColor(), payload.getPermissions(), user);
+            return ResponseEntity.ok(UserDTO.fromEntity(updated, true));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/orgs/{orgId}/roles/{roleId}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
+    public ResponseEntity<?> updateOrgRole(@PathVariable String orgId, @PathVariable String roleId, @RequestBody User.OrganizationRole payload) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            User updated = userService.updateOrganizationRole(orgId, roleId, payload.getName(), payload.getColor(), payload.getPermissions(), user);
+            return ResponseEntity.ok(UserDTO.fromEntity(updated, true));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/orgs/{orgId}/roles/{roleId}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
+    public ResponseEntity<?> deleteOrgRole(@PathVariable String orgId, @PathVariable String roleId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+
+        try {
+            User updated = userService.deleteOrganizationRole(orgId, roleId, user);
+            return ResponseEntity.ok(UserDTO.fromEntity(updated, true));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/orgs/{orgId}/members")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_INVITE', authentication)")
     public ResponseEntity<?> addOrgMember(@PathVariable String orgId, @RequestBody Map<String, String> payload) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String targetUsername = payload.get("username");
-        String role = payload.getOrDefault("role", "MEMBER");
+        String targetUserId = payload.get("userId");
+        String roleId = payload.get("roleId");
+
+        if (roleId == null) {
+            return ResponseEntity.badRequest().body("Role ID is required.");
+        }
 
         try {
-            userService.inviteOrganizationMember(orgId, targetUsername, role, user);
+            userService.inviteOrganizationMember(orgId, targetUserId, roleId, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(e.getMessage());
@@ -137,6 +213,7 @@ public class UserController {
     }
 
     @DeleteMapping("/orgs/{orgId}/members/{userId}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_REMOVE', authentication)")
     public ResponseEntity<?> removeOrgMember(@PathVariable String orgId, @PathVariable String userId) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -162,15 +239,16 @@ public class UserController {
     }
 
     @PutMapping("/orgs/{orgId}/members/{userId}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
     public ResponseEntity<?> updateMemberRole(@PathVariable String orgId, @PathVariable String userId, @RequestBody Map<String, String> payload) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String newRole = payload.get("role");
-        if (newRole == null) return ResponseEntity.badRequest().body("Role is required.");
+        String newRoleId = payload.get("roleId");
+        if (newRoleId == null) return ResponseEntity.badRequest().body("Role ID is required.");
 
         try {
-            userService.updateOrganizationMemberRole(orgId, userId, newRole, user);
+            userService.updateOrganizationMemberRole(orgId, userId, newRoleId, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(e.getMessage());
@@ -180,6 +258,7 @@ public class UserController {
     }
 
     @PutMapping("/orgs/{orgId}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_METADATA', authentication)")
     public ResponseEntity<?> updateOrganization(@PathVariable String orgId, @RequestBody Map<String, String> payload) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -200,6 +279,7 @@ public class UserController {
     }
 
     @DeleteMapping("/orgs/{orgId}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_DELETE', authentication)")
     public ResponseEntity<?> deleteOrganization(@PathVariable String orgId) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -215,6 +295,7 @@ public class UserController {
     }
 
     @PostMapping("/orgs/{orgId}/avatar")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_AVATAR', authentication)")
     public ResponseEntity<?> uploadOrgAvatar(@PathVariable String orgId, @RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -234,6 +315,7 @@ public class UserController {
     }
 
     @PostMapping("/orgs/{orgId}/banner")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_BANNER', authentication)")
     public ResponseEntity<?> uploadOrgBanner(@PathVariable String orgId, @RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -253,6 +335,7 @@ public class UserController {
     }
 
     @PostMapping("/orgs/{orgId}/invite/accept")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_INVITE_ACCEPT', authentication)")
     public ResponseEntity<?> acceptOrgInvite(@PathVariable String orgId) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -265,6 +348,7 @@ public class UserController {
     }
 
     @PostMapping("/orgs/{orgId}/invite/decline")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_INVITE_DECLINE', authentication)")
     public ResponseEntity<?> declineOrgInvite(@PathVariable String orgId) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -276,24 +360,38 @@ public class UserController {
         }
     }
 
+    @DeleteMapping("/orgs/{orgId}/invites/{userId}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_INVITE', authentication)")
+    public ResponseEntity<?> cancelOrgInvite(@PathVariable String orgId, @PathVariable String userId) {
+        User user = userService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            userService.voidOrgInvite(orgId, userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/orgs/{orgId}/link/prepare")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> prepareOrgLink(@PathVariable String orgId, HttpServletRequest request) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
         List<User> userOrgs = userService.getUserOrganizations(user.getId());
-        boolean isAdmin = userOrgs.stream()
-                .filter(o -> o.getId().equals(orgId))
-                .flatMap(o -> o.getOrganizationMembers().stream())
-                .anyMatch(m -> m.getUserId().equals(user.getId()) && "ADMIN".equals(m.getRole()));
+        User org = userOrgs.stream().filter(o -> o.getId().equals(orgId)).findFirst().orElse(null);
 
-        if (!isAdmin) return ResponseEntity.status(403).body("Insufficient permissions.");
+        if (org == null || !userService.hasOrgPermission(org, user.getId(), ApiKey.ApiPermission.ORG_CONNECTION_MANAGE)) {
+            return ResponseEntity.status(403).body("Insufficient permissions.");
+        }
 
         request.getSession().setAttribute("pending_org_link_id", orgId);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/orgs/{orgId}/connections/{provider}/toggle-visibility")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> toggleOrgConnectionVisibility(@PathVariable String orgId, @PathVariable String provider) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -308,6 +406,7 @@ public class UserController {
     }
 
     @DeleteMapping("/orgs/{orgId}/connections/{provider}")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> unlinkOrgAccount(@PathVariable String orgId, @PathVariable String provider) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -322,6 +421,7 @@ public class UserController {
     }
 
     @GetMapping("/orgs/{orgId}/repos/github")
+    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<List<GitRepository>> getOrgGithubRepos(@PathVariable String orgId) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -342,6 +442,7 @@ public class UserController {
     }
 
     @GetMapping("/user/me")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<UserDTO> getCurrentUser() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -349,6 +450,7 @@ public class UserController {
     }
 
     @DeleteMapping("/user/me")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_DELETE', authentication)")
     public ResponseEntity<?> deleteAccount(HttpServletRequest request) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -366,14 +468,16 @@ public class UserController {
         }
     }
 
-    @GetMapping("/user/profile/{username}")
-    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String username) {
-        User user = userService.getPublicProfile(username);
+    @GetMapping("/user/profile/{userId}")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String userId) {
+        User user = userService.getPublicProfile(userId);
         if (user == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(UserDTO.fromEntity(user, false));
     }
 
     @PutMapping("/user/profile")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BASIC', authentication)")
     public ResponseEntity<?> updateProfile(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -408,6 +512,7 @@ public class UserController {
     }
 
     @PostMapping("/user/profile/avatar")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_AVATAR', authentication)")
     public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -425,6 +530,7 @@ public class UserController {
     }
 
     @PostMapping("/user/profile/banner")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BANNER', authentication)")
     public ResponseEntity<?> uploadBanner(@RequestParam("file") MultipartFile file) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -442,6 +548,7 @@ public class UserController {
     }
 
     @PostMapping("/user/connections/{provider}/toggle-visibility")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> toggleVisibility(@PathVariable String provider) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -450,6 +557,7 @@ public class UserController {
     }
 
     @DeleteMapping("/user/connections/{provider}")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> unlinkAccount(@PathVariable String provider) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -462,6 +570,7 @@ public class UserController {
     }
 
     @PutMapping("/user/settings/notifications")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_NOTIFICATION_MANAGE', authentication)")
     public ResponseEntity<?> updateNotificationSettings(@RequestBody User.NotificationPreferences prefs) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
@@ -469,24 +578,26 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/user/follow/{targetUsername}")
-    public ResponseEntity<?> followUser(@PathVariable String targetUsername) {
+    @PostMapping("/user/follow/{targetId}")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_FOLLOW', authentication)")
+    public ResponseEntity<?> followUser(@PathVariable String targetId) {
         User currentUser = userService.getCurrentUser();
         if (currentUser == null) return ResponseEntity.status(401).build();
         try {
-            userService.followUser(currentUser.getId(), targetUsername);
+            userService.followUser(currentUser.getId(), targetId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
-    @PostMapping("/user/unfollow/{targetUsername}")
-    public ResponseEntity<?> unfollowUser(@PathVariable String targetUsername) {
+    @PostMapping("/user/unfollow/{targetId}")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_UNFOLLOW', authentication)")
+    public ResponseEntity<?> unfollowUser(@PathVariable String targetId) {
         User currentUser = userService.getCurrentUser();
         if (currentUser == null) return ResponseEntity.status(401).build();
         try {
-            userService.unfollowUser(currentUser.getId(), targetUsername);
+            userService.unfollowUser(currentUser.getId(), targetId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -494,6 +605,7 @@ public class UserController {
     }
 
     @GetMapping("/user/repos/github")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<List<GitRepository>> getGithubRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -525,6 +637,7 @@ public class UserController {
     }
 
     @GetMapping("/user/repos/gitlab")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<List<GitRepository>> getGitlabRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -606,21 +719,24 @@ public class UserController {
     }
 
     @GetMapping("/user/repos")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<List<GitRepository>> getMyRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         return getGithubRepos(authentication, request, response);
     }
 
-    @GetMapping("/users/{username}/following")
-    public ResponseEntity<List<UserDTO>> getUserFollowing(@PathVariable String username) {
-        List<User> following = userService.getFollowing(username);
+    @GetMapping("/users/{userId}/following")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<List<UserDTO>> getUserFollowing(@PathVariable String userId) {
+        List<User> following = userService.getFollowing(userId);
         return ResponseEntity.ok(following.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));
     }
 
-    @GetMapping("/users/{username}/followers")
-    public ResponseEntity<List<UserDTO>> getUserFollowers(@PathVariable String username) {
-        List<User> followers = userService.getFollowers(username);
+    @GetMapping("/users/{userId}/followers")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<List<UserDTO>> getUserFollowers(@PathVariable String userId) {
+        List<User> followers = userService.getFollowers(userId);
         return ResponseEntity.ok(followers.stream()
                 .map(u -> UserDTO.fromEntity(u, false))
                 .collect(Collectors.toList()));

@@ -1,6 +1,7 @@
 ---
 import '../index.css';
 import { DEFAULT_SEO } from '../data/seo-constants';
+import { BACKEND_URL } from "@/utils/api.ts";
 
 interface Props {
     title?: string;
@@ -22,21 +23,12 @@ const {
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
-const defaultImage = "https://modtale.net/assets/og-default.png";
-let image = propImage || defaultImage;
+// Rely on the image passed down from the page routes, or fallback to the default favicon
+const image = propImage || "https://modtale.net/assets/favicon.svg";
 
-if (initialData && initialData.id && initialData.classification) {
-    image = `api.modale.net/api/v1/og/project/${initialData.id}.png`;
-}
-
-const initialDataString = initialData ? JSON.stringify(initialData) : 'null';
-const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : null;
-
-const rawApiUrl = import.meta.env.PUBLIC_API_URL || "https://modtale-backend-dev-ptpi2wdeva-uc.a.run.app";
-let apiOrigin = rawApiUrl;
-try {
-    apiOrigin = new URL(rawApiUrl).origin;
-} catch (e) {}
+// Safely escape JSON to prevent `</script>` injection from breaking the document <head>
+const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
+const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
 ---
 
 <!DOCTYPE html>
@@ -52,18 +44,21 @@ try {
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content={title} />
-
+    <meta property="og:description" content={description} />
     <meta property="og:image" content={image} />
     <meta property="og:site_name" content="Modtale" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
 
     <meta name="keywords" content={keywords} />
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <meta name="theme-color" content="#3b82f6" />
 
+    <link rel="preconnect" href={BACKEND_URL} crossorigin />
+    <link rel="dns-prefetch" href={BACKEND_URL} />
     <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

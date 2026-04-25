@@ -10,13 +10,17 @@ import net.modtale.service.auth.ApiKeyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Component
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
@@ -39,10 +43,21 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             if (apiKey != null) {
                 User user = apiKeyService.getUserFromKey(apiKey);
                 if (user != null) {
+                    List<GrantedAuthority> authorities = new ArrayList<>();
+                    authorities.add(new SimpleGrantedAuthority("ROLE_API"));
+
+                    Map<String, Set<ApiKey.ApiPermission>> perms = apiKey.getContextPermissions();
+                    for (Map.Entry<String, Set<ApiKey.ApiPermission>> entry : perms.entrySet()) {
+                        String contextId = entry.getKey();
+                        for (ApiKey.ApiPermission permission : entry.getValue()) {
+                            authorities.add(new SimpleGrantedAuthority("SCOPE_" + contextId + "_" + permission.name()));
+                        }
+                    }
+
                     UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                             user,
                             null,
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_API"))
+                            authorities
                     );
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }

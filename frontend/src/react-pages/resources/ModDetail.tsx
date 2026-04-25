@@ -1,33 +1,31 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Helmet } from 'react-helmet-async';
 import type { Mod, User, ProjectVersion, Comment, ModDependency } from '../../types';
 import {
     MessageSquare, Send, Copy, X, Check,
     Tag, Scale, Link as LinkIcon, Box, Gamepad2, Heart, Share2, Edit, ChevronLeft, ChevronRight,
-    Download, Image, List, Globe, Bug, BookOpen, Github, ExternalLink, Calendar, ChevronDown, Hash,
-    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Trophy
+    Download, Image, List, Globe, Bug, BookOpen, ExternalLink, Calendar, ChevronDown, Hash,
+    CornerDownRight, Crown, Trash, Users, Flag, AlertTriangle, Archive, Github,
+    ArrowBigUp, ArrowBigDown, Trophy
 } from 'lucide-react';
 import { StatusModal } from '../../components/ui/StatusModal';
 import { ShareModal } from '@/components/resources/mod-detail/ShareModal';
+import { OptimizedImage } from '../../components/ui/OptimizedImage';
 import { api, API_BASE_URL, BACKEND_URL } from '../../utils/api';
 import { extractId, createSlug, getProjectUrl } from '../../utils/slug';
 import { useSSRData } from '../../context/SSRContext';
 import NotFound from '../../components/ui/error/NotFound';
-import { Spinner } from '../../components/ui/Spinner';
+import { Spinner } from '@/components/ui/Spinner';
 import { compareSemVer, formatTimeAgo, DiscordIcon, getLicenseInfo, getClassificationIcon, toTitleCase } from '../../utils/modHelpers';
-import { DependencyModal, DownloadModal, HistoryModal } from '@/components/resources/mod-detail/DownloadDialogs';
-import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout.tsx';
+import { DependencyModal, DownloadModal, HistoryModal, PostDownloadModal } from '@/components/resources/mod-detail/DownloadDialogs';
+import { ProjectLayout, SidebarSection } from '@/components/resources/ProjectLayout';
 import { generateProjectMeta } from '../../utils/meta';
 import { getBreadcrumbsForClassification, generateBreadcrumbSchema } from '../../utils/schema';
-import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
 import { useMobile } from '../../context/MobileContext';
+import { ReportModal } from '@/components/resources/mod-detail/ReportModal';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
+import { useHMWiki, WikiSidebar, WikiContent } from '../../components/resources/HMWiki';
 
 const ProjectSidebar: React.FC<{
     mod: Mod;
@@ -107,52 +105,73 @@ const ProjectSidebar: React.FC<{
             </SidebarSection>
 
             {author && author.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (
-                <SidebarSection title="Team Members" icon={Users}>
+                <SidebarSection title="Organization Members" icon={Users}>
                     <div className="flex flex-col gap-2">
-                        {orgMembers.map(member => (
-                            <Link
-                                key={member.id}
-                                to={`/creator/${member.username}`}
-                                className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
-                            >
-                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
-                                    {member.avatarUrl ? (
-                                        <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="font-bold text-slate-500 dark:text-slate-400 text-xs">{member.username.charAt(0).toUpperCase()}</span>
-                                    )}
-                                </div>
-                                <div>
-                                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{member.username}</div>
-                                    <div className="text-[10px] text-slate-600 dark:text-slate-400 uppercase font-bold tracking-wider">
-                                        {author.organizationMembers?.find(m => m.userId === member.id)?.role || 'Member'}
+                        {orgMembers.map(member => {
+                            const orgMembership = author.organizationMembers?.find(m => m.userId === member.id);
+                            const role = author.organizationRoles?.find(r => r.id === orgMembership?.roleId);
+                            const roleName = role?.name || 'Member';
+
+                            return (
+                                <Link
+                                    key={member.id}
+                                    to={`/creator/${member.username}`}
+                                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
+                                >
+                                    <OptimizedImage
+                                        src={member.avatarUrl}
+                                        alt={`${member.username} Avatar`}
+                                        baseWidth={32}
+                                        className="w-8 h-8 rounded-lg border border-slate-200 dark:border-white/5 shrink-0"
+                                    />
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{member.username}</div>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{roleName}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            </Link>
-                        ))}
+                                </Link>
+                            );
+                        })}
                     </div>
                 </SidebarSection>
             )}
 
             {contributors.length > 0 && (
-                <SidebarSection title="Contributors" icon={Users}>
+                <SidebarSection title={author?.accountType === 'ORGANIZATION' ? "Project Contributors" : "Team Members"} icon={Users}>
                     <div className="flex flex-col gap-2">
-                        {contributors.map(contributor => (
-                            <Link
-                                key={contributor.id}
-                                to={`/creator/${contributor.username}`}
-                                className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
-                            >
-                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
-                                    {contributor.avatarUrl ? (
-                                        <img src={contributor.avatarUrl} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="font-bold text-slate-500 dark:text-slate-400 text-xs">{contributor.username.charAt(0).toUpperCase()}</span>
-                                    )}
-                                </div>
-                                <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent">{contributor.username}</div>
-                            </Link>
-                        ))}
+                        {contributors.map(contributor => {
+                            const teamMembership = mod.teamMembers?.find(m => m.userId === contributor.id);
+                            const role = mod.projectRoles?.find(r => r.id === teamMembership?.roleId);
+
+                            return (
+                                <Link
+                                    key={contributor.id}
+                                    to={`/creator/${contributor.username}`}
+                                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
+                                >
+                                    <OptimizedImage
+                                        src={contributor.avatarUrl}
+                                        alt={`${contributor.username} Avatar`}
+                                        baseWidth={32}
+                                        className="w-8 h-8 rounded-lg border border-slate-200 dark:border-white/5 shrink-0"
+                                    />
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{contributor.username}</div>
+                                        {role ? (
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{role.name}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">Contributor</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </Link>
+                            );
+                        })}
                     </div>
                 </SidebarSection>
             )}
@@ -168,13 +187,20 @@ const ProjectSidebar: React.FC<{
                             const path = mod.classification === 'MODPACK' ? `/modpack/${slug}` : `/mod/${slug}`;
 
                             return (
-                                <button
+                                <Link
                                     key={idx}
-                                    onClick={() => navigate(path)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left"
+                                    to={path}
+                                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left block"
                                 >
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden">
-                                        {iconUrl ? <img src={iconUrl} alt="" className="w-full h-full object-cover" /> : <Box className="w-4 h-4" aria-hidden="true" />}
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/20 flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors overflow-hidden shrink-0">
+                                        {iconUrl ? (
+                                            <OptimizedImage
+                                                src={iconUrl}
+                                                alt={`${title} Icon`}
+                                                baseWidth={32}
+                                                className="w-full h-full"
+                                            />
+                                        ) : <Box className="w-4 h-4" aria-hidden="true" />}
                                     </div>
                                     <div className="min-w-0">
                                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{title}</div>
@@ -183,7 +209,7 @@ const ProjectSidebar: React.FC<{
                                             <span className="font-mono opacity-75">v{dep.versionNumber}</span>
                                         </div>
                                     </div>
-                                </button>
+                                </Link>
                             );
                         })}
                     </div>
@@ -219,6 +245,37 @@ const ProjectSidebar: React.FC<{
 });
 ProjectSidebar.displayName = 'ProjectSidebar';
 
+interface VoteWidgetProps {
+    score: number;
+    userVote: 'up' | 'down' | null;
+    onVote: (up: boolean) => void;
+    vertical?: boolean;
+}
+
+const VoteWidget: React.FC<VoteWidgetProps> = ({ score, userVote, onVote, vertical = true }) => {
+    return (
+        <div className={`flex ${vertical ? 'flex-col items-center' : 'items-center gap-2'} shrink-0 mt-1`}>
+            <button
+                onClick={() => onVote(true)}
+                className={`p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors ${userVote === 'up' ? 'text-modtale-accent' : 'text-slate-400'}`}
+                aria-label="Helpful"
+            >
+                <ArrowBigUp className={`w-6 h-6 ${userVote === 'up' ? 'fill-current' : ''}`} />
+            </button>
+            <span className={`text-sm font-black min-w-[1.5rem] text-center ${userVote === 'up' ? 'text-modtale-accent' : userVote === 'down' ? 'text-orange-500' : 'text-slate-500'}`}>
+                {score > 0 ? `+${score}` : score}
+            </span>
+            <button
+                onClick={() => onVote(false)}
+                className={`p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors ${userVote === 'down' ? 'text-orange-500' : 'text-slate-400'}`}
+                aria-label="Not Helpful"
+            >
+                <ArrowBigDown className={`w-6 h-6 ${userVote === 'down' ? 'fill-current' : ''}`} />
+            </button>
+        </div>
+    );
+};
+
 interface CommentSectionProps {
     modId: string;
     comments: Comment[];
@@ -238,11 +295,62 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
+    const [userProfiles, setUserProfiles] = useState<Record<string, {username: string, avatarUrl: string}>>({});
+
+    useEffect(() => {
+        const userIds = new Set<string>();
+        comments.forEach(c => {
+            const anyC = c as any;
+            const aId = anyC.authorId || anyC.userId;
+            if (aId && !userProfiles[aId]) userIds.add(aId);
+
+            if (anyC.developerReply) {
+                const rId = anyC.developerReply.authorId || anyC.developerReply.userId;
+                if (rId && !userProfiles[rId]) userIds.add(rId);
+            }
+        });
+
+        if (userIds.size > 0) {
+            api.post('/users/batch', { userIds: Array.from(userIds) })
+                .then(res => {
+                    const profiles: Record<string, {username: string, avatarUrl: string}> = {};
+                    res.data.forEach((u: User) => {
+                        profiles[u.id] = { username: u.username, avatarUrl: u.avatarUrl };
+                    });
+                    setUserProfiles(prev => ({...prev, ...profiles}));
+                })
+                .catch(() => {});
+        }
+    }, [comments]);
+
+    const handleVote = async (commentId: string, isReply: boolean, upvote: boolean) => {
+        if (!currentUser) {
+            onError("Log in to vote on comments.");
+            return;
+        }
+        try {
+            const endpoint = isReply ? `/projects/${modId}/comments/${commentId}/reply/vote` : `/projects/${modId}/comments/${commentId}/vote`;
+            await api.post(`${endpoint}?upvote=${upvote}`);
+            const res = await api.get(`/projects/${modId}`);
+            onCommentSubmitted(res.data.comments || []);
+        } catch (err: any) {
+            onError("Failed to register vote.");
+        }
+    };
+
+    const resolveAvatar = (url?: string | null) => {
+        if (!url || url === 'null') return null;
+        if (url.startsWith('http')) return url;
+        return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
 
     const startEditing = useCallback((comment: Comment) => {
         setText(comment.content);
         setEditingCommentId(comment.id);
-        if(innerRef?.current) innerRef.current.scrollIntoView({behavior:'smooth'});
+        if(innerRef?.current) {
+            const y = innerRef.current.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({top: y, behavior: 'smooth'});
+        }
     }, [innerRef]);
 
     const cancelEdit = useCallback(() => {
@@ -295,10 +403,12 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
 
     if (commentsDisabled && !isCreator) return null;
 
+    const currentUserAvatar = resolveAvatar(currentUser?.avatarUrl);
+
     return (
-        <div ref={innerRef} className="mt-12 border-t border-slate-200 dark:border-white/5 pt-10">
+        <div ref={innerRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-                <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> Comments <span className="text-sm font-medium text-slate-500 dark:text-slate-400">({comments.length})</span>
+                <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> {comments.length} Comments
             </h2>
 
             {commentsDisabled && (
@@ -308,108 +418,193 @@ const CommentSection: React.FC<CommentSectionProps> = React.memo(({ modId, comme
             )}
 
             {currentUser ? (
-                <form onSubmit={submit} className="mb-10 p-6 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-200 dark:border-white/5">
-                    <div className="flex justify-between mb-4">
-                        <h3 className="font-bold text-slate-900 dark:text-white m-0 text-base">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
-                        {editingCommentId && <button type="button" onClick={cancelEdit} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-500 font-bold">Cancel</button>}
-                    </div>
-                    <textarea aria-label="Comment content" value={text} onChange={e => setText(e.target.value)} className="w-full p-4 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white mb-4 focus:ring-2 focus:ring-modtale-accent outline-none font-medium text-sm min-h-[100px]" placeholder="Ask a question or share your thoughts..." required />
-                    <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 transition-colors">
-                        <Send className="w-4 h-4" aria-hidden="true" /> {editingCommentId ? 'Update Comment' : 'Post Comment'}
-                    </button>
-                </form>
-            ) : <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-950/30 rounded-2xl text-center text-slate-600 dark:text-slate-400 font-bold border border-slate-200 dark:border-white/5">Log in to post a comment.</div>}
+                <div className="mb-12 flex gap-4">
+                    <form onSubmit={submit} className="flex-1 bg-slate-50 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm focus-within:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent transition-all p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-modtale-accent m-0 text-[11px] uppercase tracking-widest">{editingCommentId ? 'Edit your comment' : 'Leave a comment'}</h3>
+                            {editingCommentId && <button type="button" onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-red-500 font-bold uppercase tracking-widest transition-colors">Cancel</button>}
+                        </div>
+                        <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0 shadow-sm border border-slate-200 dark:border-white/5 mt-0.5">
+                                {currentUserAvatar ? (
+                                    <OptimizedImage src={currentUserAvatar} alt={`${currentUser?.username} Avatar`} baseWidth={36} className="w-full h-full object-cover" />
+                                ) : (
+                                    currentUser?.username?.charAt(0).toUpperCase() || '?'
+                                )}
+                            </div>
+                            <textarea
+                                aria-label="Comment content"
+                                value={text}
+                                onChange={e => setText(e.target.value)}
+                                className="w-full bg-transparent border-none text-slate-900 dark:text-white outline-none font-medium text-sm min-h-[60px] resize-y placeholder-slate-400 dark:placeholder-slate-500 pt-1.5"
+                                placeholder="What are your thoughts?"
+                                required
+                            />
+                        </div>
+                        <div className="flex justify-end pt-1">
+                            <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors text-xs shadow-md">
+                                <Send className="w-3.5 h-3.5" aria-hidden="true" /> {editingCommentId ? 'Update' : 'Post Comment'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            ) : <div className="mb-8 p-6 bg-slate-50 dark:bg-black/20 rounded-xl text-center text-slate-500 font-bold border border-slate-200 dark:border-white/5 shadow-sm">Log in to join the conversation.</div>}
 
             <div className="space-y-4">
-                {comments?.length > 0 ? comments.map((comment) => (
-                    <div key={comment.id} className="p-6 bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-white/5 group">
-                        <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black overflow-hidden shrink-0">
-                                    {comment.userAvatarUrl ? (
-                                        <img src={comment.userAvatarUrl} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        comment.user.charAt(0)
-                                    )}
-                                </div>
-                                <div><Link to={`/creator/${comment.user}`} className="font-bold text-slate-900 dark:text-white block hover:text-modtale-accent transition-colors">{comment.user}</Link></div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                                <div suppressHydrationWarning className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                                </div>
-                                <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
-                                    {currentUser && (
-                                        <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
-                                            <Flag className="w-3 h-3" aria-hidden="true"/> Report
-                                        </button>
-                                    )}
-                                    {(currentUser && currentUser.username === comment.user) && (
-                                        <button aria-label="Edit comment" onClick={() => startEditing(comment)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-modtale-accent font-bold flex items-center gap-1">
-                                            <Edit className="w-3 h-3" aria-hidden="true"/> Edit
-                                        </button>
-                                    )}
-                                    {(isCreator || (currentUser && currentUser.username === comment.user)) && (
-                                        <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)} className="text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 font-bold flex items-center gap-1">
-                                            <Trash className="w-3 h-3" aria-hidden="true"/> Delete
-                                        </button>
-                                    )}
-                                    {isCreator && (
-                                        <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs text-modtale-accent font-bold hover:underline">
-                                            {comment.developerReply ? 'Edit Reply' : 'Reply'}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <p className="text-slate-700 dark:text-slate-300 pl-14 whitespace-pre-wrap">{comment.content}</p>
+                {comments?.length > 0 ? comments.map((comment) => {
+                    const anyC = comment as any;
+                    const authorId = anyC.authorId || anyC.userId;
+                    const profile = userProfiles[authorId];
+                    const authorUsername = profile?.username || anyC.author?.username || 'Unknown';
 
-                        {replyingCommentId === comment.id ? (
-                            <form onSubmit={submitReply} className="mt-4 ml-14 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/10">
-                                <textarea
-                                    aria-label="Developer reply content"
-                                    value={replyText}
-                                    onChange={e => setReplyText(e.target.value)}
-                                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-lg p-2 text-sm mb-2 focus:outline-none focus:border-modtale-accent text-slate-900 dark:text-white"
-                                    placeholder="Write a reply..."
-                                    rows={3}
-                                />
-                                <div className="flex justify-end gap-2">
-                                    <button type="button" onClick={() => setReplyingCommentId(null)} className="text-xs font-bold px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Cancel</button>
-                                    <button type="submit" disabled={submitting} className="text-xs font-bold bg-modtale-accent text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-modtale-accentHover transition-colors">
-                                        <CornerDownRight className="w-3 h-3" aria-hidden="true"/> Post Reply
-                                    </button>
+                    const rawAvatar = authorId ? userProfiles[authorId]?.avatarUrl : null;
+                    const authorAvatar = resolveAvatar(rawAvatar);
+
+                    const score = (anyC.upvotes?.length || 0) - (anyC.downvotes?.length || 0);
+                    const userVote = currentUser && anyC.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && anyC.downvotes?.includes(currentUser.id) ? 'down' : null);
+
+                    const profileLink = `/creator/${authorUsername}`;
+                    const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
+
+                    return (
+                        <div key={comment.id} className="p-4 sm:p-5 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-slate-200 dark:border-white/5 shadow-sm group relative flex gap-3 sm:gap-4">
+                            <VoteWidget score={score} userVote={userVote} onVote={(up) => handleVote(comment.id, false, up)} />
+
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Link to={profileLink} className="shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all shadow-sm border border-slate-200 dark:border-white/5">
+                                            {authorAvatar ? (
+                                                <OptimizedImage src={authorAvatar} alt={`${authorUsername} Avatar`} baseWidth={40} className="w-full h-full object-cover" />
+                                            ) : (
+                                                authorUsername.charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                    </Link>
+                                    <div className="flex flex-col">
+                                        <Link to={profileLink} className="font-bold text-sm sm:text-base text-slate-900 dark:text-white hover:text-modtale-accent transition-colors">
+                                            {authorUsername}
+                                        </Link>
+                                        <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                            {formatTimeAgo(comment.date)}
+                                        </span>
+                                    </div>
                                 </div>
-                            </form>
-                        ) : comment.developerReply && (
-                            <div className="mt-6 ml-14 relative">
-                                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-modtale-accent to-transparent rounded-full opacity-50"></div>
-                                <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/5">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-6 h-6 rounded-full bg-modtale-accent text-white flex items-center justify-center text-xs font-bold overflow-hidden">
-                                                {comment.developerReply.userAvatarUrl ? (
-                                                    <img src={comment.developerReply.userAvatarUrl} alt="" className="w-full h-full object-cover"/>
-                                                ) : (
-                                                    <Crown className="w-3 h-3" aria-hidden="true" />
-                                                )}
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                                                    <Link to={`/creator/${comment.developerReply.user}`} className="hover:text-modtale-accent transition-colors">{comment.developerReply.user}</Link> <Crown className="w-3 h-3 text-modtale-accent" aria-hidden="true" />
-                                                </span>
-                                                <span suppressHydrationWarning className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
-                                                    Developer Response • {new Date(comment.developerReply.date).toLocaleDateString()}
-                                                </span>
+
+                                <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed prose-code:before:hidden prose-code:after:hidden break-words">
+                                    <MarkdownRenderer content={comment.content} />
+                                </div>
+
+                                <div className="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                                    {isCreator && !comment.developerReply && (
+                                        <button aria-label="Reply to comment" onClick={() => { setReplyingCommentId(comment.id); setReplyText(''); }} className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 transition-colors">
+                                            <MessageSquare className="w-4 h-4" aria-hidden="true"/> Reply
+                                        </button>
+                                    )}
+                                    {isCreator && comment.developerReply && (
+                                        <button aria-label="Edit reply" onClick={() => { setReplyingCommentId(comment.id); setReplyText(comment.developerReply?.content || ''); }} className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 transition-colors">
+                                            <MessageSquare className="w-4 h-4" aria-hidden="true"/> Edit Reply
+                                        </button>
+                                    )}
+                                    {currentUser && !isCommentOwner && (
+                                        <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
+                                            <Flag className="w-4 h-4" aria-hidden="true"/> Report
+                                        </button>
+                                    )}
+                                    {isCommentOwner && (
+                                        <button aria-label="Edit comment" onClick={() => startEditing(comment)} className="text-xs font-bold text-slate-500 hover:text-modtale-accent flex items-center gap-1.5 transition-colors">
+                                            <Edit className="w-4 h-4" aria-hidden="true"/> Edit
+                                        </button>
+                                    )}
+                                    {(isCreator || isCommentOwner) && (
+                                        <button aria-label="Delete comment" onClick={() => deleteComment(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
+                                            <Trash className="w-4 h-4" aria-hidden="true"/> Delete
+                                        </button>
+                                    )}
+                                </div>
+
+                                {replyingCommentId === comment.id && (
+                                    <form onSubmit={submitReply} className="mt-4 pl-4 border-l-2 border-slate-200 dark:border-white/10 relative">
+                                        <textarea
+                                            aria-label="Developer reply content"
+                                            value={replyText}
+                                            onChange={e => setReplyText(e.target.value)}
+                                            className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-base focus:outline-none focus:ring-2 focus:ring-modtale-accent text-slate-900 dark:text-white transition-all shadow-inner resize-y"
+                                            placeholder="Write a reply..."
+                                            rows={3}
+                                        />
+                                        <div className="mt-2 flex justify-end gap-2">
+                                            <button type="button" onClick={() => setReplyingCommentId(null)} className="text-sm font-bold px-4 py-2 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">Cancel</button>
+                                            <button type="submit" disabled={submitting} className="text-sm font-bold bg-modtale-accent text-white px-5 py-2 rounded-lg flex items-center gap-2 hover:bg-modtale-accentHover transition-colors shadow-sm">
+                                                <CornerDownRight className="w-4 h-4" aria-hidden="true"/> Post Reply
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {comment.developerReply && !replyingCommentId && (() => {
+                                    const devReply = comment.developerReply as any;
+                                    const replyId = devReply.authorId || devReply.userId;
+
+                                    const replyProfile = userProfiles[replyId];
+                                    const replyUsername = replyProfile?.username || devReply.author?.username || 'Developer';
+
+                                    const rawReplyAvatar = replyId ? replyProfile?.avatarUrl : null;
+                                    const replyAvatar = resolveAvatar(rawReplyAvatar);
+
+                                    const replyProfileLink = `/creator/${replyUsername}`;
+
+                                    const replyScore = (devReply.upvotes?.length || 0) - (devReply.downvotes?.length || 0);
+                                    const replyUserVote = currentUser && devReply.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && devReply.downvotes?.includes(currentUser.id) ? 'down' : null);
+
+                                    return (
+                                        <div className="mt-3 flex gap-3 relative">
+                                            <div className="absolute -left-[1.75rem] sm:-left-[2.25rem] top-0 bottom-4 w-px bg-slate-200 dark:bg-white/10"></div>
+                                            <div className="absolute -left-[1.75rem] sm:-left-[2.25rem] top-4 w-4 h-px bg-slate-200 dark:bg-white/10"></div>
+
+                                            <VoteWidget score={replyScore} userVote={replyUserVote} onVote={(up) => handleVote(comment.id, true, up)} />
+
+                                            <div className="flex-1 min-w-0 bg-modtale-accent/5 dark:bg-modtale-accent/[0.02] rounded-2xl p-4 border border-modtale-accent/10 dark:border-modtale-accent/20">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Link to={replyProfileLink} className="shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-black overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all shadow-sm border border-slate-200 dark:border-white/5">
+                                                            {replyAvatar ? (
+                                                                <OptimizedImage src={replyAvatar} alt={`${replyUsername} Avatar`} baseWidth={32} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
+                                                            )}
+                                                        </div>
+                                                    </Link>
+                                                    <div className="flex flex-col">
+                                                        <Link to={replyProfileLink} className="font-bold text-sm text-slate-900 dark:text-white hover:text-modtale-accent transition-colors flex items-center gap-1.5">
+                                                            {replyUsername}
+                                                            <span className="bg-modtale-accent/10 text-modtale-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest flex items-center gap-1"><Crown className="w-2.5 h-2.5"/> Creator</span>
+                                                        </Link>
+                                                        <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                                            {formatTimeAgo(comment.developerReply.date)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed prose-code:before:hidden prose-code:after:hidden break-words">
+                                                    <MarkdownRenderer content={comment.developerReply.content} />
+                                                </div>
+
+                                                <div className="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                                                    {currentUser && currentUser.id !== replyId && (
+                                                        <button aria-label="Report comment" onClick={() => onReport(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
+                                                            <Flag className="w-4 h-4" aria-hidden="true"/> Report
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{comment.developerReply.content}</p>
-                                </div>
+                                    );
+                                })()}
                             </div>
-                        )}
-                    </div>
-                )) : <div className="text-center py-12 text-slate-600 dark:text-slate-400 italic">No comments yet.</div>}
+                        </div>
+                    );
+                }) : <div className="text-center py-16 text-slate-500 font-medium bg-white dark:bg-white/[0.02] rounded-2xl border border-slate-200 dark:border-white/5 border-dashed">No comments yet. Be the first to share your thoughts!</div>}
             </div>
         </div>
     );
@@ -443,12 +638,23 @@ export const ModDetail: React.FC<{
     const [loading, setLoading] = useState(!initialMod);
     const [isNotFound, setIsNotFound] = useState(false);
 
-    const [showDownloadModal, setShowDownloadModal] = useState(false);
-    const [showAllVersionsModal, setShowAllVersionsModal] = useState(false);
+    const [showDownloadModal, setShowDownloadModal] = useState(location.pathname.endsWith('/download'));
+    const [showAllVersionsModal, setShowAllVersionsModal] = useState(location.pathname.endsWith('/changelog'));
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
-    const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
     const [pendingDownloadVer, setPendingDownloadVer] = useState<{url: string, ver: string, deps: any[]} | null>(null);
+    const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
+    const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
+
+    const isWikiRoute = location.pathname.includes('/wiki');
+    const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
+    const wikiPageSlug = wikiMatch && wikiMatch[1] ? wikiMatch[1] : undefined;
+
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(mod?.hmWikiSlug, wikiPageSlug, isWikiRoute && mod?.hmWikiEnabled === true);
+
+    const isGalleryRoute = location.pathname.endsWith('/gallery');
+    const parsedHash = parseInt(location.hash.replace('#', ''));
+    const galleryIndex = isGalleryRoute && !isNaN(parsedHash) && parsedHash > 0 && mod?.galleryImages && parsedHash <= mod.galleryImages.length ? parsedHash - 1 : null;
 
     const [isFollowing, setIsFollowing] = useState(false);
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string }>>({});
@@ -475,56 +681,38 @@ export const ModDetail: React.FC<{
     const depsDropdownRef = useRef<HTMLDivElement>(null);
     const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://modtale.net${location.pathname}`;
 
-    const memoizedDescription = useMemo(() => {
-        if (!mod?.about) return <p className="text-slate-500 italic">No description.</p>;
+    const projectUrl = getProjectUrl(mod);
 
-        return (
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                    ...defaultSchema,
-                    attributes: {
-                        ...defaultSchema.attributes,
-                        code: ['className']
+    const wikiTopRef = useRef<HTMLDivElement>(null);
+    const prevWikiSlugRef = useRef(wikiPageSlug);
+    const prevPathnameRef = useRef(location.pathname);
+
+    useEffect(() => {
+        if (isWikiRoute && !wikiLoading && wikiTopRef.current) {
+            const wasWikiNavigation = prevPathnameRef.current.includes('/wiki') && location.pathname.includes('/wiki');
+            const slugChanged = prevWikiSlugRef.current !== wikiPageSlug;
+
+            if (wasWikiNavigation && slugChanged) {
+                setTimeout(() => {
+                    if (wikiTopRef.current) {
+                        const y = wikiTopRef.current.getBoundingClientRect().top + window.scrollY - 120;
+                        window.scrollTo({ top: y, behavior: 'smooth' });
                     }
-                }]]}
-                components={{
-                    code({node, inline, className, children, ...props}: any) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        return !inline && match ? (
-                            <SyntaxHighlighter
-                                {...props}
-                                style={vscDarkPlus}
-                                language={match[1]}
-                                PreTag="div"
-                                className="rounded-lg text-sm"
-                            >
-                                {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                        ) : (
-                            <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                                {children}
-                            </code>
-                        )
-                    },
-                    p({node, children, ...props}: any) {
-                        return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>
-                    },
-                    li({node, children, ...props}: any) {
-                        return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>
-                    },
-                    ul({node, children, ...props}: any) {
-                        return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>
-                    },
-                    ol({node, children, ...props}: any) {
-                        return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>
-                    }
-                }}
-            >
-                {mod.about}
-            </ReactMarkdown>
-        );
-    }, [mod?.about]);
+                }, 50);
+            }
+            prevWikiSlugRef.current = wikiPageSlug;
+        }
+        prevPathnameRef.current = location.pathname;
+    }, [wikiPageSlug, wikiLoading, isWikiRoute, location.pathname]);
+
+    useEffect(() => {
+        if (isWikiRoute && !wikiPageSlug && wikiData?.mod) {
+            const defaultSlug = wikiData.mod.index?.slug || (wikiData.mod.pages?.length > 0 ? wikiData.mod.pages[0].slug : null);
+            if (defaultSlug) {
+                navigate(`${projectUrl}/wiki/${defaultSlug}`, { replace: true });
+            }
+        }
+    }, [isWikiRoute, wikiPageSlug, wikiData?.mod, navigate, projectUrl]);
 
     const handleCommentSubmitted = useCallback((c: Comment[]) => {
         setMod(prev => prev ? {...prev, comments: c} : null);
@@ -571,6 +759,15 @@ export const ModDetail: React.FC<{
     }, [realId]);
 
     useEffect(() => {
+        if (location.pathname.endsWith('/gallery') && mod?.galleryImages?.length) {
+            const hashNum = parseInt(location.hash.replace('#', ''));
+            if (isNaN(hashNum) || hashNum < 1 || hashNum > mod.galleryImages.length) {
+                navigate(`${getProjectUrl(mod)}/gallery#1`, { replace: true });
+            }
+        }
+    }, [location.pathname, location.hash, mod, navigate]);
+
+    useEffect(() => {
         if (currentUser?.followingIds && mod?.author) {
             setIsFollowing(currentUser.followingIds.includes(mod.author));
         } else {
@@ -578,7 +775,7 @@ export const ModDetail: React.FC<{
         }
     }, [currentUser, mod?.author]);
 
-    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.contributors?.includes(currentUser.username)));
+    const canEdit = mod?.canEdit ?? (currentUser && mod && (currentUser.username === mod.author || mod.teamMembers?.some(m => m.userId === currentUser.id)));
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
     const fetchedJamMeta = useRef<Set<string>>(new Set());
@@ -600,28 +797,41 @@ export const ModDetail: React.FC<{
             if (!mod) return;
 
             try {
-                const authorRes = await api.get(`/user/profile/${mod.author}`);
-                const author = authorRes.data;
-                setAuthorProfile(author);
+                const authorIdToFetch = (mod as any).authorId;
+                let authorData;
 
-                if (author.accountType === 'ORGANIZATION') {
-                    const membersRes = await api.get(`/orgs/${mod.author}/members`);
+                if (authorIdToFetch) {
+                    const authorRes = await api.get(`/user/profile/${authorIdToFetch}`);
+                    authorData = authorRes.data;
+                } else {
+                    const lookupRes = await api.get(`/users/lookup/${mod.author}`);
+                    const authorRes = await api.get(`/user/profile/${lookupRes.data.id}`);
+                    authorData = authorRes.data;
+                }
+
+                setAuthorProfile(authorData);
+
+                if (authorData.accountType === 'ORGANIZATION') {
+                    const membersRes = await api.get(`/orgs/${authorData.id}/members`);
                     setOrgMembers(membersRes.data);
                 }
             } catch (e) {
+                console.error("Failed to fetch author profile", e);
             }
 
-            if (mod.contributors && mod.contributors.length > 0) {
+            if (mod.teamMembers && mod.teamMembers.length > 0) {
                 try {
-                    const res = await api.post('/users/batch', { usernames: mod.contributors });
+                    const userIds = mod.teamMembers.map(m => m.userId);
+                    const res = await api.post('/users/batch', { userIds });
                     setContributors(res.data);
                 } catch (e) {
+                    console.error("Failed to fetch contributors", e);
                 }
             }
         };
 
         if (mod) fetchTeam();
-    }, [mod?.id, mod?.author]);
+    }, [mod?.id, mod?.author, mod?.teamMembers]);
 
     useEffect(() => {
         if (!mod?.modjamIds?.length) return;
@@ -672,10 +882,22 @@ export const ModDetail: React.FC<{
             const currentPath = location.pathname;
 
             if (currentPath.replace(/\/$/, "") !== canonicalPath.replace(/\/$/, "")) {
-                navigate(canonicalPath, { replace: true });
+                if (!currentPath.endsWith('/download') && !currentPath.endsWith('/changelog') && !currentPath.endsWith('/gallery') && !currentPath.includes('/wiki')) {
+                    navigate(canonicalPath, { replace: true });
+                }
+            }
+
+            if (location.hash === '#comments' && commentsRef.current) {
+                const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
+                window.scrollTo({top: y, behavior: 'smooth'});
             }
         }
-    }, [mod, loading, location.pathname, navigate]);
+    }, [mod, loading, location.pathname, location.hash, navigate]);
+
+    useEffect(() => {
+        if (location.pathname.endsWith('/download')) setShowDownloadModal(true);
+        if (location.pathname.endsWith('/changelog')) setShowAllVersionsModal(true);
+    }, [location.pathname]);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
@@ -696,6 +918,10 @@ export const ModDetail: React.FC<{
         const displayedVersions = allVersions.filter(v => showExperimental ? true : (!v.channel || v.channel === 'RELEASE'));
         return [...displayedVersions].sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
     }, [allVersions, showExperimental]);
+
+    const hasExperimentalVersions = useMemo(() => {
+        return allVersions.some(v => v.channel && v.channel !== 'RELEASE');
+    }, [allVersions]);
 
     const latestForGame = useMemo(() => {
         const result: Record<string, ProjectVersion[]> = {};
@@ -763,11 +989,11 @@ export const ModDetail: React.FC<{
             setPendingDownloadVer({ url, ver: ver || '', deps });
             setShowDownloadModal(false);
         } else {
-            executeDownload(url, ver);
+            executeDownload(url, ver, false);
         }
     }, [mod?.classification]);
 
-    const executeDownload = async (fileUrl: string, ver?: string) => {
+    const executeDownload = async (fileUrl: string, ver?: string, asBundle: boolean = false) => {
         try {
             if (!ver) {
                 const targetUrl = `${API_BASE_URL}/files/download/${encodeURI(fileUrl)}`;
@@ -777,11 +1003,22 @@ export const ModDetail: React.FC<{
                     onDownload(mod.id);
                 }
                 setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
-                setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+
+                setLastDownloadWasBundle(false);
+
+                if (localStorage.getItem('hideInstallInstructions') !== 'true') {
+                    setShowPostDownloadModal(true);
+                }
+
+                if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
                 return;
             }
 
-            const response = await api.get(`/projects/${mod?.id}/versions/${ver}/download-url`);
+            const endpoint = asBundle
+                ? `/projects/${mod?.id}/versions/${ver}/download-bundle-url`
+                : `/projects/${mod?.id}/versions/${ver}/download-url`;
+
+            const response = await api.get(endpoint);
             const { downloadUrl } = response.data;
 
             window.open(`${API_BASE_URL}${downloadUrl}`, '_blank');
@@ -790,18 +1027,27 @@ export const ModDetail: React.FC<{
                 onDownload(mod.id);
             }
             setPendingDownloadVer(null); setShowDownloadModal(false); setShowAllVersionsModal(false);
-            setStatusModal({ type: 'success', title: 'Download Started', msg: 'Your download should begin shortly.' });
+
+            setLastDownloadWasBundle(asBundle);
+
+            if (localStorage.getItem('hideInstallInstructions') !== 'true') {
+                setShowPostDownloadModal(true);
+            }
+
+            if (location.pathname.endsWith('/download')) navigate(getProjectUrl(mod!), { replace: true });
         } catch (error) {
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Unable to generate download link. Please try again.' });
         }
     };
 
-    const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
-
     if (isNotFound) return <NotFound />;
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!mod) return null;
 
+    if (isWikiRoute && (!mod.hmWikiEnabled || !mod.hmWikiSlug)) return <NotFound />;
+    if (isGalleryRoute && (!mod.galleryImages || mod.galleryImages.length === 0)) return <NotFound />;
+
+    const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     const resolvedBannerUrl = mod?.bannerUrl ? resolveUrl(mod.bannerUrl) : null;
 
     const links = [
@@ -834,8 +1080,6 @@ export const ModDetail: React.FC<{
                     {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
                     {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
 
-                    {resolvedBannerUrl && <link rel="preload" as="image" href={resolvedBannerUrl} fetchPriority="high" />}
-
                     <meta property="og:title" content={mod.title} />
                     <meta property="og:site_name" content="Modtale" />
                     <meta property="og:image" content={ogImageUrl} />
@@ -851,8 +1095,30 @@ export const ModDetail: React.FC<{
                 </Helmet>
             )}
 
+            {isUnlisted && (
+                <div className="sticky top-16 lg:top-20 z-[100] w-full bg-amber-500/90 dark:bg-amber-500/20 backdrop-blur-md border-b border-amber-500/30 text-white dark:text-amber-500 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
+                    <AlertTriangle className="w-4 h-4" />
+                    This project is unlisted. Only people with the link can view it.
+                </div>
+            )}
+
+            {isArchived && (
+                <div className="sticky top-16 lg:top-20 z-[100] w-full bg-slate-600/90 dark:bg-slate-500/20 backdrop-blur-md border-b border-slate-500/30 text-white dark:text-slate-400 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold shadow-md">
+                    <Archive className="w-4 h-4" />
+                    This project is archived. It is read-only and no longer actively maintained.
+                </div>
+            )}
+
             {statusModal && <StatusModal type={statusModal.type} title={statusModal.title} message={statusModal.msg} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={currentUrl} title={mod.title} author={mod.author} />
+
+            <PostDownloadModal
+                isOpen={showPostDownloadModal}
+                onClose={() => setShowPostDownloadModal(false)}
+                classification={mod.classification}
+                title={mod.title}
+                isBundle={lastDownloadWasBundle}
+            />
 
             <ReportModal
                 isOpen={!!reportTarget}
@@ -866,36 +1132,47 @@ export const ModDetail: React.FC<{
                 <DependencyModal
                     dependencies={pendingDownloadVer.deps}
                     onClose={() => setPendingDownloadVer(null)}
-                    onConfirm={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver)}
+                    onConfirm={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, true)}
                 />
             )}
 
             <DownloadModal
                 show={showDownloadModal}
-                onClose={() => setShowDownloadModal(false)}
+                onClose={() => {
+                    setShowDownloadModal(false);
+                    if (location.pathname.endsWith('/download')) navigate(projectUrl, { replace: true });
+                }}
                 versionsByGame={latestForGame}
                 onDownload={initiateDownload}
                 showExperimental={showExperimental}
                 onToggleExperimental={() => setShowExperimental(!showExperimental)}
-                onViewHistory={() => { setShowDownloadModal(false); setShowAllVersionsModal(true); }}
+                onViewHistory={() => {
+                    setShowDownloadModal(false);
+                    setShowAllVersionsModal(true);
+                    if (location.pathname.endsWith('/download')) navigate(`${projectUrl}/changelog`, { replace: true });
+                }}
             />
 
             <HistoryModal
                 show={showAllVersionsModal}
-                onClose={() => setShowAllVersionsModal(false)}
+                onClose={() => {
+                    setShowAllVersionsModal(false);
+                    if (location.pathname.endsWith('/changelog')) navigate(projectUrl, { replace: true });
+                }}
                 history={sortedHistory}
                 showExperimental={showExperimental}
                 onToggleExperimental={() => setShowExperimental(!showExperimental)}
                 onDownload={initiateDownload}
+                hasExperimentalVersions={hasExperimentalVersions}
             />
 
-            {galleryIndex !== null && mod.galleryImages && (
-                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setGalleryIndex(null)}>
+            {galleryIndex !== null && mod.galleryImages && mod.galleryImages[galleryIndex] && (
+                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => navigate(projectUrl, { replace: true })}>
                     <div className="relative w-full max-w-6xl max-h-[85dvh] bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-white/10" onClick={e => e.stopPropagation()}>
 
                         <div className="p-4 flex justify-between items-center bg-black/20 border-b border-white/10 z-10 shrink-0">
                             <span className="text-sm font-bold text-white/70">Image {galleryIndex + 1} of {mod.galleryImages.length}</span>
-                            <button aria-label="Close gallery" onClick={() => setGalleryIndex(null)} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
+                            <button aria-label="Close gallery" onClick={() => navigate(projectUrl, { replace: true })} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
                         </div>
 
                         <div className="flex-1 relative flex items-center justify-center bg-black/40 overflow-hidden group">
@@ -903,37 +1180,36 @@ export const ModDetail: React.FC<{
                                 <>
                                     <button
                                         aria-label="Previous image"
-                                        onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex - 1 + mod.galleryImages!.length) % mod.galleryImages!.length)}}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const prevIdx = (galleryIndex - 1 + mod.galleryImages!.length) % mod.galleryImages!.length;
+                                            navigate(`${projectUrl}/gallery#${prevIdx + 1}`, { replace: true });
+                                        }}
                                         className="absolute left-4 p-3 bg-black/50 hover:bg-modtale-accent text-white rounded-full transition-all z-20 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0"
                                     >
                                         <ChevronLeft className="w-6 h-6" aria-hidden="true" />
                                     </button>
                                     <button
                                         aria-label="Next image"
-                                        onClick={(e) => {e.stopPropagation(); setGalleryIndex((galleryIndex + 1) % mod.galleryImages!.length)}}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const nextIdx = (galleryIndex + 1) % mod.galleryImages!.length;
+                                            navigate(`${projectUrl}/gallery#${nextIdx + 1}`, { replace: true });
+                                        }}
                                         className="absolute right-4 p-3 bg-black/50 hover:bg-modtale-accent text-white rounded-full transition-all z-20 opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0"
                                     >
                                         <ChevronRight className="w-6 h-6" aria-hidden="true" />
                                     </button>
                                 </>
                             )}
-                            <img src={resolveUrl(mod.galleryImages[galleryIndex])} className="max-w-full max-h-full object-contain shadow-lg" alt="" />
+                            <OptimizedImage
+                                src={resolveUrl(mod.galleryImages[galleryIndex])}
+                                alt={`${mod.title} Gallery Image ${galleryIndex + 1}`}
+                                baseWidth={1200}
+                                className="w-full h-full [&>img]:!object-contain shadow-lg"
+                            />
                         </div>
                     </div>
-                </div>
-            )}
-
-            {isUnlisted && (
-                <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-500 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold">
-                    <AlertTriangle className="w-4 h-4" />
-                    This project is unlisted. Only people with the link can view it.
-                </div>
-            )}
-
-            {isArchived && (
-                <div className="bg-slate-500/10 border-b border-slate-500/20 text-slate-700 dark:text-slate-400 px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold">
-                    <Archive className="w-4 h-4" />
-                    This project is archived. It is read-only and no longer actively maintained.
                 </div>
             )}
 
@@ -955,13 +1231,15 @@ export const ModDetail: React.FC<{
                         <button onClick={handleShare} aria-label="Share" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-blue-500 hover:border-blue-500/30 transition-all" title="Share">
                             <Share2 className="w-5 h-5" aria-hidden="true" />
                         </button>
-                        <button onClick={() => setReportTarget({id: mod.id, type: 'PROJECT', title: mod.title})} aria-label="Report Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
-                            <Flag className="w-5 h-5" aria-hidden="true" />
-                        </button>
-                        {Boolean(canEdit) && (
-                            <button onClick={() => navigate(`${getProjectUrl(mod)}/edit`)} aria-label="Edit Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" title="Edit Project">
-                                <Edit className="w-5 h-5" aria-hidden="true" />
+                        {(!currentUser || currentUser.id !== mod.authorId) && (
+                            <button onClick={() => setReportTarget({id: mod.id, type: 'PROJECT', title: mod.title})} aria-label="Report Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500 hover:border-red-500/30 transition-all" title="Report Project">
+                                <Flag className="w-5 h-5" aria-hidden="true" />
                             </button>
+                        )}
+                        {Boolean(canEdit) && (
+                            <Link to={`${projectUrl}/edit`} aria-label="Edit Project" className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all block" title="Edit Project">
+                                <Edit className="w-5 h-5" aria-hidden="true" />
+                            </Link>
                         )}
                     </>
                 }
@@ -977,7 +1255,7 @@ export const ModDetail: React.FC<{
                         <div className="flex flex-wrap items-center gap-x-4 md:gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
                                 <span>by <Link to={`/creator/${mod.author}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{mod.author}</Link></span>
-                                {currentUser && currentUser.username !== mod.author && (
+                                {currentUser && currentUser.id !== mod.authorId && (
                                     <button
                                         onClick={handleFollowToggle}
                                         className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-black tracking-widest transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
@@ -1035,28 +1313,57 @@ export const ModDetail: React.FC<{
                     </>
                 }
                 actionBar={
-                    <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 w-full">
-                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full xl:w-auto">
-                            <button
-                                onClick={() => setShowDownloadModal(true)}
-                                className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
-                            >
-                                <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
-                                Download
-                            </button>
+                    <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between gap-3 2xl:gap-6 w-full">
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 w-full 2xl:w-auto">
+                            {(!mod.versions || mod.versions.length === 0) ? (
+                                <button
+                                    disabled
+                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-6 lg:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group cursor-not-allowed"
+                                >
+                                    <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
+                                    Download
+                                </button>
+                            ) : (
+                                <Link
+                                    to={`${projectUrl}/download`}
+                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-6 lg:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
+                                >
+                                    <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
+                                    Download
+                                </Link>
+                            )}
 
-                            <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-2"></div>
+                            <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-1 lg:mx-2 shrink-0"></div>
 
-                            <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto">
-                                {mod.galleryImages && mod.galleryImages.length > 0 && (
-                                    <button onClick={() => {if(mod.galleryImages?.length) setGalleryIndex(0)}} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</button>
+                            <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto shrink-0">
+                                {mod.hmWikiEnabled && mod.hmWikiSlug && (
+                                    <Link to={`${projectUrl}/wiki`} className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap">
+                                        <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
+                                    </Link>
                                 )}
-                                <button onClick={() => setShowAllVersionsModal(true)} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</button>
-                                <button onClick={() => commentsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments</button>
+                                {mod.galleryImages && mod.galleryImages.length > 0 && (
+                                    <Link to={`${projectUrl}/gallery#1`} className="col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</Link>
+                                )}
+                                <Link to={`${projectUrl}/changelog`} className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</Link>
+                                <a
+                                    href={`${projectUrl}#comments`}
+                                    onClick={(e) => {
+                                        if (location.pathname === projectUrl) {
+                                            e.preventDefault();
+                                            if (commentsRef.current) {
+                                                const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
+                                                window.scrollTo({top: y, behavior: 'smooth'});
+                                            }
+                                        }
+                                    }}
+                                    className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
+                                >
+                                    <MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments
+                                </a>
                             </div>
                         </div>
 
-                        <div className="w-full xl:w-auto flex flex-col md:flex-row justify-start md:justify-end gap-3">
+                        <div className="w-full 2xl:w-auto flex flex-col md:flex-row justify-start 2xl:justify-end gap-2 mt-1 2xl:mt-0">
                             {isMobile && mod.classification === 'MODPACK' && latestDependencies.length > 0 && (
                                 <div className="relative w-full" ref={depsDropdownRef}>
                                     <button
@@ -1066,26 +1373,34 @@ export const ModDetail: React.FC<{
                                         <Box className="w-4 h-4" aria-hidden="true" /> Included Mods <ChevronDown className={`w-4 h-4 transition-transform ${showMobileDeps ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileDeps && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
+                                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1 max-h-[300px] overflow-y-auto">
                                             {latestDependencies.map((dep, idx) => {
                                                 const meta = depMeta[dep.modId];
                                                 const title = meta?.title || dep.modTitle || dep.modId;
                                                 const path = `/mod/${createSlug(title, dep.modId)}`;
                                                 return (
-                                                    <button
+                                                    <Link
                                                         key={idx}
-                                                        onClick={() => { navigate(path); setShowMobileDeps(false); }}
-                                                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white text-left"
+                                                        to={path}
+                                                        onClick={() => setShowMobileDeps(false)}
+                                                        className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-left"
                                                     >
-                                                        <div className="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center border border-white/5 shrink-0 overflow-hidden">
-                                                            {meta?.icon ? <img src={resolveUrl(meta.icon)} className="w-full h-full object-cover" alt="" /> : <Box className="w-4 h-4 text-slate-500" aria-hidden="true" />}
+                                                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-950 flex items-center justify-center border border-slate-200 dark:border-white/5 shrink-0 overflow-hidden">
+                                                            {meta?.icon ? (
+                                                                <OptimizedImage
+                                                                    src={resolveUrl(meta.icon)}
+                                                                    alt={`${title} Icon`}
+                                                                    baseWidth={32}
+                                                                    className="w-full h-full"
+                                                                />
+                                                            ) : <Box className="w-4 h-4 text-slate-500" aria-hidden="true" />}
                                                         </div>
                                                         <div className="min-w-0 flex-1">
                                                             <div className="text-sm font-bold truncate">{title}</div>
-                                                            <div className="text-[10px] text-slate-400 font-mono">v{dep.versionNumber}</div>
+                                                            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">v{dep.versionNumber}</div>
                                                         </div>
                                                         <ExternalLink className="w-3 h-3 opacity-50 shrink-0" aria-hidden="true" />
-                                                    </button>
+                                                    </Link>
                                                 );
                                             })}
                                         </div>
@@ -1093,18 +1408,19 @@ export const ModDetail: React.FC<{
                                 </div>
                             )}
 
-                            <div className="hidden md:flex gap-2 flex-wrap justify-end">
+                            <div className="hidden md:flex gap-2 flex-wrap justify-start 2xl:justify-end">
                                 {links.map((link, idx) => (
                                     <a
                                         key={idx}
                                         href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className={`p-2.5 rounded-xl border transition-all ${getLinkColor(link.type)}`}
+                                        className={`rounded-xl border transition-all flex items-center justify-center px-4 py-2.5 2xl:p-0 2xl:w-[42px] 2xl:h-[42px] gap-2 2xl:gap-0 ${getLinkColor(link.type)}`}
                                         title={link.label}
                                         aria-label={link.label}
                                     >
-                                        <link.icon className="w-5 h-5" aria-hidden="true" />
+                                        <link.icon className="w-4 h-4 2xl:w-5 2xl:h-5 shrink-0" aria-hidden="true" />
+                                        <span className="text-sm font-bold whitespace-nowrap block 2xl:hidden">{link.label}</span>
                                     </a>
                                 ))}
                             </div>
@@ -1118,16 +1434,16 @@ export const ModDetail: React.FC<{
                                         <LinkIcon className="w-4 h-4" aria-hidden="true" /> External Links <ChevronDown className={`w-4 h-4 transition-transform ${showMobileLinks ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     </button>
                                     {showMobileLinks && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
+                                        <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 p-1">
                                             {links.map((link, idx) => (
                                                 <a
                                                     key={idx}
                                                     href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-slate-300 hover:text-white"
+                                                    className="flex items-center gap-3 p-2.5 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                                                 >
-                                                    <div className={`p-1.5 rounded-lg border bg-slate-950 ${getLinkColor(link.type)}`}>
+                                                    <div className={`p-1.5 rounded-lg border bg-slate-50 dark:bg-slate-950 ${getLinkColor(link.type)}`}>
                                                         <link.icon className="w-4 h-4" aria-hidden="true" />
                                                     </div>
                                                     <span className="text-sm font-bold">{link.label}</span>
@@ -1142,35 +1458,60 @@ export const ModDetail: React.FC<{
                     </div>
                 }
                 sidebarContent={
-                    <ProjectSidebar
-                        mod={mod}
-                        navigate={navigate}
-                        dependencies={latestDependencies}
-                        depMeta={depMeta}
-                        sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
-                        contributors={contributors}
-                        orgMembers={orgMembers}
-                        author={authorProfile}
-                    />
+                    isWikiRoute ? (
+                        wikiLoading ? (
+                            <div className="flex justify-center p-4"><Spinner /></div>
+                        ) : wikiError || !wikiData ? (
+                            <SidebarSection title="Wiki" icon={BookOpen}>
+                                <div className="text-sm text-slate-500">Navigation unavailable.</div>
+                            </SidebarSection>
+                        ) : (
+                            <>
+                                <WikiSidebar tree={wikiData.mod.pages || []} projectUrl={projectUrl} currentSlug={wikiPageSlug} indexSlug={wikiData.mod.index?.slug} />
+                                <SidebarSection title="Project Info" icon={Box}>
+                                    <Link to={projectUrl} className="block text-sm font-bold text-modtale-accent hover:underline flex items-center gap-2">
+                                        <ChevronLeft className="w-4 h-4" /> Back to Project
+                                    </Link>
+                                </SidebarSection>
+                            </>
+                        )
+                    ) : (
+                        <ProjectSidebar
+                            mod={mod}
+                            navigate={navigate}
+                            dependencies={latestDependencies}
+                            depMeta={depMeta}
+                            sourceUrl={(mod as any).sourceUrl || (mod as any).repoUrl}
+                            contributors={contributors}
+                            orgMembers={orgMembers}
+                            author={authorProfile}
+                        />
+                    )
                 }
                 mainContent={
-                    <>
-                        <div className="prose dark:prose-invert prose-lg max-none">
-                            {memoizedDescription}
+                    isWikiRoute ? (
+                        <div ref={wikiTopRef} className="scroll-mt-24">
+                            <WikiContent wikiLoading={wikiLoading} wikiError={wikiError} wikiData={wikiData} wikiPageSlug={wikiPageSlug} mod={mod} />
                         </div>
-                        <CommentSection
-                            modId={mod.id}
-                            comments={mod.comments || []}
-                            currentUser={currentUser}
-                            isCreator={Boolean(canEdit)}
-                            commentsDisabled={mod.allowComments === false}
-                            onCommentSubmitted={handleCommentSubmitted}
-                            onError={handleError}
-                            onSuccess={handleSuccess}
-                            innerRef={commentsRef}
-                            onReport={handleReport}
-                        />
-                    </>
+                    ) : (
+                        <>
+                            <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
+                                <MarkdownRenderer content={mod?.about || "*No description.*"} />
+                            </div>
+                            <CommentSection
+                                modId={mod.id}
+                                comments={mod.comments || []}
+                                currentUser={currentUser}
+                                isCreator={Boolean(canEdit)}
+                                commentsDisabled={mod.allowComments === false}
+                                onCommentSubmitted={handleCommentSubmitted}
+                                onError={handleError}
+                                onSuccess={handleSuccess}
+                                innerRef={commentsRef}
+                                onReport={handleReport}
+                            />
+                        </>
+                    )
                 }
             />
         </>

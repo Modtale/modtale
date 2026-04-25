@@ -6,6 +6,7 @@ import net.modtale.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ public class NotificationController {
     @Autowired private UserService userService;
 
     @GetMapping
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_READ', authentication)")
     public ResponseEntity<?> getUserNotifications() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -25,6 +27,7 @@ public class NotificationController {
     }
 
     @PostMapping("/{id}/read")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_UPDATE', authentication)")
     public ResponseEntity<?> markAsRead(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -33,6 +36,7 @@ public class NotificationController {
     }
 
     @PostMapping("/{id}/unread")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_UPDATE', authentication)")
     public ResponseEntity<?> markAsUnread(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -41,6 +45,7 @@ public class NotificationController {
     }
 
     @PostMapping("/read-all")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_UPDATE', authentication)")
     public ResponseEntity<?> markAllAsRead() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -49,6 +54,7 @@ public class NotificationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_DELETE', authentication)")
     public ResponseEntity<?> deleteNotification(@PathVariable String id) {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -57,6 +63,7 @@ public class NotificationController {
     }
 
     @DeleteMapping("/clear-all")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_DELETE', authentication)")
     public ResponseEntity<?> clearAll() {
         User user = userService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

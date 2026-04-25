@@ -1,15 +1,16 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
-import { extractId } from '../../utils/slug';
+import { getProjectUrl } from '../../utils/slug';
 import { isBotUserAgent } from '../../utils/seo';
 import { generateProjectMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
+import { generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../../utils/schema';
+import { BACKEND_URL } from "@/utils/api.ts";
 
 const { slug } = Astro.params;
-const id = extractId(slug || '');
 const path = Astro.url.pathname;
-const API_URL = import.meta.env.PUBLIC_API_URL;
+const cleanPath = path.replace(/\/$/, "");
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
@@ -17,15 +18,21 @@ const isBot = isBotUserAgent(userAgent);
 let modData = null;
 let title = ROUTE_SEO['/worlds'].title;
 let description = ROUTE_SEO['/worlds'].description;
-let image = undefined;
-let jsonLd = undefined;
+let image = slug ? `${BACKEND_URL}/api/v1/og/project/${slug}.png` : "https://modtale.net/assets/favicon.svg";
+let jsonLd: any = undefined;
+let ssrSuccessfullyCompleted = false;
 
-if (isBot) {
+if (isBot && slug) {
     try {
-        const res = await fetch(`${API_URL}/worlds/${id}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${slug}`);
         if (res.ok) {
             modData = await res.json();
             modData.classification = 'SAVE';
+
+            const canonicalUrl = getProjectUrl(modData);
+            if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
+                return Astro.redirect(canonicalUrl, 301);
+            }
 
             const meta = generateProjectMeta(modData);
             if (meta) {
@@ -33,16 +40,11 @@ if (isBot) {
                 description = meta.description;
             }
 
-            if (modData.imageUrl) {
-                image = modData.imageUrl.startsWith('/api') ? `${API_URL.replace('/api', '')}${modData.imageUrl}` : modData.imageUrl;
-            }
-
-            jsonLd = {
+            const appSchema = {
                 "@context": "https://schema.org",
                 "@type": "SoftwareApplication",
                 "name": modData.title,
-                "description": meta?.description || description,
-                "image": image,
+                "image": modData.imageUrl,
                 "author": { "@type": "Person", "name": modData.author || 'Unknown' },
                 "applicationCategory": "GameApplication",
                 "operatingSystem": "Windows, macOS, Linux",
@@ -52,11 +54,24 @@ if (isBot) {
                     "ratingValue": modData.rating,
                 } : undefined
             };
+
+            const crumbs = getBreadcrumbsForClassification('SAVE');
+            const fullCrumbs = [...crumbs, { name: modData.title, url: canonicalUrl }];
+            const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
+
+            jsonLd = [appSchema, breadcrumbSchema];
+            ssrSuccessfullyCompleted = true;
         }
-    } catch (e) { console.error("[SSR] Fetch Error:", e); }
+    } catch (e) {}
+}
+
+if (ssrSuccessfullyCompleted) {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=86400');
+} else {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 ---
 
-<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={modData}>
+<BaseLayout title={title} description={""} image={image} jsonLd={jsonLd} initialData={modData}>
     <App client:load initialPath={path} ssrData={modData} />
 </BaseLayout>

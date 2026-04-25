@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
@@ -11,6 +11,7 @@ import { SEOHead } from './components/SEOHead';
 import { Spinner } from './components/ui/Spinner';
 import { StatusModal } from './components/ui/StatusModal';
 import { OnboardingModal } from './components/user/OnboardingModal';
+import { ErrorBoundary } from './components/ui/error/ErrorBoundary';
 
 import type { Mod, Modpack, World, User } from './types';
 import { createSlug } from './utils/slug';
@@ -21,22 +22,23 @@ import { NotificationProvider } from './context/NotificationsContext.tsx';
 import { ToastProvider } from './components/ui/Toast';
 import { MobileProvider } from './context/MobileContext';
 
-const Home = lazy(() => import('./react-pages/Home').then(module => ({ default: module.Home })));
-const Upload = lazy(() => import('./react-pages/resources/Upload').then(module => ({ default: module.Upload })));
-const CreatorProfile = lazy(() => import('./react-pages/user/CreatorProfile.tsx').then(module => ({ default: module.CreatorProfile })));
-const ModDetail = lazy(() => import('./react-pages/resources/ModDetail').then(module => ({ default: module.ModDetail })));
-const EditMod = lazy(() => import('./react-pages/resources/EditMod').then(module => ({ default: module.EditMod })));
-const TermsOfService = lazy(() => import('./react-pages/TermsOfService').then(module => ({ default: module.TermsOfService })));
-const PrivacyPolicy = lazy(() => import('./react-pages/PrivacyPolicy').then(module => ({ default: module.PrivacyPolicy })));
-const Dashboard = lazy(() => import('./react-pages/user/Dashboard.tsx').then(module => ({ default: module.Dashboard })));
-const AdminPanel = lazy(() => import('./react-pages/AdminPanel.tsx').then(module => ({ default: module.AdminPanel })));
-const ApiDocs = lazy(() => import('./react-pages/ApiDocs.tsx').then(module => ({ default: module.ApiDocs })));
-const Status = lazy(() => import('./react-pages/Status').then(module => ({ default: module.Status })));
-const VerifyEmail = lazy(() => import('./react-pages/auth/VerifyEmail.tsx').then(module => ({ default: module.VerifyEmail })));
-const ResetPassword = lazy(() => import('./react-pages/auth/ResetPassword.tsx').then(module => ({ default: module.ResetPassword })));
-const MfaVerify = lazy(() => import('./react-pages/auth/MfaVerify').then(module => ({ default: module.MfaVerify })));
-const Analytics = lazy(() => import('@/components/dashboard/Analytics.tsx').then(module => ({ default: module.Analytics })));
-const NotFound = lazy(() => import('./components/ui/error/NotFound.tsx'));
+import { Home } from './react-pages/Home';
+import { Browse } from './react-pages/Browse';
+import { Upload } from './react-pages/resources/Upload';
+import { CreatorProfile } from './react-pages/user/CreatorProfile.tsx';
+import { ModDetail } from './react-pages/resources/ModDetail';
+import { EditMod } from './react-pages/resources/EditMod';
+import { TermsOfService } from './react-pages/TermsOfService';
+import { PrivacyPolicy } from './react-pages/PrivacyPolicy';
+import { Dashboard } from './react-pages/user/Dashboard.tsx';
+import { AdminPanel } from './react-pages/AdminPanel.tsx';
+import { ApiDocs } from './react-pages/ApiDocs.tsx';
+import { Status } from './react-pages/Status';
+import { VerifyEmail } from './react-pages/auth/VerifyEmail.tsx';
+import { ResetPassword } from './react-pages/auth/ResetPassword.tsx';
+import { MfaVerify } from './react-pages/auth/MfaVerify';
+import { Analytics } from './components/dashboard/Analytics.tsx';
+import NotFound from './components/ui/error/NotFound.tsx';
 
 const JamsList = lazy(() => import('./react-pages/jams/JamsList').then(module => ({ default: module.JamsList })));
 const JamDetail = lazy(() => import('./react-pages/jams/JamDetail').then(module => ({ default: module.JamDetail })));
@@ -96,9 +98,11 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const fetchUser = async () => {
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
-            setUser(res.data);
-            if (res.data && (res.data as any).is_new_account) {
-                setShowOnboarding(true);
+            if (res.data) {
+                setUser(res.data);
+                if ((res.data as any).is_new_account) {
+                    setShowOnboarding(true);
+                }
             }
         } catch (e: any) {
             setUser(null);
@@ -119,7 +123,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     };
 
     const handleNavigate = (page: string) => { navigate(page === 'home' ? '/' : `/${page}`); };
-    const handleAuthorClick = (author: string) => { navigate(`/creator/${author}`); };
+    const handleAuthorClick = (authorUsername: string) => { navigate(`/creator/${authorUsername}`); };
     const handleModClick = (mod: Mod) => { navigate(`/mod/${createSlug(mod.title, mod.id)}`); }
     const handleWorldClick = (world: World) => { navigate(`/world/${createSlug(world.title, world.id)}`); }
 
@@ -133,8 +137,8 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
 
-    const renderHome = (classification?: Classification) => (
-        <Home
+    const renderBrowse = (classification?: Classification) => (
+        <Browse
             onModClick={handleModClick}
             onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
             onWorldClick={handleWorldClick}
@@ -144,6 +148,17 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
             onToggleFavoriteModpack={handleToggleFavorite}
             isLoggedIn={!!user}
             initialClassification={classification}
+        />
+    );
+
+    const renderModDetail = () => (
+        <ModDetail
+            onToggleFavorite={handleToggleFavorite}
+            isLiked={(id) => user?.likedModIds?.includes(id) || false}
+            currentUser={user}
+            onRefresh={async () => {}}
+            onDownload={handleDownload}
+            downloadedSessionIds={downloadedSessionIds}
         />
     );
 
@@ -183,15 +198,17 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                 />
 
                 <div className="flex-1">
-                    <Suspense fallback={<div className="p-20 flex justify-center"><Spinner /></div>}>
+                    <ErrorBoundary>
                         <Routes>
-                            <Route path="/" element={renderHome()} />
-                            <Route path="/mods" element={<Navigate to="/" replace />} />
-                            <Route path="/plugins" element={renderHome('PLUGIN')} />
-                            <Route path="/modpacks" element={renderHome('MODPACK')} />
-                            <Route path="/worlds" element={renderHome('SAVE')} />
-                            <Route path="/art" element={renderHome('ART')} />
-                            <Route path="/data" element={renderHome('DATA')} />
+                            <Route path="/" element={<Home user={user} />} />
+
+                            <Route path="/mods" element={renderBrowse()} />
+                            <Route path="/projects" element={<Navigate to="/mods" replace />} />
+                            <Route path="/plugins" element={renderBrowse('PLUGIN')} />
+                            <Route path="/modpacks" element={renderBrowse('MODPACK')} />
+                            <Route path="/worlds" element={renderBrowse('SAVE')} />
+                            <Route path="/art" element={renderBrowse('ART')} />
+                            <Route path="/data" element={renderBrowse('DATA')} />
 
                             <Route path="/jams" element={<JamsList currentUser={user} />} />
                             <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
@@ -199,8 +216,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} /> :
-                                        <Navigate to="/" />
+                                    <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
                             } />
 
                             <Route path="/dashboard/*" element={
@@ -215,21 +231,33 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                                         <Navigate to="/" />
                             } />
 
-                            <Route path="/mod/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/mod/:id" element={renderModDetail()} />
+                            <Route path="/mod/:id/download" element={renderModDetail()} />
+                            <Route path="/mod/:id/changelog" element={renderModDetail()} />
+                            <Route path="/mod/:id/gallery" element={renderModDetail()} />
+                            <Route path="/mod/:id/wiki/*" element={renderModDetail()} />
                             <Route path="/mod/:id/edit" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <EditMod currentUser={user} /> :
                                         <Navigate to="/" />
                             } />
 
-                            <Route path="/modpack/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/modpack/:id" element={renderModDetail()} />
+                            <Route path="/modpack/:id/download" element={renderModDetail()} />
+                            <Route path="/modpack/:id/changelog" element={renderModDetail()} />
+                            <Route path="/modpack/:id/gallery" element={renderModDetail()} />
+                            <Route path="/modpack/:id/wiki/*" element={renderModDetail()} />
                             <Route path="/modpack/:id/edit" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <EditMod currentUser={user} /> :
                                         <Navigate to="/" />
                             } />
 
-                            <Route path="/world/:id" element={<ModDetail onToggleFavorite={handleToggleFavorite} isLiked={(id) => user?.likedModIds?.includes(id) || false} currentUser={user} onRefresh={async () => {}} onDownload={handleDownload} downloadedSessionIds={downloadedSessionIds} />} />
+                            <Route path="/world/:id" element={renderModDetail()} />
+                            <Route path="/world/:id/download" element={renderModDetail()} />
+                            <Route path="/world/:id/changelog" element={renderModDetail()} />
+                            <Route path="/world/:id/gallery" element={renderModDetail()} />
+                            <Route path="/world/:id/wiki/*" element={renderModDetail()} />
 
                             <Route path="/creator/:username" element={
                                 <CreatorProfile
@@ -280,7 +308,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             } />
                             <Route path="*" element={<NotFound />} />
                         </Routes>
-                    </Suspense>
+                    </ErrorBoundary>
                 </div>
                 <Footer isDarkMode={isDarkMode} />
             </div>
@@ -290,7 +318,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
 export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData }) => {
     return (
-        <SSRProvider data={ssrData}>
+        <SSRProvider data={ssrData || null}>
             <HelmetProvider>
                 <MobileProvider>
                     <ExternalLinkProvider>
@@ -300,7 +328,7 @@ export const App: React.FC<any> = ({ initialPath, initialClassification, ssrData
                                     <AppContent initialClassification={initialClassification} />
                                 </StaticRouter>
                             ) : (
-                                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                                <BrowserRouter>
                                     <AppContent initialClassification={initialClassification} />
                                 </BrowserRouter>
                             )}

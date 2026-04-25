@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { BACKEND_URL } from '../../utils/api.ts';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal.tsx';
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 export const SidebarSection = React.memo(({
                                               title,
@@ -75,6 +76,24 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
+    const [scrollY, setScrollY] = useState(0);
+
+    useEffect(() => {
+        let ticking = false;
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    setScrollY(Math.min(Math.max(0, window.scrollY), 1500));
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll();
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const resolveUrl = (url?: string | null) => {
         if (!url) return null;
@@ -103,8 +122,10 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
     const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
 
+    const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
+
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative pb-20 overflow-x-hidden">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative pb-20 overflow-x-hidden z-0">
             {cropperOpen && tempImage && (
                 <ImageCropperModal
                     imageSrc={tempImage}
@@ -114,35 +135,31 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 />
             )}
 
-            <div className="relative w-full aspect-[3/1] bg-slate-800 overflow-hidden group z-10">
+            <div
+                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
+                style={{ transform: `translateY(${parallaxOffset}px)` }}
+            >
                 <div className="absolute inset-0 z-0">
                     {finalBanner ? (
-                        <img
+                        <OptimizedImage
                             src={finalBanner}
-                            alt=""
-                            fetchPriority="high"
-                            loading="eager"
-                            decoding="sync"
-                            className="w-full h-full object-cover transition-opacity duration-300 opacity-100"
+                            alt="Project Banner"
+                            baseWidth={1920}
+                            priority={true}
+                            className="w-full h-full object-cover opacity-100"
                         />
                     ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-slate-950 dark:via-slate-950/20 to-transparent pointer-events-none" />
                     )}
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/90 dark:from-slate-950/90 to-transparent z-10" />
 
-                {onBack && (
-                    <div className={`absolute top-0 left-0 right-0 z-40 mx-auto ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
-                        <div className="pt-6 pointer-events-auto w-fit">
-                            <button aria-label="Go back" onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back">
-                                <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">Back</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <div
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
+                    style={{ height: `calc(var(--fade-base) + ${parallaxOffset}px)` }}
+                />
 
                 {isEditing && (
-                    <label className={`cursor-pointer transition-all duration-300 ${
+                    <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                         finalBanner
                             ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
                             : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
@@ -164,17 +181,35 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 )}
             </div>
 
+            <div className="w-full aspect-[3/1] pointer-events-none relative z-0" />
+
+            {onBack && (
+                <div className={`absolute top-0 left-0 right-0 z-40 mx-auto ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
+                    <div className="pt-6 pointer-events-auto w-fit">
+                        <button aria-label="Go back" onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back">
+                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">Back</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className={`${containerClasses} mx-auto relative z-50 -mt-2 md:-mt-32 transition-[max-width,padding] duration-300`}>
-                <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl min-h-[80vh]`}>
+                <div className={`bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl min-h-[80vh]`}>
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/5 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
-                                <label className={`block w-32 h-32 rounded-2xl bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-4 border-slate-950 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
+                                    <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
-                                        <img src={finalIcon} alt="Icon" width={128} height={128} className="w-full h-full object-cover" />
+                                        <OptimizedImage
+                                            src={finalIcon}
+                                            alt="Icon"
+                                            baseWidth={128}
+                                            className="w-full h-full bg-transparent object-cover relative z-10"
+                                        />
                                     ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                                        <div className="w-full h-full bg-transparent flex flex-col items-center justify-center text-slate-500 relative z-10">
                                             <ImageIcon className="w-8 h-8 opacity-50" aria-hidden="true" />
                                         </div>
                                     )}
@@ -187,18 +222,25 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
-                                <label className={`block w-56 h-56 rounded-[2.5rem] bg-slate-100 dark:bg-slate-800 shadow-2xl overflow-hidden border-[8px] border-white dark:border-slate-800 group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                    <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
-                                        <img src={finalIcon} alt="Icon" width={224} height={224} className="w-full h-full object-cover" />
+                                        <OptimizedImage
+                                            src={finalIcon}
+                                            alt="Icon"
+                                            baseWidth={224}
+                                            priority={true}
+                                            className="w-full h-full bg-transparent object-cover relative z-10"
+                                        />
                                     ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                                        <div className="w-full h-full bg-transparent flex flex-col items-center justify-center text-slate-500 gap-2 relative z-10">
                                             <ImageIcon className="w-10 h-10 opacity-50" aria-hidden="true" />
                                             <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">512x512</span>
                                         </div>
                                     )}
                                     {isEditing && (
-                                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px]">
+                                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30">
                                             <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
                                             <span className="text-xs font-bold text-white">Change Icon</span>
                                             <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
@@ -232,7 +274,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                     </div>
 
                     <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-[500px]">
-                        <div className="lg:col-span-8 xl:col-span-9 p-6 md:p-12 md:border-r md:border-slate-200 md:dark:border-white/5 order-2 lg:order-1">
+                        <div className="lg:col-span-8 xl:col-span-9 p-6 md:p-12 md:border-r md:border-slate-200 md:dark:border-white/5 order-2 lg:order-1 overflow-hidden">
                             {mainContent}
                         </div>
 

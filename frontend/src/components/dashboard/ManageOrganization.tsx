@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { api, BACKEND_URL } from '../../utils/api.ts';
-import type {User, Mod} from '../../types.ts';
-import { Plus, Building2, Trash2, ChevronDown, Loader2, ArrowLeft, Settings, Upload, Image as ImageIcon, Eye, Shield, ShieldOff, ShieldCheck, UserPlus, Link as LinkIcon, EyeOff, Check, Github, Twitter } from 'lucide-react';
+import type {User, Mod, OrganizationRole} from '../../types.ts';
+import { Plus, Building2, Trash2, ChevronDown, Loader2, ArrowLeft, Settings, Upload, Image as ImageIcon, Eye, Shield, ShieldOff, ShieldCheck, UserPlus, Link as LinkIcon, EyeOff, Check, Github, Twitter, Palette, X } from 'lucide-react';
 import { ErrorBanner } from '../ui/error/ErrorBanner.tsx';
 import { StatusModal } from '../ui/StatusModal.tsx';
 import { ImageCropperModal } from '../ui/ImageCropperModal.tsx';
 import { ProjectListItem } from '@/components/dashboard/manage-projects/ProjectListItem.tsx';
 import { TransferProjectModal } from '@/components/dashboard/manage-projects/TransferProjectModal.tsx';
+import { PermissionSelector, ALL_PERMISSION_GROUPS } from '../ui/PermissionSelector.tsx';
 
 const GitLabIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -29,8 +31,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     const [loading, setLoading] = useState(true);
     const [selectedOrg, setSelectedOrg] = useState<User | null>(null);
     const [members, setMembers] = useState<User[]>([]);
+    const [invites, setInvites] = useState<User[]>([]);
     const [orgProjects, setOrgProjects] = useState<Mod[]>([]);
-    const [activeTab, setActiveTab] = useState<'MEMBERS' | 'PROJECTS' | 'SETTINGS'>('MEMBERS');
+    const [activeTab, setActiveTab] = useState<'MEMBERS' | 'ROLES' | 'PROJECTS' | 'SETTINGS'>('MEMBERS');
 
     const prevOrgIdRef = useRef<string | null>(null);
 
@@ -39,12 +42,17 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     const [createError, setCreateError] = useState<string | null>(null);
 
     const [inviteUsername, setInviteUsername] = useState('');
-    const [inviteRole, setInviteRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
+    const [inviteUserId, setInviteUserId] = useState('');
+    const [inviteRoleId, setInviteRoleId] = useState('');
     const [manageError, setManageError] = useState<string | null>(null);
     const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
     const [isSearchingUsers, setIsSearchingUsers] = useState(false);
-    const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-    const roleDropdownRef = useRef<HTMLDivElement>(null);
+
+    const [inviteRoleDropdownOpen, setInviteRoleDropdownOpen] = useState(false);
+    const [memberRoleDropdownOpen, setMemberRoleDropdownOpen] = useState<string | null>(null);
+
+    const [editingRole, setEditingRole] = useState<Partial<OrganizationRole> | null>(null);
+    const [roleModalOpen, setRoleModalOpen] = useState(false);
 
     const [displayName, setDisplayName] = useState('');
     const [bio, setBio] = useState('');
@@ -57,7 +65,6 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     const [status, setStatus] = useState<{type: 'success'|'error', title: string, msg: string} | null>(null);
 
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
-    const [memberToUpdateRole, setMemberToUpdateRole] = useState<{userId: string, currentRole: string} | null>(null);
 
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
@@ -66,6 +73,32 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const bannerInputRef = useRef<HTMLInputElement>(null);
 
+    const isModalOpen = roleModalOpen || deleteModalOpen || showUnlinkModal !== null || deleteProjectModal !== null || memberToRemove !== null || status !== null || transferModal !== null || cropperOpen || isCreating;
+
+    useEffect(() => {
+        if (isModalOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isModalOpen]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.modtale-dropdown-container')) {
+                setInviteRoleDropdownOpen(false);
+                setMemberRoleDropdownOpen(null);
+                setUserSearchResults([]);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     useEffect(() => {
         fetchOrgs();
     }, []);
@@ -73,8 +106,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     useEffect(() => {
         if (selectedOrg) {
             if (prevOrgIdRef.current !== selectedOrg.id) {
-                fetchMembers(selectedOrg.username);
-                fetchProjects(selectedOrg.username);
+                fetchMembers(selectedOrg.id);
+                fetchInvites(selectedOrg.id);
+                fetchProjects(selectedOrg.id);
                 setDisplayName(selectedOrg.username);
                 setBio(selectedOrg.bio || '');
                 setActiveTab('MEMBERS');
@@ -89,17 +123,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     }, [selectedOrg]);
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) {
-                setRoleDropdownOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    useEffect(() => {
-        if (!inviteUsername || inviteUsername.length < 2) {
+        if (!inviteUsername || inviteUsername.length < 2 || inviteUserId) {
             setUserSearchResults([]);
             return;
         }
@@ -112,7 +136,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
             finally { setIsSearchingUsers(false); }
         }, 300);
         return () => clearTimeout(delayDebounceFn);
-    }, [inviteUsername]);
+    }, [inviteUsername, inviteUserId]);
 
     const fetchOrgs = async () => {
         try {
@@ -122,18 +146,40 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         finally { setLoading(false); }
     };
 
-    const fetchMembers = async (username: string) => {
+    const fetchMembers = async (orgId: string) => {
         try {
-            const res = await api.get(`/orgs/${username}/members`);
+            const res = await api.get(`/orgs/${orgId}/members`);
             setMembers(res.data);
         } catch (e) { console.error(e); }
     };
 
-    const fetchProjects = async (username: string) => {
+    const fetchInvites = async (orgId: string) => {
         try {
-            const res = await api.get(`/creators/${username}/projects?size=100`);
+            const res = await api.get(`/orgs/${orgId}/invites`);
+            setInvites(res.data);
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchProjects = async (orgId: string) => {
+        try {
+            const res = await api.get(`/creators/${orgId}/projects?size=100`);
             setOrgProjects(res.data.content || []);
         } catch (e) { console.error(e); }
+    };
+
+    const hasOrgPermission = (perm: string) => {
+        if (!selectedOrg) return false;
+        const member = selectedOrg.organizationMembers?.find(m => m.userId === user.id);
+        if (!member) return false;
+
+        if (member.roleId && selectedOrg.organizationRoles) {
+            const role = selectedOrg.organizationRoles.find(r => r.id === member.roleId);
+            if (role) {
+                if (role.isOwner) return true;
+                if (role.permissions && role.permissions.includes(perm)) return true;
+            }
+        }
+        return false;
     };
 
     const handleCreateOrg = async (e: React.FormEvent) => {
@@ -151,26 +197,23 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
     const handleAddMember = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedOrg) return;
+        if (!selectedOrg || !inviteUserId || !inviteRoleId) return;
         setManageError(null);
         try {
-            await api.post(`/orgs/${selectedOrg.id}/members`, { username: inviteUsername, role: inviteRole });
-            await fetchMembers(selectedOrg.username);
+            await api.post(`/orgs/${selectedOrg.id}/members`, { userId: inviteUserId, roleId: inviteRoleId });
+            await fetchInvites(selectedOrg.id);
             setInviteUsername('');
+            setInviteUserId('');
             setUserSearchResults([]);
+            setStatus({ type: 'success', title: 'Invited', msg: 'Member invitation sent successfully.' });
         } catch (err: any) { setManageError(err.response?.data || "Failed to add member."); }
-    };
-
-    const handleRemoveMember = (userId: string) => {
-        if (!selectedOrg) return;
-        setMemberToRemove(userId);
     };
 
     const confirmRemoveMember = async () => {
         if (!selectedOrg || !memberToRemove) return;
         try {
             await api.delete(`/orgs/${selectedOrg.id}/members/${memberToRemove}`);
-            await fetchMembers(selectedOrg.username);
+            await fetchMembers(selectedOrg.id);
             if (memberToRemove === user.id) {
                 setSelectedOrg(null);
                 fetchOrgs();
@@ -179,29 +222,64 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         finally { setMemberToRemove(null); }
     };
 
-    const handleRoleUpdate = (userId: string, currentRole: string) => {
+    const handleCancelInvite = async (userId: string) => {
         if (!selectedOrg) return;
-        setMemberToUpdateRole({ userId, currentRole });
+        try {
+            await api.delete(`/orgs/${selectedOrg.id}/invites/${userId}`);
+            await fetchInvites(selectedOrg.id);
+        } catch (e: any) {
+            setStatus({ type: 'error', title: 'Cancel Failed', msg: e.response?.data || "Could not cancel invite." });
+        }
     };
 
-    const confirmRoleUpdate = async () => {
-        if (!selectedOrg || !memberToUpdateRole) return;
-        const { userId, currentRole } = memberToUpdateRole;
-        const newRole = currentRole === 'ADMIN' ? 'MEMBER' : 'ADMIN';
+    const handleSaveRole = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedOrg || !editingRole?.name || !editingRole?.color) return;
 
         try {
-            await api.put(`/orgs/${selectedOrg.id}/members/${userId}`, { role: newRole });
+            let updatedOrg;
+            if (editingRole.id) {
+                const res = await api.put(`/orgs/${selectedOrg.id}/roles/${editingRole.id}`, editingRole);
+                updatedOrg = res.data;
+            } else {
+                const res = await api.post(`/orgs/${selectedOrg.id}/roles`, editingRole);
+                updatedOrg = res.data;
+            }
+            setSelectedOrg(updatedOrg);
+            setOrgs(prev => prev.map(o => o.id === selectedOrg.id ? updatedOrg : o));
+            setRoleModalOpen(false);
+            setEditingRole(null);
+            setStatus({ type: 'success', title: 'Saved', msg: 'Role saved successfully.' });
+        } catch (err: any) {
+            setStatus({ type: 'error', title: 'Error', msg: err.response?.data || "Failed to save role." });
+        }
+    };
+
+    const handleDeleteRole = async (roleId: string) => {
+        if (!selectedOrg) return;
+        try {
+            const res = await api.delete(`/orgs/${selectedOrg.id}/roles/${roleId}`);
+            setSelectedOrg(res.data);
+            setOrgs(prev => prev.map(o => o.id === selectedOrg.id ? res.data : o));
+            setStatus({ type: 'success', title: 'Deleted', msg: 'Role deleted successfully.' });
+        } catch (err: any) {
+            setStatus({ type: 'error', title: 'Delete Failed', msg: err.response?.data || "Cannot delete role." });
+        }
+    };
+
+    const handleRoleUpdate = async (userId: string, newRoleId: string) => {
+        if (!selectedOrg) return;
+        try {
+            await api.put(`/orgs/${selectedOrg.id}/members/${userId}`, { roleId: newRoleId });
             const updatedOrg = { ...selectedOrg };
             const memberIdx = updatedOrg.organizationMembers?.findIndex(m => m.userId === userId);
             if (memberIdx !== undefined && memberIdx > -1 && updatedOrg.organizationMembers) {
-                updatedOrg.organizationMembers[memberIdx].role = newRole as "ADMIN" | "MEMBER";
+                updatedOrg.organizationMembers[memberIdx].roleId = newRoleId;
                 setSelectedOrg(updatedOrg);
             }
-            await fetchMembers(selectedOrg.username);
+            await fetchMembers(selectedOrg.id);
         } catch (err: any) {
-            setManageError(err.response?.data || "Failed to update role.");
-        } finally {
-            setMemberToUpdateRole(null);
+            setStatus({ type: 'error', title: 'Update Failed', msg: err.response?.data || "Failed to update member role." });
         }
     };
 
@@ -326,11 +404,12 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         const account = accounts.find(a => a.provider === provider);
         const isLinked = !!account;
         const canBeVisible = true;
+        const canManage = hasOrgPermission('ORG_CONNECTION_MANAGE');
 
         return (
-            <div className={`flex items-center justify-between p-3 rounded-xl border transition-all h-full ${isLinked ? 'bg-white dark:bg-white/5 border-modtale-accent/30' : 'bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/5'}`}>
+            <div className={`flex items-center justify-between p-3 rounded-xl border transition-all h-full ${isLinked ? 'bg-white/60 dark:bg-white/5 border-modtale-accent/30 shadow-sm' : 'bg-white/40 dark:bg-white/[0.02] border-slate-200 dark:border-white/5'}`}>
                 <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${isLinked ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-400 bg-white dark:bg-white/5'}`}>
+                    <div className={`p-2 rounded-lg ${isLinked ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-400 bg-slate-200/50 dark:bg-white/5'}`}>
                         <Icon className="w-4 h-4" />
                     </div>
                     <div>
@@ -348,9 +427,9 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                     <div className="flex gap-1.5">
                         {canBeVisible ? (
                             <button
-                                onClick={() => handleToggleOrgVisibility(provider)}
-                                className={`p-1.5 rounded-lg transition-colors ${account.visible ? 'text-modtale-accent bg-modtale-accent/10 hover:bg-modtale-accent/20' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10'}`}
-                                title={account.visible ? "Publicly Visible" : "Hidden from profile"}
+                                onClick={() => canManage && handleToggleOrgVisibility(provider)}
+                                disabled={!canManage}
+                                className={`p-1.5 rounded-lg transition-colors ${!canManage ? 'opacity-50 cursor-not-allowed' : account.visible ? 'text-modtale-accent bg-modtale-accent/10 hover:bg-modtale-accent/20' : 'text-slate-400 hover:bg-slate-200/50 dark:hover:bg-white/10'}`}
                             >
                                 {account.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                             </button>
@@ -361,19 +440,21 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         )}
                         <button
                             onClick={() => setShowUnlinkModal({ provider, label })}
-                            className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
-                            title="Unlink"
+                            disabled={!canManage}
+                            className={`p-1.5 rounded-lg transition-colors ${canManage ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30' : 'text-slate-300 opacity-50 cursor-not-allowed'}`}
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                         </button>
                     </div>
                 ) : (
-                    <button
-                        onClick={() => handleOrgLink(provider)}
-                        className="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:border-modtale-accent hover:text-modtale-accent transition-all flex items-center gap-1.5 shadow-sm"
-                    >
-                        <Plus className="w-3 h-3" /> Link
-                    </button>
+                    canManage && (
+                        <button
+                            onClick={() => handleOrgLink(provider)}
+                            className="bg-white/60 dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:border-modtale-accent hover:text-modtale-accent transition-all flex items-center gap-1.5 shadow-sm"
+                        >
+                            <Plus className="w-3 h-3" /> Link
+                        </button>
+                    )
                 )}
             </div>
         );
@@ -382,15 +463,29 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-modtale-accent" /></div>;
 
     if (selectedOrg) {
-        const myRole = selectedOrg.organizationMembers?.find(m => m.userId === user.id)?.role || 'MEMBER';
-        const isAdmin = myRole === 'ADMIN';
-        const isLastMember = members.length <= 1;
+        const canManageRoles = hasOrgPermission('ORG_MEMBER_EDIT_ROLE');
+        const canInvite = hasOrgPermission('ORG_MEMBER_INVITE');
+        const canRemove = hasOrgPermission('ORG_MEMBER_REMOVE');
+        const canEditProfile = hasOrgPermission('ORG_EDIT_METADATA');
+
+        const myMember = selectedOrg.organizationMembers?.find(m => m.userId === user.id);
+        const myRole = selectedOrg.organizationRoles?.find(r => r.id === myMember?.roleId);
+
+        const nonOwnerRoles = selectedOrg.organizationRoles?.filter(r => !r.isOwner) || [];
+        const hasRoles = nonOwnerRoles.length > 0;
 
         return (
-            <div className="space-y-6">
-                {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />}
+            <div className="space-y-6 relative">
+                {(inviteRoleDropdownOpen || memberRoleDropdownOpen) && (
+                    <div className="fixed inset-0 z-[90]" onClick={() => { setInviteRoleDropdownOpen(false); setMemberRoleDropdownOpen(null); }} />
+                )}
 
-                {deleteModalOpen && (
+                {status && createPortal(
+                    <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />,
+                    document.body
+                )}
+
+                {deleteModalOpen && createPortal(
                     <StatusModal
                         type="error"
                         title="Delete Organization"
@@ -399,10 +494,11 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         actionLabel="Delete Forever"
                         onAction={handleDeleteOrg}
                         secondaryLabel="Cancel"
-                    />
+                    />,
+                    document.body
                 )}
 
-                {showUnlinkModal && (
+                {showUnlinkModal && createPortal(
                     <StatusModal
                         type="warning"
                         title={`Unlink ${showUnlinkModal.label}?`}
@@ -411,10 +507,11 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         onAction={handleOrgUnlink}
                         onClose={() => setShowUnlinkModal(null)}
                         secondaryLabel="Cancel"
-                    />
+                    />,
+                    document.body
                 )}
 
-                {deleteProjectModal && (
+                {deleteProjectModal && createPortal(
                     <StatusModal
                         type="error"
                         title="Delete Project?"
@@ -423,10 +520,11 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         onAction={handleDeleteProject}
                         onClose={() => setDeleteProjectModal(null)}
                         secondaryLabel="Cancel"
-                    />
+                    />,
+                    document.body
                 )}
 
-                {memberToRemove && (
+                {memberToRemove && createPortal(
                     <StatusModal
                         type="warning"
                         title="Remove Member?"
@@ -435,54 +533,111 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         onAction={confirmRemoveMember}
                         secondaryLabel="Cancel"
                         onClose={() => setMemberToRemove(null)}
-                    />
+                    />,
+                    document.body
                 )}
 
-                {memberToUpdateRole && (
-                    <StatusModal
-                        type="warning"
-                        title={memberToUpdateRole.currentRole === 'ADMIN' ? "Demote Member?" : "Promote Member?"}
-                        message={`Are you sure you want to ${memberToUpdateRole.currentRole === 'ADMIN' ? 'demote this user to Member' : 'promote this user to Admin'}?`}
-                        actionLabel={memberToUpdateRole.currentRole === 'ADMIN' ? "Demote" : "Promote"}
-                        onAction={confirmRoleUpdate}
-                        secondaryLabel="Cancel"
-                        onClose={() => setMemberToUpdateRole(null)}
-                    />
+                {roleModalOpen && editingRole && createPortal(
+                    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                            <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">{editingRole.id ? 'Edit Role' : 'Create Role'}</h3>
+                                    <p className="text-xs text-slate-500">Configure permissions for this role.</p>
+                                </div>
+                                <button onClick={() => setRoleModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl"><X className="w-5 h-5" /></button>
+                            </div>
+
+                            <form onSubmit={handleSaveRole} className="flex flex-col flex-1 overflow-hidden">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role Name</label>
+                                            <input
+                                                type="text"
+                                                value={editingRole.name || ''}
+                                                onChange={e => setEditingRole({...editingRole, name: e.target.value})}
+                                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-medium"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role Color</label>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="color"
+                                                    value={editingRole.color || '#3b82f6'}
+                                                    onChange={e => setEditingRole({...editingRole, color: e.target.value})}
+                                                    className="w-12 h-12 p-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl cursor-pointer"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={editingRole.color || '#3b82f6'}
+                                                    onChange={e => setEditingRole({...editingRole, color: e.target.value})}
+                                                    className="flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-mono text-sm"
+                                                    pattern="^#[0-9A-Fa-f]{6}$"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-white/10 pb-2">Permissions</h4>
+                                        <PermissionSelector
+                                            groups={ALL_PERMISSION_GROUPS}
+                                            selectedPermissions={editingRole.permissions || []}
+                                            onChange={(perms) => setEditingRole({ ...editingRole, permissions: perms })}
+                                            variant="card"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-3 p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
+                                    <button type="button" onClick={() => setRoleModalOpen(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl">Cancel</button>
+                                    <button type="submit" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-2.5 rounded-xl font-bold shadow-lg transition-all active:scale-95 flex items-center gap-2">Save Role</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>,
+                    document.body
                 )}
 
-                {transferModal && (
+                {transferModal && createPortal(
                     <TransferProjectModal
                         project={transferModal}
+                        myOrgs={orgs}
                         onClose={() => setTransferModal(null)}
                         onSuccess={(msg) => setStatus({ type: 'success', title: 'Request Sent', msg })}
                         onError={(msg) => setStatus({ type: 'error', title: 'Transfer Failed', msg })}
-                    />
+                    />,
+                    document.body
                 )}
 
-                {cropperOpen && tempImage && (
+                {cropperOpen && tempImage && createPortal(
                     <ImageCropperModal
                         imageSrc={tempImage}
                         aspect={cropType === 'banner' ? 3 : 1}
                         onCancel={() => { setCropperOpen(false); setTempImage(null); }}
                         onCropComplete={handleCropComplete}
-                    />
+                    />,
+                    document.body
                 )}
 
                 <div className="flex items-center gap-4 mb-4">
-                    <button onClick={() => setSelectedOrg(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
+                    <button onClick={() => setSelectedOrg(null)} className="p-2 hover:bg-slate-200/50 dark:hover:bg-white/5 rounded-xl transition-colors">
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                             {selectedOrg.username}
-                            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded uppercase tracking-wider font-bold">Organization</span>
+                            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded uppercase tracking-wider font-bold border border-purple-200 dark:border-purple-800/30">Organization</span>
                         </h2>
                         <p className="text-slate-500">Manage organization settings and members</p>
                     </div>
                 </div>
 
-                <div className="flex gap-4 border-b border-slate-200 dark:border-white/5">
-                    {['MEMBERS', 'PROJECTS', 'SETTINGS'].map(tab => (
+                <div className="flex gap-4 border-b border-slate-200 dark:border-white/10">
+                    {['MEMBERS', 'ROLES', 'PROJECTS', 'SETTINGS'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
@@ -497,10 +652,10 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                         {manageError && <ErrorBanner message={manageError} />}
 
-                        {isAdmin && (
-                            <div className="bg-gradient-to-br from-white to-slate-50 dark:from-modtale-card dark:to-white/[0.02] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                        {canInvite && (
+                            <div className="relative z-50 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-10 h-10 rounded-full bg-modtale-accent/10 flex items-center justify-center text-modtale-accent">
+                                    <div className="w-10 h-10 rounded-xl bg-modtale-accent/10 flex items-center justify-center text-modtale-accent">
                                         <UserPlus className="w-5 h-5" />
                                     </div>
                                     <div>
@@ -509,139 +664,181 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                     </div>
                                 </div>
 
-                                <form onSubmit={handleAddMember} className="flex flex-col md:flex-row gap-4 items-end relative">
-                                    <div className="flex-1 w-full relative">
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Username</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Enter username..."
-                                            value={inviteUsername}
-                                            onChange={e => setInviteUsername(e.target.value)}
-                                            className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white font-medium"
-                                        />
+                                {hasRoles ? (
+                                    <form onSubmit={handleAddMember} className="flex flex-col md:flex-row gap-4 items-end">
+                                        <div className="flex-1 w-full relative modtale-dropdown-container">
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Username</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Search username..."
+                                                value={inviteUsername}
+                                                onChange={e => { setInviteUsername(e.target.value); setInviteUserId(''); }}
+                                                className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white font-medium shadow-inner"
+                                            />
 
-                                        {userSearchResults.length > 0 && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
-                                                {userSearchResults.map(res => (
-                                                    <button
-                                                        key={res.id}
-                                                        type="button"
-                                                        onClick={() => { setInviteUsername(res.username); setUserSearchResults([]); }}
-                                                        className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
-                                                    >
-                                                        <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
-                                                        <span className="font-bold text-sm text-slate-900 dark:text-white">{res.username}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                            {userSearchResults.length > 0 && (
+                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+                                                    {userSearchResults.map(res => (
+                                                        <button
+                                                            key={res.id}
+                                                            type="button"
+                                                            onClick={() => { setInviteUsername(res.username); setInviteUserId(res.id); setUserSearchResults([]); }}
+                                                            className="w-full flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
+                                                        >
+                                                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={res.avatarUrl} className="w-full h-full object-cover" /></div>
+                                                            <span className="font-bold text-sm text-slate-900 dark:text-white">{res.username}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    <div className="w-full md:w-48 relative" ref={roleDropdownRef}>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role</label>
+                                        <div className="w-full md:w-64 relative modtale-dropdown-container">
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setInviteRoleDropdownOpen(!inviteRoleDropdownOpen)}
+                                                className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-medium shadow-inner flex justify-between items-center"
+                                            >
+                                                {inviteRoleId ? (
+                                                    <div className="flex items-center gap-2 truncate">
+                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: nonOwnerRoles.find(r => r.id === inviteRoleId)?.color}} />
+                                                        <span className="truncate">{nonOwnerRoles.find(r => r.id === inviteRoleId)?.name}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400">Select Role...</span>
+                                                )}
+                                                <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${inviteRoleDropdownOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                            {inviteRoleDropdownOpen && (
+                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+                                                    <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                        {nonOwnerRoles.map(role => (
+                                                            <button
+                                                                key={role.id}
+                                                                type="button"
+                                                                onClick={() => { setInviteRoleId(role.id); setInviteRoleDropdownOpen(false); }}
+                                                                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
+                                                            >
+                                                                <div className="flex items-center gap-2 truncate">
+                                                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: role.color}} />
+                                                                    <span className="font-bold text-sm text-slate-900 dark:text-white truncate">{role.name}</span>
+                                                                </div>
+                                                                {inviteRoleId === role.id && <Check className="w-4 h-4 text-modtale-accent flex-shrink-0" />}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <button
-                                            type="button"
-                                            onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                                            className="w-full flex items-center justify-between bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white font-medium"
+                                            type="submit"
+                                            disabled={!inviteUserId || !inviteRoleId}
+                                            className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg h-11"
                                         >
-                                            <div className="flex items-center gap-2">
-                                                {inviteRole === 'ADMIN' ? <ShieldCheck className="w-4 h-4 text-amber-500"/> : <Shield className="w-4 h-4 text-blue-500"/>}
-                                                <span>{inviteRole === 'ADMIN' ? 'Admin' : 'Member'}</span>
-                                            </div>
-                                            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${roleDropdownOpen ? 'rotate-180' : ''}`} />
+                                            <Plus className="w-4 h-4" /> Invite
                                         </button>
-
-                                        {roleDropdownOpen && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setInviteRole('MEMBER'); setRoleDropdownOpen(false); }}
-                                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
-                                                >
-                                                    <Shield className="w-5 h-5 text-blue-500" />
-                                                    <div>
-                                                        <div className="font-bold text-sm text-slate-900 dark:text-white">Member</div>
-                                                        <div className="text-[10px] text-slate-500">Standard access to projects.</div>
-                                                    </div>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setInviteRole('ADMIN'); setRoleDropdownOpen(false); }}
-                                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
-                                                >
-                                                    <ShieldCheck className="w-5 h-5 text-amber-500" />
-                                                    <div>
-                                                        <div className="font-bold text-sm text-slate-900 dark:text-white">Admin</div>
-                                                        <div className="text-[10px] text-slate-500">Full access to settings & billing.</div>
-                                                    </div>
-                                                </button>
-                                            </div>
-                                        )}
+                                    </form>
+                                ) : (
+                                    <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 p-4 rounded-xl flex items-center gap-2 font-medium">
+                                        <Shield className="w-5 h-5" /> You must create at least one Role before inviting members.
                                     </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={!inviteUsername}
-                                        className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        <Plus className="w-4 h-4" /> Invite
-                                    </button>
-                                </form>
+                                )}
                             </div>
                         )}
 
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm">
-                            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+                        <div className="relative z-10 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md">
+                            <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
                                 <h3 className="font-bold text-slate-900 dark:text-white">Active Members</h3>
-                                <span className="text-xs font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-500">{members.length}</span>
+                                <span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400">{members.length}</span>
                             </div>
-                            <div className="divide-y divide-slate-100 dark:divide-white/5">
+                            <div className="divide-y divide-slate-200 dark:divide-white/10">
                                 {members.map(member => {
-                                    const role = selectedOrg.organizationMembers?.find(m => m.userId === member.id)?.role || 'MEMBER';
+                                    const membership = selectedOrg.organizationMembers?.find(m => m.userId === member.id);
+                                    const role = selectedOrg.organizationRoles?.find(r => r.id === membership?.roleId);
                                     const isMe = member.id === user.id;
-
-                                    const preventSelfRemoval = isMe && isLastMember;
+                                    const isOwner = role?.isOwner;
 
                                     return (
-                                        <div key={member.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors group">
+                                        <div key={member.id} className="p-5 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors group">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10">
                                                     <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
                                                 </div>
                                                 <div>
                                                     <div className="font-bold text-slate-900 dark:text-white text-sm">{member.username}</div>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${role === 'ADMIN' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400'}`}>{role}</span>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {role ? (
+                                                            <div className="flex items-center gap-1.5 border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-black/20 px-2 py-0.5 rounded-md">
+                                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: role.color }} />
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{role.name}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-slate-100 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/10 dark:text-slate-400">Legacy Member</span>
+                                                        )}
                                                         {isMe && <span className="text-[10px] text-slate-400 font-medium italic">(You)</span>}
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {isAdmin && !isMe && (
-                                                    <button
-                                                        onClick={() => handleRoleUpdate(member.id, role)}
-                                                        className={`p-2 rounded-lg transition-all ${role === 'ADMIN' ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
-                                                        title={role === 'ADMIN' ? "Demote to Member" : "Promote to Admin"}
-                                                    >
-                                                        {role === 'ADMIN' ? <ShieldOff className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                                                    </button>
+                                            <div className="flex items-center gap-3">
+                                                {canManageRoles && !isMe && (
+                                                    <div className="relative modtale-dropdown-container">
+                                                        <button
+                                                            onClick={() => setMemberRoleDropdownOpen(memberRoleDropdownOpen === member.id ? null : member.id)}
+                                                            disabled={isOwner && !myRole?.isOwner}
+                                                            className={`flex items-center justify-between min-w-[140px] bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors ${isOwner && !myRole?.isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer shadow-sm'}`}
+                                                        >
+                                                            <div className="flex items-center gap-2 truncate">
+                                                                {role && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
+                                                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate">
+                                                                    {role ? role.name : 'Select Role'}
+                                                                </span>
+                                                            </div>
+                                                            <ChevronDown className={`w-3 h-3 text-slate-400 ml-2 flex-shrink-0 transition-transform ${memberRoleDropdownOpen === member.id ? 'rotate-180' : ''}`} />
+                                                        </button>
+
+                                                        {memberRoleDropdownOpen === member.id && (
+                                                            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95">
+                                                                <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                                    {selectedOrg.organizationRoles?.filter(r => !r.isOwner || isOwner || myRole?.isOwner).map(r => (
+                                                                        <button
+                                                                            key={r.id}
+                                                                            onClick={() => {
+                                                                                handleRoleUpdate(member.id, r.id);
+                                                                                setMemberRoleDropdownOpen(null);
+                                                                            }}
+                                                                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
+                                                                        >
+                                                                            <div className="flex items-center gap-2 truncate">
+                                                                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: r.color}} />
+                                                                                <span className="font-bold text-xs text-slate-900 dark:text-white truncate">{r.name}</span>
+                                                                            </div>
+                                                                            {membership?.roleId === r.id && <Check className="w-3 h-3 text-modtale-accent flex-shrink-0" />}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
 
-                                                {(isAdmin || isMe) && (
+                                                {(canRemove || isMe) && (
                                                     <div className="relative group/tooltip">
                                                         <button
-                                                            onClick={() => !preventSelfRemoval && handleRemoveMember(member.id)}
-                                                            disabled={preventSelfRemoval}
-                                                            className={`p-2 rounded-lg transition-all ${preventSelfRemoval ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
+                                                            onClick={() => !isOwner && setMemberToRemove(member.id)}
+                                                            disabled={isOwner}
+                                                            className={`p-2 rounded-xl transition-all ${isOwner ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
                                                             title={isMe ? "Leave Organization" : "Remove Member"}
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
 
-                                                        {preventSelfRemoval && (
-                                                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 text-white text-xs p-2 rounded shadow-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity text-center z-10">
-                                                                You cannot leave as the only member. Delete the organization instead.
+                                                        {isOwner && (
+                                                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 text-white text-xs p-2 rounded-xl shadow-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity text-center z-10">
+                                                                The Owner cannot be removed. Transfer ownership first.
                                                             </div>
                                                         )}
                                                     </div>
@@ -652,6 +849,120 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                                 })}
                             </div>
                         </div>
+
+                        {invites.length > 0 && (
+                            <div className="relative z-0 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md">
+                                <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
+                                    <h3 className="font-bold text-slate-900 dark:text-white">Pending Invites</h3>
+                                    <span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400">{invites.length}</span>
+                                </div>
+                                <div className="divide-y divide-slate-200 dark:divide-white/10">
+                                    {invites.map(inviteUser => {
+                                        const inviteData = selectedOrg.pendingOrgInvites?.find(i => i.userId === inviteUser.id);
+                                        const inviteRole = selectedOrg.organizationRoles?.find(r => r.id === inviteData?.roleId);
+
+                                        return (
+                                            <div key={inviteUser.id} className="p-5 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/[0.02] transition-colors">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 opacity-70 grayscale">
+                                                        <img src={inviteUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-900 dark:text-white text-sm">{inviteUser.username}</div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-700/30 dark:text-amber-400">Pending</span>
+                                                            {inviteRole && (
+                                                                <span className="text-[10px] text-slate-500 font-medium">As {inviteRole.name}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {canInvite && (
+                                                    <button onClick={() => handleCancelInvite(inviteUser.id)} className="text-xs font-bold text-red-500 hover:text-red-600 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/30 transition-colors">
+                                                        Cancel
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'ROLES' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="flex justify-between items-center bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
+                            <div>
+                                <h3 className="font-bold text-lg text-slate-900 dark:text-white">Organization Roles</h3>
+                                <p className="text-xs text-slate-500 mt-1">Manage custom roles, colors, and granular permissions for your team.</p>
+                            </div>
+                            {canManageRoles && (
+                                <button onClick={() => { setEditingRole({ permissions: [] }); setRoleModalOpen(true); }} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all">
+                                    <Plus className="w-4 h-4" /> New Role
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {selectedOrg.organizationRoles?.map(role => {
+                                const memberCount = selectedOrg.organizationMembers?.filter(m => m.roleId === role.id).length || 0;
+                                return (
+                                    <div key={role.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col h-full group">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10 shadow-sm flex-shrink-0" style={{ backgroundColor: role.color }}>
+                                                    {role.isOwner ? <ShieldCheck className="w-4 h-4 text-white opacity-90" /> : <Palette className="w-4 h-4 text-white opacity-80" />}
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-slate-900 dark:text-white leading-tight flex items-center gap-1.5">
+                                                        {role.name}
+                                                    </h4>
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase">{memberCount} Member{memberCount !== 1 ? 's' : ''}</span>
+                                                </div>
+                                            </div>
+                                            {role.isOwner ? (
+                                                <span className="text-[9px] uppercase font-bold text-slate-400 border border-slate-200 dark:border-white/10 px-1.5 py-0.5 rounded bg-slate-50 dark:bg-white/5">Immutable</span>
+                                            ) : canManageRoles && (
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => { setEditingRole(role); setRoleModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-modtale-accent hover:bg-modtale-accent/10 rounded-lg transition-colors">
+                                                        <Settings className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteRole(role.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-auto pt-4 border-t border-slate-200 dark:border-white/5">
+                                            <div className="text-[10px] text-slate-500 font-bold uppercase mb-2">Key Permissions</div>
+                                            {role.isOwner ? (
+                                                <span className="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-2 py-1 rounded inline-block">Full Access</span>
+                                            ) : (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {(role.permissions || []).slice(0, 3).map(p => (
+                                                        <span key={p} className="text-[9px] px-1.5 py-0.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-slate-600 dark:text-slate-300 truncate max-w-[120px]">
+                                                            {p.replace(/_/g, ' ')}
+                                                        </span>
+                                                    ))}
+                                                    {(role.permissions || []).length > 3 && (
+                                                        <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-slate-500 font-bold">
+                                                            +{(role.permissions || []).length - 3}
+                                                        </span>
+                                                    )}
+                                                    {(role.permissions || []).length === 0 && (
+                                                        <span className="text-xs text-slate-400 italic">No specific permissions.</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 
@@ -660,68 +971,75 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         {orgProjects.length > 0 ? (
                             <div className="grid grid-cols-1 gap-4">
                                 {orgProjects.map(project => (
-                                    <ProjectListItem
-                                        key={project.id}
-                                        project={project}
-                                        canManage={isAdmin}
-                                        isOwner={false}
-                                        showAuthor={false}
-                                        onTransfer={setTransferModal}
-                                        onDelete={setDeleteProjectModal}
-                                    />
+                                    <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
+                                        <ProjectListItem
+                                            project={project}
+                                            canManage={hasOrgPermission('PROJECT_EDIT_METADATA')}
+                                            isOwner={false}
+                                            showAuthor={false}
+                                            onTransfer={setTransferModal}
+                                            onDelete={setDeleteProjectModal}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-12 text-slate-400">No projects found.</div>
+                            <div className="text-center py-12 text-slate-400 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-md shadow-sm">
+                                No projects found.
+                            </div>
                         )}
                     </div>
                 )}
 
-                {activeTab === 'SETTINGS' && isAdmin && (
+                {activeTab === 'SETTINGS' && canEditProfile && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                            <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <h3 className="font-bold mb-4">Organization Icon</h3>
                                 <div className="flex items-center gap-4">
-                                    <img src={selectedOrg.avatarUrl} alt="" className="w-16 h-16 rounded-xl object-cover bg-slate-100" />
+                                    <img src={selectedOrg.avatarUrl} alt="" className="w-16 h-16 rounded-2xl object-cover bg-slate-100 border border-slate-200 dark:border-white/10 shadow-sm" />
                                     <div>
                                         <input type="file" ref={avatarInputRef} onChange={e => handleFileSelect(e, 'avatar')} className="hidden" accept="image/*" />
-                                        <button onClick={() => avatarInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-lg text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"><Upload className="w-4 h-4" /> Upload</button>
+                                        <button onClick={() => avatarInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-200/50 dark:bg-white/5 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors border border-slate-200 dark:border-white/5 shadow-sm">
+                                            <Upload className="w-4 h-4" /> Upload
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                            <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                                 <h3 className="font-bold mb-4">Profile Banner</h3>
                                 <div className="flex items-center gap-4">
-                                    <div className="w-32 h-16 rounded-xl overflow-hidden bg-slate-100 relative">
+                                    <div className="w-32 h-16 rounded-xl overflow-hidden bg-slate-100 relative border border-slate-200 dark:border-white/10 shadow-sm">
                                         {selectedOrg.bannerUrl && <img src={selectedOrg.bannerUrl} alt="" className="w-full h-full object-cover" />}
                                     </div>
                                     <div>
                                         <input type="file" ref={bannerInputRef} onChange={e => handleFileSelect(e, 'banner')} className="hidden" accept="image/*" />
-                                        <button onClick={() => bannerInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-lg text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"><ImageIcon className="w-4 h-4" /> Upload</button>
+                                        <button onClick={() => bannerInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-slate-200/50 dark:bg-white/5 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors border border-slate-200 dark:border-white/5 shadow-sm">
+                                            <ImageIcon className="w-4 h-4" /> Upload
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                             <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-slate-400" /> General Settings</h3>
                             <form onSubmit={handleUpdateProfile} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Organization Name (Username)</label>
-                                    <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white" />
+                                    <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white shadow-inner" />
                                     <p className="text-[10px] text-slate-400 mt-1">This is your unique organization identifier.</p>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Bio</label>
-                                    <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white" />
+                                    <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-modtale-accent dark:text-white shadow-inner" />
                                 </div>
                                 <div className="flex justify-end">
-                                    <button type="submit" disabled={savingSettings} className="bg-modtale-accent text-white font-bold px-6 py-2.5 rounded-xl hover:bg-modtale-accentHover transition-colors disabled:opacity-50">{savingSettings ? 'Saving...' : 'Save Changes'}</button>
+                                    <button type="submit" disabled={savingSettings} className="bg-modtale-accent text-white font-bold px-6 py-2.5 rounded-xl hover:bg-modtale-accentHover transition-colors disabled:opacity-50 shadow-lg shadow-modtale-accent/20">{savingSettings ? 'Saving...' : 'Save Changes'}</button>
                                 </div>
                             </form>
                         </div>
 
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm">
+                        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl shadow-sm backdrop-blur-md">
                             <div className="flex items-center gap-3 mb-4">
                                 <LinkIcon className="w-5 h-5 text-modtale-accent" />
                                 <div>
@@ -738,14 +1056,16 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             </div>
                         </div>
 
-                        <div className="border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 p-6 rounded-2xl">
-                            <h3 className="font-bold text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
-                            <p className="text-sm text-red-500/80 mb-4">Deleting this organization will permanently remove it and unlist all associated projects.</p>
-                            <button onClick={() => setDeleteModalOpen(true)} className="bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/30 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">Delete Organization</button>
-                        </div>
+                        {hasOrgPermission('ORG_DELETE') && (
+                            <div className="border border-red-200 dark:border-red-900/30 bg-red-50/40 dark:bg-red-900/10 p-6 rounded-2xl backdrop-blur-md shadow-sm">
+                                <h3 className="font-bold text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
+                                <p className="text-sm text-red-500/80 mb-4">Deleting this organization will permanently remove it and unlist all associated projects.</p>
+                                <button onClick={() => setDeleteModalOpen(true)} className="bg-white dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/30 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shadow-sm">Delete Organization</button>
+                            </div>
+                        )}
                     </div>
                 )}
-                {activeTab === 'SETTINGS' && !isAdmin && (
+                {activeTab === 'SETTINGS' && !canEditProfile && (
                     <div className="text-center py-10 text-slate-500">You do not have permission to edit this organization.</div>
                 )}
             </div>
@@ -753,34 +1073,60 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-6 relative">
+            {isCreating && <div className="fixed inset-0 z-[100]" />}
+            <div className="flex justify-between items-center mb-6 relative z-[101]">
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">Organizations</h1>
-                <button onClick={() => setIsCreating(true)} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20"><Plus className="w-4 h-4" /> New Org</button>
+                <button onClick={() => setIsCreating(true)} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20"><Plus className="w-4 h-4" /> New Org</button>
             </div>
-            {isCreating && (
-                <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm animate-in slide-in-from-top-2">
-                    <h3 className="font-bold text-lg mb-4">Create Organization</h3>
-                    {createError && <ErrorBanner message={createError} className="mb-4" />}
-                    <form onSubmit={handleCreateOrg} className="flex gap-4">
-                        <input type="text" placeholder="Organization Name" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white" autoFocus />
-                        <button type="submit" disabled={!newOrgName} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-6 py-2 rounded-xl">Create</button>
-                        <button type="button" onClick={() => setIsCreating(false)} className="px-4 font-bold text-slate-500">Cancel</button>
-                    </form>
-                </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {orgs.map(org => (
-                    <div key={org.id} onClick={() => setSelectedOrg(org)} className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-slate-100 dark:bg-white/5 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-modtale-accent transition-colors">
-                                {org.avatarUrl ? <img src={org.avatarUrl} className="w-full h-full object-cover rounded-xl" /> : <Building2 className="w-6 h-6" />}
-                            </div>
-                            <span className="text-xs font-bold uppercase tracking-wider bg-slate-100 dark:bg-white/5 text-slate-500 px-2 py-1 rounded">{org.organizationMembers?.find(m => m.userId === user.id)?.role || 'MEMBER'}</span>
+
+            {isCreating && createPortal(
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-xl text-slate-900 dark:text-white">Create Organization</h3>
+                            <button onClick={() => setIsCreating(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"><X className="w-5 h-5" /></button>
                         </div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{org.username}</h3>
+                        {createError && <ErrorBanner message={createError} className="mb-4" />}
+                        <form onSubmit={handleCreateOrg} className="flex flex-col gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Organization Name</label>
+                                <input type="text" placeholder="e.g. Modtale Team" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-modtale-accent transition-all dark:text-white shadow-inner" autoFocus />
+                            </div>
+                            <div className="flex justify-end gap-3 mt-2">
+                                <button type="button" onClick={() => setIsCreating(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl">Cancel</button>
+                                <button type="submit" disabled={!newOrgName} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-2.5 rounded-xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Create</button>
+                            </div>
+                        </form>
                     </div>
-                ))}
+                </div>,
+                document.body
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-0">
+                {orgs.map(org => {
+                    const member = org.organizationMembers?.find(m => m.userId === user.id);
+                    const role = org.organizationRoles?.find(r => r.id === member?.roleId);
+
+                    return (
+                        <div key={org.id} onClick={() => setSelectedOrg(org)} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group backdrop-blur-md">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-12 bg-slate-200/50 dark:bg-white/5 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-modtale-accent border border-slate-200 dark:border-white/10 transition-colors">
+                                    {org.avatarUrl ? <img src={org.avatarUrl} className="w-full h-full object-cover rounded-xl" /> : <Building2 className="w-6 h-6" />}
+                                </div>
+                                {role ? (
+                                    <div className="flex items-center gap-1.5 border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-black/20 px-2 py-1 rounded-md">
+                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: role.color }} />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{role.name}</span>
+                                    </div>
+                                ) : (
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200/50 dark:bg-white/10 border border-slate-200 dark:border-white/5 text-slate-500 px-2 py-1 rounded-md">Legacy Member</span>
+                                )}
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{org.username}</h3>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

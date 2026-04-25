@@ -43,11 +43,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
     );
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark">
-            <div className="max-w-[112rem] mx-auto px-8 sm:px-12 md:px-16 lg:px-28 py-8 transition-[max-width,padding] duration-300">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+            <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-8 transition-[max-width,padding] duration-300">
                 <div className="flex flex-col lg:flex-row gap-8">
                     <aside className="w-full lg:w-64 flex-shrink-0">
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-2xl p-4 shadow-sm sticky top-28">
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-2xl sticky top-28">
                             <div className="flex items-center gap-3 px-4 py-4 mb-4 border-b border-slate-100 dark:border-white/5">
                                 <img src={user.avatarUrl} alt="" className="w-10 h-10 rounded-full border border-slate-200 dark:border-white/10" />
                                 <div className="overflow-hidden">
@@ -70,17 +70,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
                     </aside>
 
                     <div className="flex-1 min-w-0">
-                        <Routes>
-                            <Route path="/" element={<Navigate to="projects" replace />} />
-                            <Route path="profile" element={<ManageProfile user={user} onUpdate={onRefreshUser || (() => {})} />} />
-                            <Route path="projects" element={<ManageProjects user={user} />} />
-                            <Route path="jams" element={<ManageJams user={user} />} />
-                            <Route path="orgs" element={<ManageOrganization user={user} />} />
-                            <Route path="analytics" element={<Analytics />} />
-                            <Route path="analytics/project/:id" element={<Analytics />} />
-                            <Route path="notifications" element={<NotificationSettings user={user} />} />
-                            <Route path="developer" element={<div className="-mt-8 -mx-4"><DeveloperSettings /></div>} />
-                        </Routes>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-2xl">
+                            <Routes>
+                                <Route path="/" element={<Navigate to="projects" replace />} />
+                                <Route path="profile" element={<ManageProfile user={user} onUpdate={onRefreshUser || (() => {})} />} />
+                                <Route path="projects" element={<ManageProjects user={user} />} />
+                                <Route path="jams" element={<ManageJams user={user} />} />
+                                <Route path="orgs" element={<ManageOrganization user={user} />} />
+                                <Route path="analytics" element={<Analytics />} />
+                                <Route path="analytics/project/:id" element={<Analytics />} />
+                                <Route path="notifications" element={<NotificationSettings user={user} />} />
+                                <Route path="developer" element={<div className="-mt-8 -mx-4"><DeveloperSettings /></div>} />
+                            </Routes>
+                        </div>
                     </div>
                 </div>
             </div>

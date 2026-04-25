@@ -46,6 +46,18 @@ public class EmailService {
         sendEmail(to, subject, htmlContent);
     }
 
+    @Async
+    public void sendAccountDeletionEmail(String to, String username, String reason) {
+        String subject = "Modtale Account Deleted";
+
+        String title = "Account Deleted";
+        String body = "Your Modtale account <strong>" + username + "</strong> has been permanently deleted by an administrator.<br><br><strong>Reason provided:</strong> " + reason;
+        String buttonText = "Visit Modtale";
+
+        String htmlContent = buildHtmlEmail(title, body, frontendUrl, buttonText);
+        sendEmail(to, subject, htmlContent);
+    }
+
     private void sendEmail(String to, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

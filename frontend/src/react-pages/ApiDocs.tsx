@@ -10,11 +10,8 @@ import {
     Unlock,
     Gauge,
     Key,
-    Download,
-    User,
     Activity,
     Bell,
-    Share2,
     Image,
     Users,
     ArrowRightLeft,
@@ -24,8 +21,8 @@ import {
     AlertTriangle,
     Layers,
     Code,
-    Cpu,
-    Box
+    User,
+    Download
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -163,115 +160,115 @@ const Endpoint = ({
 
 export const ApiDocs: React.FC = () => {
     return (
-        <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 mx-auto max-w-[1920px] py-16 overflow-x-hidden">
-            <ScrollbarStyles />
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+            <div className="w-full max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto py-16 overflow-x-hidden">
+                <ScrollbarStyles />
 
-            <div className="text-center mb-16 w-full">
-                <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
-                    Modtale <span className="text-modtale-accent">API v1</span>
-                </h1>
-                <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8">
-                    Complete programmatic access to the Hytale community repository.
-                </p>
+                <div className="text-center mb-16 w-full">
+                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+                        Modtale <span className="text-modtale-accent">API v1</span>
+                    </h1>
+                    <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8">
+                        Complete programmatic access to the Hytale community repository.
+                    </p>
 
-                <div className="inline-flex flex-wrap justify-center items-center gap-3 px-5 py-3 bg-slate-100 dark:bg-white/5 rounded-full text-sm font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 mb-8 shadow-sm max-w-full">
-                    <Server className="w-4 h-4 text-modtale-accent shrink-0" />
-                    <span>Base URL:</span>
-                    <span className="font-bold text-slate-900 dark:text-white select-all break-all">https://api.modtale.net</span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full">
-                    <Link to="/dashboard/developer" className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold hover:opacity-90 transition-transform active:scale-95 shadow-lg flex items-center justify-center gap-2 w-full sm:w-auto">
-                        <Shield className="w-4 h-4" /> Get API Key
-                    </Link>
-                    <a href="https://github.com/Modtale/modtale-example" target="_blank" rel="noreferrer" className="px-6 py-3 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl font-bold hover:border-modtale-accent hover:text-modtale-accent transition-all active:scale-95 shadow-sm flex items-center justify-center gap-2 group w-full sm:w-auto">
-                        <Github className="w-5 h-5 group-hover:text-modtale-accent transition-colors" />
-                        <span>View Examples</span>
-                        <ExternalLink className="w-3 h-3 opacity-50" />
-                    </a>
-                </div>
-            </div>
-
-            <div className="space-y-12 md:space-y-20 w-full overflow-hidden">
-
-                <section className="w-full">
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 shrink-0">
-                                <Key className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-black text-slate-900 dark:text-white">Authentication & Security</h2>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Secure your requests.</p>
-                            </div>
-                        </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-                            All authenticated API requests must be directed to <code>https://api.modtale.net</code>.
-                            Include your API key in the request header to identify your client and get higher limits.
-
-                        </p>
-
-                        <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 border border-white/10 overflow-x-auto mb-8 max-w-full">
-                            <span className="text-purple-400">X-MODTALE-KEY</span>: <span className="text-white">md_12345abcdef...</span>
-                        </div>
-
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-4 tracking-wider flex items-center gap-2">
-                            <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (Token Bucket)
-                        </h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-2">
-                            <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 relative overflow-hidden group hover:border-slate-300 dark:hover:border-white/20 transition-colors">
-                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-slate-500"><Globe className="w-24 h-24" /></div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg text-slate-600 dark:text-slate-300">
-                                        <Unlock className="w-4 h-4" />
-                                    </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Public Access</span>
-                                </div>
-                                <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">60 <span className="text-sm font-medium text-slate-500">req/min</span></div>
-                                <div className="text-xl font-bold text-slate-700 dark:text-slate-300">5 <span className="text-sm font-medium text-slate-500">write/min</span></div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Perfect for browsing and testing. No key required.</p>
-                            </div>
-
-                            <div className="p-6 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-500/20 relative overflow-hidden group hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors">
-                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-blue-500"><Shield className="w-24 h-24" /></div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="p-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg text-blue-600 dark:text-blue-400">
-                                        <Zap className="w-4 h-4" />
-                                    </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Standard Key</span>
-                                </div>
-                                <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">600 <span className="text-sm font-medium text-slate-500">req/min</span></div>
-                                <div className="text-xl font-bold text-slate-700 dark:text-slate-300">60 <span className="text-sm font-medium text-slate-500">write/min</span></div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Ideal for most apps and scripts.</p>
-                            </div>
-
-                            <div className="p-6 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-500/20 relative overflow-hidden group hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors">
-                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-purple-500"><Server className="w-24 h-24" /></div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="p-2 bg-purple-100 dark:bg-purple-500/20 rounded-lg text-purple-600 dark:text-purple-400">
-                                        <Activity className="w-4 h-4" />
-                                    </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise Key</span>
-                                </div>
-                                <div className="text-3xl font-black text-purple-900 dark:text-white mb-1">5,000 <span className="text-sm font-medium text-purple-400">req/min</span></div>
-                                <div className="text-xl font-bold text-purple-700 dark:text-purple-300">500 <span className="text-sm font-medium text-purple-400">write/min</span></div>
-                                <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">For high-volume integrations.</p>
-                            </div>
-                        </div>
+                    <div className="inline-flex flex-wrap justify-center items-center gap-3 px-5 py-3 bg-slate-100 dark:bg-white/5 rounded-full text-sm font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 mb-8 shadow-sm max-w-full">
+                        <Server className="w-4 h-4 text-modtale-accent shrink-0" />
+                        <span>Base URL:</span>
+                        <span className="font-bold text-slate-900 dark:text-white select-all break-all">https://api.modtale.net</span>
                     </div>
-                </section>
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Database className="w-6 h-6 text-slate-400" /> Metadata & Enums
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/tags"
-                            desc="Retrieve the strictly enforced list of allowed project tags. Use these for search filtering or when creating/updating projects."
-                            response={`[
+                    <div className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full">
+                        <Link to="/dashboard/developer" className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold hover:opacity-90 transition-transform active:scale-95 shadow-lg flex items-center justify-center gap-2 w-full sm:w-auto">
+                            <Shield className="w-4 h-4" /> Get API Key
+                        </Link>
+                        <a href="https://github.com/Modtale/modtale-example" target="_blank" rel="noreferrer" className="px-6 py-3 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl font-bold hover:border-modtale-accent hover:text-modtale-accent transition-all active:scale-95 shadow-sm flex items-center justify-center gap-2 group w-full sm:w-auto">
+                            <Github className="w-5 h-5 group-hover:text-modtale-accent transition-colors" />
+                            <span>View Examples</span>
+                            <ExternalLink className="w-3 h-3 opacity-50" />
+                        </a>
+                    </div>
+                </div>
+
+                <div className="space-y-12 md:space-y-20 w-full overflow-hidden">
+
+                    <section className="w-full">
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-lg text-green-600 dark:text-green-400 shrink-0">
+                                    <Key className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Authentication & Security</h2>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">Secure your requests.</p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+                                All authenticated API requests must be directed to <code>https://api.modtale.net</code>.
+                                Include your API key in the request header to identify your client and get higher limits.
+                            </p>
+
+                            <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 border border-white/10 overflow-x-auto mb-8 max-w-full">
+                                <span className="text-purple-400">X-MODTALE-KEY</span>: <span className="text-white">md_12345abcdef...</span>
+                            </div>
+
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mb-4 tracking-wider flex items-center gap-2">
+                                <Gauge className="w-4 h-4 text-slate-400" /> Rate Limits (Token Bucket)
+                            </h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-2">
+                                <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 relative overflow-hidden group hover:border-slate-300 dark:hover:border-white/20 transition-colors">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-slate-500"><Globe className="w-24 h-24" /></div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <div className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg text-slate-600 dark:text-slate-300">
+                                            <Unlock className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Public Access</span>
+                                    </div>
+                                    <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">60 <span className="text-sm font-medium text-slate-500">req/min</span></div>
+                                    <div className="text-xl font-bold text-slate-700 dark:text-slate-300">5 <span className="text-sm font-medium text-slate-500">write/min</span></div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Perfect for browsing and testing. No key required.</p>
+                                </div>
+
+                                <div className="p-6 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-500/20 relative overflow-hidden group hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-blue-500"><Shield className="w-24 h-24" /></div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <div className="p-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg text-blue-600 dark:text-blue-400">
+                                            <Zap className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Standard Key</span>
+                                    </div>
+                                    <div className="text-3xl font-black text-slate-900 dark:text-white mb-1">600 <span className="text-sm font-medium text-slate-500">req/min</span></div>
+                                    <div className="text-xl font-bold text-slate-700 dark:text-slate-300">60 <span className="text-sm font-medium text-slate-500">write/min</span></div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Ideal for most apps and scripts.</p>
+                                </div>
+
+                                <div className="p-6 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-500/20 relative overflow-hidden group hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-purple-500"><Server className="w-24 h-24" /></div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <div className="p-2 bg-purple-100 dark:bg-purple-500/20 rounded-lg text-purple-600 dark:text-purple-400">
+                                            <Activity className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise Key</span>
+                                    </div>
+                                    <div className="text-3xl font-black text-purple-900 dark:text-white mb-1">5,000 <span className="text-sm font-medium text-purple-400">req/min</span></div>
+                                    <div className="text-xl font-bold text-purple-700 dark:text-purple-300">500 <span className="text-sm font-medium text-purple-400">write/min</span></div>
+                                    <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">For high-volume integrations.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Database className="w-6 h-6 text-slate-400" /> Metadata & System
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/tags"
+                                desc="Retrieve the strictly enforced list of allowed project tags. Use these for search filtering or when creating/updating projects."
+                                response={`[
   "Adventure", "RPG", "Sci-Fi", "Fantasy", "Survival", "Magic", "Tech",
   "Exploration", "Minigame", "PvP", "Parkour", "Hardcore", "Skyblock",
   "Puzzle", "Quests", "Economy", "Protection", "Admin Tools", "Chat",
@@ -280,27 +277,27 @@ export const ApiDocs: React.FC = () => {
   "Kitchen Sink", "City", "Landscape", "Spawn", "Lobby", "Medieval",
   "Modern", "Futuristic", "Models", "Textures", "Animations", "Particles"
 ]`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/meta/classifications"
-                            desc="Get allowed project types."
-                            response={`[ "PLUGIN", "DATA", "ART", "SAVE", "MODPACK" ]`}
-                        />
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/meta/classifications"
+                                desc="Get allowed project types."
+                                response={`[ "PLUGIN", "DATA", "ART", "SAVE", "MODPACK" ]`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/meta/game-versions"
-                            desc="Get supported game target versions."
-                            response={`[ "2026.01.13-dcad8778f", "2026.01.17-4b0f30090" ]`}
-                        />
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/meta/game-versions"
+                                desc="Get supported game target versions."
+                                response={`[ "2026.01.13-dcad8778f", "2026.01.17-4b0f30090" ]`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/status"
-                            desc="Get system health and latency statistics."
-                            response={`{
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/status"
+                                desc="Get system health and latency statistics."
+                                response={`{
   "overall": "operational",
   "services": [
     { "id": "api", "status": "operational", "latency": 12 },
@@ -308,34 +305,37 @@ export const ApiDocs: React.FC = () => {
   ],
   "timestamp": 1740000000000
 }`}
-                        />
-                    </div>
-                </section>
+                            />
+                        </div>
+                    </section>
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Globe className="w-6 h-6 text-slate-400" /> Project Discovery
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Globe className="w-6 h-6 text-slate-400" /> Project Discovery
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/projects"
-                            desc="Search projects with advanced filtering. Authentication is required only for specific 'category' filters like Favorites."
-                            params={{
-                                "search": "string (Keywords)",
-                                "page": "int (0-based, default 0)",
-                                "size": "int (default 10, max 100)",
-                                "sort": "enum (relevance|downloads|updated|newest|rating|favorites)",
-                                "classification": "enum (PLUGIN|DATA|ART|SAVE|MODPACK)",
-                                "tags": "string (Comma-separated list)",
-                                "gameVersion": "string (Exact match)",
-                                "category": "string ('Favorites' | 'Your Projects' - Requires Auth)",
-                                "author": "string (Filter by Author Username)",
-                                "creator": "string (Alias for author)",
-                                "dateRange": "enum (7d, 30d, 90d, 1y, all)"
-                            }}
-                            response={`{
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects"
+                                desc="Search projects with advanced filtering. Authentication is required only for specific 'category' filters like Favorites."
+                                auth={false}
+                                params={{
+                                    "search": "string (Keywords)",
+                                    "page": "int (0-based, default 0)",
+                                    "size": "int (default 10, max 100)",
+                                    "sort": "enum (relevance|downloads|updated|newest|rating|favorites)",
+                                    "classification": "enum (PLUGIN|DATA|ART|SAVE|MODPACK)",
+                                    "tags": "string (Comma-separated list)",
+                                    "gameVersion": "string (Exact match)",
+                                    "category": "string ('Favorites' | 'Your Projects' - Requires Auth)",
+                                    "author": "string (Filter by Author Username)",
+                                    "creator": "string (Alias for author)",
+                                    "minDownloads": "int",
+                                    "minFavorites": "int",
+                                    "dateRange": "enum (7d, 30d, 90d, 1y, all)"
+                                }}
+                                response={`{
   "content": [
     {
       "id": "550e8400-e29b...",
@@ -353,13 +353,13 @@ export const ApiDocs: React.FC = () => {
   "totalPages": 12,
   "totalElements": 115
 }`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/projects/{id}"
-                            desc="Get full project details including versions, gallery, and markdown description."
-                            response={`{
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/{id}"
+                                desc="Get full project details including versions, gallery, and markdown description."
+                                response={`{
   "id": "...",
   "title": "Super Tools",
   "description": "Short summary...",
@@ -379,74 +379,123 @@ export const ApiDocs: React.FC = () => {
   "license": "MIT",
   "repositoryUrl": "https://github.com/..."
 }`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/projects/user/contributed"
-                            auth={true}
-                            desc="Get a paginated list of all projects the authenticated user owns or has contributed to."
-                            response={`{ "content": [ ...projects ], "totalPages": 1 }`}
-                        />
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/{id}/meta"
+                                desc="Get a lightweight metadata payload for a project."
+                                response={`{
+  "title": "Super Tools",
+  "description": "Adds powerful tools...",
+  "icon": "https://cdn.modtale.net/...",
+  "author": "ModDev123",
+  "classification": "PLUGIN",
+  "downloads": 15420,
+  "repositoryUrl": "https://github.com/...",
+  "slug": "super-tools"
+}`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/creators/{username}/projects"
-                            desc="Get projects owned by a specific creator or organization."
-                            response={`{ "content": [ ...projects ] }`}
-                        />
-                    </div>
-                </section>
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/{id}/versions/{version}/dependencies"
+                                desc="Get dependencies mapped to a specific project version."
+                                params={{
+                                    "id": "string (Project UUID or Slug)",
+                                    "version": "string (SemVer)"
+                                }}
+                                response={`[
+  {
+    "modId": "dependency-uuid",
+    "title": "Library Mod",
+    "versionNumber": "1.2.0",
+    "optional": false
+  }
+]`}
+                            />
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <FileText className="w-6 h-6 text-slate-400" /> Project Management
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <div className="mb-8 p-4 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">
-                            <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2 text-sm flex items-center gap-2">
-                                <Code className="w-4 h-4"/> Project Lifecycle
-                            </h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Projects transition through these states:</p>
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/user/contributed"
+                                auth={true}
+                                desc="Get a paginated list of all projects the authenticated user owns or has contributed to."
+                                params={{
+                                    "page": "int (default 0)",
+                                    "size": "int (default 100)"
+                                }}
+                                response={`{ "content": [ ...projects ], "totalPages": 1 }`}
+                            />
 
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/creators/{userId}/projects"
+                                desc="Get projects owned by a specific creator or organization by their ID."
+                                params={{
+                                    "page": "int (default 0)",
+                                    "size": "int (default 10)"
+                                }}
+                                response={`{ "content": [ ...projects ] }`}
+                            />
                         </div>
+                    </section>
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects"
-                            auth={true}
-                            desc="Initialize a new project Draft."
-                            validation={[
-                                "Title must be unique.",
-                                "Description max 250 characters.",
-                                "Owner field only required for Organization creation."
-                            ]}
-                            params={{
-                                "title": "string (Required)",
-                                "classification": "enum (Required)",
-                                "description": "string (Required)",
-                                "owner": "string (Optional Org Username for attribution)",
-                                "slug": "string (Optional URL slug)"
-                            }}
-                            response={`{
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <FileText className="w-6 h-6 text-slate-400" /> Project Lifecycle & Management
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <div className="mb-8 p-4 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">
+                                <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2 text-sm flex items-center gap-2">
+                                    <Code className="w-4 h-4"/> Project Lifecycle
+                                </h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Projects transition through these states:</p>
+                                <ul className="text-xs text-slate-500 dark:text-slate-400 list-disc list-inside">
+                                    <li><b>DRAFT</b>: Editable, invisible to public.</li>
+                                    <li><b>PENDING</b>: Locked, awaiting admin review.</li>
+                                    <li><b>PUBLISHED</b>: Publicly visible and searchable.</li>
+                                    <li><b>UNLISTED</b>: Publicly accessible via direct URL, hidden from search.</li>
+                                    <li><b>ARCHIVED</b>: Read-only, publicly visible, no longer receiving updates.</li>
+                                    <li><b>DELETED</b>: Pending permanent purge or soft-deleted if retained for dependencies.</li>
+                                </ul>
+                            </div>
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects"
+                                auth={true}
+                                desc="Initialize a new project Draft."
+                                validation={[
+                                    "Title must be unique.",
+                                    "Description max 250 characters.",
+                                    "Owner field only required for Organization creation."
+                                ]}
+                                params={{
+                                    "title": "string (Required)",
+                                    "classification": "enum (Required)",
+                                    "description": "string (Required)",
+                                    "owner": "string (Optional Org Username for attribution)",
+                                    "slug": "string (Optional URL slug)"
+                                }}
+                                response={`{
   "id": "new-uuid",
   "title": "My Mod",
   "status": "DRAFT",
   "expiresAt": "2024-04-19"
 }`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/projects/{id}"
-                            auth={true}
-                            desc="Update project metadata."
-                            validation={[
-                                "Short Description: max 250 chars.",
-                                "Full Description (about): max 50,000 chars.",
-                                "Repo URL: Must be valid GitHub/GitLab HTTPS URL."
-                            ]}
-                            body={`{
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}"
+                                auth={true}
+                                desc="Update project metadata."
+                                validation={[
+                                    "Short Description: max 250 chars.",
+                                    "Full Description (about): max 50,000 chars.",
+                                    "Repo URL: Must be valid GitHub/GitLab HTTPS URL."
+                                ]}
+                                body={`{
   "title": "New Title",
   "description": "Updated summary",
   "about": "# Header\\nUpdated markdown...",
@@ -455,147 +504,110 @@ export const ApiDocs: React.FC = () => {
   "repositoryUrl": "https://github.com/me/repo",
   "slug": "new-url-slug"
 }`}
-                            response={`200 OK`}
-                        />
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/publish"
-                            auth={true}
-                            desc="Submit a draft for publishing. This makes the project public."
-                            validation={[
-                                "Must have at least one Version uploaded (except Modpacks).",
-                                "Must have a valid License (except Modpacks).",
-                                "Must have an Icon uploaded.",
-                                "Must have Tags selected."
-                            ]}
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/submit"
+                                auth={true}
+                                desc="Submit a draft for admin review."
+                                validation={[
+                                    "Must have at least one Version uploaded (except Modpacks).",
+                                    "Must have a valid License (except Modpacks).",
+                                    "Must have an Icon uploaded.",
+                                    "Must have Tags selected."
+                                ]}
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/submit"
-                            auth={true}
-                            desc="Submit a project for admin review."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/revert"
+                                auth={true}
+                                desc="Revert a PENDING project back to DRAFT state."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/archive"
-                            auth={true}
-                            desc="Archive a project. It becomes read-only but remains visible."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/publish"
+                                auth={true}
+                                desc="Publish a project (Requires Admin, or restoring an Unlisted/Archived project)."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/unlist"
-                            auth={true}
-                            desc="Unlist a project. It is hidden from search but accessible via direct link."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/archive"
+                                auth={true}
+                                desc="Archive a project. It becomes read-only but remains visible."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/projects/{id}"
-                            auth={true}
-                            desc="Delete a project."
-                            note="If the project is a dependency for other active projects, it will be 'Soft Deleted' (metadata scrubbed, files kept) to prevent breaking modpacks. Otherwise, it is permanently purged."
-                            response={`200 OK`}
-                        />
-                    </div>
-                </section>
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/unlist"
+                                auth={true}
+                                desc="Unlist a project. It is hidden from search but accessible via direct link."
+                                response={`200 OK`}
+                            />
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Image className="w-6 h-6 text-slate-400" /> Media & Assets
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/projects/{id}/icon"
-                            auth={true}
-                            desc="Upload project icon."
-                            validation={["Aspect Ratio: Exactly 1:1", "Formats: PNG, JPEG, WebP", "Max Size: 2MB"]}
-                            params={{ "file": "MultipartFile (Binary)" }}
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/projects/{id}/banner"
-                            auth={true}
-                            desc="Upload project banner."
-                            validation={["Aspect Ratio: Exactly 3:1", "Formats: PNG, JPEG, WebP", "Max Size: 4MB"]}
-                            params={{ "file": "MultipartFile (Binary)" }}
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/gallery"
-                            auth={true}
-                            desc="Add an image to the gallery."
-                            params={{ "file": "MultipartFile (Binary)" }}
-                            response={`"https://cdn.modtale.net/gallery/image.png"`}
-                        />
-
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/projects/{id}/gallery"
-                            auth={true}
-                            desc="Remove an image from the gallery."
-                            params={{ "imageUrl": "string (Full URL)" }}
-                            response={`200 OK`}
-                        />
-                    </div>
-                </section>
-
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Download className="w-6 h-6 text-slate-400" /> Version Management
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800 text-sm">
-                            <p className="flex items-start gap-2 text-blue-800 dark:text-blue-200">
-                                <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                                <span>
-                                     <strong>Modpack Logic:</strong> Modpacks do not have binary file uploads. They are defined by a list of dependencies (`modIds`).
-                                     When a user downloads a Modpack, the API dynamically generates a ZIP file containing the manifest and all dependent files.
-                                 </span>
-                            </p>
-
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}"
+                                auth={true}
+                                desc="Delete a project."
+                                note="If the project is a dependency for other active projects, it will be 'Soft Deleted' (metadata scrubbed, files kept) to prevent breaking modpacks. Otherwise, it is permanently purged after 30 days."
+                                response={`200 OK`}
+                            />
                         </div>
+                    </section>
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/versions"
-                            auth={true}
-                            desc="Upload a new version. Handles file uploads for mods/art/data and dependency linking for modpacks. Files are automatically scanned for malware by Warden."
-                            validation={[
-                                "Version string must be strictly SemVer X.Y.Z (e.g., 1.0.0).",
-                                "File is required for standard projects (JAR/ZIP).",
-                                "File is ignored for Modpacks.",
-                                "Modpacks must have at least 2 dependencies.",
-                            ]}
-                            params={{
-                                "versionNumber": "string (Required, X.Y.Z)",
-                                "gameVersions": "string[] (Required, see meta/game-versions)",
-                                "changelog": "string",
-                                "channel": "enum (RELEASE | BETA | ALPHA)",
-                                "file": "MultipartFile (Required for non-modpacks)",
-                                "modIds": "string[] (Format: 'UUID:Version' or 'UUID:Version:optional')"
-                            }}
-                            response={`200 OK`}
-                        />
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Download className="w-6 h-6 text-slate-400" /> Version Management
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800 text-sm">
+                                <p className="flex items-start gap-2 text-blue-800 dark:text-blue-200">
+                                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>
+                                         <strong>Modpack Logic:</strong> Modpacks do not have binary file uploads. They are defined by a list of dependencies (`modIds`).
+                                         When a user downloads a Modpack, the API dynamically generates a ZIP file containing the manifest and all dependent files.
+                                     </span>
+                                </p>
+                            </div>
 
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/projects/{id}/versions/{versionId}"
-                            auth={true}
-                            desc="Update version metadata (specifically dependencies for Modpacks)."
-                            body={`{
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/versions"
+                                auth={true}
+                                desc="Upload a new version. Handles file uploads for mods/art/data and dependency linking for modpacks. Files are automatically scanned for malware by Warden."
+                                validation={[
+                                    "Version string must be strictly SemVer X.Y.Z (e.g., 1.0.0).",
+                                    "File is required for standard projects (JAR/ZIP).",
+                                    "File is ignored for Modpacks.",
+                                    "Modpacks must have at least 2 dependencies.",
+                                    "Max 5 versions per day, 30 per month."
+                                ]}
+                                params={{
+                                    "versionNumber": "string (Required, X.Y.Z)",
+                                    "gameVersions": "string[] (Required, see meta/game-versions)",
+                                    "changelog": "string",
+                                    "channel": "enum (RELEASE | BETA | ALPHA)",
+                                    "file": "MultipartFile (Required for non-modpacks)",
+                                    "modIds": "string[] (Format: 'UUID:Version' or 'UUID:Version:optional')"
+                                }}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/versions/{versionId}"
+                                auth={true}
+                                desc="Update version metadata (specifically dependencies for Modpacks)."
+                                body={`{
   "modIds": [
     "dependency-uuid-1:1.0.0",
     "dependency-uuid-2:2.1.0:optional"
@@ -603,222 +615,324 @@ export const ApiDocs: React.FC = () => {
   "gameVersions": ["2026.01.17"],
   "channel": "BETA"
 }`}
-                            response={`200 OK`}
-                        />
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/projects/{id}/versions/{versionId}"
-                            auth={true}
-                            desc="Delete a version."
-                            note="Prevented if it is the ONLY version of a Published project."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/versions/{versionId}"
+                                auth={true}
+                                desc="Delete a version."
+                                note="Prevented if it is the ONLY version of a Published project."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/projects/{id}/versions/{version}/download-url"
-                            desc="Generate a temporary, signed download link for a version."
-                            response={`{
-  "downloadUrl": "/download/token-uuid",
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/{id}/versions/{version}/download-url"
+                                auth={true}
+                                desc="Generate a temporary, signed download link for a version."
+                                response={`{
+  "downloadUrl": "/api/v1/download/token-uuid",
   "expiresIn": 300
 }`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/version/{hash}"
-                            desc="Lookup version details by file hash (SHA-256)."
-                            response={`{ "id": "v1", "versionNumber": "1.0.0", "projectId": "..." }`}
-                        />
-                    </div>
-                </section>
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/download/{token}"
+                                desc="Download a file or modpack zip using a pre-signed token."
+                                response={`<Binary Stream>`}
+                            />
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <ArrowRightLeft className="w-6 h-6 text-slate-400" /> Collaboration
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/invite"
-                            auth={true}
-                            desc="Invite a contributor (Individual Project only, not Org)."
-                            params={{ "username": "string" }}
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/invite/accept"
-                            auth={true}
-                            desc="Accept a contribution invite."
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/invite/decline"
-                            auth={true}
-                            desc="Decline a contribution invite."
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/projects/{id}/contributors/{username}"
-                            auth={true}
-                            desc="Remove a contributor."
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/transfer"
-                            auth={true}
-                            desc="Initiate ownership transfer to another User or Organization."
-                            body={`{ "username": "TargetUsername" }`}
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/transfer/resolve"
-                            auth={true}
-                            desc="Accept or decline a transfer request."
-                            body={`{ "accept": true }`}
-                            response={`200 OK`}
-                        />
-                    </div>
-                </section>
-
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Users className="w-6 h-6 text-slate-400" /> Organizations
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/orgs"
-                            auth={true}
-                            desc="Create a new Organization."
-                            body={`{ "name": "MyStudio" }`}
-                            response={`{
-  "id": "org-uuid",
-  "username": "MyStudio",
-  "accountType": "ORGANIZATION",
-  "organizationMembers": [
-    { "userId": "your-id", "role": "ADMIN" }
-  ]
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/projects/{id}/versions/{version}/download-bundle-url"
+                                auth={true}
+                                desc="Generate a temporary, signed download link to download a mod and all its dependencies bundled."
+                                response={`{
+  "downloadUrl": "/api/v1/download-bundle/token-uuid",
+  "expiresIn": 300
 }`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/user/orgs"
-                            auth={true}
-                            desc="List organizations you belong to."
-                            response={`[ { "id": "...", "username": "MyStudio", "role": "ADMIN" } ]`}
-                        />
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/download-bundle/{token}"
+                                desc="Download a bundled zip using a pre-signed token."
+                                response={`<Binary Stream>`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/orgs/{username}/members"
-                            auth={true}
-                            desc="Get public members of an organization."
-                            response={`[ { "username": "User1", "roles": ["ADMIN"], "avatarUrl": "..." } ]`}
-                        />
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/version/{hash}"
+                                auth={true}
+                                desc="Lookup version details by file hash (SHA-256)."
+                                response={`{ "id": "v1", "versionNumber": "1.0.0", "projectId": "..." }`}
+                            />
+                        </div>
+                    </section>
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/orgs/{id}/members"
-                            auth={true}
-                            desc="Invite a user to the organization (Admin only)."
-                            body={`{ "username": "NewMember", "role": "MEMBER" }`}
-                            response={`200 OK`}
-                        />
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Image className="w-6 h-6 text-slate-400" /> Media & Assets
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/icon"
+                                auth={true}
+                                desc="Upload project icon."
+                                validation={["Aspect Ratio: Exactly 1:1", "Formats: PNG, JPEG, WebP", "Max Size: 5MB"]}
+                                params={{ "file": "MultipartFile (Binary)" }}
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/orgs/{id}/members/{userId}"
-                            auth={true}
-                            desc="Update member role (ADMIN/MEMBER)."
-                            body={`{ "role": "ADMIN" }`}
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/banner"
+                                auth={true}
+                                desc="Upload project banner."
+                                validation={["Aspect Ratio: Exactly 3:1", "Formats: PNG, JPEG, WebP", "Max Size: 5MB"]}
+                                params={{ "file": "MultipartFile (Binary)" }}
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/orgs/{id}/members/{userId}"
-                            auth={true}
-                            desc="Remove member / Leave organization."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/gallery"
+                                auth={true}
+                                desc="Add an image to the gallery."
+                                validation={["Aspect Ratio: Exactly 16:9", "Formats: PNG, JPEG, WebP", "Max Size: 5MB", "Max 20 images per project"]}
+                                params={{ "file": "MultipartFile (Binary)" }}
+                                response={`"https://cdn.modtale.net/gallery/image.png"`}
+                            />
 
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/orgs/{id}"
-                            auth={true}
-                            desc="Update organization profile."
-                            body={`{ "displayName": "My Studio", "bio": "We make mods." }`}
-                            response={`{ ...updatedUserObj }`}
-                        />
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/gallery"
+                                auth={true}
+                                desc="Remove an image from the gallery."
+                                params={{ "imageUrl": "string (Full URL)" }}
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/orgs/{id}"
-                            auth={true}
-                            desc="Delete organization."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/og/project/{identifier}"
+                                desc="Dynamically generate an Open Graph image for the project card."
+                                response={`<Image Stream (JPEG)>`}
+                            />
+                        </div>
+                    </section>
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/orgs/{id}/avatar"
-                            auth={true}
-                            desc="Upload organization avatar."
-                            params={{ "file": "MultipartFile" }}
-                            response={`"url"`}
-                        />
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Activity className="w-6 h-6 text-slate-400" /> Comments & Social Actions
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/favorite"
+                                auth={true}
+                                desc="Toggle favorite status for a project."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/orgs/{id}/banner"
-                            auth={true}
-                            desc="Upload organization banner."
-                            params={{ "file": "MultipartFile" }}
-                            response={`"url"`}
-                        />
-                    </div>
-                </section>
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments"
+                                auth={true}
+                                desc="Post a comment on a project."
+                                body={`{
+  "content": "Amazing mod!"
+}`}
+                                response={`200 OK`}
+                            />
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <User className="w-6 h-6 text-slate-400" /> User Profile & Settings
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/users/search"
-                            desc="Public user search."
-                            params={{ "query": "string" }}
-                            response={`[ { "username": "Modder", "avatarUrl": "..." } ]`}
-                        />
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/comments/{commentId}"
+                                auth={true}
+                                desc="Edit an existing comment."
+                                body={`{ "content": "Updated text" }`}
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/users/batch"
-                            desc="Batch retrieve user profiles by username."
-                            body={`{ "usernames": ["User1", "User2"] }`}
-                            response={`[ { "username": "User1", ... }, { "username": "User2", ... } ]`}
-                        />
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/comments/{commentId}"
+                                auth={true}
+                                desc="Delete a comment."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/user/me"
-                            auth={true}
-                            desc="Get authenticated user details."
-                            response={`{
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments/{commentId}/reply"
+                                auth={true}
+                                desc="Developer reply to a comment."
+                                body={`{ "reply": "Thanks for playing!" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments/{commentId}/vote"
+                                auth={true}
+                                desc="Upvote or downvote a user comment."
+                                params={{ "upvote": "boolean" }}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/comments/{commentId}/reply/vote"
+                                auth={true}
+                                desc="Upvote or downvote a developer reply."
+                                params={{ "upvote": "boolean" }}
+                                response={`200 OK`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <ArrowRightLeft className="w-6 h-6 text-slate-400" /> Collaboration & Roles
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/roles"
+                                auth={true}
+                                desc="Create a custom role for a project."
+                                body={`{ "name": "Artist", "color": "#ff0000", "permissions": ["VERSION_CREATE"] }`}
+                                response={`{ ...projectObj }`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/roles/{roleId}"
+                                auth={true}
+                                desc="Update a project role."
+                                body={`{ "name": "Lead Artist", "color": "#00ff00", "permissions": ["VERSION_CREATE"] }`}
+                                response={`{ ...projectObj }`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/roles/{roleId}"
+                                auth={true}
+                                desc="Delete a project role (must have no assigned members)."
+                                response={`{ ...projectObj }`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/invite"
+                                auth={true}
+                                desc="Invite a contributor."
+                                body={`{ "userId": "uuid", "roleId": "role-uuid" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/invites/{userId}"
+                                auth={true}
+                                desc="Cancel a pending invite."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/invite/accept"
+                                auth={true}
+                                desc="Accept a contribution invite."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/invite/decline"
+                                auth={true}
+                                desc="Decline a contribution invite."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/projects/{id}/contributors/{userId}"
+                                auth={true}
+                                desc="Update a team member's role."
+                                body={`{ "roleId": "new-role-uuid" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/projects/{id}/contributors/{userId}"
+                                auth={true}
+                                desc="Remove a contributor."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/transfer"
+                                auth={true}
+                                desc="Initiate ownership transfer to another User or Organization."
+                                body={`{ "userId": "TargetUserId" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/projects/{id}/transfer/resolve"
+                                auth={true}
+                                desc="Accept or decline a transfer request."
+                                body={`{ "accept": true }`}
+                                response={`200 OK`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <User className="w-6 h-6 text-slate-400" /> User Profile & Settings
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/search"
+                                auth={true}
+                                desc="Public user search."
+                                params={{ "query": "string" }}
+                                response={`[ { "username": "Modder", "avatarUrl": "..." } ]`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/users/batch"
+                                auth={true}
+                                desc="Batch retrieve user profiles by IDs."
+                                body={`{ "userIds": ["id1", "id2"] }`}
+                                response={`[ { "username": "User1", ... }, { "username": "User2", ... } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/lookup/{username}"
+                                desc="Resolve a username to a user ID."
+                                response={`{ "id": "user-uuid" }`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/me"
+                                auth={true}
+                                desc="Get authenticated user details."
+                                response={`{
   "id": "u1",
   "username": "Me",
   "email": "me@example.com",
@@ -828,103 +942,359 @@ export const ApiDocs: React.FC = () => {
   "followingIds": ["u2"],
   "notificationPreferences": { ... }
 }`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/user/profile"
-                            auth={true}
-                            desc="Update profile settings."
-                            body={`{
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/user/me"
+                                auth={true}
+                                desc="Permanently delete user account."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/profile/{userId}"
+                                auth={true}
+                                desc="Get public user profile details."
+                                response={`{ "username": "Creator123", "bio": "...", "avatarUrl": "..." }`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/user/profile"
+                                auth={true}
+                                desc="Update profile settings."
+                                body={`{
   "username": "NewName",
   "bio": "I make things."
 }`}
-                            response={`{ ...updatedUser }`}
-                        />
+                                response={`{ ...updatedUser }`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/user/profile/avatar"
-                            auth={true}
-                            desc="Upload user avatar."
-                            params={{ "file": "MultipartFile" }}
-                            response={`"url"`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/user/profile/avatar"
+                                auth={true}
+                                desc="Upload user avatar."
+                                params={{ "file": "MultipartFile" }}
+                                response={`"url"`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/user/profile/banner"
-                            auth={true}
-                            desc="Upload user banner."
-                            params={{ "file": "MultipartFile" }}
-                            response={`"url"`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/user/profile/banner"
+                                auth={true}
+                                desc="Upload user banner."
+                                params={{ "file": "MultipartFile" }}
+                                response={`"url"`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/users/{username}/following"
-                            desc="Get list of users this user follows."
-                            response={`[ { "username": "..." } ]`}
-                        />
-
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/users/{username}/followers"
-                            desc="Get list of users following this user."
-                            response={`[ { "username": "..." } ]`}
-                        />
-
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/user/settings/notifications"
-                            auth={true}
-                            desc="Update notification preferences."
-                            body={`{
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/user/settings/notifications"
+                                auth={true}
+                                desc="Update notification preferences."
+                                body={`{
   "projectUpdates": "EMAIL",
   "newFollowers": "ON",
   "dependencyUpdates": "OFF",
-  "creatorUploads": "ON"
+  "creatorUploads": "ON",
+  "newComments": "ON"
 }`}
-                            response={`200 OK`}
-                        />
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/user/follow/{targetUsername}"
-                            auth={true}
-                            desc="Follow a user."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/user/follow/{targetId}"
+                                auth={true}
+                                desc="Follow a user."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/user/unfollow/{targetUsername}"
-                            auth={true}
-                            desc="Unfollow a user."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/user/unfollow/{targetId}"
+                                auth={true}
+                                desc="Unfollow a user."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="DELETE"
-                            path="/api/v1/user/me"
-                            auth={true}
-                            desc="Permanently delete user account."
-                            response={`200 OK`}
-                        />
-                    </div>
-                </section>
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/{userId}/following"
+                                auth={true}
+                                desc="Get list of users this user follows."
+                                response={`[ { "username": "..." } ]`}
+                            />
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Bell className="w-6 h-6 text-slate-400" /> Notifications & Analytics
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/notifications"
-                            auth={true}
-                            desc="Retrieve user notifications."
-                            response={`[
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/{userId}/followers"
+                                auth={true}
+                                desc="Get list of users following this user."
+                                response={`[ { "username": "..." } ]`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Users className="w-6 h-6 text-slate-400" /> Organizations
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs"
+                                auth={true}
+                                desc="Create a new Organization."
+                                body={`{ "name": "MyStudio" }`}
+                                response={`{
+  "id": "org-uuid",
+  "username": "MyStudio",
+  "accountType": "ORGANIZATION",
+  "organizationMembers": [
+    { "userId": "your-id", "roleId": "role-id" }
+  ]
+}`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/orgs"
+                                auth={true}
+                                desc="List organizations you belong to."
+                                response={`[ { "id": "...", "username": "MyStudio" } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/users/{userId}/organizations"
+                                auth={true}
+                                desc="List organizations another user belongs to."
+                                response={`[ { "id": "...", "username": "MyStudio" } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/orgs/{orgId}/members"
+                                auth={true}
+                                desc="Get members of an organization."
+                                response={`[ { "username": "User1", "roles": ["ADMIN"], "avatarUrl": "..." } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/orgs/{orgId}/invites"
+                                auth={true}
+                                desc="Get pending invites for an organization."
+                                response={`[ { "username": "InvitedUser", "id": "..." } ]`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/roles"
+                                auth={true}
+                                desc="Create a custom role for an organization."
+                                body={`{ "name": "Dev", "color": "#000", "permissions": ["PROJECT_CREATE"] }`}
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/orgs/{orgId}/roles/{roleId}"
+                                auth={true}
+                                desc="Update an organization role."
+                                body={`{ "name": "Lead Dev", "color": "#111", "permissions": ["PROJECT_CREATE"] }`}
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/roles/{roleId}"
+                                auth={true}
+                                desc="Delete an organization role."
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/members"
+                                auth={true}
+                                desc="Invite a user to the organization."
+                                body={`{ "userId": "TargetUserId", "roleId": "RoleId" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/members/{userId}"
+                                auth={true}
+                                desc="Remove member / Leave organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/orgs/{orgId}/members/{userId}"
+                                auth={true}
+                                desc="Update member role."
+                                body={`{ "roleId": "NewRoleId" }`}
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="PUT"
+                                path="/api/v1/orgs/{orgId}"
+                                auth={true}
+                                desc="Update organization profile."
+                                body={`{ "displayName": "My Studio", "bio": "We make mods." }`}
+                                response={`{ ...orgObj }`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}"
+                                auth={true}
+                                desc="Delete organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/avatar"
+                                auth={true}
+                                desc="Upload organization avatar."
+                                params={{ "file": "MultipartFile" }}
+                                response={`"url"`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/banner"
+                                auth={true}
+                                desc="Upload organization banner."
+                                params={{ "file": "MultipartFile" }}
+                                response={`"url"`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/invite/accept"
+                                auth={true}
+                                desc="Accept an invite to an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/invite/decline"
+                                auth={true}
+                                desc="Decline an invite to an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/invites/{userId}"
+                                auth={true}
+                                desc="Cancel a pending organization invite."
+                                response={`200 OK`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Layers className="w-6 h-6 text-slate-400" /> Connections & Repositories
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/user/connections/{provider}/toggle-visibility"
+                                auth={true}
+                                desc="Toggle visibility of an OAuth connection on your profile."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/user/connections/{provider}"
+                                auth={true}
+                                desc="Unlink an OAuth connection."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/link/prepare"
+                                auth={true}
+                                desc="Prepare a session to link an OAuth account to an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/orgs/{orgId}/connections/{provider}/toggle-visibility"
+                                auth={true}
+                                desc="Toggle visibility of an organization connection."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/orgs/{orgId}/connections/{provider}"
+                                auth={true}
+                                desc="Unlink an OAuth connection from an organization."
+                                response={`200 OK`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/repos/github"
+                                auth={true}
+                                desc="Get the authenticated user's GitHub repositories."
+                                response={`[ { "name": "my-repo", "url": "https://github.com/...", "private": false } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/repos/gitlab"
+                                auth={true}
+                                desc="Get the authenticated user's GitLab repositories."
+                                response={`[ { "name": "my-repo", "url": "https://gitlab.com/...", "private": false } ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/user/repos"
+                                auth={true}
+                                desc="Alias for /api/v1/user/repos/github."
+                                response={`[ ...repos ]`}
+                            />
+
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/orgs/{orgId}/repos/github"
+                                auth={true}
+                                desc="Get the organization's GitHub repositories."
+                                response={`[ { "name": "org-repo", "url": "https://github.com/...", "private": false } ]`}
+                            />
+                        </div>
+                    </section>
+
+                    <section className="w-full">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Bell className="w-6 h-6 text-slate-400" /> Notifications
+                        </h2>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
+                            <Endpoint
+                                method="GET"
+                                path="/api/v1/notifications"
+                                auth={true}
+                                desc="Retrieve user notifications."
+                                response={`[
   {
     "id": "n1",
     "title": "Project Update",
@@ -935,77 +1305,51 @@ export const ApiDocs: React.FC = () => {
     "type": "INFO"
   }
 ]`}
-                        />
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/notifications/{id}/read"
-                            auth={true}
-                            desc="Mark notification as read."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/notifications/{id}/read"
+                                auth={true}
+                                desc="Mark notification as read."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/notifications/read-all"
-                            auth={true}
-                            desc="Mark all notifications as read."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/notifications/{id}/unread"
+                                auth={true}
+                                desc="Mark notification as unread."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="GET"
-                            path="/api/v1/projects/{id}/analytics"
-                            desc="Get public stats for a project."
-                            params={{ "range": "30d | 90d | 1y" }}
-                            response={`{ "views": 500, "downloads": 120, "history": [...] }`}
-                        />
-                    </div>
-                </section>
+                            <Endpoint
+                                method="POST"
+                                path="/api/v1/notifications/read-all"
+                                auth={true}
+                                desc="Mark all notifications as read."
+                                response={`200 OK`}
+                            />
 
-                <section className="w-full">
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Activity className="w-6 h-6 text-slate-400" /> Social Actions
-                    </h2>
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl p-6 md:p-8 shadow-sm w-full overflow-hidden">
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/favorite"
-                            auth={true}
-                            desc="Toggle favorite status for a project."
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/notifications/{id}"
+                                auth={true}
+                                desc="Delete a single notification."
+                                response={`200 OK`}
+                            />
 
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/comments"
-                            auth={true}
-                            desc="Post a comment."
-                            body={`{
-  "content": "Amazing mod!"
-}`}
-                            response={`200 OK`}
-                        />
+                            <Endpoint
+                                method="DELETE"
+                                path="/api/v1/notifications/clear-all"
+                                auth={true}
+                                desc="Delete all notifications."
+                                response={`200 OK`}
+                            />
+                        </div>
+                    </section>
 
-                        <Endpoint
-                            method="PUT"
-                            path="/api/v1/projects/{id}/comments/{commentId}"
-                            auth={true}
-                            desc="Edit your comment."
-                            body={`{ "content": "Updated text" }`}
-                            response={`200 OK`}
-                        />
-
-                        <Endpoint
-                            method="POST"
-                            path="/api/v1/projects/{id}/comments/{commentId}/reply"
-                            auth={true}
-                            desc="Developer reply to a comment."
-                            body={`{ "reply": "Thanks!" }`}
-                            response={`200 OK`}
-                        />
-                    </div>
-                </section>
+                </div>
             </div>
         </div>
     );

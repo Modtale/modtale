@@ -9,8 +9,11 @@ import net.modtale.service.AnalyticsService;
 import net.modtale.service.user.UserService;
 import net.modtale.service.resources.ModService;
 import net.modtale.repository.user.UserRepository;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.CacheControl;
@@ -18,7 +21,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -38,6 +45,12 @@ public class AnalyticsController {
             return request.getRemoteAddr();
         }
         return xfHeader.split(",")[0];
+    }
+
+    private long getSecondsUntilMidnight() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime midnight = now.toLocalDate().plusDays(1).atStartOfDay();
+        return Duration.between(now, midnight).getSeconds();
     }
 
     @GetMapping("/user/analytics")
@@ -74,7 +87,7 @@ public class AnalyticsController {
         CreatorAnalytics data = analyticsService.getCreatorDashboard(resolvedTargetUsername, range, include);
 
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate())
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
                 .body(data);
     }
 
@@ -96,7 +109,7 @@ public class AnalyticsController {
         ProjectAnalyticsDetail data = analyticsService.getProjectAnalytics(projectId, user != null ? user.getUsername() : "anon", range);
 
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate())
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
                 .body(data);
     }
 

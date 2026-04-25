@@ -48,7 +48,12 @@ public class AnalyticsService {
 
     private final ConcurrentLinkedQueue<DownloadEvent> downloadBuffer = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<String, AtomicInteger> viewBuffer = new ConcurrentHashMap<>();
-    private final ConcurrentLinkedQueue<String> newProjectBuffer = new ConcurrentLinkedQueue<>(); // Added buffer
+    private final ConcurrentLinkedQueue<String> newProjectBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> newUserBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> newOrgBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> deletedProjectBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> deletedUserBuffer = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<String> deletedOrgBuffer = new ConcurrentLinkedQueue<>();
 
     private final Cache<String, Boolean> debounceCache = Caffeine.newBuilder()
             .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -408,9 +413,29 @@ public class AnalyticsService {
         newProjectBuffer.add(projectId);
     }
 
+    public void logDeletedProject(String projectId) {
+        deletedProjectBuffer.add(projectId);
+    }
+
+    public void logNewUser(String userId) {
+        newUserBuffer.add(userId);
+    }
+
+    public void logDeletedUser(String userId) {
+        deletedUserBuffer.add(userId);
+    }
+
+    public void logNewOrg(String orgId) {
+        newOrgBuffer.add(orgId);
+    }
+
+    public void logDeletedOrg(String orgId) {
+        deletedOrgBuffer.add(orgId);
+    }
+
     @Scheduled(fixedRate = 10000)
     public void flushAnalyticsBuffer() {
-        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty()) return;
+        if (downloadBuffer.isEmpty() && viewBuffer.isEmpty() && newProjectBuffer.isEmpty() && newUserBuffer.isEmpty() && newOrgBuffer.isEmpty() && deletedProjectBuffer.isEmpty() && deletedUserBuffer.isEmpty() && deletedOrgBuffer.isEmpty()) return;
 
         LocalDate now = LocalDate.now();
         int day = now.getDayOfMonth();
@@ -450,7 +475,9 @@ public class AnalyticsService {
                     .inc("totalDownloads", agg.total)
                     .inc("apiDownloads", agg.api)
                     .inc("frontendDownloads", agg.frontend)
-                    .inc("days." + day + ".d", agg.total);
+                    .inc("days." + day + ".d", agg.total)
+                    .inc("days." + day + ".a", agg.api)
+                    .inc("days." + day + ".f", agg.frontend);
 
             for (Map.Entry<String, Integer> vEntry : agg.versions.entrySet()) {
                 String safeVersion = vEntry.getKey().replace(".", "_");
@@ -471,7 +498,9 @@ public class AnalyticsService {
                         .inc("totalDownloads", platformAggregate.total)
                         .inc("apiDownloads", platformAggregate.api)
                         .inc("frontendDownloads", platformAggregate.frontend)
-                        .inc("days." + day + ".d", platformAggregate.total);
+                        .inc("days." + day + ".d", platformAggregate.total)
+                        .inc("days." + day + ".a", platformAggregate.api)
+                        .inc("days." + day + ".f", platformAggregate.frontend);
                 mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
             } catch (Exception e) {
                 logger.error("Failed to flush platform download stats", e);
@@ -525,20 +554,51 @@ public class AnalyticsService {
             }
         }
 
-        int newProjectCount = 0;
-        while(newProjectBuffer.poll() != null) {
-            newProjectCount++;
-        }
+        int netProjectCount = 0;
+        while(newProjectBuffer.poll() != null) netProjectCount++;
+        while(deletedProjectBuffer.poll() != null) netProjectCount--;
 
-        if (newProjectCount > 0) {
+        if (netProjectCount != 0) {
             try {
                 Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
                 Update pu = new Update()
-                        .inc("newProjects", newProjectCount)
-                        .inc("days." + day + ".n", newProjectCount);
+                        .inc("newProjects", netProjectCount)
+                        .inc("days." + day + ".n", netProjectCount);
                 mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
             } catch (Exception e) {
-                logger.error("Failed to flush new project stats", e);
+                logger.error("Failed to flush net project stats", e);
+            }
+        }
+
+        int netUserCount = 0;
+        while(newUserBuffer.poll() != null) netUserCount++;
+        while(deletedUserBuffer.poll() != null) netUserCount--;
+
+        if (netUserCount != 0) {
+            try {
+                Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+                Update pu = new Update()
+                        .inc("newUsers", netUserCount)
+                        .inc("days." + day + ".u", netUserCount);
+                mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+            } catch (Exception e) {
+                logger.error("Failed to flush net user stats", e);
+            }
+        }
+
+        int netOrgCount = 0;
+        while(newOrgBuffer.poll() != null) netOrgCount++;
+        while(deletedOrgBuffer.poll() != null) netOrgCount--;
+
+        if (netOrgCount != 0) {
+            try {
+                Query pq = Query.query(Criteria.where("year").is(year).and("month").is(month));
+                Update pu = new Update()
+                        .inc("newOrgs", netOrgCount)
+                        .inc("days." + day + ".o", netOrgCount);
+                mongoTemplate.upsert(pq, pu, PlatformMonthlyStats.class);
+            } catch (Exception e) {
+                logger.error("Failed to flush net org stats", e);
             }
         }
     }
@@ -565,11 +625,17 @@ public class AnalyticsService {
     }
 
     public PlatformAnalyticsSummary getPlatformAnalytics(String range) {
-        LocalDate end = LocalDate.now();
+        LocalDate end = LocalDate.now().minusDays(1);
         LocalDate start = calculateStartDate(range);
 
-        int startY = start.getYear();
-        int startM = start.getMonthValue();
+        LocalDate comparisonEnd = start.minusDays(1);
+        LocalDate comparisonStart = start.minusDays(java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1);
+
+        LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
+        LocalDate fetchStart = comparisonStart.isBefore(chartStart) ? comparisonStart : chartStart;
+
+        int startY = fetchStart.getYear();
+        int startM = fetchStart.getMonthValue();
 
         Criteria criteria = new Criteria().orOperator(
                 Criteria.where("year").gt(startY),
@@ -580,15 +646,20 @@ public class AnalyticsService {
 
         PlatformAnalyticsSummary summary = new PlatformAnalyticsSummary();
 
-        long totalDownloads = 0;
-        long totalViews = 0;
-        long totalApi = 0;
-        long totalFrontend = 0;
-        long totalNewProjects = 0;
+        long currentDownloads = 0, prevDownloads = 0;
+        long currentViews = 0, prevViews = 0;
+        long currentApi = 0, prevApi = 0;
+        long currentFrontend = 0, prevFrontend = 0;
+        long currentNewProjects = 0, prevNewProjects = 0;
+        long currentNewUsers = 0, prevNewUsers = 0;
+        long currentNewOrgs = 0, prevNewOrgs = 0;
 
         Map<LocalDate, Integer> downloadSeries = new HashMap<>();
+        Map<LocalDate, Integer> apiDownloadSeries = new HashMap<>();
         Map<LocalDate, Integer> viewSeries = new HashMap<>();
         Map<LocalDate, Integer> newProjectsSeries = new HashMap<>();
+        Map<LocalDate, Integer> newUsersSeries = new HashMap<>();
+        Map<LocalDate, Integer> newOrgsSeries = new HashMap<>();
 
         for (PlatformMonthlyStats stat : stats) {
             YearMonth ym = YearMonth.of(stat.getYear(), stat.getMonth());
@@ -598,38 +669,65 @@ public class AnalyticsService {
                     try {
                         int day = Integer.parseInt(entry.getKey());
                         LocalDate date = ym.atDay(day);
-                        if (!date.isBefore(start) && !date.isAfter(end)) {
+
+                        if (!date.isBefore(chartStart) && !date.isAfter(end)) {
                             downloadSeries.put(date, entry.getValue().getD());
+                            apiDownloadSeries.put(date, entry.getValue().getA());
                             viewSeries.put(date, entry.getValue().getV());
                             newProjectsSeries.put(date, entry.getValue().getN());
+                            newUsersSeries.put(date, entry.getValue().getU());
+                            newOrgsSeries.put(date, entry.getValue().getO());
+                        }
 
-                            totalDownloads += entry.getValue().getD();
-                            totalViews += entry.getValue().getV();
-                            totalNewProjects += entry.getValue().getN();
+                        if (!date.isBefore(start) && !date.isAfter(end)) {
+                            currentDownloads += entry.getValue().getD();
+                            currentViews += entry.getValue().getV();
+                            currentApi += entry.getValue().getA();
+                            currentFrontend += entry.getValue().getF();
+                            currentNewProjects += entry.getValue().getN();
+                            currentNewUsers += entry.getValue().getU();
+                            currentNewOrgs += entry.getValue().getO();
+                        } else if (!date.isBefore(comparisonStart) && !date.isAfter(comparisonEnd)) {
+                            prevDownloads += entry.getValue().getD();
+                            prevViews += entry.getValue().getV();
+                            prevApi += entry.getValue().getA();
+                            prevFrontend += entry.getValue().getF();
+                            prevNewProjects += entry.getValue().getN();
+                            prevNewUsers += entry.getValue().getU();
+                            prevNewOrgs += entry.getValue().getO();
                         }
                     } catch (Exception ignored) {}
                 }
             }
-
-            totalApi += stat.getApiDownloads();
-            totalFrontend += stat.getFrontendDownloads();
         }
 
-        summary.setTotalDownloads(totalDownloads);
-        summary.setTotalViews(totalViews);
-        summary.setApiDownloads(totalApi);
-        summary.setFrontendDownloads(totalFrontend);
-        summary.setTotalNewProjects(totalNewProjects);
+        summary.setTotalDownloads(currentDownloads);
+        summary.setPreviousTotalDownloads(prevDownloads);
+        summary.setTotalViews(currentViews);
+        summary.setPreviousTotalViews(prevViews);
+        summary.setApiDownloads(currentApi);
+        summary.setPreviousApiDownloads(prevApi);
+        summary.setFrontendDownloads(currentFrontend);
+        summary.setPreviousFrontendDownloads(prevFrontend);
+        summary.setTotalNewProjects(currentNewProjects);
+        summary.setPreviousTotalNewProjects(prevNewProjects);
+        summary.setTotalNewUsers(currentNewUsers);
+        summary.setPreviousTotalNewUsers(prevNewUsers);
+        summary.setTotalNewOrgs(currentNewOrgs);
+        summary.setPreviousTotalNewOrgs(prevNewOrgs);
 
-        summary.setDownloadsChart(fillDates(start, end, downloadSeries));
-        summary.setViewsChart(fillDates(start, end, viewSeries));
-        summary.setNewProjectsChart(fillDates(start, end, newProjectsSeries));
+        summary.setDownloadsChart(fillDates(chartStart, end, downloadSeries));
+        summary.setApiDownloadsChart(fillDates(chartStart, end, apiDownloadSeries));
+        summary.setViewsChart(fillDates(chartStart, end, viewSeries));
+        summary.setNewProjectsChart(fillDates(chartStart, end, newProjectsSeries));
+        summary.setNewUsersChart(fillDates(chartStart, end, newUsersSeries));
+        summary.setNewOrgsChart(fillDates(chartStart, end, newOrgsSeries));
 
         return summary;
     }
 
     public CreatorAnalytics getCreatorDashboard(String userId, String range, List<String> include) {
-        LocalDate end = LocalDate.now();
+        LocalDate end = LocalDate.now().minusDays(1);
         LocalDate start = calculateStartDate(range);
 
         LocalDate comparisonEnd = start.minusDays(1);
@@ -682,7 +780,7 @@ public class AnalyticsService {
     }
 
     public ProjectAnalyticsDetail getProjectAnalytics(String projectId, String userId, String range) {
-        LocalDate end = LocalDate.now();
+        LocalDate end = LocalDate.now().minusDays(1);
         LocalDate start = calculateStartDate(range);
         LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
 
@@ -707,10 +805,11 @@ public class AnalyticsService {
     }
 
     private LocalDate calculateStartDate(String range) {
-        if ("7d".equals(range)) return LocalDate.now().minusDays(7);
-        if ("90d".equals(range)) return LocalDate.now().minusDays(90);
-        if ("1y".equals(range)) return LocalDate.now().minusYears(1);
-        return LocalDate.now().minusDays(30);
+        LocalDate baseDate = LocalDate.now().minusDays(1);
+        if ("7d".equals(range)) return baseDate.minusDays(7);
+        if ("90d".equals(range)) return baseDate.minusDays(90);
+        if ("1y".equals(range)) return baseDate.minusYears(1);
+        return baseDate.minusDays(30);
     }
 
     private List<ProjectMonthlyStats> getStatsInMemory(String id, LocalDate start, LocalDate end, boolean isProject, boolean excludeVersions) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../../../utils/api.ts';
 import type {Mod, User} from '../../../types.ts';
 import { Building2, Plus, Users, Loader2 } from 'lucide-react';
@@ -30,13 +31,13 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 const orgsData = orgsRes.data || [];
                 setMyOrgs(orgsData);
 
-                const personalPromise = api.get(`/creators/${user.username}/projects?size=100`);
+                const personalPromise = api.get(`/creators/${user.id}/projects?size=100`);
                 const contribPromise = api.get('/projects/user/contributed').catch(() => ({ data: { content: [] } }));
 
                 const orgPromises = orgsData.map((org: User) =>
-                    api.get(`/creators/${org.username}/projects?size=100`)
-                        .then(res => ({ username: org.username, projects: res.data.content || [] }))
-                        .catch(() => ({ username: org.username, projects: [] }))
+                    api.get(`/creators/${org.id}/projects?size=100`)
+                        .then(res => ({ id: org.id, projects: res.data.content || [] }))
+                        .catch(() => ({ id: org.id, projects: [] }))
                 );
 
                 const [personalRes, contribRes, ...orgResults] = await Promise.all([
@@ -51,7 +52,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 const orgData: Record<string, Mod[]> = {};
                 orgResults.forEach((result: any) => {
                     if (result.projects.length > 0) {
-                        orgData[result.username] = result.projects;
+                        orgData[result.id] = result.projects;
                     }
                 });
                 setOrgProjects(orgData);
@@ -63,7 +64,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
             }
         };
         init();
-    }, [user.username, user.id]);
+    }, [user.id]);
 
     const handleDelete = async () => {
         if (!deleteModal) return;
@@ -90,26 +91,30 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">Your Projects</h1>
-                <Link to="/upload" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20">
+                <Link to="/upload" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20">
                     <Plus className="w-4 h-4" /> New Project
                 </Link>
             </div>
 
-            {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />}
+            {status && typeof document !== 'undefined' ? createPortal(
+                <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />,
+                document.body
+            ) : null}
 
-            {transferModal && (
+            {transferModal && typeof document !== 'undefined' ? createPortal(
                 <TransferProjectModal
                     project={transferModal}
                     myOrgs={myOrgs}
                     onClose={() => setTransferModal(null)}
                     onSuccess={(msg) => setStatus({ type: 'success', title: 'Request Sent', msg })}
                     onError={(msg) => setStatus({ type: 'error', title: 'Transfer Failed', msg })}
-                />
-            )}
+                />,
+                document.body
+            ) : null}
 
-            {deleteModal && (
+            {deleteModal && typeof document !== 'undefined' ? createPortal(
                 <StatusModal
                     type="error"
                     title="Delete Project?"
@@ -118,66 +123,74 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                     onAction={handleDelete}
                     onClose={() => setDeleteModal(null)}
                     secondaryLabel="Cancel"
-                />
-            )}
+                />,
+                document.body
+            ) : null}
 
             <div className="space-y-8">
                 <div className="grid grid-cols-1 gap-4">
                     {projects.map(project => (
-                        <ProjectListItem
-                            key={project.id}
-                            project={project}
-                            canManage={true}
-                            isOwner={true}
-                            showAuthor={true}
-                            onTransfer={setTransferModal}
-                            onDelete={setDeleteModal}
-                        />
+                        <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
+                            <ProjectListItem
+                                project={project}
+                                canManage={true}
+                                isOwner={true}
+                                showAuthor={true}
+                                onTransfer={setTransferModal}
+                                onDelete={setDeleteModal}
+                            />
+                        </div>
                     ))}
                 </div>
 
-                {Object.entries(orgProjects).map(([orgName, pList]) => (
-                    <div key={orgName} className="border-t border-slate-200 dark:border-white/5 pt-8">
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Building2 className="w-5 h-5 text-purple-500" />
-                            {myOrgs.find(o => o.username === orgName)?.displayName || orgName}
-                        </h2>
-                        <div className="grid grid-cols-1 gap-4">
-                            {pList.map(project => {
-                                const isOrgAdmin = myOrgs.some(o => o.username === orgName && o.organizationMembers?.some(m => m.userId === user.id && m.role === 'ADMIN'));
-                                return (
-                                    <ProjectListItem
-                                        key={project.id}
-                                        project={project}
-                                        canManage={isOrgAdmin}
-                                        showAuthor={false}
-                                        onTransfer={setTransferModal}
-                                        onDelete={setDeleteModal}
-                                    />
-                                );
-                            })}
+                {Object.entries(orgProjects).map(([orgId, pList]) => {
+                    const orgUser = myOrgs.find(o => o.id === orgId);
+                    const orgDisplayName = orgUser?.displayName || orgUser?.username || orgId;
+                    return (
+                        <div key={orgId} className="border-t border-slate-200 dark:border-white/10 pt-8 mt-8">
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Building2 className="w-5 h-5 text-purple-500" />
+                                {orgDisplayName}
+                            </h2>
+                            <div className="grid grid-cols-1 gap-4">
+                                {pList.map(project => {
+                                    const isOrgAdmin = myOrgs.some(o => o.id === orgId && o.organizationMembers?.some(m => m.userId === user.id && m.role === 'ADMIN'));
+                                    return (
+                                        <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
+                                            <ProjectListItem
+                                                project={project}
+                                                canManage={isOrgAdmin}
+                                                showAuthor={false}
+                                                onTransfer={setTransferModal}
+                                                onDelete={setDeleteModal}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {contributedProjects.length > 0 && (
-                    <div className="border-t border-slate-200 dark:border-white/5 pt-8">
+                    <div className="border-t border-slate-200 dark:border-white/10 pt-8 mt-8">
                         <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                             <Users className="w-5 h-5 text-blue-500" />
                             Contributed Projects
                         </h2>
                         <div className="grid grid-cols-1 gap-4">
                             {contributedProjects.map(project => {
-                                const isOwner = project.author.toLowerCase() === user.username.toLowerCase();
+                                const isOwner = project.authorId === user.id;
                                 return (
-                                    <ProjectListItem
-                                        key={project.id}
-                                        project={project}
-                                        canManage={isOwner}
-                                        showAuthor={true}
-                                        onTransfer={setTransferModal}
-                                        onDelete={setDeleteModal}
-                                    />
+                                    <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
+                                        <ProjectListItem
+                                            project={project}
+                                            canManage={isOwner}
+                                            showAuthor={true}
+                                            onTransfer={setTransferModal}
+                                            onDelete={setDeleteModal}
+                                        />
+                                    </div>
                                 );
                             })}
                         </div>
@@ -185,7 +198,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 )}
 
                 {projects.length === 0 && Object.keys(orgProjects).length === 0 && contributedProjects.length === 0 && (
-                    <div className="text-center py-12 text-slate-400">
+                    <div className="text-center py-12 text-slate-400 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-md shadow-sm">
                         <p>No projects found.</p>
                     </div>
                 )}

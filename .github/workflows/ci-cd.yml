@@ -1,4 +1,4 @@
-name: Modtale CI/CD
+name: Modtale CI/CD 
 
 on:
   push:
@@ -39,7 +39,7 @@ jobs:
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-            
+          
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-dev" >> $GITHUB_ENV
@@ -51,7 +51,7 @@ jobs:
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-            
+          
           else
             SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
@@ -82,6 +82,8 @@ jobs:
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
             "--allow-unauthenticated"
+            "--use-http2"
+            "--memory" "1Gi"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
             "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
             "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
@@ -94,6 +96,10 @@ jobs:
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
+            ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
+            ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
+            ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
+            ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
           else
             ARGS+=("--update-secrets" "MONGODB_URI=MONGODB_URI:latest")
             ARGS+=("--update-secrets" "R2_ACCESS_KEY=R2_ACCESS_KEY:latest")
@@ -103,9 +109,6 @@ jobs:
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
             ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
             ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
-            ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
-            ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
-            ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
             ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
@@ -152,8 +155,8 @@ jobs:
             echo "FINAL_FRONTEND_URL=${{ env.FRONTEND_DOMAIN }}" >> $GITHUB_ENV
           fi
 
-      - name: Update Backend CORS
+      - name: Update Backend CORS and Self-Awareness
         run: |
           gcloud run services update ${{ env.BACKEND_SERVICE }} \
             --region $REGION \
-            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }}
+            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }},BACKEND_URL=$(cat backend/backend_url.txt)
