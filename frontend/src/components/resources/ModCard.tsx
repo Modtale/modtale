@@ -99,9 +99,9 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
                         {title}
                     </h3>
-                    <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1 pointer-events-auto">
+                    <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
-                        <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate">
+                        <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
                             {author}
                         </Link>
                     </div>
@@ -132,16 +132,16 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center sm:justify-start relative z-20 pointer-events-none">
-                    <div className="flex justify-between items-start gap-2 sm:gap-4 pointer-events-auto">
+                    <div className="flex justify-between items-start gap-2 sm:gap-4">
                         <div className="min-w-0 flex-1">
                             <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
-                                <Link to={canonicalPath} onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined} className="focus:outline-none relative z-30">
+                                <Link to={canonicalPath} onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined} className="focus:outline-none relative z-30 pointer-events-auto">
                                     {title}
                                 </Link>
                             </h3>
                             <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
                                 <span>by</span>
-                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block">
+                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
                                     {author}
                                 </Link>
                             </div>
@@ -152,8 +152,8 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         </div>
                     </div>
                     <p className="mt-1.5 sm:mt-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1 leading-relaxed pointer-events-none">{desc}</p>
-                    <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest pointer-events-auto">
-                        <span className="flex items-center gap-1 sm:gap-1.5"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
+                    <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span className="flex items-center gap-1 sm:gap-1.5 pointer-events-none"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
                         <button
                             disabled={!isLoggedIn}
                             onClick={(e) => {
@@ -161,7 +161,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                                 e.stopPropagation();
                                 if(isLoggedIn) onToggleFavorite(mod.id);
                             }}
-                            className={`flex items-center gap-1 sm:gap-1.5 transition-colors relative z-30 ${
+                            className={`flex items-center gap-1 sm:gap-1.5 transition-colors relative z-30 pointer-events-auto ${
                                 !isLoggedIn
                                     ? 'text-slate-300 dark:text-white/10 cursor-not-allowed'
                                     : isFavorite
@@ -230,12 +230,12 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                     )}
                 </div>
 
-                <div className="mt-12 pointer-events-auto">
+                <div className="mt-12">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
                         <Link
                             to={canonicalPath}
                             onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
-                            className="relative z-30 focus:outline-none"
+                            className="relative z-30 focus:outline-none pointer-events-auto"
                         >
                             {title}
                         </Link>
@@ -246,7 +246,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                         <Link
                             to={`/creator/${author}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30"
+                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
                         >
                             {author}
                         </Link>
@@ -259,7 +259,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                     </p>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pointer-events-auto">
+                <div className="mt-5 flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1.5 pointer-events-none"><Download className="w-4 h-4" /> {downloads}</span>
 
@@ -270,7 +270,7 @@ export const ModCard: React.FC<ModCardProps> = React.memo(({ mod, path, isFavori
                                 e.stopPropagation();
                                 if(isLoggedIn) onToggleFavorite(mod.id);
                             }}
-                            className={`flex items-center gap-1.5 transition-colors relative z-30 ${
+                            className={`flex items-center gap-1.5 transition-colors relative z-30 pointer-events-auto ${
                                 !isLoggedIn
                                     ? 'text-slate-300 dark:text-white/10 cursor-not-allowed'
                                     : isFavorite
