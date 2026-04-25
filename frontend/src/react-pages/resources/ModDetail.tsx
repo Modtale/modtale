@@ -1232,12 +1232,12 @@ export const ModDetail: React.FC<{
                     </>
                 }
                 actionBar={
-                    <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-2 xl:gap-6 w-full">
-                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full xl:w-auto">
+                    <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between gap-3 2xl:gap-6 w-full">
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 w-full 2xl:w-auto">
                             {(!mod.versions || mod.versions.length === 0) ? (
                                 <button
                                     disabled
-                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group cursor-not-allowed"
+                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-6 lg:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group cursor-not-allowed"
                                 >
                                     <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
                                     Download
@@ -1245,25 +1245,25 @@ export const ModDetail: React.FC<{
                             ) : (
                                 <Link
                                     to={`${projectUrl}/download`}
-                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-8 py-3.5 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
+                                    className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-6 lg:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group"
                                 >
                                     <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" />
                                     Download
                                 </Link>
                             )}
 
-                            <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-2"></div>
+                            <div className="hidden md:block w-px h-10 bg-slate-200 dark:bg-white/10 mx-1 lg:mx-2 shrink-0"></div>
 
-                            <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto">
+                            <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto shrink-0">
                                 {mod.hmWikiEnabled && mod.hmWikiSlug && (
-                                    <Link to={`${projectUrl}/wiki`} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap">
+                                    <Link to={`${projectUrl}/wiki`} className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap">
                                         <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
                                     </Link>
                                 )}
                                 {mod.galleryImages && mod.galleryImages.length > 0 && (
-                                    <Link to={`${projectUrl}/gallery#1`} className="col-span-2 md:col-span-1 flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</Link>
+                                    <Link to={`${projectUrl}/gallery#1`} className="col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><Image className="w-4 h-4" aria-hidden="true" /> Gallery</Link>
                                 )}
-                                <Link to={`${projectUrl}/changelog`} className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</Link>
+                                <Link to={`${projectUrl}/changelog`} className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</Link>
                                 <a
                                     href={`${projectUrl}#comments`}
                                     onClick={(e) => {
@@ -1275,14 +1275,14 @@ export const ModDetail: React.FC<{
                                             }
                                         }
                                     }}
-                                    className="flex items-center justify-center gap-2 px-5 py-3 md:py-2.5 text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
+                                    className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
                                 >
                                     <MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments
                                 </a>
                             </div>
                         </div>
 
-                        <div className="w-full xl:w-auto flex flex-col md:flex-row justify-start md:justify-end gap-2">
+                        <div className="w-full 2xl:w-auto flex flex-col md:flex-row justify-start 2xl:justify-end gap-2 mt-1 2xl:mt-0">
                             {isMobile && mod.classification === 'MODPACK' && latestDependencies.length > 0 && (
                                 <div className="relative w-full" ref={depsDropdownRef}>
                                     <button
@@ -1327,18 +1327,19 @@ export const ModDetail: React.FC<{
                                 </div>
                             )}
 
-                            <div className="hidden md:flex gap-2 flex-wrap justify-end">
+                            <div className="hidden md:flex gap-2 flex-wrap justify-start 2xl:justify-end">
                                 {links.map((link, idx) => (
                                     <a
                                         key={idx}
                                         href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className={`p-2.5 rounded-xl border transition-all ${getLinkColor(link.type)}`}
+                                        className={`p-2.5 md:px-4 md:py-2.5 rounded-xl border transition-all flex items-center justify-center gap-2 ${getLinkColor(link.type)}`}
                                         title={link.label}
                                         aria-label={link.label}
                                     >
-                                        <link.icon className="w-5 h-5" aria-hidden="true" />
+                                        <link.icon className="w-4 h-4" aria-hidden="true" />
+                                        <span className="text-sm font-bold whitespace-nowrap">{link.label}</span>
                                     </a>
                                 ))}
                             </div>
