@@ -75,11 +75,11 @@ const SortDropdown = ({ value, onChange, onOpen, isMobile }: { value: string, on
     const currentLabel = options.find(o => o.id === value)?.label || 'Sort';
 
     return (
-        <div className="relative flex-1 md:flex-none w-full md:w-auto" ref={containerRef}>
+        <div className="relative flex-1 lg:flex-none w-full lg:w-auto" ref={containerRef}>
             <button
                 onClick={handleToggle}
                 aria-label="Sort options"
-                className={`w-full md:w-auto h-10 flex items-center justify-center md:justify-between gap-1 sm:gap-2 border rounded-xl px-2 sm:px-4 text-[11px] sm:text-xs md:text-sm font-bold transition-all whitespace-nowrap md:min-w-[130px] shadow-sm ${
+                className={`w-full lg:w-auto h-10 flex items-center justify-center lg:justify-between gap-1 sm:gap-2 border rounded-xl px-2 sm:px-3 text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap lg:min-w-[110px] shadow-sm ${
                     isOpen
                         ? 'bg-modtale-accent text-white border-transparent'
                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02]'
@@ -121,7 +121,7 @@ const FilterDropdown = ({ label, value, options, onChange }: { label: string, va
             <style>{` .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.3); border-radius: 20px; } `}</style>
             <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">{label}</label>
             <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="w-full text-left px-3 py-2 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-white/[0.05] transition-colors shadow-sm">{value}<ChevronDown className={`w-4 h-4 text-slate-400 transition-transform pointer-events-none ${isOpen ? 'rotate-180' : ''}`} /></button>
-            {isOpen && <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[250] max-h-48 overflow-y-auto py-1 custom-scrollbar">{options.map(opt => <button key={opt} onClick={(e) => { e.stopPropagation(); onChange(opt); setIsOpen(false); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${value === opt ? 'bg-modtale-accent text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>{opt}{value === opt && <Check className="w-3 h-3" />}</button>)}</div>}
+            {isOpen && <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[250] max-h-48 overflow-y-auto py-1 custom-scrollbar">{options.map(opt => <button key={opt} onClick={(e) => { e.stopPropagation(); onChange(opt); setIsOpen(false); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${value === opt ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>{opt}{value === opt && <Check className="w-3 h-3" />}</button>)}</div>}
         </div>
     );
 };
@@ -168,7 +168,6 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
-    useRef<HTMLDivElement>(null);
     const [customDl, setCustomDl] = useState('');
     const [customFav, setCustomFav] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
@@ -263,7 +262,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
 
     return (
         <div className="w-full flex flex-col relative z-40 min-w-0">
-            <div className="md:hidden flex items-center w-full transition-all duration-300 gap-2">
+            <div className="lg:hidden flex items-center w-full transition-all duration-300 gap-2">
                 <div className="relative group flex-1 h-10 min-w-0 transition-all duration-300">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10 pointer-events-none group-focus-within:text-modtale-accent transition-colors" />
                     <input
@@ -305,28 +304,28 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                 </div>
             </div>
 
-            <div className={`w-full flex flex-col transition-all duration-300 overflow-visible ${isScrolled && isMobile ? 'max-h-0 opacity-0 pointer-events-none mt-0' : 'max-h-[500px] opacity-100 mt-3 md:mt-0 gap-3'}`}>
+            <div className={`w-full flex flex-col transition-all duration-300 overflow-visible ${isScrolled && isMobile ? 'max-h-0 opacity-0 pointer-events-none mt-0' : 'max-h-[500px] opacity-100 mt-3 lg:mt-0 gap-3'}`}>
 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full min-w-0">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-4 w-full min-w-0">
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                         {categoryPills ? (
                             <div className="min-w-0 max-w-full">
                                 {categoryPills}
                             </div>
                         ) : (
-                            <div className="hidden md:block shrink-0 min-w-0">
-                                <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm truncate">{pageTitle}</h1>
+                            <div className="hidden lg:block shrink-0 min-w-0">
+                                <h1 className="text-xl lg:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm truncate">{pageTitle}</h1>
                             </div>
                         )}
-                        <div className="hidden xl:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
+                        <div className="hidden 2xl:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
                             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide block drop-shadow-sm whitespace-nowrap">
                                 {loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}
                             </span>
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-start md:justify-end gap-2 w-full md:w-auto shrink-0">
-                        <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-2 w-full lg:w-auto shrink-0 mt-1 lg:mt-0">
+                        <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
                             <button
                                 onClick={() => onViewStyleChange('grid')}
                                 className={`p-1.5 rounded-lg transition-colors ${viewStyle === 'grid' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}
@@ -353,13 +352,13 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             </button>
                         </div>
 
-                        <div className="relative flex-1 md:flex-none h-10" ref={tagRef}>
-                            <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full md:w-auto h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-3 sm:px-4 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
-                                <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
+                        <div className="relative flex-1 lg:flex-none h-10" ref={tagRef}>
+                            <button onClick={() => { setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full lg:w-auto h-full flex items-center justify-center lg:justify-start gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                                <div className="flex items-center gap-1.5 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
                                 {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{selectedTags.length}</span>}
                             </button>
                             {isTagsOpen && (
-                                <div className="absolute left-0 md:left-auto top-full mt-2 w-[280px] sm:w-[320px] md:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
+                                <div className="absolute left-0 lg:left-auto top-full mt-2 w-[280px] sm:w-[320px] lg:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
                                     <div className="flex justify-between items-center mb-3">
                                         <span className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</span>
                                         {selectedTags.length > 0 && <button onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
@@ -376,9 +375,9 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             )}
                         </div>
 
-                        <div className="relative flex-1 md:flex-none h-10" ref={filterRef}>
-                            <button onClick={onToggleFilterMenu} className={`w-full h-full flex items-center justify-center md:justify-start gap-1 sm:gap-2 border rounded-xl px-3 sm:px-4 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
-                                <div className="flex items-center gap-1 sm:gap-2 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
+                        <div className="relative flex-1 lg:flex-none h-10" ref={filterRef}>
+                            <button onClick={onToggleFilterMenu} className={`w-full h-full flex items-center justify-center lg:justify-start gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
+                                <div className="flex items-center gap-1.5 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
                                 {displayFilterCount > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{displayFilterCount}</span>}
                             </button>
 
@@ -465,22 +464,19 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                                                 </>
                                                             )}
                                                         </div>
-                                                    </div>
 
-                                                    <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/50 flex gap-3">
-                                                        <button onClick={resetAll} className="px-4 py-3 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold rounded-xl text-xs hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center justify-center border border-transparent dark:border-red-500/20">
-                                                            <RotateCcw className="w-5 h-5" />
-                                                        </button>
-                                                        <button onClick={onToggleFilterMenu} className="flex-1 py-3 bg-modtale-accent text-white font-bold rounded-xl text-sm shadow-md hover:bg-modtale-accentHover transition-colors">
-                                                            Show Results
-                                                        </button>
+                                                        <div className="pt-2 border-t border-slate-200 dark:border-white/10">
+                                                            <button onClick={resetAll} className="w-full py-2 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold rounded-xl text-xs hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2 border border-transparent dark:border-red-500/20">
+                                                                <RotateCcw className="w-3 h-3 pointer-events-none" /> Reset Filters
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>,
                                             document.body
                                         ) : null
                                     ) : (
-                                        <div className="absolute right-0 top-full mt-2 w-[280px] md:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
+                                        <div className="absolute right-0 top-full mt-2 w-[280px] lg:w-72 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] animate-in fade-in slide-in-from-top-2">
                                             <div className="p-4 border-b border-slate-200 dark:border-white/10">
                                                 <span className="font-bold text-sm text-slate-900 dark:text-white">Refine Results</span>
                                             </div>
@@ -561,7 +557,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </div>
 
                         {isDownloadSort && (
-                            <div className="hidden md:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shadow-sm shrink-0">
+                            <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center animate-in fade-in slide-in-from-right-4 duration-200 shadow-sm shrink-0">
                                 {[
                                     { label: '7d', val: 7 },
                                     { label: '30d', val: 30 },
@@ -583,7 +579,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                 </div>
 
                 {isDownloadSort && (
-                    <div className="md:hidden flex justify-center h-10 w-full mt-3">
+                    <div className="lg:hidden flex justify-center h-10 w-full mt-3">
                         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 flex w-full justify-between shadow-sm">
                             {[
                                 { label: '7 Days', val: 7 },
@@ -701,9 +697,9 @@ const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All'
                                 to={toPath}
                                 onClick={() => onClassificationChange(type.id as Classification | 'All')}
                                 ref={(el) => { tabsRef.current[index] = el; }}
-                                className={`px-3 md:px-4 h-full rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 transition-colors duration-200 whitespace-nowrap snap-center ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
+                                className={`px-3 lg:px-4 h-full rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 transition-colors duration-200 whitespace-nowrap snap-center ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
                             >
-                                <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 pointer-events-none`} />
+                                <Icon className={`w-3.5 h-3.5 lg:w-4 lg:h-4 pointer-events-none`} />
                                 <span className="inline pointer-events-none">{type.label.replace(' Assets', '').replace('Server ', '')}</span>
                             </Link>
                         );
