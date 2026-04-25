@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../../../utils/api.ts';
 import type {Mod, User} from '../../../types.ts';
 import { Building2, Plus, Users, Loader2 } from 'lucide-react';
@@ -97,19 +98,23 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 </Link>
             </div>
 
-            {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />}
+            {status && typeof document !== 'undefined' ? createPortal(
+                <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />,
+                document.body
+            ) : null}
 
-            {transferModal && (
+            {transferModal && typeof document !== 'undefined' ? createPortal(
                 <TransferProjectModal
                     project={transferModal}
                     myOrgs={myOrgs}
                     onClose={() => setTransferModal(null)}
                     onSuccess={(msg) => setStatus({ type: 'success', title: 'Request Sent', msg })}
                     onError={(msg) => setStatus({ type: 'error', title: 'Transfer Failed', msg })}
-                />
-            )}
+                />,
+                document.body
+            ) : null}
 
-            {deleteModal && (
+            {deleteModal && typeof document !== 'undefined' ? createPortal(
                 <StatusModal
                     type="error"
                     title="Delete Project?"
@@ -118,8 +123,9 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                     onAction={handleDelete}
                     onClose={() => setDeleteModal(null)}
                     secondaryLabel="Cancel"
-                />
-            )}
+                />,
+                document.body
+            ) : null}
 
             <div className="space-y-8">
                 <div className="grid grid-cols-1 gap-4">
