@@ -1334,12 +1334,12 @@ export const ModDetail: React.FC<{
                                         href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className={`p-2.5 md:px-4 md:py-2.5 rounded-xl border transition-all flex items-center justify-center gap-2 ${getLinkColor(link.type)}`}
+                                        className={`rounded-xl border transition-all flex items-center justify-center px-4 py-2.5 2xl:p-0 2xl:w-[42px] 2xl:h-[42px] gap-2 2xl:gap-0 ${getLinkColor(link.type)}`}
                                         title={link.label}
                                         aria-label={link.label}
                                     >
-                                        <link.icon className="w-4 h-4" aria-hidden="true" />
-                                        <span className="text-sm font-bold whitespace-nowrap">{link.label}</span>
+                                        <link.icon className="w-4 h-4 2xl:w-5 2xl:h-5 shrink-0" aria-hidden="true" />
+                                        <span className="text-sm font-bold whitespace-nowrap block 2xl:hidden">{link.label}</span>
                                     </a>
                                 ))}
                             </div>
