@@ -36,6 +36,7 @@ public class ModDTO {
     private List<String> types;
     private List<String> childProjectIds;
     private List<String> modIds;
+    private List<String> modjamIds;
     private boolean allowModpacks;
     private boolean allowComments;
     private boolean hmWikiEnabled;
@@ -82,6 +83,7 @@ public class ModDTO {
         dto.setLastTrendingNotification(mod.getLastTrendingNotification());
         dto.setLinks(mod.getLinks());
         dto.setTypes(mod.getTypes());
+        dto.setModjamIds(mod.getModjamIds());
         dto.setAllowModpacks(mod.isAllowModpacks());
         dto.setAllowComments(mod.isAllowComments());
         dto.setHmWikiEnabled(mod.isHmWikiEnabled());
@@ -168,6 +170,8 @@ public class ModDTO {
     public void setChildProjectIds(List<String> childProjectIds) { this.childProjectIds = childProjectIds; }
     public List<String> getModIds() { return modIds; }
     public void setModIds(List<String> modIds) { this.modIds = modIds; }
+    public List<String> getModjamIds() { return modjamIds; }
+    public void setModjamIds(List<String> modjamIds) { this.modjamIds = modjamIds; }
     public boolean isAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public boolean isAllowComments() { return allowComments; }

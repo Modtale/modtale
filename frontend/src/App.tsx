@@ -39,7 +39,8 @@ import { ResetPassword } from './react-pages/auth/ResetPassword.tsx';
 import { MfaVerify } from './react-pages/auth/MfaVerify';
 import { Analytics } from './components/dashboard/Analytics.tsx';
 import NotFound from './components/ui/error/NotFound.tsx';
-
+import { JamsList } from './react-pages/jams/JamsList';
+import { JamDetail } from './react-pages/jams/JamDetail';
 const ScrollToTop = () => {
     const { pathname } = useLocation();
     useEffect(() => {
@@ -206,6 +207,10 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/worlds" element={renderBrowse('SAVE')} />
                             <Route path="/art" element={renderBrowse('ART')} />
                             <Route path="/data" element={renderBrowse('DATA')} />
+
+                            <Route path="/jams" element={<JamsList currentUser={user} />} />
+                            <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
+                            <Route path="/jam/:id/edit" element={<JamDetail currentUser={user} />} />
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :

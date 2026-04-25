@@ -125,6 +125,8 @@ public class Mod {
     private List<String> childProjectIds;
 
     private List<String> modIds;
+    private List<String> modjamIds = new ArrayList<>();
+
     private boolean allowModpacks = true;
     private boolean allowComments = true;
 
@@ -139,7 +141,6 @@ public class Mod {
 
     private String approvedBy;
 
-    // Deprecated fields mapped to String
     private List<String> contributors = new ArrayList<>();
     private List<String> pendingInvites = new ArrayList<>();
 
@@ -217,6 +218,10 @@ public class Mod {
     public void setChildProjectIds(List<String> childProjectIds) { this.childProjectIds = childProjectIds; }
     public List<String> getModIds() { return modIds; }
     public void setModIds(List<String> modIds) { this.modIds = modIds; }
+
+    public List<String> getModjamIds() { return modjamIds; }
+    public void setModjamIds(List<String> modjamIds) { this.modjamIds = modjamIds; }
+
     public boolean isAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public boolean isAllowComments() { return allowComments; }
