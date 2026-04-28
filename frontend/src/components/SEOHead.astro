@@ -23,10 +23,8 @@ const {
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
-// Rely on the image passed down from the page routes, or fallback to the default favicon
 const image = propImage || "https://modtale.net/assets/favicon.svg";
 
-// Safely escape JSON to prevent `</script>` injection from breaking the document <head>
 const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
 ---

@@ -32,7 +32,8 @@ const useScrollLock = (lock: boolean) => {
 interface DependencyModalProps {
     dependencies: NonNullable<ProjectVersion['dependencies']>;
     onClose: () => void;
-    onConfirm: () => void;
+    onDownloadBundle: () => void;
+    onDownloadModOnly: () => void;
 }
 
 interface MetaCache {
@@ -64,7 +65,6 @@ export const PostDownloadModal: React.FC<{
     if (!isOpen) return null;
 
     const isWorld = classification === 'SAVE';
-    const isModpack = classification === 'MODPACK';
     const folderName = isWorld ? 'Saves' : 'Mods';
 
     const paths = {
@@ -160,7 +160,7 @@ export const PostDownloadModal: React.FC<{
                         </div>
 
                         <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
-                            {isWorld && (
+                            {isWorld ? (
                                 <>
                                     <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
                                         <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>1</div>
@@ -187,38 +187,7 @@ export const PostDownloadModal: React.FC<{
                                         </div>
                                     </div>
                                 </>
-                            )}
-
-                            {isModpack && (
-                                <>
-                                    <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
-                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>1</div>
-                                        <div className="pt-1.5">
-                                            Locate the downloaded modpack in your <code className={`bg-slate-100 dark:bg-black/50 border border-slate-200 dark:border-white/10 px-1.5 py-0.5 rounded-md font-mono text-xs ${theme.text} shadow-inner`}>Downloads</code> folder.
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
-                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
-                                        <div className="w-full min-w-0 pt-1.5">
-                                            <p className="mb-3">Unzip the downloaded file and place ALL contents into your Hytale Mods directory:</p>
-                                            <div className="flex items-center gap-3 bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl p-2 pl-3">
-                                                <code className="flex-1 font-mono text-[11px] text-slate-600 dark:text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
-                                                <button onClick={handleCopy} className="p-2 rounded-lg bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-transparent text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors shadow-sm shrink-0 self-start" title="Copy Path">
-                                                    {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
-                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>3</div>
-                                        <div className="pt-1.5">
-                                            Restart your Hytale Launcher. The modpack will be loaded automatically.
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {!isWorld && !isModpack && (
+                            ) : (
                                 <>
                                     <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
                                         <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>1</div>
@@ -289,9 +258,8 @@ export const PostDownloadModal: React.FC<{
     );
 };
 
-export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, onClose, onConfirm }) => {
+export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, onClose, onDownloadBundle, onDownloadModOnly }) => {
     useScrollLock(true);
-    const [selected, setSelected] = useState<Set<string>>(new Set(dependencies.map(d => d.modId)));
     const [metaCache, setMetaCache] = useState<MetaCache>({});
 
     useEffect(() => {
@@ -317,46 +285,6 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
         fetchMeta();
     }, [dependencies]);
 
-    const missingRequired = dependencies.filter(d => !d.isOptional && !selected.has(d.modId)).length > 0;
-
-    const toggleDep = (id: string) => {
-        const next = new Set(selected);
-        if (next.has(id)) next.delete(id); else next.add(id);
-        setSelected(next);
-    };
-
-    const toggleAll = () => {
-        if (selected.size === dependencies.length) {
-            setSelected(new Set());
-        } else {
-            setSelected(new Set(dependencies.map(d => d.modId)));
-        }
-    };
-
-    const handleDownload = async () => {
-        for (let index = 0; index < dependencies.length; index++) {
-            const d = dependencies[index];
-            if (selected.has(d.modId)) {
-                try {
-                    await new Promise(resolve => setTimeout(resolve, index * 250));
-
-                    const response = await api.get(`/projects/${d.modId}/versions/${d.versionNumber}/download-url`);
-                    const { downloadUrl } = response.data;
-
-                    const link = document.createElement('a');
-                    link.href = `${API_BASE_URL}${downloadUrl}`;
-                    link.setAttribute('download', '');
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                } catch (error) {
-                    console.error(`Failed to download dependency ${d.modId}:`, error);
-                }
-            }
-        }
-        onConfirm();
-    };
-
     const getIconUrl = (path?: string) => {
         if (!path) return '/assets/favicon.svg';
         return path.startsWith('http') ? path : `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
@@ -367,70 +295,39 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden relative flex flex-col max-h-[85dvh]">
                 <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50/50 dark:bg-black/20 shrink-0">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <LinkIcon className="w-5 h-5 text-emerald-500" /> Dependencies
+                        <LinkIcon className="w-5 h-5 text-emerald-500" /> Bundle Download
                     </h3>
                     <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500" /></button>
                 </div>
 
                 <div className="p-6 space-y-4 overflow-y-auto bg-slate-50/50 dark:bg-slate-900 custom-scrollbar">
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
-                            Select dependencies to download automatically.
-                        </div>
-                        <button onClick={toggleAll} className="text-xs font-bold text-modtale-accent hover:underline">
-                            {selected.size === dependencies.length ? 'Deselect All' : 'Select All'}
-                        </button>
+                    <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                        This mod requires the following dependencies. We recommend downloading the bundle, which includes everything in a single zip file.
                     </div>
 
                     <div className="space-y-2">
                         {dependencies.map(dep => {
                             const meta = metaCache[dep.modId];
-                            const isSelected = selected.has(dep.modId);
 
                             return (
                                 <div
                                     key={dep.modId}
-                                    className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm transition-all cursor-pointer group ${
-                                        isSelected
-                                            ? 'border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 hover:bg-emerald-50 dark:hover:bg-emerald-500/20'
-                                            : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:border-blue-400 dark:hover:border-blue-500'
-                                    }`}
-                                    onClick={() => toggleDep(dep.modId)}
+                                    className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 shadow-sm"
                                 >
                                     <div className="flex items-center gap-4 min-w-0">
-                                        {isSelected ? (
-                                            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
-                                                <Check className="w-3.5 h-3.5" aria-hidden="true" />
-                                            </div>
-                                        ) : (
-                                            <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 flex items-center justify-center shrink-0 shadow-sm transition-colors group-hover:border-blue-400" />
-                                        )}
-
-                                        <Link
-                                            to={`/mod/${createSlug(meta?.title || dep.modTitle || dep.modId, dep.modId)}`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                            }}
-                                            className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1 hover:border-modtale-accent/50 hover:shadow-md transition-all"
-                                        >
+                                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1">
                                             <img
                                                 src={getIconUrl(meta?.icon)}
                                                 alt=""
                                                 className="w-full h-full object-cover rounded-lg"
                                                 onError={(e) => e.currentTarget.src='/assets/favicon.svg'}
                                             />
-                                        </Link>
+                                        </div>
 
                                         <div className="min-w-0">
-                                            <Link
-                                                to={`/mod/${createSlug(meta?.title || dep.modTitle || dep.modId, dep.modId)}`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                }}
-                                                className="font-bold text-slate-900 dark:text-white truncate hover:text-modtale-accent transition-colors block"
-                                            >
+                                            <div className="font-bold text-slate-900 dark:text-white truncate">
                                                 {meta?.title || dep.modTitle || dep.modId}
-                                            </Link>
+                                            </div>
                                             <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1 flex items-center gap-1.5">
                                                 <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
                                                 <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
@@ -449,27 +346,23 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                             );
                         })}
                     </div>
-
-                    {missingRequired && (
-                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 shadow-sm">
-                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <p>Some <span className="font-bold">Required</span> dependencies are unchecked.</p>
-                        </div>
-                    )}
                 </div>
 
-                <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-black/20 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-5 py-2.5 font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-colors text-sm">
-                        Cancel
-                    </button>
-                    <Link
-                        to="#"
-                        onClick={(e) => { e.preventDefault(); handleDownload(); }}
-                        className="px-6 py-2.5 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-colors flex items-center gap-2 bg-modtale-accent hover:bg-blue-500 text-white text-sm"
+                <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-black/20 flex flex-col gap-3 shrink-0">
+                    <button
+                        onClick={onDownloadBundle}
+                        className="w-full px-6 py-3 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 bg-modtale-accent hover:bg-blue-500 text-white text-base active:scale-[0.98]"
                     >
-                        <Download className="w-4 h-4" />
-                        {selected.size > 0 ? `Download (${selected.size})` : "Continue without Downloading"}
-                    </Link>
+                        <Download className="w-5 h-5" /> Download Bundle (.zip)
+                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={onClose} className="flex-1 px-5 py-2.5 font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-colors text-sm">
+                            Cancel
+                        </button>
+                        <button onClick={onDownloadModOnly} className="flex-1 px-5 py-2.5 font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-modtale-accent/50 rounded-xl transition-colors text-sm">
+                            Just the Mod
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

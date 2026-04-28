@@ -47,7 +47,6 @@ export const Upload: React.FC<UploadProps> = ({ currentUser }) => {
                 setOwner(currentUser.username);
             }
 
-            // Corrected Org Member typing mapping
             api.get('/user/orgs').then(res => {
                 const adminOrgs = res.data.filter((o: User) => {
                     const adminRole = o.organizationRoles?.find(r => r.name.toLowerCase() === 'admin' || r.isOwner);

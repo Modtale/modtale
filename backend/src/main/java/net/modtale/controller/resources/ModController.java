@@ -399,11 +399,9 @@ public class ModController {
 
             if (targetVersion == null) return ResponseEntity.notFound().build();
 
-            // Track main mod download
             modService.incrementDownloadCount(mod.getId(), targetVersion.getId());
             analyticsService.logDownload(mod.getId(), targetVersion.getId(), mod.getAuthor(), isApi, clientIp);
 
-            // Track dependency downloads
             if (targetVersion.getDependencies() != null) {
                 for (ModDependency dep : targetVersion.getDependencies()) {
                     modService.incrementDownloadCount(dep.getModId());
