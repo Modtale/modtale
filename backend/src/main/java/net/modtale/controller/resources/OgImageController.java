@@ -51,6 +51,14 @@ public class OgImageController {
     private static final Color BADGE_BG = new Color(15, 23, 42, 242);
     private static final Color ICON_BORDER = new Color(30, 41, 59);
 
+    private static final int CARD_MARGIN = 70;
+    private static final int CARD_ARC = 48;
+    private static final int PROJECT_PADDING = 70;
+    private static final int ICON_SIZE = 210;
+    private static final int STAT_VALUE_FONT_SIZE = 28;
+    private static final int STAT_GAP = 60;
+    private static final int LOGO_HEIGHT = 28;
+
     private static final String LOGO_SVG = """
         <svg
                 version="1.1"
@@ -70,11 +78,11 @@ public class OgImageController {
             <path style="fill:#f8fafc;fill-opacity:1" d="m 665.08398,295.32227 h 87.3913 V 263.4043 h -55.88739 v -19.82422 h 28.22266 c 2.76172,-8.20834 5.52343,-16.41667 8.28515,-24.625 h -37.33398 v -21.06446 c 16.57357,10e-6 33.14713,0 49.7207,0 3.65039,-10.18033 7.30078,-20.36067 10.95117,-30.54101 h -91.34961 z" />
             <g transform="matrix(0.77142635,0,0,0.77142635,-179.66965,52.927569)">
         <path style="fill:#f8fafc;fill-opacity:1" d="m 395.64453,148.49805 c -3.94941,0.25606 -7.8891,0.70088 -11.76954,1.49094 -3.57847,0.70463 -7.11197,1.65331 -10.56425,2.82935 -4.06943,1.37759 -8.02998,3.07772 -11.83207,5.07691 -3.85267,2.02217 -7.54948,4.34295 -11.03565,6.94599 -3.44691,2.56687 -6.69332,5.40301 -9.69919,8.47377 -3.03831,3.10963 -5.84065,6.45068 -8.35513,9.99703 -2.51784,3.54894 -4.75919,7.29382 -6.69219,11.19169 -1.90871,3.84945 -3.51632,7.84724 -4.80647,11.94499 -1.29814,4.14826 -2.28058,8.39506 -2.92033,12.69403 -0.63207,4.26597 -0.93331,8.57916 -0.90073,12.891 0.0351,3.92472 0.35499,7.84197 0.93158,11.72389 0.65171,4.23079 1.61824,8.41207 2.90052,12.49693 1.29564,4.10313 2.90619,8.10679 4.82164,11.9606 1.9189,3.86075 4.13321,7.5755 6.63192,11.08999 2.51074,3.54812 5.31021,6.89095 8.34646,10.00155 3.00864,3.07836 6.25626,5.9247 9.70989,8.49523 3.53678,2.64828 7.29773,4.99442 11.20952,7.0483 3.84256,2.00438 7.84295,3.70494 11.94992,5.09041 4.12203,1.38435 8.35287,2.44309 12.64063,3.16909 4.23923,0.71119 8.53318,1.10131 12.83232,1.14663 4.34361,0.0535 8.69134,-0.24055 12.98963,-0.87211 4.30008,-0.62645 8.54927,-1.59988 12.69764,-2.89498 4.14422,-1.29089 8.18379,-2.91644 12.07495,-4.84068 3.90324,-1.92927 7.64785,-4.17756 11.20203,-6.69276 3.55289,-2.52086 6.90392,-5.3253 10.01768,-8.37271 3.11265,-3.04888 5.9817,-6.34564 8.58156,-9.84256 2.55881,-3.4526 4.85357,-7.10139 6.84468,-10.91066 2.02091,-3.84725 3.73357,-7.85614 5.12278,-11.97437 1.39025,-4.11892 2.45464,-8.348 3.18378,-12.63418 0.71906,-4.23777 1.116,-8.53175 1.16363,-12.83079 0.0598,-4.30791 -0.22096,-8.62164 -0.84369,-12.88541 -0.60404,-4.23736 -1.5436,-8.42887 -2.80876,-12.51841 -1.06342,-3.51585 -2.38742,-6.95445 -3.92052,-10.29167 -1.79973,-3.92013 -3.91113,-7.69637 -6.29796,-11.28837 -2.38438,-3.58804 -5.05175,-6.98621 -7.96276,-10.1609 -2.91234,-3.17077 -6.07263,-6.11104 -9.43634,-8.79698 -3.37845,-2.68305 -6.96388,-5.1011 -10.71021,-7.2391 -3.44893,-1.94946 -7.03089,-3.65483 -10.71589,-3.98563,-1.54405 -8.08234,-2.80101 -12.25552,-3.72958 -4.24306,-0.93958 -8.55932,-1.5419 -12.89682,-1.81617 -3.13994,-0.20076 -6.2858,-0.1728 -9.42874,-0.0566 z" />
-                <path style="fill:#3b82f6;fill-opacity:1;stroke-width:0.710258" d="m 437.43623,210.62198 v 44.64745 l -38.66583,22.32373 -38.66583,-22.32373 v -44.64745 l 38.66583,-22.32372 z" />
-        </g>
-        </g>
-        </g>
-        </svg>
+                    <path style="fill:#3b82f6;fill-opacity:1;stroke-width:0.710258" d="m 437.43623,210.62198 v 44.64745 l -38.66583,22.32373 -38.66583,-22.32373 v -44.64745 l 38.66583,-22.32372 z" />
+            </g>
+            </g>
+            </g>
+            </svg>
     """;
 
     public OgImageController(ModService modService) {
@@ -208,16 +216,14 @@ public class OgImageController {
         setupRenderingHints(g2d);
         drawBackground(g2d, width, height);
 
-        int margin = 40;
-        int cardX = margin;
-        int cardY = margin;
-        int cardW = width - (margin * 2);
-        int cardH = height - (margin * 2);
-        int arc = 32;
-        RoundRectangle2D cardShape = new RoundRectangle2D.Float(cardX, cardY, cardW, cardH, arc, arc);
+        int cardX = CARD_MARGIN;
+        int cardY = CARD_MARGIN;
+        int cardW = width - (CARD_MARGIN * 2);
+        int cardH = height - (CARD_MARGIN * 2);
+        RoundRectangle2D cardShape = new RoundRectangle2D.Float(cardX, cardY, cardW, cardH, CARD_ARC, CARD_ARC);
 
         drawCardBackgroundWithBanner(g2d, mod, banner, cardShape, cardX, cardY, cardW);
-        drawProjectContent(g2d, mod, icon, cardX, cardY, cardW, cardH);
+        drawProjectContent(image, g2d, mod, icon, cardX, cardY, cardW, cardH);
         drawBranding(g2d, cardX, cardY, cardW, cardH);
 
         g2d.dispose();
@@ -280,47 +286,65 @@ public class OgImageController {
         g2d.drawLine(x, y + headerH, x + w, y + headerH);
     }
 
-    private void drawProjectContent(Graphics2D g2d, Mod mod, BufferedImage icon, int cardX, int cardY, int cardW, int cardH) {
+    private void drawProjectContent(BufferedImage image, Graphics2D g2d, Mod mod, BufferedImage icon, int cardX, int cardY, int cardW, int cardH) {
         int headerH = cardW / 3;
-        int padding = 50;
-        int iconSize = 210;
+        int iconSize = ICON_SIZE;
 
-        int iconX = cardX + padding;
-        int iconY = cardY + headerH - (iconSize / 2);
-        drawIcon(g2d, mod, icon, iconX, iconY, iconSize);
+        int iconX = cardX + PROJECT_PADDING;
+        int iconY = cardY + headerH - (iconSize / 2) - 20;
+        drawIcon(image, g2d, mod, icon, iconX, iconY, iconSize);
 
         int textX = iconX;
-        int titleY = iconY + iconSize + 75;
 
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 64));
+        // Title Noticeably Bolded
+        int titleY = iconY + iconSize + 65;
+        g2d.setFont(new Font("Impact", Font.BOLD, 56));
         g2d.setColor(TEXT_PRIMARY);
-        String title = truncateText(g2d, mod.getTitle(), cardW - (padding * 2));
+        String title = truncateText(g2d, mod.getTitle(), cardW - (PROJECT_PADDING * 2));
         g2d.drawString(title, textX, titleY);
 
+        // Increased padding with author name
         int authorY = titleY + 60;
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 36));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 32));
         g2d.setColor(TEXT_SECONDARY);
         g2d.drawString("by " + mod.getAuthor(), textX, authorY);
 
-        int descY = authorY + 70;
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 40));
+        // Increased padding between author and description
+        int descY = authorY + 60;
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 36));
         g2d.setColor(TEXT_DESC);
         String desc = mod.getDescription() != null ? mod.getDescription() : "";
-        drawWrappedText(g2d, desc, textX, descY, cardW - (padding * 2), 2);
+        drawWrappedText(g2d, desc, textX, descY, cardW - (PROJECT_PADDING * 2), 2);
 
-        int statY = cardY + cardH - 50;
-        int statX = textX;
-
-        drawStatWithIcon(g2d, statX, statY, "download", formatNumber(mod.getDownloadCount()));
-        drawStatWithIcon(g2d, statX + 240, statY, "heart", formatNumber(mod.getFavoriteCount()));
+        int statY = cardY + cardH - PROJECT_PADDING;
+        drawStatsBlock(g2d, statY, textX, mod);
     }
 
-    private void drawIcon(Graphics2D g2d, Mod mod, BufferedImage img, int x, int y, int size) {
+    private void drawIcon(BufferedImage mainImage, Graphics2D g2d, Mod mod, BufferedImage img, int x, int y, int size) {
         g2d.setColor(new Color(0, 0, 0, 90));
         g2d.fillRoundRect(x + 5, y + 5, size, size, 40, 40);
 
         Shape clip = new RoundRectangle2D.Float(x, y, size, size, 40, 40);
         g2d.setClip(clip);
+
+        int sx = Math.max(0, x);
+        int sy = Math.max(0, y);
+        int w = Math.min(size, mainImage.getWidth() - sx);
+        int h = Math.min(size, mainImage.getHeight() - sy);
+
+        if (w > 0 && h > 0) {
+            int blurScale = 6;
+            BufferedImage tiny = new BufferedImage(Math.max(1, w / blurScale), Math.max(1, h / blurScale), BufferedImage.TYPE_INT_RGB);
+            Graphics2D gTiny = tiny.createGraphics();
+            gTiny.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            gTiny.drawImage(mainImage.getSubimage(sx, sy, w, h), 0, 0, tiny.getWidth(), tiny.getHeight(), null);
+            gTiny.dispose();
+
+            g2d.drawImage(tiny, x, y, size, size, null);
+        }
+
+        g2d.setColor(new Color(15, 23, 42, 140));
+        g2d.fillRect(x, y, size, size);
 
         try {
             if (img != null) {
@@ -393,59 +417,81 @@ public class OgImageController {
         g2d.drawString(display, iconX + iconW + gap, y + fm.getAscent() + (vPadding/2) - 2);
     }
 
-    private void drawStatWithIcon(Graphics2D g2d, int x, int y, String iconType, String value) {
+    private void drawStatsBlock(Graphics2D g2d, int y, int leftX, Mod mod) {
+        g2d.setFont(new Font("SansSerif", Font.BOLD, STAT_VALUE_FONT_SIZE));
         g2d.setColor(TEXT_SECONDARY);
-        Graphics2D iconG = (Graphics2D) g2d.create();
 
-        iconG.translate(x, y - 28);
-        iconG.scale(1.4, 1.4);
-        iconG.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        String downloadVal = formatNumber(mod.getDownloadCount());
+        String heartVal = formatNumber(mod.getFavoriteCount());
 
-        if ("download".equals(iconType)) {
-            Path2D path = new Path2D.Float();
-            path.moveTo(21, 15);
-            path.lineTo(21, 19);
-            path.curveTo(21, 20, 20, 21, 19, 21);
-            path.lineTo(5, 21);
-            path.curveTo(4, 21, 3, 20, 3, 19);
-            path.lineTo(3, 15);
-            iconG.draw(path);
+        int downloadWidth = drawStatWithIcon(g2d, -1000, y, "download", downloadVal);
+        int heartWidth = drawStatWithIcon(g2d, -1000, y, "heart", heartVal);
 
-            Path2D arrow = new Path2D.Float();
-            arrow.moveTo(7, 10);
-            arrow.lineTo(12, 15);
-            arrow.lineTo(17, 10);
-            arrow.moveTo(12, 15);
-            arrow.lineTo(12, 3);
-            iconG.draw(arrow);
-        } else {
-            Path2D heart = new Path2D.Float();
-            heart.moveTo(12, 21.35);
+        int totalWidth = downloadWidth + STAT_GAP + heartWidth;
+        int currentX = leftX;
 
-            heart.curveTo(12, 21.35, 2.5, 13, 2.5, 8.5);
-            heart.curveTo(2.5, 5, 5, 3, 8, 3);
-            heart.curveTo(10, 3, 11, 4, 12, 5.5);
-            heart.curveTo(13, 4, 14, 3, 16, 3);
-            heart.curveTo(19, 3, 21.5, 5, 21.5, 8.5);
-            heart.curveTo(21.5, 13, 12, 21.35, 12, 21.35);
+        drawStatWithIcon(g2d, currentX, y, "download", downloadVal);
+        currentX += downloadWidth + STAT_GAP;
+        drawStatWithIcon(g2d, currentX, y, "heart", heartVal);
+    }
 
-            iconG.draw(heart);
+    private int drawStatWithIcon(Graphics2D g2d, int x, int y, String iconType, String value) {
+        FontMetrics fm = g2d.getFontMetrics();
+        int iconW = 22;
+        int textXOffset = 38;
+
+        if (x != -1000) {
+            Graphics2D iconG = (Graphics2D) g2d.create();
+            iconG.translate(x, y - fm.getAscent() + 2);
+            iconG.scale(1.4, 1.4);
+            iconG.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+            if ("download".equals(iconType)) {
+                Path2D path = new Path2D.Float();
+                path.moveTo(21, 15);
+                path.lineTo(21, 19);
+                path.curveTo(21, 20, 20, 21, 19, 21);
+                path.lineTo(5, 21);
+                path.curveTo(4, 21, 3, 20, 3, 19);
+                path.lineTo(3, 15);
+                iconG.draw(path);
+
+                Path2D arrow = new Path2D.Float();
+                arrow.moveTo(7, 10);
+                arrow.lineTo(12, 15);
+                arrow.lineTo(17, 10);
+                arrow.moveTo(12, 15);
+                arrow.lineTo(12, 3);
+                iconG.draw(arrow);
+            } else {
+                Path2D heart = new Path2D.Float();
+                heart.moveTo(12, 21.35);
+
+                heart.curveTo(12, 21.35, 2.5, 13, 2.5, 8.5);
+                heart.curveTo(2.5, 5, 5, 3, 8, 3);
+                heart.curveTo(10, 3, 11, 4, 12, 5.5);
+                heart.curveTo(13, 4, 14, 3, 16, 3);
+                heart.curveTo(19, 3, 21.5, 5, 21.5, 8.5);
+                heart.curveTo(21.5, 13, 12, 21.35, 12, 21.35);
+
+                iconG.draw(heart);
+            }
+            iconG.dispose();
+
+            g2d.drawString(value, x + textXOffset, y);
         }
-        iconG.dispose();
 
-        g2d.setColor(TEXT_SECONDARY);
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 36));
-        g2d.drawString(value, x + 45, y);
+        return textXOffset + fm.stringWidth(value);
     }
 
     private void drawBranding(Graphics2D g2d, int cardX, int cardY, int cardW, int cardH) {
         if (logoDocument == null) return;
 
-        float logoHeight = 44f;
+        float logoHeight = (float) LOGO_HEIGHT;
         float logoWidth = (float) (logoHeight * (logoDocument.size().width / logoDocument.size().height));
 
-        float x = cardX + cardW - 50 - logoWidth;
-        float y = cardY + cardH - 40 - logoHeight;
+        float x = cardX + cardW - PROJECT_PADDING - logoWidth;
+        float y = cardY + cardH - PROJECT_PADDING - logoHeight + 10;
 
         Graphics2D logoG = (Graphics2D) g2d.create();
         logoG.translate(x, y);
@@ -474,7 +520,8 @@ public class OgImageController {
         if (text == null || text.isEmpty()) return;
 
         FontMetrics fm = g2d.getFontMetrics();
-        int lineHeight = fm.getHeight() + 16;
+        // Decreased line-height from +12 to +4
+        int lineHeight = fm.getHeight() + 4;
         String[] words = text.split("\\s+");
         StringBuilder currentLine = new StringBuilder();
         int lineCount = 0;
