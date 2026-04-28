@@ -947,7 +947,7 @@ public class ModService {
                 Map<String, Object> body = new HashMap<>();
                 body.put("username", "Modtale Admin Bot");
                 body.put("avatar_url", frontendUrl + "/assets/favicon.png");
-                body.put("content", "?? **Verification Required**");
+                body.put("content", "**Verification Required**");
                 body.put("embeds", List.of(embed));
 
                 logger.info("Triggering Admin Discord Webhook for pending project {}", mod.getId());
@@ -999,7 +999,7 @@ public class ModService {
                 Map<String, Object> body = new HashMap<>();
                 body.put("username", "Modtale Warden");
                 body.put("avatar_url", frontendUrl + "/assets/favicon.png");
-                body.put("content", "? **Malicious or Flagged File Detected**");
+                body.put("content", "**Flagged File Detected**");
                 body.put("embeds", List.of(embed));
 
                 logger.info("Triggering Admin Discord Webhook for flagged version {}", version != null ? version.getId() : "unknown");
