@@ -314,7 +314,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                     <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
                         <LinkIcon className="w-5 h-5 text-emerald-500" /> Dependencies
                     </h3>
-                    <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500" /></button>
+                    <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500 transition-colors" /></button>
                 </div>
 
                 <div className="p-6 space-y-4 overflow-y-auto bg-slate-50/50 dark:bg-slate-900 custom-scrollbar">
@@ -399,37 +399,28 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                     )}
                 </div>
 
-                <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-black/20 flex flex-col gap-3 shrink-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                            onClick={onDownloadModOnly}
-                            className="w-full px-5 py-3 font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-xl transition-all text-sm flex items-center justify-center gap-2 group h-full shadow-sm"
-                        >
-                            <div className="p-1.5 bg-slate-100 dark:bg-black/20 rounded-lg group-hover:bg-slate-200 dark:group-hover:bg-black/40 transition-colors">
-                                <FileText className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <div className="flex flex-col items-start text-left">
-                                <span className="leading-tight">Just the Mod</span>
-                                <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">Without dependencies</span>
-                            </div>
-                        </button>
-
-                        <button
-                            onClick={() => onDownloadBundle(Array.from(selected))}
-                            disabled={selected.size === 0}
-                            className="w-full px-5 py-3 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 bg-modtale-accent hover:bg-blue-500 text-white text-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-modtale-accent h-full group"
-                        >
-                            <div className="p-1.5 bg-white/20 rounded-lg">
-                                <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-                            </div>
-                            <div className="flex flex-col items-start text-left">
-                                <span className="leading-tight">Download Bundle</span>
-                                <span className="text-[10px] font-normal text-blue-100">1 Mod + {selected.size} Dependencies</span>
-                            </div>
-                        </button>
-                    </div>
-                    <button onClick={onClose} className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors uppercase tracking-wider">
-                        Cancel
+                <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-black/20 shrink-0">
+                    <button
+                        onClick={() => {
+                            if (selected.size === 0) {
+                                onDownloadModOnly();
+                            } else {
+                                onDownloadBundle(Array.from(selected));
+                            }
+                        }}
+                        className="w-full px-5 py-3.5 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-3 bg-modtale-accent hover:bg-modtale-accentHover text-white text-base active:scale-[0.98] group"
+                    >
+                        <Download className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
+                        <div className="flex flex-col items-start text-left">
+                            <span className="leading-tight">
+                                {selected.size === 0 ? "Download Mod Only" : "Download Bundle"}
+                            </span>
+                            {selected.size > 0 && (
+                                <span className="text-[10px] font-normal text-blue-100">
+                                    Includes mod + {selected.size} dependenc{selected.size === 1 ? 'y' : 'ies'}
+                                </span>
+                            )}
+                        </div>
                     </button>
                 </div>
             </div>
