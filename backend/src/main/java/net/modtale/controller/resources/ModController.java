@@ -328,7 +328,10 @@ public class ModController {
 
     @GetMapping("/projects/{id}/versions/{version}/download-bundle-url")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_DOWNLOAD', authentication)")
-    public ResponseEntity<?> getDownloadBundleUrl(@PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<?> getDownloadBundleUrl(
+            @PathVariable String id,
+            @PathVariable String version,
+            @RequestParam(value = "deps", required = false) List<String> deps) {
         try {
             Mod mod = modService.getModById(id);
             if (mod == null) return ResponseEntity.notFound().build();
@@ -349,7 +352,7 @@ public class ModController {
 
             if (targetVersion == null) return ResponseEntity.notFound().build();
 
-            String token = downloadTokenService.generateToken(id, version);
+            String token = downloadTokenService.generateToken(id, version, deps);
             String downloadUrl = "/download-bundle/" + token;
 
             return ResponseEntity.ok(Map.of(
@@ -374,6 +377,7 @@ public class ModController {
 
             String id = downloadToken.getProjectId();
             String version = downloadToken.getVersion();
+            List<String> selectedDeps = downloadToken.getSelectedDependencies();
 
             Mod mod = modService.getModById(id);
             if (mod == null) return ResponseEntity.notFound().build();
@@ -404,12 +408,14 @@ public class ModController {
 
             if (targetVersion.getDependencies() != null) {
                 for (ModDependency dep : targetVersion.getDependencies()) {
-                    modService.incrementDownloadCount(dep.getModId());
-                    analyticsService.logDownload(dep.getModId(), null, null, isApi, clientIp);
+                    if (selectedDeps == null || selectedDeps.contains(dep.getModId())) {
+                        modService.incrementDownloadCount(dep.getModId());
+                        analyticsService.logDownload(dep.getModId(), null, null, isApi, clientIp);
+                    }
                 }
             }
 
-            byte[] zipData = modService.generateBundleZip(mod, targetVersion);
+            byte[] zipData = modService.generateBundleZip(mod, targetVersion, selectedDeps);
             ByteArrayResource resource = new ByteArrayResource(zipData);
             String zipFilename = mod.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-UNZIP-ME.zip";
 

@@ -32,7 +32,7 @@ const useScrollLock = (lock: boolean) => {
 interface DependencyModalProps {
     dependencies: NonNullable<ProjectVersion['dependencies']>;
     onClose: () => void;
-    onDownloadBundle: () => void;
+    onDownloadBundle: (selectedDeps: string[]) => void;
     onDownloadModOnly: () => void;
 }
 
@@ -260,6 +260,7 @@ export const PostDownloadModal: React.FC<{
 
 export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, onClose, onDownloadBundle, onDownloadModOnly }) => {
     useScrollLock(true);
+    const [selected, setSelected] = useState<Set<string>>(new Set(dependencies.map(d => d.modId)));
     const [metaCache, setMetaCache] = useState<MetaCache>({});
 
     useEffect(() => {
@@ -285,6 +286,22 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
         fetchMeta();
     }, [dependencies]);
 
+    const missingRequired = dependencies.filter(d => !d.isOptional && !selected.has(d.modId)).length > 0;
+
+    const toggleDep = (id: string) => {
+        const next = new Set(selected);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setSelected(next);
+    };
+
+    const toggleAll = () => {
+        if (selected.size === dependencies.length) {
+            setSelected(new Set());
+        } else {
+            setSelected(new Set(dependencies.map(d => d.modId)));
+        }
+    };
+
     const getIconUrl = (path?: string) => {
         if (!path) return '/assets/favicon.svg';
         return path.startsWith('http') ? path : `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
@@ -295,39 +312,66 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden relative flex flex-col max-h-[85dvh]">
                 <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50/50 dark:bg-black/20 shrink-0">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <LinkIcon className="w-5 h-5 text-emerald-500" /> Bundle Download
+                        <LinkIcon className="w-5 h-5 text-emerald-500" /> Dependencies
                     </h3>
                     <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500" /></button>
                 </div>
 
                 <div className="p-6 space-y-4 overflow-y-auto bg-slate-50/50 dark:bg-slate-900 custom-scrollbar">
-                    <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
-                        This mod requires the following dependencies. We recommend downloading the bundle, which includes everything in a single zip file.
+                    <div className="flex items-center justify-between">
+                        <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                            Select dependencies to include in your bundle download.
+                        </div>
+                        <button onClick={toggleAll} className="text-xs font-bold text-modtale-accent hover:underline">
+                            {selected.size === dependencies.length ? 'Deselect All' : 'Select All'}
+                        </button>
                     </div>
 
                     <div className="space-y-2">
                         {dependencies.map(dep => {
                             const meta = metaCache[dep.modId];
+                            const isSelected = selected.has(dep.modId);
 
                             return (
                                 <div
                                     key={dep.modId}
-                                    className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 shadow-sm"
+                                    className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm transition-all cursor-pointer group ${
+                                        isSelected
+                                            ? 'border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 hover:bg-emerald-50 dark:hover:bg-emerald-500/20'
+                                            : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:border-blue-400 dark:hover:border-blue-500'
+                                    }`}
+                                    onClick={() => toggleDep(dep.modId)}
                                 >
                                     <div className="flex items-center gap-4 min-w-0">
-                                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1">
+                                        {isSelected ? (
+                                            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
+                                                <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 flex items-center justify-center shrink-0 shadow-sm transition-colors group-hover:border-blue-400" />
+                                        )}
+
+                                        <Link
+                                            to={`/mod/${createSlug(meta?.title || dep.modTitle || dep.modId, dep.modId)}`}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1 hover:border-modtale-accent/50 hover:shadow-md transition-all"
+                                        >
                                             <img
                                                 src={getIconUrl(meta?.icon)}
                                                 alt=""
                                                 className="w-full h-full object-cover rounded-lg"
                                                 onError={(e) => e.currentTarget.src='/assets/favicon.svg'}
                                             />
-                                        </div>
+                                        </Link>
 
                                         <div className="min-w-0">
-                                            <div className="font-bold text-slate-900 dark:text-white truncate">
+                                            <Link
+                                                to={`/mod/${createSlug(meta?.title || dep.modTitle || dep.modId, dep.modId)}`}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="font-bold text-slate-900 dark:text-white truncate hover:text-modtale-accent transition-colors block"
+                                            >
                                                 {meta?.title || dep.modTitle || dep.modId}
-                                            </div>
+                                            </Link>
                                             <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1 flex items-center gap-1.5">
                                                 <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
                                                 <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
@@ -346,23 +390,47 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                             );
                         })}
                     </div>
+
+                    {missingRequired && (
+                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 shadow-sm">
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <p>Some <span className="font-bold">Required</span> dependencies are unchecked.</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-black/20 flex flex-col gap-3 shrink-0">
-                    <button
-                        onClick={onDownloadBundle}
-                        className="w-full px-6 py-3 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 bg-modtale-accent hover:bg-blue-500 text-white text-base active:scale-[0.98]"
-                    >
-                        <Download className="w-5 h-5" /> Download Bundle (.zip)
-                    </button>
-                    <div className="flex gap-2">
-                        <button onClick={onClose} className="flex-1 px-5 py-2.5 font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-colors text-sm">
-                            Cancel
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                            onClick={onDownloadModOnly}
+                            className="w-full px-5 py-3 font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-xl transition-all text-sm flex items-center justify-center gap-2 group h-full shadow-sm"
+                        >
+                            <div className="p-1.5 bg-slate-100 dark:bg-black/20 rounded-lg group-hover:bg-slate-200 dark:group-hover:bg-black/40 transition-colors">
+                                <FileText className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <div className="flex flex-col items-start text-left">
+                                <span className="leading-tight">Just the Mod</span>
+                                <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">Without dependencies</span>
+                            </div>
                         </button>
-                        <button onClick={onDownloadModOnly} className="flex-1 px-5 py-2.5 font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-modtale-accent/50 rounded-xl transition-colors text-sm">
-                            Just the Mod
+
+                        <button
+                            onClick={() => onDownloadBundle(Array.from(selected))}
+                            disabled={selected.size === 0}
+                            className="w-full px-5 py-3 font-bold rounded-xl shadow-lg shadow-modtale-accent/20 transition-all flex items-center justify-center gap-2 bg-modtale-accent hover:bg-blue-500 text-white text-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-modtale-accent h-full group"
+                        >
+                            <div className="p-1.5 bg-white/20 rounded-lg">
+                                <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                            </div>
+                            <div className="flex flex-col items-start text-left">
+                                <span className="leading-tight">Download Bundle</span>
+                                <span className="text-[10px] font-normal text-blue-100">1 Mod + {selected.size} Dependencies</span>
+                            </div>
                         </button>
                     </div>
+                    <button onClick={onClose} className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors uppercase tracking-wider">
+                        Cancel
+                    </button>
                 </div>
             </div>
         </div>

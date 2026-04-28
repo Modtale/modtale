@@ -947,7 +947,7 @@ public class ModService {
                 Map<String, Object> body = new HashMap<>();
                 body.put("username", "Modtale Admin Bot");
                 body.put("avatar_url", frontendUrl + "/assets/favicon.png");
-                body.put("content", "⚠️ **Verification Required**");
+                body.put("content", "?? **Verification Required**");
                 body.put("embeds", List.of(embed));
 
                 logger.info("Triggering Admin Discord Webhook for pending project {}", mod.getId());
@@ -999,7 +999,7 @@ public class ModService {
                 Map<String, Object> body = new HashMap<>();
                 body.put("username", "Modtale Warden");
                 body.put("avatar_url", frontendUrl + "/assets/favicon.png");
-                body.put("content", "🚨 **Malicious or Flagged File Detected**");
+                body.put("content", "? **Malicious or Flagged File Detected**");
                 body.put("embeds", List.of(embed));
 
                 logger.info("Triggering Admin Discord Webhook for flagged version {}", version != null ? version.getId() : "unknown");
@@ -2259,7 +2259,7 @@ public class ModService {
         return zipBytes;
     }
 
-    public byte[] generateBundleZip(Mod mainMod, ModVersion mainVersion) throws IOException {
+    public byte[] generateBundleZip(Mod mainMod, ModVersion mainVersion, List<String> selectedDependencies) throws IOException {
         User user = userService.getCurrentUser();
 
         if (user != null) {
@@ -2294,6 +2294,10 @@ public class ModService {
 
             if (mainVersion.getDependencies() != null) {
                 for (ModDependency dep : mainVersion.getDependencies()) {
+                    if (selectedDependencies != null && !selectedDependencies.contains(dep.getModId())) {
+                        continue;
+                    }
+
                     Mod depMod = getRawModById(dep.getModId());
                     if (depMod == null) continue;
 
