@@ -1219,7 +1219,7 @@ export const ModDetail: React.FC<{
                                     </button>
                                 )}
                             </div>
-                            <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-600">?</span>
+                            <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
                             <span suppressHydrationWarning className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
                                 <Calendar className="w-3 h-3" aria-hidden="true" /> Updated <span suppressHydrationWarning>{formatTimeAgo(mod.updatedAt)}</span>
                             </span>
