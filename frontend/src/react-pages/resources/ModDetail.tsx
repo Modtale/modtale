@@ -948,7 +948,7 @@ export const ModDetail: React.FC<{
         }
     }, [mod?.classification]);
 
-    const executeDownload = async (fileUrl: string, ver?: string, asBundle: boolean = false) => {
+    const executeDownload = async (fileUrl: string, ver?: string, asBundle: boolean = false, selectedDeps?: string[]) => {
         try {
             if (!ver) {
                 const targetUrl = `${API_BASE_URL}/files/download/${encodeURI(fileUrl)}`;
@@ -970,7 +970,7 @@ export const ModDetail: React.FC<{
             }
 
             const endpoint = asBundle
-                ? `/projects/${mod?.id}/versions/${ver}/download-bundle-url`
+                ? `/projects/${mod?.id}/versions/${ver}/download-bundle-url${selectedDeps ? `?deps=${selectedDeps.join(',')}` : ''}`
                 : `/projects/${mod?.id}/versions/${ver}/download-url`;
 
             const response = await api.get(endpoint);
@@ -1086,7 +1086,7 @@ export const ModDetail: React.FC<{
                 <DependencyModal
                     dependencies={pendingDownloadVer.deps}
                     onClose={() => setPendingDownloadVer(null)}
-                    onDownloadBundle={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, true)}
+                    onDownloadBundle={(selectedDeps) => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, true, selectedDeps)}
                     onDownloadModOnly={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, false)}
                 />
             )}
@@ -1219,7 +1219,7 @@ export const ModDetail: React.FC<{
                                     </button>
                                 )}
                             </div>
-                            <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-600">•</span>
+                            <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-600">?</span>
                             <span suppressHydrationWarning className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
                                 <Calendar className="w-3 h-3" aria-hidden="true" /> Updated <span suppressHydrationWarning>{formatTimeAgo(mod.updatedAt)}</span>
                             </span>

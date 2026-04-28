@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -21,17 +22,20 @@ public class DownloadTokenService {
         private final String projectId;
         private final String version;
         private final Instant expiresAt;
+        private final List<String> selectedDependencies;
         private boolean used;
 
-        public DownloadToken(String projectId, String version, Instant expiresAt) {
+        public DownloadToken(String projectId, String version, List<String> selectedDependencies, Instant expiresAt) {
             this.projectId = projectId;
             this.version = version;
+            this.selectedDependencies = selectedDependencies;
             this.expiresAt = expiresAt;
             this.used = false;
         }
 
         public String getProjectId() { return projectId; }
         public String getVersion() { return version; }
+        public List<String> getSelectedDependencies() { return selectedDependencies; }
         public Instant getExpiresAt() { return expiresAt; }
         public boolean isUsed() { return used; }
         public void markAsUsed() { this.used = true; }
@@ -41,7 +45,7 @@ public class DownloadTokenService {
         }
     }
 
-    public String generateToken(String projectId, String version) {
+    public String generateToken(String projectId, String version, List<String> selectedDependencies) {
         cleanExpiredTokens();
 
         byte[] randomBytes = new byte[TOKEN_LENGTH];
@@ -49,9 +53,13 @@ public class DownloadTokenService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
 
         Instant expiresAt = Instant.now().plusSeconds(TOKEN_VALIDITY_MINUTES * 60);
-        tokens.put(token, new DownloadToken(projectId, version, expiresAt));
+        tokens.put(token, new DownloadToken(projectId, version, selectedDependencies, expiresAt));
 
         return token;
+    }
+
+    public String generateToken(String projectId, String version) {
+        return generateToken(projectId, version, null);
     }
 
     public DownloadToken validateAndConsume(String token) {
