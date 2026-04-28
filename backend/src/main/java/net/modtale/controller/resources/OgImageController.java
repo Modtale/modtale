@@ -112,7 +112,7 @@ public class OgImageController {
         }
     }
 
-    @GetMapping(value = {"/project/{identifier}", "/project/{identifier}.png", "/project/{identifier}.jpg"})
+    @GetMapping(value = {"/project/{identifier}", "/project/{identifier}.png", "/project/{identifier}.jpg", "/project/{identifier}.jpeg"})
     public ResponseEntity<ByteArrayResource> generateOgImage(
             @PathVariable String identifier,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
@@ -120,7 +120,7 @@ public class OgImageController {
     ) {
         try {
             String uri = request.getRequestURI();
-            boolean isJpg = uri.endsWith(".jpg");
+            boolean isJpg = uri.endsWith(".jpg") || uri.endsWith(".jpeg");
             String formatName = isJpg ? "jpg" : "png";
             MediaType mediaType = isJpg ? MediaType.IMAGE_JPEG : MediaType.IMAGE_PNG;
 
@@ -152,7 +152,7 @@ public class OgImageController {
             BufferedImage banner = bannerFuture.get(2, TimeUnit.SECONDS);
             BufferedImage icon = iconFuture.get(2, TimeUnit.SECONDS);
 
-            byte[] imageBytes = renderImage(mod, banner, icon, formatName);
+            byte[] imageBytes = renderImage(mod, banner, icon, formatName, isJpg);
             renderCache.put(cacheKey, new CachedRender(imageBytes, versionKey));
 
             return serveImage(imageBytes, versionKey, mediaType);
@@ -213,10 +213,12 @@ public class OgImageController {
         }
     }
 
-    private byte[] renderImage(Mod mod, BufferedImage banner, BufferedImage icon, String format) throws Exception {
+    private byte[] renderImage(Mod mod, BufferedImage banner, BufferedImage icon, String format, boolean isJpg) throws Exception {
         int width = 1200;
         int height = 950;
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+        int imageType = isJpg ? BufferedImage.TYPE_INT_RGB : BufferedImage.TYPE_INT_ARGB;
+        BufferedImage image = new BufferedImage(width, height, imageType);
         Graphics2D g2d = image.createGraphics();
 
         setupRenderingHints(g2d);
