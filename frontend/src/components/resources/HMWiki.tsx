@@ -1,4 +1,3 @@
-// components/resources/HMWiki.tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';

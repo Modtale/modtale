@@ -1086,7 +1086,8 @@ export const ModDetail: React.FC<{
                 <DependencyModal
                     dependencies={pendingDownloadVer.deps}
                     onClose={() => setPendingDownloadVer(null)}
-                    onConfirm={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, true)}
+                    onDownloadBundle={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, true)}
+                    onDownloadModOnly={() => executeDownload(pendingDownloadVer.url, pendingDownloadVer.ver, false)}
                 />
             )}
 

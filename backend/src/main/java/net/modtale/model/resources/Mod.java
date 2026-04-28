@@ -139,7 +139,6 @@ public class Mod {
 
     private String approvedBy;
 
-    // Deprecated fields mapped to String
     private List<String> contributors = new ArrayList<>();
     private List<String> pendingInvites = new ArrayList<>();
 

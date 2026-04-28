@@ -294,7 +294,6 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 </div>
             )}
 
-            {/* GLASS CARD */}
             <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300 ${glassCardMargin}`}>
                 <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl p-6 md:px-10 md:pb-6 flex flex-col md:flex-row gap-4 md:gap-10 items-start transition-colors ${
                     isEditing ? 'md:pt-8' : 'md:pt-10'
