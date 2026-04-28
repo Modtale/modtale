@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.weisj.jsvg.SVGDocument;
 import com.github.weisj.jsvg.parser.SVGLoader;
+import jakarta.servlet.http.HttpServletRequest;
 import net.modtale.model.resources.Mod;
 import net.modtale.service.resources.ModService;
 import org.springframework.core.io.ByteArrayResource;
@@ -104,21 +105,25 @@ public class OgImageController {
     private static class CachedRender {
         final byte[] data;
         final String versionHash;
-        final long timestamp;
 
         CachedRender(byte[] data, String versionHash) {
             this.data = data;
             this.versionHash = versionHash;
-            this.timestamp = System.currentTimeMillis();
         }
     }
 
     @GetMapping(value = {"/project/{identifier}", "/project/{identifier}.png", "/project/{identifier}.jpg"})
     public ResponseEntity<ByteArrayResource> generateOgImage(
             @PathVariable String identifier,
-            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
+            HttpServletRequest request
     ) {
         try {
+            String uri = request.getRequestURI();
+            boolean isJpg = uri.endsWith(".jpg");
+            String formatName = isJpg ? "jpg" : "png";
+            MediaType mediaType = isJpg ? MediaType.IMAGE_JPEG : MediaType.IMAGE_PNG;
+
             Mod mod = modService.getModById(identifier);
             if (mod == null) return ResponseEntity.notFound().build();
 
@@ -131,9 +136,10 @@ public class OgImageController {
                         .build();
             }
 
-            CachedRender cached = renderCache.getIfPresent(mod.getId());
+            String cacheKey = mod.getId() + ":" + formatName;
+            CachedRender cached = renderCache.getIfPresent(cacheKey);
             if (cached != null && cached.versionHash.equals(versionKey)) {
-                return serveImage(cached.data, versionKey);
+                return serveImage(cached.data, versionKey, mediaType);
             }
 
             CompletableFuture<BufferedImage> bannerFuture = CompletableFuture.supplyAsync(() ->
@@ -146,10 +152,10 @@ public class OgImageController {
             BufferedImage banner = bannerFuture.get(2, TimeUnit.SECONDS);
             BufferedImage icon = iconFuture.get(2, TimeUnit.SECONDS);
 
-            byte[] imageBytes = renderImage(mod, banner, icon);
-            renderCache.put(mod.getId(), new CachedRender(imageBytes, versionKey));
+            byte[] imageBytes = renderImage(mod, banner, icon, formatName);
+            renderCache.put(cacheKey, new CachedRender(imageBytes, versionKey));
 
-            return serveImage(imageBytes, versionKey);
+            return serveImage(imageBytes, versionKey, mediaType);
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -173,11 +179,11 @@ public class OgImageController {
         }
     }
 
-    private ResponseEntity<ByteArrayResource> serveImage(byte[] bytes, String etag) {
+    private ResponseEntity<ByteArrayResource> serveImage(byte[] bytes, String etag, MediaType contentType) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
                 .eTag(etag)
-                .contentType(MediaType.IMAGE_JPEG)
+                .contentType(contentType)
                 .contentLength(bytes.length)
                 .body(new ByteArrayResource(bytes));
     }
@@ -207,10 +213,10 @@ public class OgImageController {
         }
     }
 
-    private byte[] renderImage(Mod mod, BufferedImage banner, BufferedImage icon) throws Exception {
+    private byte[] renderImage(Mod mod, BufferedImage banner, BufferedImage icon, String format) throws Exception {
         int width = 1200;
         int height = 950;
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = image.createGraphics();
 
         setupRenderingHints(g2d);
@@ -229,7 +235,7 @@ public class OgImageController {
         g2d.dispose();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(image, "jpeg", baos);
+        ImageIO.write(image, format, baos);
         return baos.toByteArray();
     }
 
@@ -296,20 +302,17 @@ public class OgImageController {
 
         int textX = iconX;
 
-        // Title Noticeably Bolded
         int titleY = iconY + iconSize + 65;
         g2d.setFont(new Font("Impact", Font.BOLD, 56));
         g2d.setColor(TEXT_PRIMARY);
         String title = truncateText(g2d, mod.getTitle(), cardW - (PROJECT_PADDING * 2));
         g2d.drawString(title, textX, titleY);
 
-        // Increased padding with author name
         int authorY = titleY + 60;
         g2d.setFont(new Font("SansSerif", Font.PLAIN, 32));
         g2d.setColor(TEXT_SECONDARY);
         g2d.drawString("by " + mod.getAuthor(), textX, authorY);
 
-        // Increased padding between author and description
         int descY = authorY + 60;
         g2d.setFont(new Font("SansSerif", Font.PLAIN, 36));
         g2d.setColor(TEXT_DESC);
@@ -427,9 +430,7 @@ public class OgImageController {
         int downloadWidth = drawStatWithIcon(g2d, -1000, y, "download", downloadVal);
         int heartWidth = drawStatWithIcon(g2d, -1000, y, "heart", heartVal);
 
-        int totalWidth = downloadWidth + STAT_GAP + heartWidth;
         int currentX = leftX;
-
         drawStatWithIcon(g2d, currentX, y, "download", downloadVal);
         currentX += downloadWidth + STAT_GAP;
         drawStatWithIcon(g2d, currentX, y, "heart", heartVal);
@@ -437,7 +438,6 @@ public class OgImageController {
 
     private int drawStatWithIcon(Graphics2D g2d, int x, int y, String iconType, String value) {
         FontMetrics fm = g2d.getFontMetrics();
-        int iconW = 22;
         int textXOffset = 38;
 
         if (x != -1000) {
@@ -466,14 +466,12 @@ public class OgImageController {
             } else {
                 Path2D heart = new Path2D.Float();
                 heart.moveTo(12, 21.35);
-
                 heart.curveTo(12, 21.35, 2.5, 13, 2.5, 8.5);
                 heart.curveTo(2.5, 5, 5, 3, 8, 3);
                 heart.curveTo(10, 3, 11, 4, 12, 5.5);
                 heart.curveTo(13, 4, 14, 3, 16, 3);
                 heart.curveTo(19, 3, 21.5, 5, 21.5, 8.5);
                 heart.curveTo(21.5, 13, 12, 21.35, 12, 21.35);
-
                 iconG.draw(heart);
             }
             iconG.dispose();
@@ -520,7 +518,6 @@ public class OgImageController {
         if (text == null || text.isEmpty()) return;
 
         FontMetrics fm = g2d.getFontMetrics();
-        // Decreased line-height from +12 to +4
         int lineHeight = fm.getHeight() + 4;
         String[] words = text.split("\\s+");
         StringBuilder currentLine = new StringBuilder();
