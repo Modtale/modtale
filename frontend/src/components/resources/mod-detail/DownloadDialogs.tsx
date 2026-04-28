@@ -340,6 +340,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                         {dependencies.map(dep => {
                             const meta = metaCache[dep.modId];
                             const isSelected = selected.has(dep.modId);
+                            const isRequiredMissing = !dep.isOptional && !isSelected;
 
                             return (
                                 <div
@@ -347,7 +348,9 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                                     className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm transition-all cursor-pointer group ${
                                         isSelected
                                             ? 'border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 hover:bg-emerald-50 dark:hover:bg-emerald-500/20'
-                                            : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:border-blue-400 dark:hover:border-blue-500'
+                                            : isRequiredMissing
+                                                ? 'border-red-400 dark:border-red-500/50 bg-red-50/50 dark:bg-red-900/20 hover:border-red-500'
+                                                : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:border-blue-400 dark:hover:border-blue-500'
                                     }`}
                                     onClick={() => toggleDep(dep.modId)}
                                 >
@@ -355,6 +358,10 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                                         {isSelected ? (
                                             <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
                                                 <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                                            </div>
+                                        ) : isRequiredMissing ? (
+                                            <div className="w-6 h-6 rounded-full border-2 border-red-400 dark:border-red-500 bg-red-50 dark:bg-red-900/50 flex items-center justify-center shrink-0 shadow-sm transition-colors group-hover:bg-red-100 dark:group-hover:bg-red-900/80 text-red-500">
+                                                <span className="text-[14px] font-black leading-none">!</span>
                                             </div>
                                         ) : (
                                             <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 flex items-center justify-center shrink-0 shadow-sm transition-colors group-hover:border-blue-400" />
@@ -380,8 +387,10 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex-shrink-0 ml-4">
-                                        {!dep.isOptional ? (
+                                    <div className="flex-shrink-0 ml-4 flex items-center">
+                                        {isRequiredMissing ? (
+                                            <span className="text-[10px] font-black uppercase bg-red-500 text-white px-2.5 py-1 rounded-md shadow-md flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Required</span>
+                                        ) : !dep.isOptional ? (
                                             <span className="text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-500/30">Required</span>
                                         ) : (
                                             <span className="text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10">Optional</span>
@@ -393,9 +402,9 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({ dependencies, 
                     </div>
 
                     {missingRequired && (
-                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 shadow-sm">
-                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <p>Some <span className="font-bold">Required</span> dependencies are unchecked.</p>
+                        <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 p-3 rounded-xl border border-red-200 dark:border-red-500/20 shadow-sm">
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 animate-pulse" />
+                            <p>You have unselected <span className="font-bold">Required</span> dependencies. The mod may not function correctly without them.</p>
                         </div>
                     )}
                 </div>
