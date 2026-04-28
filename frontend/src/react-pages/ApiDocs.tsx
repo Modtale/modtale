@@ -649,7 +649,12 @@ export const ApiDocs: React.FC = () => {
                                 method="GET"
                                 path="/api/v1/projects/{id}/versions/{version}/download-bundle-url"
                                 auth={true}
-                                desc="Generate a temporary, signed download link to download a mod and all its dependencies bundled."
+                                desc="Generate a temporary, signed download link to download a mod and its dependencies bundled."
+                                params={{
+                                    "id": "string (Project UUID or Slug)",
+                                    "version": "string (SemVer)",
+                                    "deps": "string[] (Optional, list of dependency project IDs to include)"
+                                }}
                                 response={`{
   "downloadUrl": "/api/v1/download-bundle/token-uuid",
   "expiresIn": 300
