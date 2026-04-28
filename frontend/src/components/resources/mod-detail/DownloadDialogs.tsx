@@ -197,18 +197,27 @@ export const PostDownloadModal: React.FC<{
                                     </div>
 
                                     {isBundle ? (
-                                        <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
-                                            <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
-                                            <div className="w-full min-w-0 pt-1.5">
-                                                <p className="mb-3">Extract the downloaded zip file (named something like <span className="font-mono text-xs">mod-name-UNZIP-ME.zip</span>) and place ALL the files into your Hytale Mods directory:</p>
-                                                <div className="flex items-center gap-3 bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl p-2 pl-3">
-                                                    <code className="flex-1 font-mono text-[11px] text-slate-600 dark:text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
-                                                    <button onClick={handleCopy} className="p-2 rounded-lg bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-transparent text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors shadow-sm shrink-0 self-start" title="Copy Path">
-                                                        {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                                                    </button>
+                                        <>
+                                            <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
+                                                <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
+                                                <div className="w-full min-w-0 pt-1.5">
+                                                    <p className="font-bold text-modtale-accent mb-1 flex items-center gap-1.5"><AlertCircle className="w-4 h-4"/> Important: Unzip the file!</p>
+                                                    <p className="text-slate-600 dark:text-slate-400">Right-click the downloaded bundle (named <code className="font-mono text-[10px] bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-slate-800 dark:text-slate-200">-UNZIP-ME.zip</code>) and select <strong>Extract All</strong>.</p>
                                                 </div>
                                             </div>
-                                        </div>
+                                            <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
+                                                <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>3</div>
+                                                <div className="w-full min-w-0 pt-1.5">
+                                                    <p className="mb-3">Move <strong>ALL</strong> of the extracted mod files into your Hytale Mods directory:</p>
+                                                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-xl p-2 pl-3">
+                                                        <code className="flex-1 font-mono text-[11px] text-slate-600 dark:text-slate-400 break-all select-all leading-relaxed">{paths[os]}</code>
+                                                        <button onClick={handleCopy} className="p-2 rounded-lg bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-transparent text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors shadow-sm shrink-0 self-start" title="Copy Path">
+                                                            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
                                     ) : (
                                         <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
                                             <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
@@ -225,9 +234,9 @@ export const PostDownloadModal: React.FC<{
                                     )}
 
                                     <div className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 shadow-sm">
-                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>3</div>
+                                        <div className={`w-8 h-8 rounded-full ${theme.bgAlpha} ${theme.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>{isBundle ? '4' : '3'}</div>
                                         <div className="pt-1.5">
-                                            Restart your Hytale Launcher to load the new mod.
+                                            Restart your Hytale Launcher to load the new mod{isBundle && 's'}.
                                         </div>
                                     </div>
                                 </>
