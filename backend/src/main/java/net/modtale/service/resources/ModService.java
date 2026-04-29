@@ -633,7 +633,6 @@ public class ModService {
         }
 
         mod.setStatus("DRAFT");
-        mod.setUpdatedAt(LocalDateTime.now().toString());
         mod.setVersions(new ArrayList<>());
         mod.setAllowModpacks(true);
         mod.setAllowComments(true);
@@ -666,7 +665,6 @@ public class ModService {
 
         mod.setStatus("PENDING");
         mod.setExpiresAt(null);
-        mod.setUpdatedAt(LocalDateTime.now().toString());
 
         if (mod.getVersions() != null) {
             for (ModVersion version : mod.getVersions()) {
@@ -1486,7 +1484,6 @@ public class ModService {
         if (updatedMod.getLinks() != null) existing.setLinks(updatedMod.getLinks());
         if (updatedMod.getImageUrl() != null) existing.setImageUrl(updatedMod.getImageUrl());
 
-        existing.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(existing);
         evictProjectDetails(existing);
 
@@ -1506,7 +1503,6 @@ public class ModService {
         }
         String path = storageService.upload(file, "images");
         mod.setImageUrl(storageService.getPublicUrl(path));
-        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
         evictProjectDetails(mod);
     }
@@ -1523,7 +1519,6 @@ public class ModService {
 
         String path = storageService.upload(file, "images");
         mod.setBannerUrl(storageService.getPublicUrl(path));
-        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
         evictProjectDetails(mod);
     }
@@ -1601,7 +1596,6 @@ public class ModService {
             }
         }
 
-        mod.setUpdatedAt(LocalDateTime.now().toString());
         modRepository.save(mod);
         evictProjectDetails(mod);
     }
