@@ -1115,7 +1115,11 @@ public class ModService {
         combined.addAll(pendingVersions);
 
         List<Mod> result = new ArrayList<>(combined);
-        result.sort(Comparator.comparing(Mod::getUpdatedAt));
+        result.sort((a, b) -> {
+            String d1 = a.getUpdatedAt() == null ? "" : a.getUpdatedAt();
+            String d2 = b.getUpdatedAt() == null ? "" : b.getUpdatedAt();
+            return d1.compareTo(d2);
+        });
         return result;
     }
 

@@ -29,7 +29,11 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         );
     }
 
-    const sortedProjects = [...pendingProjects].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+    const sortedProjects = [...pendingProjects].sort((a, b) => {
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return timeA - timeB;
+    });
 
     const renderQueueItem = (mod: Mod) => {
         const isProjectPending = mod.status === 'PENDING';
@@ -62,7 +66,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                         </div>
                         <div className="flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 dark:bg-white/5 px-3 py-1.5 rounded-lg uppercase tracking-wider">
                             <Clock className="w-3 h-3" />
-                            {mod.updatedAt}
+                            {mod.updatedAt || 'NEW'}
                         </div>
                     </div>
 
