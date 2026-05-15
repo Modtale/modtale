@@ -1,11 +1,12 @@
 package net.modtale.config.security;
 
 import net.modtale.config.auth.ApiKeyAuthFilter;
-import net.modtale.config.auth.CustomOAuth2UserService;
-import net.modtale.config.auth.CustomOidcUserService;
-import net.modtale.service.auth.CustomUserDetailsService;
-import net.modtale.service.user.UserService;
 import net.modtale.model.user.User;
+import net.modtale.service.auth.AuthenticationService;
+import net.modtale.service.auth.LocalUserDetailsService;
+import net.modtale.service.auth.OAuth2LoginService;
+import net.modtale.service.auth.OidcLoginService;
+import net.modtale.service.user.AccountService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,12 +62,14 @@ public class SecurityConfig {
 
     @Autowired private ApiKeyAuthFilter apiKeyAuthFilter;
     @Autowired private RateLimitFilter rateLimitFilter;
-    @Autowired private CustomOAuth2UserService customOAuth2UserService;
-    @Autowired private CustomOidcUserService customOidcUserService;
+    @Autowired private OAuth2LoginService oauth2LoginService;
+    @Autowired private OidcLoginService oidcLoginService;
     @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
-    @Autowired private CustomUserDetailsService userDetailsService;
+    @Autowired private LocalUserDetailsService userDetailsService;
     @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private UserService userService;
+
+    @Autowired private AccountService accountService;
+    @Autowired private AuthenticationService authenticationService;
 
     @PostConstruct
     public void logConfig() {
@@ -186,7 +189,7 @@ public class SecurityConfig {
                 })
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
-                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
+                .addFilterAfter(new net.modtale.config.security.CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
@@ -198,8 +201,8 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService)
-                                .oidcUserService(customOidcUserService)
+                                .userService(oauth2LoginService)
+                                .oidcUserService(oidcLoginService)
                         )
                         .authorizedClientRepository(authorizedClientRepository)
                         .successHandler(oauthSuccessHandler())
@@ -387,19 +390,19 @@ public class SecurityConfig {
                         LocalDateTime expiresAt = client.getAccessToken().getExpiresAt() != null ?
                                 LocalDateTime.ofInstant(client.getAccessToken().getExpiresAt(), ZoneId.systemDefault()) : null;
 
-                        User user = userService.getPublicProfile(login);
+                        User user = accountService.getPublicProfile(login);
                         if (user != null) {
-                            userService.updateProviderTokens(user.getId(), "gitlab", accessToken, refreshToken, expiresAt);
+                            accountService.updateProviderTokens(user.getId(), "gitlab", accessToken, refreshToken, expiresAt);
                         }
                     }
                 }
             }
 
-            User user = userService.getPublicProfile(login);
+            User user = accountService.getPublicProfile(login);
             boolean isLinking = Boolean.TRUE.equals(oauthUser.getAttribute("is_linking"));
 
             if (user != null && user.isMfaEnabled() && !isLinking) {
-                String preAuthToken = userService.generatePreAuthToken(user.getId());
+                String preAuthToken = authenticationService.generatePreAuthToken(user.getId());
 
                 SecurityContextHolder.clearContext();
 

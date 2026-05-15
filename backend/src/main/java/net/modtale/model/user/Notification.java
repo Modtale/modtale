@@ -22,7 +22,7 @@ public class Notification {
     private String iconUrl;
     private boolean isRead;
 
-    private String type;
+    private NotificationType type;
     private Map<String, String> metadata = new HashMap<>();
 
     @Indexed(expireAfterSeconds = 2592000)
@@ -31,16 +31,16 @@ public class Notification {
     public Notification() {}
 
     public Notification(String userId, String title, String message, URI link, String iconUrl) {
-        this(userId, title, message, link, iconUrl, "INFO", new HashMap<>());
+        this(userId, title, message, link, iconUrl, NotificationType.INFO, new HashMap<>());
     }
 
-    public Notification(String userId, String title, String message, URI link, String iconUrl, String type, Map<String, String> metadata) {
+    public Notification(String userId, String title, String message, URI link, String iconUrl, NotificationType type, Map<String, String> metadata) {
         this.userId = userId;
         this.title = title;
         this.message = message;
         this.link = link.toString();
         this.iconUrl = iconUrl;
-        this.type = type != null ? type : "INFO";
+        this.type = type != null ? type : NotificationType.INFO;
         this.metadata = metadata != null ? metadata : new HashMap<>();
         this.isRead = false;
         this.createdAt = LocalDateTime.now();
@@ -62,8 +62,8 @@ public class Notification {
     public void setRead(boolean read) { isRead = read; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public NotificationType getType() { return type; }
+    public void setType(NotificationType type) { this.type = type; }
     public Map<String, String> getMetadata() { return metadata; }
     public void setMetadata(Map<String, String> metadata) { this.metadata = metadata; }
 }
