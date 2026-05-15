@@ -1,6 +1,6 @@
 package net.modtale.model.analytics;
 
-import net.modtale.model.resources.ProjectMeta;
+import net.modtale.model.project.ProjectMeta;
 
 import java.util.List;
 import java.util.Map;

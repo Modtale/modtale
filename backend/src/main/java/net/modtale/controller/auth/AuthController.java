@@ -3,7 +3,8 @@ package net.modtale.controller.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import net.modtale.model.user.User;
-import net.modtale.service.user.UserService;
+import net.modtale.service.user.AccountService;
+import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.TwoFactorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,13 +23,14 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    @Autowired private UserService userService;
+    @Autowired private AuthenticationService authenticationService;
+    @Autowired private AccountService accountService;
     @Autowired private TwoFactorService twoFactorService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            User user = userService.registerUser(request.username, request.email, request.password);
+            User user = authenticationService.registerUser(request.username, request.email, request.password);
             return ResponseEntity.ok(Map.of("message", "User registered successfully", "username", user.getUsername()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -38,7 +40,7 @@ public class AuthController {
     @PostMapping("/verify")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         try {
-            userService.verifyEmail(token);
+            authenticationService.verifyEmail(token);
             return ResponseEntity.ok(Map.of("message", "Email verified successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -47,10 +49,10 @@ public class AuthController {
 
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerification() {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
-            userService.resendVerificationEmail(user);
+            authenticationService.resendVerificationEmail(user);
             return ResponseEntity.ok(Map.of("message", "Verification email sent"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -61,14 +63,14 @@ public class AuthController {
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         if (email == null || email.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
-        userService.initiatePasswordReset(email);
+        authenticationService.initiatePasswordReset(email);
         return ResponseEntity.ok(Map.of("message", "If an account exists for that email, a password reset link has been sent."));
     }
 
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
         try {
-            userService.completePasswordReset(request.token, request.password);
+            authenticationService.completePasswordReset(request.token, request.password);
             return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now login."));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -77,14 +79,14 @@ public class AuthController {
 
     @PutMapping("/credentials")
     public ResponseEntity<?> updateCredentials(@RequestBody Map<String, String> payload) {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
         String email = payload.get("email");
         String password = payload.get("password");
 
         try {
-            userService.addCredentials(user.getId(), email, password);
+            authenticationService.addCredentials(user.getId(), email, password);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -93,14 +95,14 @@ public class AuthController {
 
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> payload) {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
         String currentPassword = payload.get("currentPassword");
         String newPassword = payload.get("newPassword");
 
         try {
-            userService.changePassword(user.getId(), currentPassword, newPassword);
+            authenticationService.changePassword(user.getId(), currentPassword, newPassword);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -109,12 +111,12 @@ public class AuthController {
 
     @GetMapping("/mfa/setup")
     public ResponseEntity<?> setupMfa() {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         if (user.isMfaEnabled()) return ResponseEntity.badRequest().body(Map.of("error", "MFA is already enabled."));
 
         String secret = twoFactorService.generateNewSecret();
-        userService.setTempMfaSecret(user.getId(), secret);
+        authenticationService.setTempMfaSecret(user.getId(), secret);
 
         String qrCode = twoFactorService.generateQrCodeImageUri(secret, user.getUsername());
         return ResponseEntity.ok(Map.of("secret", secret, "qrCode", qrCode));
@@ -122,7 +124,7 @@ public class AuthController {
 
     @PostMapping("/mfa/verify")
     public ResponseEntity<?> verifyMfaSetup(@RequestBody Map<String, String> body) {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
         String code = body.get("code");
@@ -133,7 +135,7 @@ public class AuthController {
         String secret = user.getMfaSecret();
 
         if (twoFactorService.isOtpValid(secret, code)) {
-            userService.enableMfa(user.getId());
+            authenticationService.enableMfa(user.getId());
             return ResponseEntity.ok(Map.of("message", "MFA enabled successfully"));
         } else {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid verification code. 2FA not enabled."));
@@ -146,10 +148,10 @@ public class AuthController {
         String password = body.get("password");
 
         try {
-            User user = userService.authenticate(username, password);
+            User user = authenticationService.authenticate(username, password);
 
             if (user.isMfaEnabled()) {
-                String preAuthToken = userService.generatePreAuthToken(user.getId());
+                String preAuthToken = authenticationService.generatePreAuthToken(user.getId());
                 return ResponseEntity.accepted().body(Map.of("mfa_required", true, "pre_auth_token", preAuthToken));
             } else {
                 createSession(user, request);
@@ -165,7 +167,7 @@ public class AuthController {
         String preAuthToken = body.get("pre_auth_token");
         String code = body.get("code");
 
-        User user = userService.validatePreAuthToken(preAuthToken);
+        User user = authenticationService.validatePreAuthToken(preAuthToken);
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Session expired or invalid. Please login again."));
         }

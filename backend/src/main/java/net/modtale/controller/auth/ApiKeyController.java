@@ -2,7 +2,7 @@ package net.modtale.controller.auth;
 
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.user.UserService;
+import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.ApiKeyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,7 @@ public class ApiKeyController {
     private ApiKeyService apiKeyService;
 
     @Autowired
-    private UserService userService;
+    private AccountService accountService;
 
     public static class CreateKeyRequest {
         private String name;
@@ -35,7 +35,7 @@ public class ApiKeyController {
 
     @GetMapping
     public ResponseEntity<List<ApiKey>> getMyKeys() {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         List<ApiKey> keys = apiKeyService.getMyKeys(user.getId());
@@ -47,7 +47,7 @@ public class ApiKeyController {
 
     @PostMapping
     public ResponseEntity<?> createKey(@RequestBody CreateKeyRequest payload) {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         if (!user.isEmailVerified()) {
@@ -72,7 +72,7 @@ public class ApiKeyController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> revokeKey(@PathVariable String id) {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         apiKeyService.revokeKey(id, user.getId());

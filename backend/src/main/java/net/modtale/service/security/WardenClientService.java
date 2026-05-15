@@ -1,6 +1,7 @@
 package net.modtale.service.security;
 
-import net.modtale.model.resources.ScanResult;
+import net.modtale.model.project.ScanResult;
+import net.modtale.model.project.ScanStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +36,7 @@ public class WardenClientService {
         if (!wardenEnabled) {
             logger.warn("Warden scanner is DISABLED. Returning MOCK 'CLEAN' result for file: {}", filename);
             ScanResult mockResult = new ScanResult();
-            mockResult.setStatus("CLEAN");
+            mockResult.setStatus(ScanStatus.CLEAN);
             mockResult.setRiskScore(0);
             mockResult.setIssues(new ArrayList<>());
             mockResult.setScanTimestamp(System.currentTimeMillis());
@@ -63,7 +64,7 @@ public class WardenClientService {
         } catch (Exception e) {
             logger.error("Failed to communicate with Warden service: " + e.getMessage());
             ScanResult errorResult = new ScanResult();
-            errorResult.setStatus("FAILED");
+            errorResult.setStatus(ScanStatus.FAILED);
             errorResult.setRiskScore(-1);
             errorResult.setIssues(new ArrayList<>());
             return errorResult;

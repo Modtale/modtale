@@ -3,7 +3,7 @@ package net.modtale.controller.user;
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
 import net.modtale.service.user.ReportService;
-import net.modtale.service.user.UserService;
+import net.modtale.service.user.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,11 +16,11 @@ import java.util.Map;
 public class ReportController {
 
     @Autowired private ReportService reportService;
-    @Autowired private UserService userService;
+    @Autowired private AccountService accountService;
 
     @PostMapping("/reports")
     public ResponseEntity<?> submitReport(@RequestBody Map<String, String> payload) {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
         String targetId = payload.get("targetId");
@@ -53,7 +53,7 @@ public class ReportController {
 
     @PostMapping("/admin/reports/{id}/resolve")
     public ResponseEntity<?> resolveReport(@PathVariable String id, @RequestBody Map<String, String> payload) {
-        User admin = userService.getCurrentUser();
+        User admin = accountService.getCurrentUser();
         if (admin == null) return ResponseEntity.status(401).build();
 
         String statusStr = payload.get("status");
