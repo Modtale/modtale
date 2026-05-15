@@ -26,9 +26,11 @@ public class ProjectService {
 
     @Autowired private ProjectRepository projectRepository;
     @Autowired private UserRepository userRepository;
-    @Autowired private AccountService accountService;
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private CacheManager cacheManager;
+
+    @Lazy
+    @Autowired private AccountService accountService;
 
     @Lazy
     @Autowired private AccessControlService AccessControlService;

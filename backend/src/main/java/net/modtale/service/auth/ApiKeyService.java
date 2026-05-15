@@ -11,6 +11,7 @@ import net.modtale.service.user.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,9 +26,11 @@ public class ApiKeyService {
 
     @Autowired private ApiKeyRepository apiKeyRepository;
     @Autowired private UserRepository userRepository;
-    @Autowired private OrganizationService organizationService;
     @Autowired private ProjectRepository projectRepository;
     @Autowired private AccessControlService accessControlService;
+
+    @Lazy
+    @Autowired private OrganizationService organizationService;
 
     @Qualifier("taskExecutor")
     @Autowired private Executor taskExecutor;
@@ -225,7 +228,7 @@ public class ApiKeyService {
                 }
             } else {
                 Project project = projectRepository.findById(contextId).orElse(null);
-                if (project != null && !"DELETED".equals(project.getStatus())) {
+                if (project != null && !project.getStatus().name().equals("DELETED")) {
                     User user = userRepository.findById(apiKey.getUserId()).orElse(null);
 
                     if (accessControlService.isOwner(project, user)) {
