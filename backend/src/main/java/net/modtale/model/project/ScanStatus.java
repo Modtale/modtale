@@ -4,5 +4,7 @@ public enum ScanStatus {
     SCANNING,
     CLEAN,
     FAILED,
-    FLAGGED
+    FLAGGED,
+    SUSPICIOUS,
+    INFECTED
 }
