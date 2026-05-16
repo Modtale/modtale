@@ -1,6 +1,7 @@
 package net.modtale.controller.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import net.modtale.model.user.User;
 import net.modtale.service.user.AccountService;
@@ -13,7 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -26,6 +27,7 @@ public class AuthController {
     @Autowired private AuthenticationService authenticationService;
     @Autowired private AccountService accountService;
     @Autowired private TwoFactorService twoFactorService;
+    @Autowired private SecurityContextRepository securityContextRepository;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -143,7 +145,7 @@ public class AuthController {
     }
 
     @PostMapping("/signin")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> body, HttpServletRequest request, HttpServletResponse response) {
         String username = body.get("username");
         String password = body.get("password");
 
@@ -154,7 +156,7 @@ public class AuthController {
                 String preAuthToken = authenticationService.generatePreAuthToken(user.getId());
                 return ResponseEntity.accepted().body(Map.of("mfa_required", true, "pre_auth_token", preAuthToken));
             } else {
-                createSession(user, request);
+                createSession(user, request, response);
                 return ResponseEntity.ok(Map.of("status", "success"));
             }
         } catch (Exception e) {
@@ -163,7 +165,7 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/validate-login")
-    public ResponseEntity<?> validateLoginMfa(@RequestBody Map<String, String> body, HttpServletRequest request) {
+    public ResponseEntity<?> validateLoginMfa(@RequestBody Map<String, String> body, HttpServletRequest request, HttpServletResponse response) {
         String preAuthToken = body.get("pre_auth_token");
         String code = body.get("code");
 
@@ -174,7 +176,7 @@ public class AuthController {
 
         if (user.isMfaEnabled()) {
             if (twoFactorService.isOtpValid(user.getMfaSecret(), code)) {
-                createSession(user, request);
+                createSession(user, request, response);
                 return ResponseEntity.ok(Map.of("status", "success"));
             } else {
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid 2FA code"));
@@ -184,7 +186,9 @@ public class AuthController {
         return ResponseEntity.badRequest().build();
     }
 
-    private void createSession(User user, HttpServletRequest request) {
+    private void createSession(User user, HttpServletRequest request, HttpServletResponse response) {
+        HttpSession session = request.getSession(true);
+
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 user,
@@ -193,8 +197,8 @@ public class AuthController {
         );
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
-        HttpSession session = request.getSession(true);
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+
+        securityContextRepository.saveContext(context, request, response);
     }
 
     public static class RegisterRequest {

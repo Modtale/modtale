@@ -27,6 +27,27 @@ public class AccessControlService {
         return accountService.getCurrentUser() != null;
     }
 
+    public boolean hasPersonalPerm(String permStr, Authentication authentication) {
+        User user = accountService.getCurrentUser();
+        return user != null;
+    }
+
+    public boolean hasOrgPerm(String orgId, String permStr, Authentication authentication) {
+        User user = accountService.getCurrentUser();
+        if (user == null) return false;
+        if (isAdmin(user)) return true;
+
+        User org = userRepository.findById(orgId).orElse(null);
+        if (org == null) return false;
+
+        try {
+            ApiKey.ApiPermission perm = ApiKey.ApiPermission.valueOf(permStr);
+            return hasOrgPermission(org, user.getId(), perm);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     public boolean hasCreateProjectPerm(String ownerName, Authentication authentication) {
         User user = accountService.getCurrentUser();
         if (user == null) return false;
