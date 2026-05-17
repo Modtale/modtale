@@ -29,7 +29,7 @@ export interface User {
     email?: string;
     emailVerified?: boolean;
     createdAt?: string;
-    likedModIds: string[];
+    likedProjectIds: string[];
     followingIds?: string[];
     followerIds?: string[];
     connectedAccounts?: ConnectedAccount[];
@@ -49,9 +49,9 @@ export interface User {
     pendingOrgInvites?: OrganizationMember[];
 }
 
-export interface ModDependency {
-    modId: string;
-    modTitle: string;
+export interface ProjectDependency {
+    projectId: string;
+    projectTitle: string;
     versionNumber: string;
     isOptional?: boolean;
 }
@@ -82,7 +82,7 @@ export interface ProjectVersion {
     downloadCount: number;
     releaseDate: string;
     changelog?: string;
-    dependencies?: ModDependency[];
+    dependencies?: ProjectDependency[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     scanResult?: ScanResult;
     reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -119,7 +119,7 @@ export interface ProjectMember {
     avatarUrl?: string;
 }
 
-export interface Mod {
+export interface Project {
     id: string;
     slug?: string;
     title: string;
@@ -137,7 +137,7 @@ export interface Mod {
     favoriteCount: number;
     updatedAt: string;
     createdAt?: string;
-    modIds?: string[];
+    projectIds?: string[];
     childProjectIds?: string[];
     sizeBytes?: number;
     comments: Comment[];
@@ -159,9 +159,6 @@ export interface Mod {
     canEdit?: boolean;
     isOwner?: boolean;
 }
-
-export type Modpack = Mod;
-export type World = Mod;
 
 export interface AnalyticsDataPoint {
     date: string;

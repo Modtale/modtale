@@ -1,8 +1,8 @@
-import type { Mod, Modpack, World } from '../types';
+import type { Project } from '../types';
 import { getProjectUrl } from './slug';
 import {BACKEND_URL} from "@/utils/api.ts";
 
-export const generateItemListSchema = (items: (Mod | Modpack | World)[]) => {
+export const generateItemListSchema = (items: Project[]) => {
     if (!items || items.length === 0) return null;
 
     return {
