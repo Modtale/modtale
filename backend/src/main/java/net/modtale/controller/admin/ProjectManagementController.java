@@ -25,7 +25,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admin")
-public class AdminProjectController {
+public class ProjectManagementController {
 
     @Autowired private AccountService accountService;
     @Autowired private ProjectService projectService;

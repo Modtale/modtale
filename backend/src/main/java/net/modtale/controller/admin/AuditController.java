@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/admin")
-public class AdminAuditController {
+public class AuditController {
 
     @Autowired private AccountService accountService;
     @Autowired private AdminLogRepository adminLogRepository;

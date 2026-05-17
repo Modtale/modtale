@@ -22,7 +22,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/admin")
-public class AdminUserController {
+public class UserManagementController {
 
     @Autowired private AccountService accountService;
     @Autowired private UserManagementService userManagementService;
