@@ -24,9 +24,7 @@ public class OAuth2LoginService extends DefaultOAuth2UserService {
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         String provider = userRequest.getClientRegistration().getRegistrationId();
-
         OAuth2User oauthUser = super.loadUser(userRequest);
-
         String accessToken = userRequest.getAccessToken().getTokenValue();
 
         try {
@@ -35,15 +33,7 @@ public class OAuth2LoginService extends DefaultOAuth2UserService {
             if (currentAuth != null && currentAuth.isAuthenticated() &&
                     !currentAuth.getName().equals("anonymousUser")) {
 
-                User currentUser = null;
-
-                if (currentAuth.getPrincipal() instanceof User) {
-                    currentUser = (User) currentAuth.getPrincipal();
-                } else if (currentAuth.getPrincipal() instanceof OAuth2User) {
-                    String username = ((OAuth2User) currentAuth.getPrincipal()).getAttribute("login");
-                    if (username == null) username = currentAuth.getName();
-                    currentUser = accountService.getPublicProfile(username);
-                }
+                User currentUser = accountService.getCurrentUser();
 
                 if (currentUser != null) {
                     return authenticationService.linkAccount(currentUser, provider, oauthUser, accessToken);

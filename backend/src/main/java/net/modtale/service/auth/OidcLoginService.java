@@ -14,7 +14,6 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -39,8 +38,8 @@ public class OidcLoginService extends OidcUserService {
 
         try {
             Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
-            if (currentAuth != null && currentAuth.isAuthenticated() && !currentAuth.getName().equals("anonymousUser")) {
 
+            if (currentAuth != null && currentAuth.isAuthenticated() && !currentAuth.getName().equals("anonymousUser")) {
                 String pendingOrgId = (String) request.getSession().getAttribute("pending_org_link_id");
 
                 if (pendingOrgId != null) {
@@ -49,15 +48,7 @@ public class OidcLoginService extends OidcUserService {
                     return new CustomOidcUser(linkedUser, oidcUser.getIdToken(), oidcUser.getUserInfo());
                 }
 
-                User currentUser = null;
-
-                if (currentAuth.getPrincipal() instanceof User) {
-                    currentUser = (User) currentAuth.getPrincipal();
-                } else if (currentAuth.getPrincipal() instanceof OAuth2User) {
-                    String username = ((OAuth2User) currentAuth.getPrincipal()).getAttribute("login");
-                    if (username == null) username = currentAuth.getName();
-                    currentUser = accountService.getPublicProfile(username);
-                }
+                User currentUser = accountService.getCurrentUser();
 
                 if (currentUser != null) {
                     DefaultOAuth2User linkedUser = authenticationService.linkAccount(currentUser, provider, oidcUser, accessToken);
