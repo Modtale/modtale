@@ -124,7 +124,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative selection:bg-blue-500 selection:text-white overflow-x-hidden transition-colors duration-300">
             <Helmet>
-                <title>Projecttale - The Hytale Community Repository</title>
+                <title>Modtale - The Hytale Community Repository</title>
                 <meta name="description" content="The community repository for Hytale. Discover, download, and share Hytale worlds, plugins, asset packs, worlds, and projectpacks." />
                 <style>{`
                     @keyframes marquee-up {
@@ -166,13 +166,13 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl animate-in fade-in duration-500 py-4 lg:py-8 justify-center mx-auto lg:mx-0">
                             <img
                                 src="/assets/logo_light.svg"
-                                alt="Projecttale Logo"
+                                alt="Modtale Logo"
                                 className="h-14 sm:h-16 md:h-20 lg:h-24 mb-6 sm:mb-10 object-contain drop-shadow-[0_0_30px_rgba(59,130,246,0.2)] hidden dark:block"
                                 fetchPriority="high"
                             />
                             <img
                                 src="/assets/logo.svg"
-                                alt="Projecttale Logo"
+                                alt="Modtale Logo"
                                 className="h-14 sm:h-16 md:h-20 lg:h-24 mb-6 sm:mb-10 object-contain drop-shadow-sm block dark:hidden"
                                 fetchPriority="high"
                             />
@@ -268,7 +268,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 <span className="text-blue-600 dark:text-blue-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-blue-50 dark:bg-blue-500/10 w-fit px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20 mx-auto lg:mx-0">Version Management</span>
                                 <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Projects with Confidence.</h2>
                                 <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                    Finding the right file shouldn't be a puzzle. Projecttale makes it easy to find projects for your game version and review changelogs before you hit download.
+                                    Finding the right file shouldn't be a puzzle. Modtale makes it easy to find projects for your game version and review changelogs before you hit download.
                                 </p>
                                 <Link to="/projects" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
                                     Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
@@ -289,7 +289,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-emerald-50 dark:bg-emerald-500/10 w-fit px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20 mx-auto lg:mx-0">Library Resolution</span>
                                 <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Project Dependencies.</h2>
                                 <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                    Forget hunting down core libraries or confusing projectpacks. Projecttale allows you to seamlessly download all required projects in one swift action.
+                                    Forget hunting down core libraries or confusing projectpacks. Modtale allows you to seamlessly download all required projects in one swift action.
                                 </p>
                             </div>
                             <div className="flex-1 w-full relative mt-4 lg:mt-0">
@@ -307,7 +307,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 <span className="text-amber-600 dark:text-amber-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-amber-50 dark:bg-amber-500/10 w-fit px-3 py-1 rounded-full border border-amber-100 dark:border-amber-500/20 mx-auto lg:mx-0">Community Hub</span>
                                 <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
                                 <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                    Projecttale keeps the Hytale community connected. Receive real-time alerts when tracked projects drop new updates, or when developers reply directly to your feedback.
+                                    Modtale keeps the Hytale community connected. Receive real-time alerts when tracked projects drop new updates, or when developers reply directly to your feedback.
                                 </p>
                             </div>
                             <div className="flex-1 w-full relative mt-4 lg:mt-0">
@@ -329,10 +329,10 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             </div>
                             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-tight">Built by the community,<br className="sm:hidden" /> for the community.</h2>
                             <p className="text-base sm:text-lg lg:text-xl text-slate-600 dark:text-slate-300 mb-8 sm:mb-12 font-medium max-w-3xl mx-auto leading-relaxed">
-                                Projecttale is 100% open-source. We believe a projectding repository should exist purely to serve its ecosystem, free from corporate interests. Explore our source code or utilize our public API to build your own tools.
+                                Modtale is 100% open-source. We believe a projectding repository should exist purely to serve its ecosystem, free from corporate interests. Explore our source code or utilize our public API to build your own tools.
                             </p>
                             <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-                                <a href="https://github.com/Projecttale/projecttale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5">
+                                <a href="https://github.com/Modtale/Modtale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5">
                                     <Github className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View Source Code
                                 </a>
                                 <Link to="/api-docs" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/20 hover:-translate-y-0.5">
