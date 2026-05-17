@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import type { Mod, User, ProjectVersion, Comment, ModDependency } from '../../types';
@@ -652,6 +652,82 @@ export const ModDetail: React.FC<{
 
     const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(mod?.hmWikiSlug, wikiPageSlug, isWikiRoute && mod?.hmWikiEnabled === true);
 
+    const [displayWikiData, setDisplayWikiData] = useState(wikiData);
+    const [displaySlug, setDisplaySlug] = useState(wikiPageSlug);
+
+    const wikiContentRef = useRef<HTMLDivElement>(null);
+    const [lockedHeight, setLockedHeight] = useState<number | undefined>(undefined);
+    const prefetchedSlugs = useRef<Set<string>>(new Set());
+
+    // --- Aggressive Scroll Lock System ---
+    const prevPathnameRef = useRef(location.pathname);
+    const scrollPosRef = useRef(typeof window !== 'undefined' ? window.scrollY : 0);
+
+    // Track scroll position constantly while NOT navigating between wiki pages
+    useEffect(() => {
+        const handleScroll = () => {
+            scrollPosRef.current = window.scrollY;
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Intercept path changes. If it's a wiki tab change, freeze the scroll position instantly
+    useEffect(() => {
+        const wasWiki = prevPathnameRef.current.includes('/wiki');
+        const isWiki = location.pathname.includes('/wiki');
+
+        if (wasWiki && isWiki && prevPathnameRef.current !== location.pathname) {
+            const targetY = scrollPosRef.current;
+
+            // Execute sequentially across the next few event loops to
+            // override any external global ScrollToTop components
+            window.scrollTo(0, targetY);
+            requestAnimationFrame(() => window.scrollTo(0, targetY));
+            setTimeout(() => window.scrollTo(0, targetY), 10);
+            setTimeout(() => window.scrollTo(0, targetY), 50);
+        }
+
+        prevPathnameRef.current = location.pathname;
+    }, [location.pathname]);
+    // ------------------------------------
+
+    useEffect(() => {
+        setDisplayWikiData(null);
+        setDisplaySlug(wikiPageSlug);
+        setLockedHeight(undefined);
+        prefetchedSlugs.current.clear();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mod?.id]);
+
+    useEffect(() => {
+        if (wikiLoading && wikiContentRef.current && lockedHeight === undefined) {
+            setLockedHeight(wikiContentRef.current.offsetHeight);
+        }
+    }, [wikiLoading, lockedHeight]);
+
+    useEffect(() => {
+        if (wikiData && !wikiLoading) {
+            setDisplayWikiData(wikiData);
+            setDisplaySlug(wikiPageSlug);
+            setTimeout(() => setLockedHeight(undefined), 50);
+        }
+    }, [wikiData, wikiLoading, wikiPageSlug]);
+
+    useEffect(() => {
+        if (isWikiRoute && displayWikiData?.mod?.pages && mod) {
+            const pagesToFetch = displayWikiData.mod.pages
+                .map((p: any) => p.slug)
+                .filter((s: string) => s && !prefetchedSlugs.current.has(s) && s !== displaySlug)
+                .slice(0, 3);
+
+            pagesToFetch.forEach((slugToFetch: string) => {
+                prefetchedSlugs.current.add(slugToFetch);
+                api.get(`/wiki/${mod.id}/${slugToFetch}`).catch(() => {});
+            });
+        }
+    }, [isWikiRoute, displayWikiData?.mod?.pages, mod, displaySlug]);
+
     const isGalleryRoute = location.pathname.endsWith('/gallery');
     const parsedHash = parseInt(location.hash.replace('#', ''));
     const galleryIndex = isGalleryRoute && !isNaN(parsedHash) && parsedHash > 0 && mod?.galleryImages && parsedHash <= mod.galleryImages.length ? parsedHash - 1 : null;
@@ -682,36 +758,14 @@ export const ModDetail: React.FC<{
 
     const projectUrl = getProjectUrl(mod);
 
-    const wikiTopRef = useRef<HTMLDivElement>(null);
-    const prevWikiSlugRef = useRef(wikiPageSlug);
-    const prevPathnameRef = useRef(location.pathname);
-
     useEffect(() => {
-        if (isWikiRoute && !wikiLoading && wikiTopRef.current) {
-            const wasWikiNavigation = prevPathnameRef.current.includes('/wiki') && location.pathname.includes('/wiki');
-            const slugChanged = prevWikiSlugRef.current !== wikiPageSlug;
-
-            if (wasWikiNavigation && slugChanged) {
-                setTimeout(() => {
-                    if (wikiTopRef.current) {
-                        const y = wikiTopRef.current.getBoundingClientRect().top + window.scrollY - 120;
-                        window.scrollTo({ top: y, behavior: 'smooth' });
-                    }
-                }, 50);
-            }
-            prevWikiSlugRef.current = wikiPageSlug;
-        }
-        prevPathnameRef.current = location.pathname;
-    }, [wikiPageSlug, wikiLoading, isWikiRoute, location.pathname]);
-
-    useEffect(() => {
-        if (isWikiRoute && !wikiPageSlug && wikiData?.mod) {
-            const defaultSlug = wikiData.mod.index?.slug || (wikiData.mod.pages?.length > 0 ? wikiData.mod.pages[0].slug : null);
+        if (isWikiRoute && !wikiPageSlug && displayWikiData?.mod) {
+            const defaultSlug = displayWikiData.mod.index?.slug || (displayWikiData.mod.pages?.length > 0 ? displayWikiData.mod.pages[0].slug : null);
             if (defaultSlug) {
                 navigate(`${projectUrl}/wiki/${defaultSlug}`, { replace: true });
             }
         }
-    }, [isWikiRoute, wikiPageSlug, wikiData?.mod, navigate, projectUrl]);
+    }, [isWikiRoute, wikiPageSlug, displayWikiData?.mod, navigate, projectUrl]);
 
     const handleCommentSubmitted = useCallback((c: Comment[]) => {
         setMod(prev => prev ? {...prev, comments: c} : null);
@@ -841,13 +895,8 @@ export const ModDetail: React.FC<{
                     navigate(canonicalPath, { replace: true });
                 }
             }
-
-            if (location.hash === '#comments' && commentsRef.current) {
-                const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
-                window.scrollTo({top: y, behavior: 'smooth'});
-            }
         }
-    }, [mod, loading, location.pathname, location.hash, navigate]);
+    }, [mod, loading, location.pathname, navigate]);
 
     useEffect(() => {
         if (location.pathname.endsWith('/download')) setShowDownloadModal(true);
@@ -1267,15 +1316,6 @@ export const ModDetail: React.FC<{
                                 <Link to={`${projectUrl}/changelog`} className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"><List className="w-4 h-4" aria-hidden="true" /> Changelog</Link>
                                 <a
                                     href={`${projectUrl}#comments`}
-                                    onClick={(e) => {
-                                        if (location.pathname === projectUrl) {
-                                            e.preventDefault();
-                                            if (commentsRef.current) {
-                                                const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
-                                                window.scrollTo({top: y, behavior: 'smooth'});
-                                            }
-                                        }
-                                    }}
                                     className="flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
                                 >
                                     <MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments
@@ -1379,15 +1419,15 @@ export const ModDetail: React.FC<{
                 }
                 sidebarContent={
                     isWikiRoute ? (
-                        wikiLoading ? (
+                        (wikiLoading && !displayWikiData) ? (
                             <div className="flex justify-center p-4"><Spinner /></div>
-                        ) : wikiError || !wikiData ? (
+                        ) : wikiError || !displayWikiData ? (
                             <SidebarSection title="Wiki" icon={BookOpen}>
                                 <div className="text-sm text-slate-500">Navigation unavailable.</div>
                             </SidebarSection>
                         ) : (
                             <>
-                                <WikiSidebar tree={wikiData.mod.pages || []} projectUrl={projectUrl} currentSlug={wikiPageSlug} indexSlug={wikiData.mod.index?.slug} />
+                                <WikiSidebar tree={displayWikiData.mod.pages || []} projectUrl={projectUrl} currentSlug={wikiPageSlug} indexSlug={displayWikiData.mod.index?.slug} />
                                 <SidebarSection title="Project Info" icon={Box}>
                                     <Link to={projectUrl} className="block text-sm font-bold text-modtale-accent hover:underline flex items-center gap-2">
                                         <ChevronLeft className="w-4 h-4" /> Back to Project
@@ -1410,8 +1450,18 @@ export const ModDetail: React.FC<{
                 }
                 mainContent={
                     isWikiRoute ? (
-                        <div ref={wikiTopRef} className="scroll-mt-24">
-                            <WikiContent wikiLoading={wikiLoading} wikiError={wikiError} wikiData={wikiData} wikiPageSlug={wikiPageSlug} mod={mod} />
+                        <div
+                            ref={wikiContentRef}
+                            style={{ minHeight: lockedHeight ? `${lockedHeight}px` : undefined }}
+                            className={`transition-opacity duration-200 ${wikiLoading ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}
+                        >
+                            <WikiContent
+                                wikiLoading={wikiLoading && !displayWikiData}
+                                wikiError={wikiError}
+                                wikiData={displayWikiData}
+                                wikiPageSlug={displaySlug}
+                                mod={mod}
+                            />
                         </div>
                     ) : (
                         <>
