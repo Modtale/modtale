@@ -102,10 +102,15 @@ public class SecurityConfig {
         }
     }
 
+    private boolean isLocalhost() {
+        String cleanUrl = getCleanFrontendUrl();
+        return cleanUrl != null && (cleanUrl.contains("localhost") || cleanUrl.contains("127.0.0.1"));
+    }
+
     @Bean
     public CookieSerializer cookieSerializer() {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
-        serializer.setUseSecureCookie(true);
+        serializer.setUseSecureCookie(!isLocalhost());
         serializer.setCookiePath("/");
 
         boolean isPreview = isPreviewEnvironment();
@@ -116,10 +121,10 @@ public class SecurityConfig {
         } else {
             serializer.setSameSite("Lax");
 
-            if (cleanUrl != null && !cleanUrl.isBlank()) {
+            if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
                 try {
                     String host = URI.create(cleanUrl).getHost();
-                    if (host != null && !host.equalsIgnoreCase("localhost")) {
+                    if (host != null) {
                         String[] parts = host.split("\\.");
                         if (parts.length >= 2) {
                             String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
@@ -138,7 +143,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
         tokenRepository.setCookieHttpOnly(false);
-        tokenRepository.setSecure(true);
+        tokenRepository.setSecure(!isLocalhost());
         tokenRepository.setCookiePath("/");
 
         tokenRepository.setCookieCustomizer(cookie -> {
@@ -150,10 +155,10 @@ public class SecurityConfig {
                 cookie.domain(null);
             } else {
                 cookie.sameSite("Lax");
-                if (cleanUrl != null && !cleanUrl.isBlank()) {
+                if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
                     try {
                         String host = URI.create(cleanUrl).getHost();
-                        if (host != null && !host.equalsIgnoreCase("localhost")) {
+                        if (host != null) {
                             String[] parts = host.split("\\.");
                             if (parts.length >= 2) {
                                 String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
@@ -226,10 +231,7 @@ public class SecurityConfig {
                                 "/api/v1/tags",
                                 "/api/v1/files/**",
                                 "/api/v1/user/profile/**",
-                                "/api/v1/users/search",
-                                "/api/v1/users/*/organizations",
-                                "/api/v1/users/*/following",
-                                "/api/v1/users/*/followers",
+                                "/api/v1/users/**",
                                 "/api/v1/orgs/*/members",
                                 "/api/v1/creators/**",
                                 "/api/v1/og/**",
@@ -237,7 +239,8 @@ public class SecurityConfig {
                                 "/api/v1/meta/**",
                                 "/api/v1/status",
                                 "/api/v1/version/**",
-                                "/api/v1/analytics/platform/stats"
+                                "/api/v1/analytics/platform/stats",
+                                "/api/v1/wiki/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
