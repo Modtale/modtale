@@ -1,0 +1,3 @@
+export const GLASS_CARD = "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]";
+export const GLASS_HEADER = "bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10";
+export const GLASS_ITEM = "bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300";

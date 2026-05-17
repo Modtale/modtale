@@ -1,6 +1,6 @@
-import type { Mod, Modpack, World } from '../types';
+import type { Project } from '../types';
 
-export const generateProjectMeta = (item: Mod | Modpack | World | any) => {
+export const generateProjectMeta = (item: Project | any) => {
     if (!item) return null;
 
     const title = `${item.title} | Modtale`;
