@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '@/utils/api';
 import { Package, Users, ChevronLeft, ChevronRight, CornerDownLeft, Building2 } from 'lucide-react';
-import { createSlug } from '@/utils/slug';
+import { createSlug, getProjectUrl } from '@/utils/slug';
 import { ProfileLayout } from '../components/ProfileLayout';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { Spinner } from '@/components/ui/Spinner';
@@ -25,6 +25,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                                         }) => {
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const projectsTitleRef = useRef<HTMLHeadingElement>(null);
 
     const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -132,6 +133,25 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         return () => clearTimeout(timer);
     }, [fetchProjects, profileUser?.id]);
 
+    useEffect(() => {
+        if (profileUser && !loadingProjects) {
+            const isCreator = totalItems > 0 || profileUser.accountType === 'ORGANIZATION';
+            const canonicalBase = isCreator ? `/creator/${profileUser.username}` : `/user/${profileUser.username}`;
+            const currentPrefixMatch = location.pathname.match(/^\/(user|creator)\/[^/]+/i);
+
+            if (currentPrefixMatch) {
+                const currentBase = currentPrefixMatch[0];
+                if (currentBase !== canonicalBase) {
+                    const newPath = location.pathname.replace(currentBase, canonicalBase);
+                    navigate(
+                        { pathname: newPath, search: location.search, hash: location.hash },
+                        { replace: true }
+                    );
+                }
+            }
+        }
+    }, [profileUser, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
+
     const handleToggleFollow = async () => {
         if (!currentUser) { navigate('/login'); return; }
         if (!profileUser) return;
@@ -192,11 +212,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         return rangeWithDots;
     };
 
-    const getProjectPath = (item: Project) => {
-        const slug = createSlug(item.title, item.id);
-        return item.classification === 'MODPACK' ? `/modpack/${slug}` : (item.classification === 'SAVE' ? `/world/${slug}` : `/mod/${slug}`);
-    };
-
     if (loadingUser) return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark"><Spinner fullScreen /></div>;
     if (notFound) return <NotFound />;
     if (!profileUser) return <div className="min-h-screen flex flex-col items-center justify-center"><h2 className="text-2xl font-bold">User not found</h2><button onClick={onBack}>Go Back</button></div>;
@@ -248,7 +263,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                     return (
                                         <Link
                                             key={member.id}
-                                            to={`/user/${member.username}`}
+                                            to={`/creator/${member.username}`}
                                             className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                         >
                                             <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -281,7 +296,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                 {memberOrgs.map(org => (
                                     <Link
                                         key={org.id}
-                                        to={`/user/${org.username}`}
+                                        to={`/creator/${org.username}`}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -327,7 +342,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                 <div key={project.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <ProjectCard
                                         project={project}
-                                        path={getProjectPath(project)}
+                                        path={getProjectUrl(project)}
                                         isFavorite={likedModIds.includes(project.id)}
                                         onToggleFavorite={() => { onToggleFavorite(project.id); }}
                                         isLoggedIn={!!currentUser}
