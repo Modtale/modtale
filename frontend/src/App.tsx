@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Route, Routes, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
+import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
@@ -48,18 +48,6 @@ const ScrollToTop = () => {
         window.scrollTo(0, 0);
     }, [pathname]);
     return null;
-};
-
-const LegacyProjectRedirect = () => {
-    const location = useLocation();
-    const newPath = location.pathname.replace(/^\/(mod|modpack|world)/i, '/project');
-    return <Navigate to={newPath + location.search + location.hash} replace />;
-};
-
-const LegacyUserRedirect = () => {
-    const { username } = useParams();
-    const location = useLocation();
-    return <Navigate to={`/user/${username}${location.search}${location.hash}`} replace />;
 };
 
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
@@ -218,9 +206,9 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                 <div className="flex-1">
                     <ErrorBoundary>
                         <Routes>
-=                            <Route path="/" element={<Home user={user} />} />
+                            <Route path="/" element={<Home user={user} />} />
 
-=                            <Route path="/mods" element={renderBrowse()} />
+                            <Route path="/mods" element={renderBrowse()} />
                             <Route path="/projects" element={<Navigate to="/mods" replace />} />
                             <Route path="/plugins" element={renderBrowse('PLUGIN')} />
                             <Route path="/modpacks" element={renderBrowse('MODPACK')} />
@@ -228,60 +216,56 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/art" element={renderBrowse('ART')} />
                             <Route path="/data" element={renderBrowse('DATA')} />
 
-=                            <Route path="/upload" element={
+                            <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     <CreateProject onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
                             } />
 
-=                            <Route path="/dashboard/*" element={
+                            <Route path="/dashboard/*" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
                                         <Navigate to="/" />
                             } />
 
-=                            <Route path="/project/:id" element={renderProjectDetail()} />
-                            <Route path="/project/:id/download" element={renderProjectDetail()} />
-                            <Route path="/project/:id/changelog" element={renderProjectDetail()} />
-                            <Route path="/project/:id/gallery" element={renderProjectDetail()} />
-                            <Route path="/project/:id/wiki/*" element={renderProjectDetail()} />
-                            <Route path="/project/:id/edit" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
-                                        <Navigate to="/" />
-                            } />
+                            {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
+                                <React.Fragment key={path}>
+                                    <Route path={path} element={renderProjectDetail()} />
+                                    <Route path={`${path}/download`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/changelog`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/gallery`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/wiki/*`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/edit`} element={
+                                        loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                            user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
+                                                <Navigate to="/" />
+                                    } />
+                                </React.Fragment>
+                            ))}
 
-                            {/* Legacy Project Redirects (Catches both exact hits and sub-routes) */}
-                            <Route path="/mod/:id" element={<LegacyProjectRedirect />} />
-                            <Route path="/mod/:id/*" element={<LegacyProjectRedirect />} />
-                            <Route path="/modpack/:id" element={<LegacyProjectRedirect />} />
-                            <Route path="/modpack/:id/*" element={<LegacyProjectRedirect />} />
-                            <Route path="/world/:id" element={<LegacyProjectRedirect />} />
-                            <Route path="/world/:id/*" element={<LegacyProjectRedirect />} />
+                            {['/user/:username', '/creator/:username'].map(path => (
+                                <Route key={path} path={path} element={
+                                    <UserProfile
+                                        onModClick={handleProjectClick}
+                                        onBack={() => handleNavigate('home')}
+                                        likedModIds={user?.likedProjectIds || []}
+                                        onToggleFavorite={handleToggleFavorite}
+                                        currentUser={user}
+                                        onRefreshUser={fetchUser}
+                                    />
+                                } />
+                            ))}
 
-=                            <Route path="/user/:username" element={
-                                <UserProfile
-                                    onModClick={handleProjectClick}
-                                    onBack={() => handleNavigate('home')}
-                                    likedModIds={user?.likedProjectIds || []}
-                                    onToggleFavorite={handleToggleFavorite}
-                                    currentUser={user}
-                                    onRefreshUser={fetchUser}
-                                />
-                            } />
-
-=                            <Route path="/creator/:username" element={<LegacyUserRedirect />} />
-
-=                            <Route path="/verify" element={<VerifyEmail />} />
+                            <Route path="/verify" element={<VerifyEmail />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
                             <Route path="/mfa" element={<MfaVerify />} />
 
-=                            <Route path="/terms" element={<TermsOfService />} />
+                            <Route path="/terms" element={<TermsOfService />} />
                             <Route path="/privacy" element={<PrivacyPolicy />} />
                             <Route path="/status" element={<Status />} />
 
-=                            <Route path="/api-docs" element={<ApiDocs />} />
+                            <Route path="/api-docs" element={<ApiDocs />} />
 
-=                            <Route path="/admin" element={
+                            <Route path="/admin" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <AdminPanel currentUser={user} /> :
                                         <Navigate to="/" />

@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, Github, Globe } from 'lucide-react';
 
-import type { User, Project } from '@/types';
+import type { User } from '@/types';
 import { theme } from '@/styles/theme';
 import { getProjectUrl } from '@/utils/slug';
 import { generateProjectMeta } from '@/utils/meta';
@@ -29,9 +29,6 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { ShareModal } from '../components/dialogs/ShareModal';
 import { ReportModal } from '../components/dialogs/ReportModal';
 import { PostDownloadModal } from '../components/dialogs/PostDownloadModal';
-import { DownloadModal } from '../components/dialogs/DownloadModal';
-import { HistoryModal } from '../components/dialogs/HistoryModal';
-import { DependencyModal } from '../components/dialogs/DependencyModal';
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -43,8 +40,8 @@ interface ProjectDetailViewProps {
 }
 
 export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
-                                                                        currentUser, isLiked, onToggleFavorite, onDownload, downloadedSessionIds, onRefresh
-                                                                    }) => {
+                                                                     currentUser, isLiked, onToggleFavorite, onDownload, downloadedSessionIds, onRefresh
+                                                                 }) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
@@ -57,14 +54,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
 
-    const [showDownloadModal, setShowDownloadModal] = useState(location.pathname.endsWith('/download'));
-    const [showAllVersionsModal, setShowAllVersionsModal] = useState(location.pathname.endsWith('/changelog'));
-    const [pendingDownloadVer, setPendingDownloadVer] = useState<any>(null);
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
     const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
     const commentsRef = useRef<HTMLDivElement>(null);
-
-    const [showExperimental, setShowExperimental] = useState(false);
 
     const isWikiRoute = location.pathname.includes('/wiki');
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
@@ -99,6 +91,24 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             setLockedHeight(undefined);
         }
     }, [wikiData, wikiLoading, wikiPageSlug]);
+
+    useEffect(() => {
+        if (project) {
+            const canonicalBase = getProjectUrl(project);
+            const currentPrefixMatch = location.pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
+
+            if (currentPrefixMatch) {
+                const currentBase = currentPrefixMatch[0];
+                if (currentBase !== canonicalBase) {
+                    const newPath = location.pathname.replace(currentBase, canonicalBase);
+                    navigate(
+                        { pathname: newPath, search: location.search, hash: location.hash },
+                        { replace: true }
+                    );
+                }
+            }
+        }
+    }, [project, location.pathname, location.search, location.hash, navigate]);
 
     if (isNotFound) return <NotFound />;
     if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;

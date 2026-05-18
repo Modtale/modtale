@@ -70,7 +70,6 @@ public class ReportService {
             if (commentOpt.isPresent()) {
                 String content = commentOpt.get().getContent();
 
-                // Note: Fixed commentOpt.get().getId() to commentOpt.get().getUserId()
                 User commentAuthor = accountService.getPublicProfile(commentOpt.get().getUserId());
                 String authorName = commentAuthor != null ? commentAuthor.getUsername() : "Unknown User";
 
