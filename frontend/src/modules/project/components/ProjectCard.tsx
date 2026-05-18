@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe, ChevronRight } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
 import { Link } from 'react-router-dom';
-import { getProjectUrl } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import { prefetchProject } from '@/utils/prefetch';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import type { Project } from '@/types';
@@ -13,7 +13,6 @@ interface ProjectCardProps {
     isFavorite: boolean;
     onToggleFavorite: (projectId: string) => void;
     isLoggedIn: boolean;
-    onClick?: () => void;
     priority?: boolean;
     viewStyle?: 'grid' | 'list' | 'compact';
 }
@@ -54,7 +53,7 @@ const formatTimeAgo = (dateString: string) => {
     return "Just now";
 };
 
-export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, onClick, viewStyle = 'grid' }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid' }) => {
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
@@ -63,7 +62,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 
     const title = project.title || 'Untitled Project';
     const author = project.author || 'Unknown';
-    const canonicalPath = path || getProjectUrl(project);
+
+    const canonicalPath = path || SiteRoutes.project(project);
+
     const desc = project.description ? project.description : 'No description provided.';
     const classification = project.classification || 'PLUGIN';
 
@@ -96,7 +97,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm transform-gpu hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 ${BASE_HOVER_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-xl ring-0 group-hover:ring-2 group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
-                <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
+                <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
                 <div className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-20">
                     <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent object-cover" />
@@ -107,7 +108,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     </h3>
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
-                        <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
+                        <Link to={SiteRoutes.creator(author)} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
                             {author}
                         </Link>
                     </div>
@@ -131,7 +132,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 p-4 sm:p-5 ${BASE_HOVER_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
-                <Link to={canonicalPath} onClick={onClick} className="absolute inset-0 z-10" />
+                <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
                 <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-20">
                     <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -141,13 +142,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     <div className="flex justify-between items-start gap-2 sm:gap-4">
                         <div className="min-w-0 flex-1">
                             <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
-                                <Link to={canonicalPath} onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined} className="focus:outline-none relative z-30 pointer-events-auto">
+                                <Link to={canonicalPath} className="focus:outline-none relative z-30 pointer-events-auto">
                                     {title}
                                 </Link>
                             </h3>
                             <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
                                 <span>by</span>
-                                <Link to={`/creator/${author}`} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
+                                <Link to={SiteRoutes.creator(author)} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
                                     {author}
                                 </Link>
                             </div>
@@ -192,9 +193,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
             aria-label={`Project: ${title} by ${author}`}
         >
             <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
+
             <Link
                 to={canonicalPath}
-                onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
                 className="absolute inset-0 z-10 focus:outline-none"
                 aria-hidden="true"
                 tabIndex={-1}
@@ -242,7 +243,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
                         <Link
                             to={canonicalPath}
-                            onClick={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
                             className="relative z-30 focus:outline-none pointer-events-auto"
                         >
                             {title}
@@ -252,7 +252,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
                         <Link
-                            to={`/creator/${author}`}
+                            to={SiteRoutes.creator(author)}
                             onClick={(e) => e.stopPropagation()}
                             className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
                         >

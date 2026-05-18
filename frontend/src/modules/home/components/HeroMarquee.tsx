@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { BACKEND_URL } from '@/utils/api';
-import { getProjectUrl } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import type { Project } from '@/types';
 
 export const FeaturedModCard = ({ project, priority = false }: { project: Project, priority?: boolean }) => {
@@ -18,7 +18,7 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
         ? (project.bannerUrl.startsWith('/api') ? `${BACKEND_URL}${project.bannerUrl}` : project.bannerUrl)
         : null;
 
-    const projectUrl = getProjectUrl(project);
+    const projectUrl = SiteRoutes.project(project);
 
     return (
         <article className="group relative flex flex-col w-full shrink-0 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden isolate hover:-translate-y-1.5 transition-all duration-500 shadow-lg hover:shadow-2xl dark:shadow-xl hover:ring-[3px] hover:ring-blue-600 dark:hover:ring-blue-500 hover:border-transparent">
@@ -55,15 +55,15 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
                     />
                 </div>
 
-                <div className="mt-8 sm:mt-10 flex-1 relative z-20">
+                <div className="mt-8 sm:mt-10 flex-1 relative z-20 pointer-events-none">
                     <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
                         {project.title}
                     </h3>
                     <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
                         <Link
-                            to={`/user/${project.author}`}
-                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-40"
+                            to={SiteRoutes.creator(project.author)}
+                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-40 pointer-events-auto"
                             aria-label={`View profile for ${project.author}`}
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -72,7 +72,7 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
                     </div>
                 </div>
 
-                <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-20 text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+                <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-20 pointer-events-none text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
                     <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" aria-hidden="true" />
                     <span className="text-[11px] sm:text-[13px] leading-none translate-y-[1px]">{project.downloadCount?.toLocaleString() || 0}</span>
                 </div>

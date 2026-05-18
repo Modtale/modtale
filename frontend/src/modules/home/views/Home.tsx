@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { Search, Upload, ChevronRight, Github, Code } from 'lucide-react';
 import { api } from '@/utils/api';
 import type { Project, User } from '@/types';
+import { SiteRoutes } from '@/utils/routes';
 
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { MarqueeColumn, MarqueeRow } from '../components/HeroMarquee';
@@ -24,17 +25,21 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
     useEffect(() => {
         const observer = new IntersectionObserver(([entry]) => {
             if (entry.isIntersecting) {
-                setIsVisible(true);
+                if ('requestIdleCallback' in window) {
+                    (window as any).requestIdleCallback(() => setIsVisible(true));
+                } else {
+                    setTimeout(() => setIsVisible(true), 50);
+                }
                 observer.disconnect();
             }
-        }, { rootMargin: '400px' });
+        }, { rootMargin: '600px' });
 
         if (ref.current) observer.observe(ref.current);
         return () => observer.disconnect();
     }, []);
 
     return (
-        <div ref={ref} className="w-full" style={{ minHeight: isVisible ? 'auto' : minHeight }}>
+        <div ref={ref} style={{ minHeight: isVisible ? 'auto' : minHeight }} className="w-full contain-content">
             {isVisible && children}
         </div>
     );
@@ -43,89 +48,59 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
 export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
     const ssrData = getInitialData();
 
-    const [isMounted, setIsMounted] = useState(false);
-    const [renderMarquees, setRenderMarquees] = useState(false);
-    const [allProjects, setAllProjects] = useState<Project[]>(ssrData?.homeProjects || []);
+    const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+    const [projects, setProjects] = useState<Project[]>(ssrData?.homeProjects || []);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
+    const [readyForHeavyUI, setReadyForHeavyUI] = useState(false);
 
     useEffect(() => {
-        setIsMounted(true);
-        let isStale = false;
+        const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+        window.addEventListener('resize', handleResize, { passive: true });
 
-        const marqueeTimer = setTimeout(() => {
-            if (!isStale) setRenderMarquees(true);
-        }, 150);
+        const idleTimer = setTimeout(() => {
+            setReadyForHeavyUI(true);
 
-        if (!ssrData || !ssrData.homeProjects || ssrData.homeProjects.length === 0) {
-            const fetchInitial = async () => {
-                try {
-                    const trending = await api.get('/projects', { params: { size: 16, sort: 'trending' } });
-                    if (isStale) return;
-                    setAllProjects(trending.data?.content || []);
-
-                    setTimeout(async () => {
-                        if (isStale) return;
-                        try {
-                            const [popular, gems, relevance] = await Promise.all([
-                                api.get('/projects', { params: { size: 16, sort: 'popular' } }),
-                                api.get('/projects', { params: { size: 16, category: 'hidden_gems', sort: 'favorites' } }),
-                                api.get('/projects', { params: { size: 16, sort: 'relevance' } })
-                            ]);
-                            if (isStale) return;
-
-                            const combined = [
-                                ...(trending.data?.content || []),
-                                ...(popular.data?.content || []),
-                                ...(gems.data?.content || []),
-                                ...(relevance.data?.content || [])
-                            ];
-                            const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
-                            setAllProjects(unique.sort(() => Math.random() - 0.5));
-                        } catch (err) {}
-                    }, 800);
-                } catch (err) {}
-            };
-            fetchInitial();
-        } else if (allProjects.length > 0) {
-            setAllProjects(prev => [...prev].sort(() => Math.random() - 0.5));
-        }
-
-        if (!ssrData || !ssrData.stats || (ssrData.stats.totalProjects === 0 && ssrData.stats.totalDownloads === 0)) {
-            setTimeout(() => {
-                if (isStale) return;
-                api.get('/analytics/platform/stats')
-                    .then(res => { if (!isStale) setStats(res.data); })
+            if (!ssrData?.homeProjects?.length) {
+                api.get('/projects', { params: { size: 16, sort: 'trending' } })
+                    .then(res => {
+                        if (res.data?.content) setProjects(res.data.content);
+                    })
                     .catch(() => {});
-            }, 300);
-        }
+            }
+
+            if (!ssrData?.stats?.totalProjects) {
+                api.get('/analytics/platform/stats')
+                    .then(res => setStats(res.data))
+                    .catch(() => {});
+            }
+        }, 100);
 
         return () => {
-            isStale = true;
-            clearTimeout(marqueeTimer);
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(idleTimer);
         };
     }, []);
 
-    const validFeaturedProjects = allProjects.filter(project => {
-        const hasBanner = Boolean(project.bannerUrl);
-        const hasCustomIcon = Boolean(project.imageUrl) && !project.imageUrl.includes('favicon.svg') && !project.imageUrl.includes('favicon.png');
-        return hasBanner && hasCustomIcon;
-    });
+    const validFeaturedProjects = useMemo(() => {
+        if (!readyForHeavyUI) return [];
+        return projects.filter(p => Boolean(p.bannerUrl) && Boolean(p.imageUrl) && !p.imageUrl?.includes('favicon'));
+    }, [projects, readyForHeavyUI]);
 
     const randomDisplayProject = useMemo(() => {
-        if (allProjects.length === 0) return undefined;
-        const withIcons = allProjects.filter(m => m.imageUrl && !m.imageUrl.includes('favicon'));
-        return withIcons[Math.floor(Math.random() * withIcons.length)];
-    }, [allProjects]);
+        if (!readyForHeavyUI || validFeaturedProjects.length === 0) return undefined;
+        return validFeaturedProjects[Math.floor(Math.random() * validFeaturedProjects.length)];
+    }, [validFeaturedProjects, readyForHeavyUI]);
 
-    const displayFeaturedProjects = validFeaturedProjects.slice(0, 16);
-    const col1Projects = displayFeaturedProjects.filter((_, i) => i % 2 === 0);
-    const col2Projects = displayFeaturedProjects.filter((_, i) => i % 2 === 1);
+    const col1Projects = useMemo(() => validFeaturedProjects.filter((_, i) => i % 2 === 0), [validFeaturedProjects]);
+    const col2Projects = useMemo(() => validFeaturedProjects.filter((_, i) => i % 2 === 1), [validFeaturedProjects]);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative selection:bg-blue-500 selection:text-white overflow-x-hidden transition-colors duration-300">
             <Helmet>
                 <title>Modtale - The Hytale Community Repository</title>
                 <meta name="description" content="The community repository for Hytale. Discover, download, and share Hytale worlds, plugins, asset packs, worlds, and projectpacks." />
+                <link rel="preload" as="image" href="/assets/logo_light.svg" />
+                <link rel="preload" as="image" href="/assets/logo.svg" />
                 <style>{`
                     @keyframes marquee-up {
                         from { transform: translateY(0); }
@@ -151,19 +126,22 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                         animation: marquee-right var(--marquee-duration, 35s) linear infinite;
                         will-change: transform;
                     }
+                    .contain-content {
+                        contain: content;
+                    }
                 `}</style>
             </Helmet>
 
-            <main className="relative z-10">
+            <main className="relative z-10 contain-content">
                 <section className="relative w-full min-h-[85vh] 2xl:min-h-[90vh] flex flex-col items-center justify-center pt-12 sm:pt-16 lg:pt-16 2xl:pt-36 pb-16 lg:pb-20 border-b border-slate-200 dark:border-white/5 overflow-hidden">
-                    <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+                    <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none transform-gpu" />
 
-                    <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
-                    <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
+                    <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
+                    <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
 
                     <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 2xl:gap-20 items-stretch">
 
-                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl animate-in fade-in duration-500 py-4 lg:py-8 justify-center mx-auto lg:mx-0">
+                        <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl justify-center mx-auto lg:mx-0">
                             <img
                                 src="/assets/logo_light.svg"
                                 alt="Modtale Logo"
@@ -190,50 +168,50 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
 
                             <nav aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mb-8 sm:mb-10 2xl:mb-14">
                                 <Link
-                                    to="/projects"
-                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto text-base sm:text-lg ring-1 ring-blue-500"
+                                    to={SiteRoutes.browse()}
+                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto text-base sm:text-lg ring-1 ring-blue-500 transform-gpu"
                                 >
                                     <Search className="w-5 h-5 mr-2 sm:mr-3" aria-hidden="true" />
                                     Discover Projects
                                 </Link>
                                 <Link
-                                    to="/upload"
-                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full sm:w-auto text-base sm:text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                    to={SiteRoutes.upload()}
+                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto text-base sm:text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu"
                                 >
                                     <Upload className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                     Publish Work
                                 </Link>
                             </nav>
 
-                            <div className={`${GLASS_CARD} flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-4 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5`}>
+                            <div className={`${GLASS_CARD} flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-4 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
                                 <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        <AnimatedCounter value={stats.totalProjects} />
+                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalProjects} /> : 0}
                                     </span>
                                     <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
                                 <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        <AnimatedCounter value={stats.totalDownloads} />
+                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalDownloads} /> : 0}
                                     </span>
                                     <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
                                 <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        <AnimatedCounter value={stats.totalUsers} />
+                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalUsers} /> : 0}
                                     </span>
                                     <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
                                 </div>
                             </div>
                         </div>
 
-                        {displayFeaturedProjects.length > 0 && (
+                        {isDesktop ? (
                             <div className="relative hidden lg:block w-full lg:min-h-[600px] 2xl:min-h-[750px]">
-                                {renderMarquees && (
+                                {validFeaturedProjects.length > 0 && (
                                     <aside
-                                        className="absolute -inset-x-4 xl:-inset-x-8 inset-y-0 px-4 xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden animate-in fade-in slide-in-from-right-12 duration-1000"
+                                        className="absolute -inset-x-4 xl:-inset-x-8 inset-y-0 px-4 xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
                                         style={{
                                             maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
                                             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
@@ -245,11 +223,9 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                     </aside>
                                 )}
                             </div>
-                        )}
-
-                        {displayFeaturedProjects.length > 0 && (
-                            <div className="-mx-6 sm:-mx-12 md:-mx-16 flex flex-col gap-4 lg:hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 mt-8 sm:mt-12 mb-4">
-                                {renderMarquees && (
+                        ) : (
+                            <div className="-mx-6 sm:-mx-12 md:-mx-16 flex flex-col gap-4 lg:hidden mt-8 sm:mt-12 mb-4 contain-content">
+                                {validFeaturedProjects.length > 0 && (
                                     <>
                                         <MarqueeRow projects={col1Projects} duration="35s" />
                                         <MarqueeRow projects={col2Projects} duration="45s" reverse={true} />
@@ -261,7 +237,6 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                 </section>
 
                 <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 space-y-16 sm:space-y-24 lg:space-y-32 2xl:space-y-40 py-16 sm:py-24 lg:py-32 2xl:py-40 relative z-20">
-
                     <LazySection minHeight="400px">
                         <section className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
                             <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
@@ -270,12 +245,12 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
                                     Finding the right file shouldn't be a puzzle. Modtale makes it easy to find projects for your game version and review changelogs before you hit download.
                                 </p>
-                                <Link to="/projects" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
+                                <Link to={SiteRoutes.browse()} className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
                                     Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
                                 </Link>
                             </div>
                             <div className="flex-1 w-full relative mt-4 lg:mt-0">
-                                <div className="absolute -inset-10 bg-gradient-to-tr from-blue-400/20 to-transparent dark:from-blue-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
+                                <div className="absolute -inset-10 bg-gradient-to-tr from-blue-400/20 to-transparent dark:from-blue-500/20 blur-3xl rounded-full z-0 pointer-events-none transform-gpu" />
                                 <div className="relative z-10 w-full max-w-lg mx-auto lg:ml-auto">
                                     <InlineDownloadUI />
                                 </div>
@@ -293,7 +268,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 </p>
                             </div>
                             <div className="flex-1 w-full relative mt-4 lg:mt-0">
-                                <div className="absolute -inset-10 bg-gradient-to-tl from-emerald-400/20 to-transparent dark:from-emerald-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
+                                <div className="absolute -inset-10 bg-gradient-to-tl from-emerald-400/20 to-transparent dark:from-emerald-500/20 blur-3xl rounded-full z-0 pointer-events-none transform-gpu" />
                                 <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
                                     <InlineDependencyUI randomProject={randomDisplayProject} />
                                 </div>
@@ -311,7 +286,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 </p>
                             </div>
                             <div className="flex-1 w-full relative mt-4 lg:mt-0">
-                                <div className="absolute -inset-10 bg-gradient-to-tl from-amber-400/20 to-transparent dark:from-amber-500/20 blur-3xl rounded-full z-0 pointer-events-none" />
+                                <div className="absolute -inset-10 bg-gradient-to-tl from-amber-400/20 to-transparent dark:from-amber-500/20 blur-3xl rounded-full z-0 pointer-events-none transform-gpu" />
                                 <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
                                     <InlineNotificationUI />
                                 </div>
@@ -322,7 +297,7 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                 </div>
 
                 <LazySection minHeight="300px">
-                    <section className="py-16 sm:py-20 lg:py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl relative z-20">
+                    <section className="py-16 sm:py-20 lg:py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 relative z-20">
                         <div className="max-w-4xl mx-auto px-6 text-center">
                             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl sm:rounded-3xl mx-auto mb-6 sm:mb-8 flex items-center justify-center shadow-inner border border-slate-300/50 dark:border-white/5">
                                 <Code className="w-8 h-8 sm:w-10 sm:h-10 text-slate-500 dark:text-slate-400" aria-hidden="true" />
@@ -332,10 +307,10 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                                 Modtale is 100% open-source. We believe a projectding repository should exist purely to serve its ecosystem, free from corporate interests. Explore our source code or utilize our public API to build your own tools.
                             </p>
                             <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-                                <a href="https://github.com/Modtale/Modtale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5">
+                                <a href="https://github.com/Modtale/Modtale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu">
                                     <Github className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View Source Code
                                 </a>
-                                <Link to="/api-docs" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/20 hover:-translate-y-0.5">
+                                <Link to={SiteRoutes.apiDocs()} className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/20 hover:-translate-y-0.5 transform-gpu">
                                     <Code className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View API Docs
                                 </Link>
                             </nav>

@@ -3,7 +3,6 @@ import { Helmet } from 'react-helmet-async';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, X, ChevronLeft, ChevronRight, CornerDownLeft, PackageSearch } from 'lucide-react';
 
-import type { Project } from '@/types';
 import { useMobile } from '@/context/MobileContext';
 import { useSSRData } from '@/context/SSRContext';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '@/utils/schema';
@@ -12,6 +11,7 @@ import { BROWSE_VIEWS, PROJECT_TYPES } from '@/data/categories';
 import type { Classification } from '@/data/categories';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BACKEND_URL } from '@/utils/api';
+import { SiteRoutes } from '@/utils/routes';
 
 import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
@@ -24,7 +24,6 @@ const getResolvedImageUrl = (url?: string) => {
 };
 
 interface BrowseViewProps {
-    onProjectSelect: (project: Project) => void;
     likedProjectIds: string[];
     onToggleFavorite: (id: string) => void;
     isLoggedIn: boolean;
@@ -32,7 +31,7 @@ interface BrowseViewProps {
 }
 
 export const Browse: React.FC<BrowseViewProps> = ({
-                                                      onProjectSelect, likedProjectIds, onToggleFavorite, isLoggedIn, initialClassification
+                                                      likedProjectIds, onToggleFavorite, isLoggedIn, initialClassification
                                                   }) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { isMobile } = useMobile();
@@ -225,7 +224,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 ))}
                             </div>
                         ) : items.length > 0 ? (
-                            <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} onProjectSelect={onProjectSelect} />
+                            <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
                         ) : (
                             <div className="mt-8 animate-in fade-in zoom-in-95 duration-500">
                                 <EmptyState icon={PackageSearch} title="No matches found" message="Try adjusting your search terms or filters to find what you're looking for." />

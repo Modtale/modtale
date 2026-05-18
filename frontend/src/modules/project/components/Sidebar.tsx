@@ -4,7 +4,7 @@ import { Heart, Download, Gamepad2, Tag, Scale, Hash, Copy, Check, Users, Box, L
 import { SidebarSection } from '@/modules/project/components/ProjectLayout';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { getLicenseInfo } from '@/utils/modHelpers';
-import { createSlug } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project, User, ProjectDependency } from '@/types';
 
@@ -103,7 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             return (
                                 <Link
                                     key={member.id}
-                                    to={`/creator/${member.username}`}
+                                    to={SiteRoutes.creator(member.username)}
                                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <OptimizedImage
@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             return (
                                 <Link
                                     key={contributor.id}
-                                    to={`/creator/${contributor.username}`}
+                                    to={SiteRoutes.creator(contributor.username)}
                                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <OptimizedImage
@@ -171,8 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             const meta = depMeta[dep.projectId];
                             const iconUrl = getIconUrl(meta?.icon);
                             const title = meta?.title || dep.projectTitle || dep.projectId;
-                            const slug = createSlug(title, dep.projectId);
-                            const path = `/project/${slug}`;
+                            const path = SiteRoutes.project({ id: dep.projectId, title: title });
 
                             return (
                                 <Link

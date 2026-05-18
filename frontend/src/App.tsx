@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Route, Routes, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
@@ -38,8 +38,8 @@ import { ExternalLinkProvider } from '@/context/ExternalLinkContext';
 import { NotificationProvider } from '@/context/NotificationsContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import { MobileProvider } from '@/context/MobileContext';
-import type { Project, User } from '@/types';
-import { createSlug } from '@/utils/slug';
+import type { User } from '@/types';
+import { SiteRoutes } from '@/utils/routes';
 import type { Classification } from '@/data/categories';
 
 const ScrollToTop = () => {
@@ -48,6 +48,12 @@ const ScrollToTop = () => {
         window.scrollTo(0, 0);
     }, [pathname]);
     return null;
+};
+
+const LegacyUserRedirect = () => {
+    const { username } = useParams();
+    const location = useLocation();
+    return <Navigate to={`${SiteRoutes.creator(username || '')}${location.search}${location.hash}`} replace />;
 };
 
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
@@ -119,13 +125,11 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     const handleLogout = async () => {
         try { await api.post(`${BACKEND_URL}/logout`); } catch (e) {}
         setUser(null);
-        navigate('/');
+        navigate(SiteRoutes.home());
     };
 
-    const handleNavigate = (page: string) => { navigate(page === 'home' ? '/' : `/${page}`); };
-    const handleUserClick = (username: string) => { navigate(`/user/${username}`); };
-
-    const handleProjectClick = (project: Project) => { navigate(`/project/${createSlug(project.title, project.id)}`); };
+    const handleNavigate = (page: string) => { navigate(page === 'home' ? SiteRoutes.home() : `/${page}`); };
+    const handleUserClick = (username: string) => { navigate(SiteRoutes.creator(username)); };
 
     const handleToggleFavorite = async (id: string) => {
         if (!user) return;
@@ -140,7 +144,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
 
     const renderBrowse = (classification?: Classification) => (
         <Browse
-            onProjectSelect={handleProjectClick}
             likedProjectIds={user?.likedProjectIds || []}
             onToggleFavorite={handleToggleFavorite}
             isLoggedIn={!!user}
@@ -209,7 +212,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/" element={<Home user={user} />} />
 
                             <Route path="/mods" element={renderBrowse()} />
-                            <Route path="/projects" element={<Navigate to="/mods" replace />} />
+                            <Route path="/projects" element={<Navigate to={SiteRoutes.browse()} replace />} />
                             <Route path="/plugins" element={renderBrowse('PLUGIN')} />
                             <Route path="/modpacks" element={renderBrowse('MODPACK')} />
                             <Route path="/worlds" element={renderBrowse('SAVE')} />
@@ -224,7 +227,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/dashboard/*" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
-                                        <Navigate to="/" />
+                                        <Navigate to={SiteRoutes.home()} />
                             } />
 
                             {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
@@ -237,23 +240,21 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                                     <Route path={`${path}/edit`} element={
                                         loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                             user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
-                                                <Navigate to="/" />
+                                                <Navigate to={SiteRoutes.home()} />
                                     } />
                                 </React.Fragment>
                             ))}
 
-                            {['/user/:username', '/creator/:username'].map(path => (
-                                <Route key={path} path={path} element={
-                                    <UserProfile
-                                        onModClick={handleProjectClick}
-                                        onBack={() => handleNavigate('home')}
-                                        likedModIds={user?.likedProjectIds || []}
-                                        onToggleFavorite={handleToggleFavorite}
-                                        currentUser={user}
-                                        onRefreshUser={fetchUser}
-                                    />
-                                } />
-                            ))}
+                            <Route path="/creator/:username" element={
+                                <UserProfile
+                                    onBack={() => navigate(SiteRoutes.home())}
+                                    likedModIds={user?.likedProjectIds || []}
+                                    onToggleFavorite={handleToggleFavorite}
+                                    currentUser={user}
+                                    onRefreshUser={fetchUser}
+                                />
+                            } />
+                            <Route path="/user/:username" element={<LegacyUserRedirect />} />
 
                             <Route path="/verify" element={<VerifyEmail />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
@@ -268,7 +269,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/admin" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <AdminPanel currentUser={user} /> :
-                                        <Navigate to="/" />
+                                        <Navigate to={SiteRoutes.home()} />
                             } />
 
                             <Route path="*" element={<NotFound />} />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { SiteRoutes } from '@/utils/routes';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 127.14 96.36" fill="currentColor">
@@ -30,15 +31,15 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
 
     const getFooterDescription = () => {
         switch (path) {
-            case '/plugins':
+            case SiteRoutes.browse('PLUGIN'):
                 return "The premier community repository for Hytale plugins. Discover, download, and share Hytale plugins, admin tools, gameplay scripts, and libraries.";
-            case '/modpacks':
+            case SiteRoutes.browse('MODPACK'):
                 return "The premier community repository for Hytale modpacks. Discover, download, and share curated Hytale modpacks, collections, and tech packs.";
-            case '/worlds':
+            case SiteRoutes.browse('SAVE'):
                 return "The premier community repository for Hytale worlds. Discover, download, and share Hytale maps, lobbies, schematics, and spawns.";
-            case '/art':
+            case SiteRoutes.browse('ART'):
                 return "The premier community repository for Hytale art assets. Discover, download, and share Hytale models, textures, animations, and resources.";
-            case '/data':
+            case SiteRoutes.browse('DATA'):
                 return "The premier community repository for Hytale data assets. Discover, download, and share Hytale configs, loot tables, and data packs.";
             default:
                 return "The premier community repository for Hytale. Discover, download, and share Hytale mods, worlds, plugins, art + data assets, and modpacks.";
@@ -64,19 +65,19 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     <div className="col-span-1">
                         <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</h4>
                         <div className="flex flex-col space-y-3">
-                            <Link to="/modpacks" className={linkClass}>
+                            <Link to={SiteRoutes.browse('MODPACK')} className={linkClass}>
                                 <Layers className="w-3.5 h-3.5 mr-2 opacity-70" /> Modpacks
                             </Link>
-                            <Link to="/plugins" className={linkClass}>
+                            <Link to={SiteRoutes.browse('PLUGIN')} className={linkClass}>
                                 <Box className="w-3.5 h-3.5 mr-2 opacity-70" /> Plugins
                             </Link>
-                            <Link to="/worlds" className={linkClass}>
+                            <Link to={SiteRoutes.browse('SAVE')} className={linkClass}>
                                 <Save className="w-3.5 h-3.5 mr-2 opacity-70" /> Worlds
                             </Link>
-                            <Link to="/art" className={linkClass}>
+                            <Link to={SiteRoutes.browse('ART')} className={linkClass}>
                                 <Palette className="w-3.5 h-3.5 mr-2 opacity-70" /> Art Assets
                             </Link>
-                            <Link to="/data" className={linkClass}>
+                            <Link to={SiteRoutes.browse('DATA')} className={linkClass}>
                                 <Database className="w-3.5 h-3.5 mr-2 opacity-70" /> Data Assets
                             </Link>
                         </div>
@@ -85,14 +86,14 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     <div className="col-span-1">
                         <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Resources</h4>
                         <div className="flex flex-col space-y-3">
-                            <Link to="/api-docs" className={linkClass}>
+                            <Link to={SiteRoutes.apiDocs()} className={linkClass}>
                                 <Code className="w-4 h-4 mr-2 opacity-70" /> API Docs
                             </Link>
                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
-                            <Link to="/terms" className={linkClass}>
+                            <Link to={SiteRoutes.terms()} className={linkClass}>
                                 <FileText className="w-4 h-4 mr-2 opacity-70" /> Terms of Service
                             </Link>
-                            <Link to="/privacy" className={linkClass}>
+                            <Link to={SiteRoutes.privacy()} className={linkClass}>
                                 <Shield className="w-4 h-4 mr-2 opacity-70" /> Privacy Policy
                             </Link>
                         </div>

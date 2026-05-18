@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '@/utils/api';
 import { Package, Users, ChevronLeft, ChevronRight, CornerDownLeft, Building2 } from 'lucide-react';
-import { createSlug, getProjectUrl } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import { ProfileLayout } from '../components/ProfileLayout';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { Spinner } from '@/components/ui/Spinner';
@@ -12,7 +12,6 @@ import { ReportModal } from '@/modules/project/components/dialogs/ReportModal';
 import type { Project, User } from '@/types';
 
 interface UserProfileProps {
-    onModClick: (project: Project) => void;
     onBack: () => void;
     likedModIds: string[];
     onToggleFavorite: (id: string) => void;
@@ -21,7 +20,7 @@ interface UserProfileProps {
 }
 
 export const UserProfile: React.FC<UserProfileProps> = ({
-                                                            onModClick, onBack, likedModIds, onToggleFavorite, currentUser, onRefreshUser
+                                                            onBack, likedModIds, onToggleFavorite, currentUser, onRefreshUser
                                                         }) => {
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
@@ -135,14 +134,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
     useEffect(() => {
         if (profileUser && !loadingProjects) {
-            const isCreator = totalItems > 0 || profileUser.accountType === 'ORGANIZATION';
-            const canonicalBase = isCreator ? `/creator/${profileUser.username}` : `/user/${profileUser.username}`;
+            const canonicalPath = SiteRoutes.creator(profileUser.username);
             const currentPrefixMatch = location.pathname.match(/^\/(user|creator)\/[^/]+/i);
 
             if (currentPrefixMatch) {
                 const currentBase = currentPrefixMatch[0];
-                if (currentBase !== canonicalBase) {
-                    const newPath = location.pathname.replace(currentBase, canonicalBase);
+                if (currentBase !== canonicalPath) {
+                    const newPath = location.pathname.replace(currentBase, canonicalPath);
                     navigate(
                         { pathname: newPath, search: location.search, hash: location.hash },
                         { replace: true }
@@ -153,7 +151,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }, [profileUser, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
 
     const handleToggleFollow = async () => {
-        if (!currentUser) { navigate('/login'); return; }
+        if (!currentUser) { navigate(SiteRoutes.login()); return; }
         if (!profileUser) return;
         const previousState = actualIsFollowing;
         setIsFollowingOptimistic(!previousState);
@@ -263,7 +261,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                     return (
                                         <Link
                                             key={member.id}
-                                            to={`/creator/${member.username}`}
+                                            to={SiteRoutes.creator(member.username)}
                                             className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                         >
                                             <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -296,7 +294,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                 {memberOrgs.map(org => (
                                     <Link
                                         key={org.id}
-                                        to={`/creator/${org.username}`}
+                                        to={SiteRoutes.creator(org.username)}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -342,11 +340,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                 <div key={project.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <ProjectCard
                                         project={project}
-                                        path={getProjectUrl(project)}
+                                        path={SiteRoutes.project(project)}
                                         isFavorite={likedModIds.includes(project.id)}
                                         onToggleFavorite={() => { onToggleFavorite(project.id); }}
                                         isLoggedIn={!!currentUser}
-                                        onClick={() => { onModClick(project); }}
                                     />
                                 </div>
                             ))}

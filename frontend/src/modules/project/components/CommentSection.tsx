@@ -6,6 +6,7 @@ import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { formatTimeAgo } from '@/utils/modHelpers';
 import { BACKEND_URL } from '@/utils/api';
+import { SiteRoutes } from '@/utils/routes';
 import type { Comment, User } from '@/types';
 
 interface VoteWidgetProps {
@@ -236,7 +237,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                     const score = (anyC.upvotes?.length || 0) - (anyC.downvotes?.length || 0);
                     const userVote = currentUser && anyC.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && anyC.downvotes?.includes(currentUser.id) ? 'down' : null);
 
-                    const profileLink = `/creator/${authorUsername}`;
+                    const profileLink = SiteRoutes.creator(authorUsername);
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
 
                     return (
@@ -325,7 +326,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                     const rawReplyAvatar = replyId ? replyProfile?.avatarUrl : null;
                                     const replyAvatar = resolveAvatar(rawReplyAvatar);
 
-                                    const replyProfileLink = `/creator/${replyUsername}`;
+                                    const replyProfileLink = SiteRoutes.creator(replyUsername);
 
                                     const replyScore = (devReply.upvotes?.length || 0) - (devReply.downvotes?.length || 0);
                                     const replyUserVote = currentUser && devReply.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && devReply.downvotes?.includes(currentUser.id) ? 'down' : null);

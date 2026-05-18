@@ -5,6 +5,7 @@ import { api } from '@/utils/api';
 import type { User } from '@/types';
 import { Link } from 'react-router-dom';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { SiteRoutes } from '@/utils/routes';
 
 interface FollowingModalProps {
     userId: string;
@@ -62,7 +63,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
                             {users.map(u => (
                                 <Link
                                     key={u.id}
-                                    to={`/user/${u.username}`}
+                                    to={SiteRoutes.creator(u.username)}
                                     onClick={onClose}
                                     className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
                                 >
