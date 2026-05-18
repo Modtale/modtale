@@ -223,7 +223,7 @@ public class LifecycleService {
             Set<String> depIds = new HashSet<>();
             if (project.getVersions() != null) project.getVersions().forEach(v -> {
                 if (v.getFileUrl() != null) storageService.deleteFile(v.getFileUrl());
-                if (v.getDependencies() != null) v.getDependencies().forEach(d -> depIds.add(d.getModId()));
+                if (v.getDependencies() != null) v.getDependencies().forEach(d -> depIds.add(d.getProjectId()));
             });
             if (project.getModIds() != null) depIds.addAll(project.getModIds());
             if (project.getImageUrl() != null) storageService.deleteFile(project.getImageUrl());

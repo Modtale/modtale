@@ -55,8 +55,8 @@ public class DownloadService {
 
             if (mainVersion.getDependencies() != null) {
                 for (ProjectDependency dep : mainVersion.getDependencies()) {
-                    if (selectedDependencies != null && !selectedDependencies.contains(dep.getModId())) continue;
-                    Project depProject = projectService.getRawProjectById(dep.getModId());
+                    if (selectedDependencies != null && !selectedDependencies.contains(dep.getProjectId())) continue;
+                    Project depProject = projectService.getRawProjectById(dep.getProjectId());
                     if (depProject == null) continue;
                     ProjectVersion depVer = depProject.getVersions().stream().filter(v -> v.getVersionNumber().equals(dep.getVersionNumber())).findFirst().orElse(null);
 
