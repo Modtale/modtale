@@ -2,17 +2,7 @@ import React, { useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PROJECT_TYPES } from '@/data/categories';
 import type { Classification } from '@/data/categories';
-
-const getRouteForClassification = (cls: Classification | 'All') => {
-    switch(cls) {
-        case 'PLUGIN': return '/plugins';
-        case 'MODPACK': return '/modpacks';
-        case 'SAVE': return '/worlds';
-        case 'ART': return '/art';
-        case 'DATA': return '/data';
-        default: return '/mods';
-    }
-};
+import { SiteRoutes } from '@/utils/routes';
 
 export const CategoryPillNav: React.FC<{ selectedClassification: Classification | 'All', onClassificationChange: (cls: Classification | 'All') => void, currentSearchParams: URLSearchParams }> = ({ selectedClassification, onClassificationChange, currentSearchParams }) => {
     const tabsRef = useRef<(HTMLElement | null)[]>([]);
@@ -80,7 +70,7 @@ export const CategoryPillNav: React.FC<{ selectedClassification: Classification 
                         const Icon = type.icon;
                         const isSelected = selectedClassification === type.id;
                         const searchString = currentSearchParams.toString();
-                        const toPath = getRouteForClassification(type.id as Classification | 'All') + (searchString ? `?${searchString}` : '');
+                        const toPath = SiteRoutes.browse(type.id === 'All' ? undefined : type.id) + (searchString ? `?${searchString}` : '');
 
                         return (
                             <Link

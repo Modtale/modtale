@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Download, BookOpen, Image as ImageIcon, List, MessageSquare, Box, ChevronDown, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
-import { createSlug } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project, ProjectDependency } from '@/types';
 
@@ -81,7 +81,8 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, lates
                                 {latestDependencies.map((dep, idx) => {
                                     const meta = depMeta[dep.projectId];
                                     const title = meta?.title || dep.projectTitle || dep.projectId;
-                                    const path = `/project/${createSlug(title, dep.projectId)}`;
+                                    const path = SiteRoutes.project({ id: dep.projectId, title: title });
+
                                     return (
                                         <Link key={idx} to={path} onClick={() => setShowMobileDeps(false)} className={`w-full flex items-center gap-3 p-2.5 ${theme.colors.bgSurfaceHover} transition-colors ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} text-left`}>
                                             <div className={`w-8 h-8 rounded-lg ${theme.colors.bgSurfaceAlt} flex items-center justify-center border ${theme.colors.border} shrink-0 overflow-hidden`}>

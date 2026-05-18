@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
 import { TransferProjectModal } from '@/components/shared/TransferProjectModal';
+import { SiteRoutes } from '@/utils/routes';
 
 interface ManageProjectsProps {
     user: User;
@@ -93,7 +94,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
         <div className="space-y-8">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">Your Projects</h1>
-                <Link to="/upload" className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20">
+                <Link to={SiteRoutes.upload()} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-modtale-accent/20">
                     <Plus className="w-4 h-4" /> New Project
                 </Link>
             </div>

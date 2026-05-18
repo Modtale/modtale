@@ -6,6 +6,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import type { User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
+import { SiteRoutes } from '@/utils/routes';
+import { Link } from 'react-router-dom';
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
@@ -225,7 +227,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const parallaxOffset = isEditing ? 0 : 500 * (1 - Math.exp(-scrollY / 600));
 
     return (
-        <div className={`min-h-screen ${theme.colors.bgBase} relative z-0 overflow-x-hidden pb-12 md:pb-20 transition-colors duration-300`}>
+        <div className={`relative z-0 overflow-x-hidden ${isEditing ? '' : 'mb-6 md:mb-16'}`}>
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
 
@@ -243,12 +245,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             className="w-full h-full object-cover opacity-100"
                         />
                     ) : (
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-slate-950 dark:via-slate-950/20 to-transparent pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-[#0B1120] dark:via-[#0B1120]/20 to-transparent pointer-events-none" />
                     )}
                 </div>
 
                 <div
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
                     style={{ height: `calc(var(--fade-base) + ${parallaxOffset}px)` }}
                 />
 
@@ -332,7 +334,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                 {actionInput ? actionInput : (
                                     <>
                                         {isSelf ? (
-                                            <a href="/dashboard/profile" className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 backdrop-blur-md">
+                                            <a href={SiteRoutes.dashboard()} className="px-6 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 backdrop-blur-md">
                                                 <Settings className="w-5 h-5" /> Manage Profile
                                             </a>
                                         ) : (
@@ -373,7 +375,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         {!isEditing && (
                             <div className="md:hidden flex items-center gap-3 w-full mb-6 h-12 relative z-20">
                                 {isSelf ? (
-                                    <a href="/dashboard/profile" className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 backdrop-blur-md">
+                                    <a href={SiteRoutes.dashboard()} className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 backdrop-blur-md">
                                         <Settings className="w-4 h-4" /> Manage Profile
                                     </a>
                                 ) : (

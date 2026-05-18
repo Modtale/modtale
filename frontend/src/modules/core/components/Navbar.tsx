@@ -6,6 +6,7 @@ import { FollowingModal } from '@/modules/user/components/FollowingModal';
 import { SignInModal } from '@/modules/auth/components/SignInModal.tsx';
 import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
+import { SiteRoutes } from '@/utils/routes';
 import type { User } from "@/types.ts";
 
 interface NavbarProps {
@@ -19,7 +20,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-                                                  user, onLogout, currentPage, onNavigate, isDarkMode, toggleDarkMode, onUserClick
+                                                  user, onLogout, currentPage, isDarkMode, toggleDarkMode
                                               }) => {
     const { isMobile } = useMobile();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -77,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className={`${widthClass} w-full h-full transition-[padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]`}>
                     <div className="flex items-center justify-between h-full">
 
-                        <Link to="/" className="flex items-center cursor-pointer group flex-shrink-0 mr-8">
+                        <Link to={SiteRoutes.home()} className="flex items-center cursor-pointer group flex-shrink-0 mr-8">
                             <img
                                 src={logoSrc}
                                 alt="Modtale"
@@ -108,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     {isBrowseDropdownOpen && (
                                         <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
                                             <Link
-                                                to="/mods"
+                                                to={SiteRoutes.browse()}
                                                 onClick={() => setIsBrowseDropdownOpen(false)}
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
@@ -117,7 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                             </Link>
                                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>
                                             <Link
-                                                to="/plugins"
+                                                to={SiteRoutes.browse('PLUGIN')}
                                                 onClick={() => setIsBrowseDropdownOpen(false)}
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
@@ -125,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 Plugins
                                             </Link>
                                             <Link
-                                                to="/modpacks"
+                                                to={SiteRoutes.browse('MODPACK')}
                                                 onClick={() => setIsBrowseDropdownOpen(false)}
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
@@ -133,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 Modpacks
                                             </Link>
                                             <Link
-                                                to="/worlds"
+                                                to={SiteRoutes.browse('SAVE')}
                                                 onClick={() => setIsBrowseDropdownOpen(false)}
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
@@ -141,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 Worlds
                                             </Link>
                                             <Link
-                                                to="/art"
+                                                to={SiteRoutes.browse('ART')}
                                                 onClick={() => setIsBrowseDropdownOpen(false)}
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
@@ -149,7 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 Art Assets
                                             </Link>
                                             <Link
-                                                to="/data"
+                                                to={SiteRoutes.browse('DATA')}
                                                 onClick={() => setIsBrowseDropdownOpen(false)}
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
@@ -161,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 </div>
 
                                 <Link
-                                    to="/api-docs"
+                                    to={SiteRoutes.apiDocs()}
                                     className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                                         currentPage === 'api-docs'
                                             ? 'text-modtale-accent bg-modtale-accent/10'
@@ -174,7 +175,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 {user && (
                                     <>
                                         <Link
-                                            to="/dashboard"
+                                            to={SiteRoutes.dashboard()}
                                             className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                                                 currentPage.startsWith('dashboard')
                                                     ? 'text-modtale-accent bg-modtale-accent/10'
@@ -185,7 +186,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                             Dashboard
                                         </Link>
                                         <Link
-                                            to="/upload"
+                                            to={SiteRoutes.upload()}
                                             className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                                                 currentPage === 'upload'
                                                     ? 'text-modtale-accent bg-modtale-accent/10'
@@ -232,17 +233,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 </div>
 
                                                 <div className="px-2 space-y-0.5">
-                                                    <Link to={`/user/${user.username}`} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                    <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                                                         <UserIcon className="w-4 h-4 text-slate-400" /> Your Profile
                                                     </Link>
                                                     <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                                                         <Users className="w-4 h-4 text-slate-400" /> Following
                                                     </button>
-                                                    <Link to="/dashboard" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                    <Link to={SiteRoutes.dashboard()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                                                         <LayoutDashboard className="w-4 h-4 text-slate-400" /> User Dashboard
                                                     </Link>
                                                     {user.roles?.includes('ADMIN') && (
-                                                        <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
+                                                        <Link to={SiteRoutes.admin()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
                                                             <Shield className="w-4 h-4" /> Admin Panel
                                                         </Link>
                                                     )}
@@ -280,26 +281,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
                     <div className="space-y-1">
                         <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Browse</div>
-                        <Link to="/mods" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
-                        <Link to="/plugins" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Plugins</Link>
-                        <Link to="/modpacks" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Modpacks</Link>
-                        <Link to="/worlds" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Worlds</Link>
-                        <Link to="/art" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Palette className="w-4 h-4 mr-3" /> Art Assets</Link>
-                        <Link to="/data" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Database className="w-4 h-4 mr-3" /> Data Assets</Link>
+                        <Link to={SiteRoutes.browse()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
+                        <Link to={SiteRoutes.browse('PLUGIN')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Plugins</Link>
+                        <Link to={SiteRoutes.browse('MODPACK')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Modpacks</Link>
+                        <Link to={SiteRoutes.browse('SAVE')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Worlds</Link>
+                        <Link to={SiteRoutes.browse('ART')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Palette className="w-4 h-4 mr-3" /> Art Assets</Link>
+                        <Link to={SiteRoutes.browse('DATA')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Database className="w-4 h-4 mr-3" /> Data Assets</Link>
                     </div>
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
 
-                    <Link to="/api-docs" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> API</Link>
+                    <Link to={SiteRoutes.apiDocs()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> API</Link>
                     {user && (
                         <>
-                            <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
-                            <Link to="/upload" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Upload className="w-4 h-4 mr-3" /> Create Project</Link>
+                            <Link to={SiteRoutes.dashboard()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
+                            <Link to={SiteRoutes.upload()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Upload className="w-4 h-4 mr-3" /> Create Project</Link>
                         </>
                     )}
 
                     {user?.roles?.includes('ADMIN') && (
-                        <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
+                        <Link to={SiteRoutes.admin()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
                     )}
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
@@ -311,7 +312,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     {user ? (
                         <>
-                            <Link to={`/user/${user.username}`} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
+                            <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
                                 <img src={user.avatarUrl} className="w-6 h-6 rounded-full" alt="" /> Profile
                             </Link>
                             <button onClick={() => { setIsFollowingOpen(true); setIsMobileMenuOpen(false); }} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">

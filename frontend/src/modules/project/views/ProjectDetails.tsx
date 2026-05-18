@@ -5,7 +5,7 @@ import { ChevronLeft, Github, Globe } from 'lucide-react';
 
 import type { User } from '@/types';
 import { theme } from '@/styles/theme';
-import { getProjectUrl } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import { generateProjectMeta } from '@/utils/meta';
 import { generateBreadcrumbSchema, getBreadcrumbsForClassification } from '@/utils/schema';
 import { DiscordIcon } from '@/utils/modHelpers';
@@ -94,13 +94,14 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     useEffect(() => {
         if (project) {
-            const canonicalBase = getProjectUrl(project);
+            const canonicalPath = SiteRoutes.project(project);
             const currentPrefixMatch = location.pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
 
             if (currentPrefixMatch) {
                 const currentBase = currentPrefixMatch[0];
-                if (currentBase !== canonicalBase) {
-                    const newPath = location.pathname.replace(currentBase, canonicalBase);
+                if (currentBase !== canonicalPath) {
+                    const newPath = location.pathname.replace(currentBase, canonicalPath);
+                    console.log(`[DEBUG Redirect] Swapping base from ${currentBase} to canonical ${canonicalPath}`);
                     navigate(
                         { pathname: newPath, search: location.search, hash: location.hash },
                         { replace: true }
@@ -114,7 +115,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
 
     const canEdit = project.canEdit ?? (currentUser && (currentUser.username === project.author || project.teamMembers?.some(m => m.userId === currentUser.id)));
-    const projectUrl = getProjectUrl(project);
+    const projectUrl = SiteRoutes.project(project);
+
     const meta = generateProjectMeta(project);
     const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);
 
@@ -140,7 +142,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <ProjectLayout
                 bannerUrl={project.bannerUrl}
                 iconUrl={project.imageUrl}
-                onBack={() => navigate(-1)}
+                onBack={() => navigate(SiteRoutes.home())}
                 headerActions={
                     <HeaderActions
                         project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} canEdit={Boolean(canEdit)} projectUrl={projectUrl}

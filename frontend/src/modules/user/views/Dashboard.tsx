@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { User, Package, Users, Code, BarChart2, Bell } from 'lucide-react';
 import type { User as UserType } from '@/types';
+import { SiteRoutes } from '@/utils/routes';
 
 import { ManageProjects } from './ManageProjects';
 import { DeveloperSettings } from './DeveloperSettings';
@@ -16,7 +17,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => {
-    if (!user) return <Navigate to="/" replace />;
+    if (!user) return <Navigate to={SiteRoutes.home()} replace />;
 
     const SidebarLink = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => (
         <NavLink
@@ -47,13 +48,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
                             </div>
 
                             <nav className="space-y-1">
-                                <SidebarLink to="/dashboard/profile" icon={User} label="Manage Profile" />
-                                <SidebarLink to="/dashboard/projects" icon={Package} label="Manage Projects" />
-                                <SidebarLink to="/dashboard/orgs" icon={Users} label="Organizations" />
-                                <SidebarLink to="/dashboard/analytics" icon={BarChart2} label="Analytics" />
-                                <SidebarLink to="/dashboard/notifications" icon={Bell} label="Notifications" />
+                                <SidebarLink to={SiteRoutes.dashboardProfile()} icon={User} label="Manage Profile" />
+                                <SidebarLink to={SiteRoutes.dashboardProjects()} icon={Package} label="Manage Projects" />
+                                <SidebarLink to={SiteRoutes.dashboardOrgs()} icon={Users} label="Organizations" />
+                                <SidebarLink to={SiteRoutes.dashboardAnalytics()} icon={BarChart2} label="Analytics" />
+                                <SidebarLink to={SiteRoutes.dashboardNotifications()} icon={Bell} label="Notifications" />
                                 <div className="h-px bg-slate-100 dark:bg-white/5 my-2 mx-4" />
-                                <SidebarLink to="/dashboard/developer" icon={Code} label="Developer Settings" />
+                                <SidebarLink to={SiteRoutes.dashboardDeveloper()} icon={Code} label="Developer Settings" />
                             </nav>
                         </div>
                     </aside>

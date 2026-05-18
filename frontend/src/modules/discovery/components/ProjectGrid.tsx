@@ -3,7 +3,7 @@ import { PackageSearch } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { getProjectUrl } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import type { Project } from '@/types';
 
 interface ProjectGridProps {
@@ -14,11 +14,10 @@ interface ProjectGridProps {
     likedProjectIds: string[];
     onToggleFavorite: (id: string) => void;
     isLoggedIn: boolean;
-    onProjectSelect: (item: Project) => void;
 }
 
 export const ProjectGrid: React.FC<ProjectGridProps> = ({
-                                                            items, loading, viewStyle, itemsPerPage, likedProjectIds, onToggleFavorite, isLoggedIn, onProjectSelect
+                                                            items, loading, viewStyle, itemsPerPage, likedProjectIds, onToggleFavorite, isLoggedIn
                                                         }) => {
     if (loading) {
         return (
@@ -48,11 +47,10 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                     <div key={item.id} className={isPriority ? "" : "animate-in fade-in zoom-in-95 duration-500 fill-mode-backwards"} style={isPriority ? {} : { animationDelay: `${(index - 6) * 50}ms` }}>
                         <ProjectCard
                             project={item}
-                            path={getProjectUrl(item)}
+                            path={SiteRoutes.project(item)}
                             isFavorite={likedProjectIds.includes(item.id)}
                             onToggleFavorite={onToggleFavorite}
                             isLoggedIn={isLoggedIn}
-                            onClick={() => onProjectSelect(item)}
                             priority={isPriority}
                             viewStyle={viewStyle}
                         />
