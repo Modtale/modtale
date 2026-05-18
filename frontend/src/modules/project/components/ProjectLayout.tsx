@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-react';
-import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
@@ -29,13 +28,13 @@ export const SidebarSection: React.FC<SidebarSectionProps> = React.memo(({
     const visibilityClass = isVisibleOnMobile ? "" : "hidden md:block";
 
     return (
-        <div className={`border-b ${theme.colors.borderFaint} last:border-0 pb-4 mb-4 last:mb-0 last:pb-0 ${visibilityClass} ${className}`}>
+        <div className={`border-b border-slate-200 dark:border-white/10 last:border-0 pb-4 mb-4 last:mb-0 last:pb-0 ${visibilityClass} ${className}`}>
             <h3 className="w-full m-0 p-0">
                 <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
                     aria-expanded={isOpen}
-                    className={`w-full flex items-center justify-between text-xs font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-3 hover:${theme.colors.textPrimary} transition-colors`}
+                    className="w-full flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                     <span className="flex items-center gap-2">{Icon && <Icon className="w-3 h-3" aria-hidden="true" />} {title}</span>
                     {isOpen ? <ChevronUp className="w-3 h-3" aria-hidden="true" /> : <ChevronDown className="w-3 h-3" aria-hidden="true" />}
@@ -127,7 +126,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
     const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
 
     return (
-        <div className={`min-h-screen ${theme.colors.bgBase} relative pb-20 overflow-x-hidden z-0`}>
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
             {cropperOpen && tempImage && (
                 <ImageCropperModal
                     imageSrc={tempImage}
@@ -151,12 +150,12 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             className="w-full h-full object-cover opacity-100"
                         />
                     ) : (
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-slate-950 dark:via-slate-950/20 to-transparent pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-[#0B1120] dark:via-[#0B1120]/20 to-transparent pointer-events-none" />
                     )}
                 </div>
 
                 <div
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-slate-950 to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
                     style={{ height: `calc(var(--fade-base) + ${parallaxOffset}px)` }}
                 />
 
@@ -196,11 +195,11 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             )}
 
             <div className={`${containerClasses} relative z-50 -mt-2 md:-mt-32 transition-[max-width,padding] duration-300`}>
-                <div className={`${theme.colors.bgBase} border ${theme.colors.border} rounded-3xl shadow-2xl min-h-[80vh]`}>
-                    <div className={`relative md:p-12 md:pb-6 border-b ${theme.colors.borderFaint} p-4 pt-0`}>
+                <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl shadow-2xl min-h-[80vh]">
+                    <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/10 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
-                                <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
@@ -211,7 +210,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             className="w-full h-full bg-transparent object-cover relative z-10"
                                         />
                                     ) : (
-                                        <div className={`w-full h-full bg-transparent flex flex-col items-center justify-center ${theme.colors.textSecondary} relative z-10`}>
+                                        <div className="w-full h-full bg-transparent flex flex-col items-center justify-center text-slate-400 relative z-10">
                                             <ImageIcon className="w-8 h-8 opacity-50" aria-hidden="true" />
                                         </div>
                                     )}
@@ -226,7 +225,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
-                                <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {finalIcon ? (
@@ -238,9 +237,9 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             className="w-full h-full bg-transparent object-cover relative z-10"
                                         />
                                     ) : (
-                                        <div className={`w-full h-full bg-transparent flex flex-col items-center justify-center ${theme.colors.textSecondary} gap-2 relative z-10`}>
+                                        <div className="w-full h-full bg-transparent flex flex-col items-center justify-center text-slate-400 gap-2 relative z-10">
                                             <ImageIcon className="w-10 h-10 opacity-50" aria-hidden="true" />
-                                            <span className={`text-[10px] font-bold uppercase tracking-widest ${theme.colors.textMuted}`}>512x512</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">512x512</span>
                                         </div>
                                     )}
                                     {isEditing && (
@@ -266,12 +265,12 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                 </div>
 
                                 {actionBar && (
-                                    <div className={`mt-8 pt-8 border-t ${theme.colors.borderFaint} w-full`}>
+                                    <div className="mt-8 pt-8 border-t border-slate-200 dark:border-white/10 w-full">
                                         {actionBar}
                                     </div>
                                 )}
 
-                                {tabs && <div className={`mt-6 border-t ${theme.colors.borderFaint} pt-1`}>{tabs}</div>}
+                                {tabs && <div className="mt-6 border-t border-slate-200 dark:border-white/10 pt-1">{tabs}</div>}
                             </div>
                         </div>
                     </div>
