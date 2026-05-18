@@ -19,11 +19,7 @@
 
 <br />
 
----
-
-## 📂 Repository Structure
-
-Modtale is structured as a monorepo.
+## Welcome to the Modtale Monorepo!
 
 ```text
 modtale/
@@ -52,7 +48,7 @@ modtale/
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Domain | Technology | Usage |
 | --- | --- | --- |
@@ -68,7 +64,7 @@ modtale/
 
 ---
 
-## 💻 Local Development Setup
+## Local Development Setup
 
 Ready to contribute? Follow these steps to get Modtale running on your local machine.
 
@@ -98,7 +94,7 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
 | `WARDEN_ENABLED` | **Must be false locally** | `false` |
 
-> 🔒 **Note on Warden:** The "Warden" malware and security scanner is proprietary to protect our threat-detection logic. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where file uploads bypass the scanner and automatically return a mock "CLEAN" status.
+> **Note on Warden:** The "Warden" malware and security scanner is proprietary to protect our threat-detection logic. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where file uploads bypass the scanner and automatically return a mock "CLEAN" status.
 
 **(Optional) OAuth Variables:**
 To test social logins (GitHub, Discord, Google), provide their respective Client IDs and Secrets (e.g., `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`).
@@ -143,18 +139,18 @@ npm run dev
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
 
 Modtale is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This ensures that the platform remains open and accessible to the Hytale community forever.
 
-## 🤝 Community & Support
+## Community & Support
 
-* 📖 **API Documentation:** [modtale.net/api-docs]()
-* 💬 **Discord:** [Join the Developer Server]()
-* 🐦 **X (Twitter):** [@modtalenet]()
-* 🦋 **Bluesky:** [@modtale.net]()
+* **API Documentation:** [modtale.net/api-docs]()
+* **Discord:** [Join the Developer Server]()
+* **X (Twitter):** [@modtalenet]()
+* **Bluesky:** [@modtale.net]()
 
 ### Contributing
 
@@ -162,7 +158,7 @@ We welcome contributions from the community! Whether it's a bug fix, a new featu
 
 ---
 
-## ⭐ Star History
+## Star History
 
 <div align="center">
   <a href="https://www.star-history.com/#Modtale/modtale&Date">
