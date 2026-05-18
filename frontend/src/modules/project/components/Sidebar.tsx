@@ -11,7 +11,7 @@ import type { Project, User, ProjectDependency } from '@/types';
 interface SidebarProps {
     project: Project;
     dependencies?: ProjectDependency[];
-    depMeta: Record<string, { icon: string, title: string }>;
+    depMeta: Record<string, { icon: string, title: string, classification?: string, slug?: string }>;
     navigate: (path: string) => void;
     contributors: User[];
     orgMembers: User[];
@@ -171,7 +171,15 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             const meta = depMeta[dep.projectId];
                             const iconUrl = getIconUrl(meta?.icon);
                             const title = meta?.title || dep.projectTitle || dep.projectId;
-                            const path = SiteRoutes.project({ id: dep.projectId, title: title });
+
+                            const targetProjectParams = {
+                                id: dep.projectId,
+                                title: title,
+                                slug: meta?.slug,
+                                classification: meta?.classification
+                            };
+
+                            const path = SiteRoutes.project(targetProjectParams);
 
                             return (
                                 <Link
