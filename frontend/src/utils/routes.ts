@@ -66,4 +66,10 @@ export class SiteRoutes {
         if (/^\d+$/.test(slug)) return `${slug}-mod-${id}`;
         return `${slug}-${id}`;
     }
+
+    static extractId(param: string | undefined) {
+        if (!param) return '';
+        const match = param.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+        return match ? match[0] : param;
+    }
 }
