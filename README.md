@@ -19,67 +19,64 @@
 
 <br />
 
-## About
-
-### Supported Content Types
-
-Modtale is engineered to support the specific file structures and metadata requirements of Hytale's modification system:
-
-* **Modpacks:** Curated collections of plugins and asset packs with automated dependency resolution.
-* **Server Plugins:** Server-side JAR files executed by the Hytale server.
-* **Worlds:** Maps, lobbies, and schematics.
-* **Art Assets:** Models, textures, and client-side visuals.
-* **Data Assets:** Configs, loot tables, and other data-driven properties.
-
 ---
 
-## Repository Structure
+## 📂 Repository Structure
 
-This monorepo houses the core components of the Modtale app:
+Modtale is structured as a monorepo.
 
 ```text
 modtale/
-├── backend/                # Spring Boot REST API
-│   ├── src/main/java/      # Application source code
-│   └── build.gradle        # Backend dependencies & build config
-├── frontend/               # Astro + React Web Application
-│   ├── src/                # Components, pages, and styles
-│   ├── astro.config.mjs    # Astro configuration
-│   └── package.json        # Frontend dependencies & scripts
-└── Warden/                 # (Closed Source) Security Scanner Service
+├── backend/                       # ☕ Spring Boot API
+│   ├── src/main/java/             # Core Java Application
+│   │   ├── config/                # Security, CORS, and WebMvc configs
+│   │   ├── controllers/           # REST endpoints mapping
+│   │   ├── models/                # MongoDB document schemas
+│   │   ├── repositories/          # Database interaction layer
+│   │   └── services/              # Core business logic (Uploads, Auth, etc.)
+│   └── build.gradle               # Dependencies & build definitions
+│
+├── frontend/                      # Astro + React Web Application
+│   ├── src/
+│   │   ├── components/            # Reusable, stateless UI components (Buttons, Modals)
+│   │   ├── modules/               # Domain-Driven Design (Auth, Project, User domains)
+│   │   ├── pages/                 # Astro SSR entry points (e.g., /[...all].astro)
+│   │   ├── styles/                # Tailwind global CSS & theme constants
+│   │   └── utils/                 # API clients, Helpers
+│   ├── astro.config.mjs           # Astro build & integration settings
+│   └── package.json               # Node dependencies
+│
+└── Warden/                        # Security Scanner Service (Closed Source)
 
 ```
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-| Domain | Technology | Version | Usage |
-| --- | --- | --- | --- |
-| **Frontend** | **Astro** | v4.3.5 | Framework & Hybrid Routing (SSR/CSR) |
-|  | **React** | v19.2.1 | UI Library & Interactive Islands |
-|  | **Node.js** | v20+ | Runtime Environment |
-|  | **Tailwind CSS** | v3.4 | Utility-first Styling System |
-|  | **Lucide React** | Latest | Iconography |
-| **Backend** | **Java** | JDK 21 | Server-side Language |
-|  | **Spring Boot** | v3.3.4 | REST API Framework |
-|  | **MongoDB** | Latest | Primary NoSQL Data Store |
-|  | **Bucket4j** | v0.10.3 | Rate Limiting (Token Bucket Algorithm) |
-|  | **Caffeine** | Latest | High-performance In-memory Caching |
-| **Infra** | **Cloudflare R2** | N/A | S3-compatible Object Storage |
-|  | **Docker** | Latest | Containerization & Deployment |
+| Domain | Technology | Usage |
+| --- | --- | --- |
+| **Frontend** | **Astro** | Framework & Server-Side Rendering (SSR) |
+|  | **React** | Interactive UI Components & SPA Routing (`react-router-dom`) |
+|  | **Tailwind CSS** | Utility-first, responsive, and dark-mode compatible styling |
+|  | **Lucide React** | Consistent, lightweight SVG iconography |
+| **Backend** | **Java 21** | Modern, high-performance server language |
+|  | **Spring Boot** | Enterprise-grade REST API Framework |
+|  | **MongoDB** | Primary NoSQL document data store |
+|  | **Bucket4j / Caffeine** | Token-bucket rate limiting and high-speed in-memory caching |
+| **Infrastructure** | **Cloudflare R2** | Zero-egress, S3-compatible Object Storage for mod files & images |
 
 ---
 
-## Local Development
+## 💻 Local Development Setup
 
-Follow these steps to set up the development environment on your local machine.
+Ready to contribute? Follow these steps to get Modtale running on your local machine.
 
 ### Prerequisites
 
 * **Node.js:** v20 or higher.
-* **Java JDK:** Version 21 (Amazon Corretto or OpenJDK recommended).
-* **MongoDB:** A local instance running on port `27017` or a valid Atlas connection string.
+* **Java JDK:** Version 21 (Amazon Corretto, Eclipse Temurin, or standard OpenJDK).
+* **MongoDB:** A local instance running on port `27017`, or a valid MongoDB Atlas connection string.
 
 ### 1. Clone the Repository
 
@@ -91,29 +88,24 @@ cd modtale
 
 ### 2. Backend Configuration
 
-The backend relies on environment variables for configuration. You can set these in your IDE run configuration or export them in your terminal session.
+The Spring Boot backend relies on environment variables. You can set these in your IDE's Run Configuration or export them directly in your terminal.
 
-**Required Variables:**
-| Variable | Description | Example (Local) |
-| :--- | :--- | :--- |
-| `MONGODB_URI` | MongoDB Connection String | `mongodb://localhost:27017/modtale` |
-| `R2_ACCESS_KEY` | Storage Access Key | `your_r2_access_key` |
-| `R2_SECRET_KEY` | Storage Secret Key | `your_r2_secret_key` |
+| Variable | Description | Example |
+| --- | --- | --- |
+| `MONGODB_URI` | Connection String | `mongodb://localhost:27017/modtale` |
+| `R2_ACCESS_KEY` | Storage Access Key | `your_dev_access_key` |
+| `R2_SECRET_KEY` | Storage Secret Key | `your_dev_secret_key` |
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
-| `WARDEN_ENABLED` | **Set to `false` for local dev** | `false` |
+| `WARDEN_ENABLED` | **Must be false locally** | `false` |
 
-> **Note on Warden:** The "Warden" security scanner is closed source and not included in this repo. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where all file scans return a mock "CLEAN" result.
+> 🔒 **Note on Warden:** The "Warden" malware and security scanner is proprietary to protect our threat-detection logic. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where file uploads bypass the scanner and automatically return a mock "CLEAN" status.
 
-**Optional Variables (OAuth):**
-*To test login features, you will need valid OAuth credentials. If you skip these, the app will start, but login will fail.*
-
-* `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
-* `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`
-* `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+**(Optional) OAuth Variables:**
+To test social logins (GitHub, Discord, Google), provide their respective Client IDs and Secrets (e.g., `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`).
 
 ### 3. Run the Backend
 
-Navigate to the backend directory and run the application using Gradle.
+Open a terminal in the `backend/` directory and use the Gradle wrapper.
 
 ```bash
 cd backend
@@ -125,23 +117,20 @@ gradlew.bat bootRun
 
 ```
 
-*The API will initialize at `http://localhost:8080`.*
+*The API will start and listen on `http://localhost:8080`.*
 
-### 4. Frontend Configuration
+### 4. Frontend Configuration & Execution
 
-Create a `.env` file in the `frontend/` directory to configure the API connection.
+Create a `.env` file inside the `frontend/` directory to point the React client to your local API.
 
 **File:** `frontend/.env`
 
 ```ini
-# Points to your local backend instance
 PUBLIC_API_URL=http://localhost:8080/api/v1
 
 ```
 
-### 5. Run the Frontend
-
-Navigate to the frontend directory, install dependencies, and start the dev server.
+Next, open a separate terminal, install the Node dependencies, and start the Astro development server.
 
 ```bash
 cd frontend
@@ -150,32 +139,30 @@ npm run dev
 
 ```
 
-*The web client will initialize at `http://localhost:5173`.*
+*The web client is now accessible at `http://localhost:5173`!*
 
 ---
 
-## License
+## 📜 License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
 
-Modtale is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+Modtale is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This ensures that the platform remains open and accessible to the Hytale community forever.
 
-## Community & Support
+## 🤝 Community & Support
 
-* **Docs:** [modtale.net/api-docs](https://modtale.net/api-docs)
-* **Discord:** [Join the Server](https://discord.gg/PcFaDVYqVe)
-* **X (Twitter):** [@modtalenet](https://x.com/modtalenet)
-* **Bluesky:** [@modtale.net](https://bsky.app/profile/modtale.net)
-
----
+* 📖 **API Documentation:** [modtale.net/api-docs]()
+* 💬 **Discord:** [Join the Developer Server]()
+* 🐦 **X (Twitter):** [@modtalenet]()
+* 🦋 **Bluesky:** [@modtale.net]()
 
 ### Contributing
 
-Please refer to [CONTRIBUTING.md](https://github.com/Modtale/modtale?tab=contributing-ov-file) for guidelines on submitting pull requests and reporting issues.
+We welcome contributions from the community! Whether it's a bug fix, a new feature, or documentation improvements, please refer to our [CONTRIBUTING.md]() for coding guidelines and pull request instructions.
 
 ---
 
-## Star History
+## ⭐ Star History
 
 <div align="center">
   <a href="https://www.star-history.com/#Modtale/modtale&Date">
