@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Save, UploadCloud, Eye, ImageIcon, Users, BookOpen, Settings, FileText } from 'lucide-react';
+import { UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText } from 'lucide-react';
 
 import type { User, Project, ProjectVersion } from '@/types';
 import { theme } from '@/styles/theme';
-import { createSlug } from '@/utils/slug';
 import { useHMWiki, WikiSidebar } from '@/modules/project/components/HMWiki';
 import { SidebarSection, ProjectLayout } from '../components/ProjectLayout';
 
@@ -19,7 +18,6 @@ import { Settings as SettingsTab } from '../tabs/Settings';
 import { WikiPreview } from '../tabs/WikiPreview';
 
 import { Spinner } from '@/components/ui/Spinner';
-import { StatusModal } from '@/components/ui/StatusModal';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
@@ -154,7 +152,34 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <Gallery projectData={projectData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} handleGalleryDelete={async () => {}} getGalleryRootProps={() => ({})} getGalleryInputProps={() => ({})} isGalleryDragActive={false} isLoading={false} />
                         )}
                         {activeTab === 'team' && (
-                            <Team projectData={projectData} currentUser={currentUser} canInvite={true} canManageRoles={true} canRemove={true} inviteUsername="" setInviteUsername={() => {}} setInviteUserId={() => {}} inviteRoleId="" setInviteRoleId={() => {}} userSearchResults={[]} setUserSearchResults={() => {}} inviteRoleDropdownOpen={false} setInviteRoleDropdownOpen={() => {}} memberRoleDropdownOpen={null} setMemberRoleDropdownOpen={() => {}} setMemberToRemove={() => {}} handleInvite={() => {}} handleRoleUpdate={handleRoleUpdate} handleCancelInvite={handleCancelInvite} setEditingRole={() => {}} setRoleModalOpen={() => {}} handleDeleteRole={() => {}} isInviting={false} contributors={contributors} />
+                            <Team
+                                projectData={projectData}
+                                currentUser={currentUser}
+                                canInvite={true}
+                                canManageRoles={true}
+                                canRemove={true}
+                                inviteUsername=""
+                                inviteUserId=""
+                                setInviteUsername={() => {}}
+                                setInviteUserId={() => {}}
+                                inviteRoleId=""
+                                setInviteRoleId={() => {}}
+                                userSearchResults={[]}
+                                setUserSearchResults={() => {}}
+                                inviteRoleDropdownOpen={false}
+                                setInviteRoleDropdownOpen={() => {}}
+                                memberRoleDropdownOpen={null}
+                                setMemberRoleDropdownOpen={() => {}}
+                                setMemberToRemove={() => {}}
+                                handleInvite={() => {}}
+                                handleRoleUpdate={handleRoleUpdate}
+                                handleCancelInvite={handleCancelInvite}
+                                setEditingRole={() => {}}
+                                setRoleModalOpen={() => {}}
+                                handleDeleteRole={() => {}}
+                                isInviting={false}
+                                contributors={contributors}
+                            />
                         )}
                         {activeTab === 'settings' && (
                             <SettingsTab projectData={projectData} metaData={metaData} setMetaData={setMetaData} setProjectData={setProjectData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} slugError={slugError} handleSlugChange={() => {}} getUrlPrefix={() => ''} markDirty={markDirty} isLoading={false} />

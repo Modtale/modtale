@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Check, ChevronDown, Trash2, Shield, Users, Settings } from 'lucide-react';
+import {Plus, Check, ChevronDown, Trash2, Shield, Settings} from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Project, User } from '@/types';
