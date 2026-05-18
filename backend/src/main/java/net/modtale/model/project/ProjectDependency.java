@@ -3,29 +3,29 @@ package net.modtale.model.project;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class ProjectDependency {
-    private String modId;
-    private String modTitle;
+    private String projectId;
+    private String projectTitle;
     private String versionNumber;
     private boolean isOptional;
 
     public ProjectDependency() {}
 
-    public ProjectDependency(String modId, String modTitle, String versionNumber) {
-        this(modId, modTitle, versionNumber, false);
+    public ProjectDependency(String projectId, String projectTitle, String versionNumber) {
+        this(projectId, projectTitle, versionNumber, false);
     }
 
-    public ProjectDependency(String modId, String modTitle, String versionNumber, boolean isOptional) {
-        this.modId = modId;
-        this.modTitle = modTitle;
+    public ProjectDependency(String projectId, String projectTitle, String versionNumber, boolean isOptional) {
+        this.projectId = projectId;
+        this.projectTitle = projectTitle;
         this.versionNumber = versionNumber;
         this.isOptional = isOptional;
     }
 
-    public String getModId() { return modId; }
-    public void setModId(String modId) { this.modId = modId; }
+    public String getProjectId() { return projectId; }
+    public void setProjectId(String projectId) { this.projectId = projectId; }
 
-    public String getModTitle() { return modTitle; }
-    public void setModTitle(String modTitle) { this.modTitle = modTitle; }
+    public String getProjectTitle() { return projectTitle; }
+    public void setProjectTitle(String projectTitle) { this.projectTitle = projectTitle; }
 
     public String getVersionNumber() { return versionNumber; }
     public void setVersionNumber(String versionNumber) { this.versionNumber = versionNumber; }

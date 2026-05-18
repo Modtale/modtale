@@ -131,7 +131,7 @@ public class VersionController {
             trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
 
             if ("MODPACK".equals(project.getClassification())) {
-                if (targetVersion.getDependencies() != null) targetVersion.getDependencies().forEach(dep -> trackingService.logDownload(dep.getModId(), null, null, isApi, clientIp));
+                if (targetVersion.getDependencies() != null) targetVersion.getDependencies().forEach(dep -> trackingService.logDownload(dep.getProjectId(), null, null, isApi, clientIp));
                 byte[] zipData = downloadService.generateBundleZip(project, targetVersion, null, null);
                 return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + project.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-" + targetVersion.getVersionNumber() + ".zip\"").contentType(MediaType.APPLICATION_OCTET_STREAM).body(new ByteArrayResource(zipData));
             }
