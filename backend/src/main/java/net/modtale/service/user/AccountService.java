@@ -2,6 +2,7 @@ package net.modtale.service.user;
 
 import net.modtale.model.project.Project;
 import net.modtale.model.user.Notification;
+import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
@@ -127,12 +128,14 @@ public class AccountService {
     }
 
     public void toggleConnectionVisibility(String userId, String provider) {
-        if ("google".equals(provider)) {
+        if ("google".equalsIgnoreCase(provider)) {
             throw new IllegalArgumentException("Google accounts cannot be made visible on public profiles.");
         }
         User user = userRepository.findById(userId).orElseThrow();
+        OAuthProvider targetProvider = OAuthProvider.fromString(provider);
+
         user.getConnectedAccounts().stream()
-                .filter(a -> a.getProvider().equals(provider))
+                .filter(a -> a.getProvider() == targetProvider)
                 .findFirst()
                 .ifPresent(a -> a.setVisible(!a.isVisible()));
         userRepository.save(user);
@@ -140,12 +143,13 @@ public class AccountService {
 
     public void unlinkAccount(String userId, String provider) {
         User user = userRepository.findById(userId).orElseThrow();
+        OAuthProvider targetProvider = OAuthProvider.fromString(provider);
 
-        boolean isTargetLinked = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider().equals(provider));
+        boolean isTargetLinked = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider() == targetProvider);
 
         if (isTargetLinked && !user.getHasPassword()) {
             long remainingAuthMethods = user.getConnectedAccounts().stream()
-                    .filter(a -> !a.getProvider().equals(provider))
+                    .filter(a -> a.getProvider() != targetProvider)
                     .count();
 
             if (remainingAuthMethods == 0) {
@@ -153,10 +157,10 @@ public class AccountService {
             }
         }
 
-        boolean removed = user.getConnectedAccounts().removeIf(a -> a.getProvider().equals(provider));
+        boolean removed = user.getConnectedAccounts().removeIf(a -> a.getProvider() == targetProvider);
         if (removed) {
-            if ("github".equals(provider)) user.setGithubAccessToken(null);
-            if ("gitlab".equals(provider)) {
+            if ("github".equalsIgnoreCase(provider)) user.setGithubAccessToken(null);
+            if ("gitlab".equalsIgnoreCase(provider)) {
                 user.setGitlabAccessToken(null);
                 user.setGitlabRefreshToken(null);
                 user.setGitlabTokenExpiresAt(null);
@@ -169,7 +173,7 @@ public class AccountService {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) return;
 
-        if ("gitlab".equals(provider)) {
+        if ("gitlab".equalsIgnoreCase(provider)) {
             user.setGitlabAccessToken(accessToken);
             if (refreshToken != null) user.setGitlabRefreshToken(refreshToken);
             if (expiresAt != null) user.setGitlabTokenExpiresAt(expiresAt);

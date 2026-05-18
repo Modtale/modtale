@@ -119,7 +119,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     };
 
     const getProviderDetails = (provider: string) => {
-        switch (provider) {
+        // Enforce lowercase matching to prevent case-sensitivity bugs
+        switch (provider?.toLowerCase()) {
             case 'github': return { icon: Github, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
             case 'gitlab': return { icon: Gitlab, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
             case 'twitter': return { icon: Twitter, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
@@ -140,7 +141,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const SocialButton = ({ account, compact = false, isRightMost = false }: { account: any, compact?: boolean, isRightMost?: boolean }) => {
         const { icon: Icon, label, activeClass, iconBg, profileBtnBg } = getProviderDetails(account.provider);
         const displayUrl = account.profileUrl || '#';
-        const isDiscord = account.provider === 'discord';
+        // Enforce lowercase matching here as well
+        const isDiscord = account.provider?.toLowerCase() === 'discord';
         const finalUrl = isDiscord ? `https://discord.com/users/${account.providerId}` : displayUrl;
 
         const popupPositionClasses = isRightMost ? "right-0 left-auto translate-x-0" : "left-1/2 -translate-x-1/2";
@@ -225,12 +227,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const parallaxOffset = isEditing ? 0 : 500 * (1 - Math.exp(-scrollY / 600));
 
     return (
-        <div className={`min-h-screen ${theme.colors.bgBase} relative z-0 overflow-x-hidden pb-12 md:pb-20`}>
+        <div className={`relative z-0 overflow-x-hidden ${isEditing ? '' : 'mb-6 md:mb-16'}`}>
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
 
             <div
-                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${resolvedBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
+                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] bg-slate-800 z-0 will-change-transform overflow-hidden ${isEditing ? 'rounded-2xl md:rounded-3xl' : 'md:rounded-b-3xl'}`}
                 style={{ transform: `translateY(${parallaxOffset}px)` }}
             >
                 <div className="absolute inset-0 z-0">
@@ -243,7 +245,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             className="w-full h-full object-cover opacity-100"
                         />
                     ) : (
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-slate-950 dark:via-slate-950/20 to-transparent pointer-events-none" />
+                        <div className="w-full h-full bg-gradient-to-br from-modtale-accent/20 via-slate-900 to-black" />
                     )}
                 </div>
 
@@ -255,8 +257,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 {isEditing && (
                     <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                         resolvedBanner
-                            ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
-                            : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
+                            ? "absolute top-6 right-6 z-30 bg-white/80 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 text-slate-900 dark:text-white px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/20 backdrop-blur-md shadow-sm hover:scale-105"
+                            : "absolute inset-x-6 top-6 bottom-0 z-30 flex flex-col items-center justify-center rounded-t-3xl border-2 border-b-0 border-dashed border-slate-400/50 dark:border-white/20 hover:border-slate-500/60 dark:hover:border-white/40 bg-slate-100/50 dark:bg-white/5 hover:bg-slate-200/50 dark:hover:bg-white/10 group/banner backdrop-blur-sm pb-4 md:pb-16"
                     }`}>
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'banner')} disabled={uploadingBanner} />
                         {resolvedBanner ? (
@@ -294,7 +296,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             )}
 
             <div className={`w-full mx-auto ${containerClasses} relative z-50 transition-[max-width,padding] duration-300 ${glassCardMargin}`}>
-                <div className={`bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl shadow-2xl p-6 md:px-10 md:pb-6 flex flex-col md:flex-row gap-4 md:gap-10 items-start transition-colors ${
+                <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl p-6 md:px-10 md:pb-6 flex flex-col md:flex-row gap-4 md:gap-10 items-start transition-colors ${
                     isEditing ? 'md:pt-8' : 'md:pt-10'
                 }`}>
 
@@ -401,7 +403,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         </div>
 
                         {!isEditing && stats && (
-                            <div className="hidden pt-4 md:pt-6 border-t border-slate-200 dark:border-white/10 md:flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 relative z-10">
+                            <div className="hidden pt-4 md:pt-6 border-t border-slate-200 dark:border-white/5 md:flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 relative z-10">
                                 <div className="flex justify-between w-full md:w-auto md:flex md:gap-8 text-left">
                                     <div className="text-center md:text-left">
                                         <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</div>

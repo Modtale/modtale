@@ -49,7 +49,7 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
     };
 
     const AccountRow = ({ provider, icon: Icon, label }: { provider: string, icon: any, label: string }) => {
-        const account = accounts.find(a => a.provider === provider);
+        const account = accounts.find(a => a.provider?.toLowerCase() === provider.toLowerCase());
         const isLinked = !!account;
         const canBeVisible = provider !== 'google';
         const isLastAuthMethod = isLinked && accounts.length <= 1 && !(user as any).hasPassword;
