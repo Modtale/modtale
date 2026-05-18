@@ -49,7 +49,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         <div className="flex flex-col gap-8">
             <div className="grid grid-cols-2 gap-2 py-2">
                 <div className="flex flex-col items-center justify-start">
-                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{project.favoriteCount.toLocaleString()}</div>
+                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">
+                        {(project.favoriteCount || 0).toLocaleString()}
+                    </div>
                     <div className="flex items-center justify-center mt-1 h-5 w-full gap-1.5 text-slate-500 dark:text-slate-400">
                         <Heart className="w-3.5 h-3.5" aria-hidden="true" />
                         <span className="text-[10px] font-bold uppercase tracking-widest pt-0.5">Favorites</span>
@@ -57,7 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </div>
 
                 <div className="flex flex-col items-center justify-start border-l border-slate-200 dark:border-white/5">
-                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">{project.downloadCount.toLocaleString()}</div>
+                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">
+                        {(project.downloadCount || 0).toLocaleString()}
+                    </div>
                     <div className="flex items-center gap-1.5 mt-1 h-5">
                         <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
                         <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pt-0.5">Downloads</span>
