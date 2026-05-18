@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { projectClient } from '../api/projectClient';
-import { extractId } from '@/utils/slug';
+import { SiteRoutes } from '@/utils/routes';
 import type { Project, User } from '@/types';
 
 export const useProjectDetail = (rawId: string | undefined, initialData: Project | null, currentUser: User | null) => {
-    const realId = rawId ? extractId(rawId) : '';
+    const realId = rawId ? SiteRoutes.extractId(rawId) : '';
     const [project, setProject] = useState<Project | null>(initialData);
     const [loading, setLoading] = useState(!initialData);
     const [isNotFound, setIsNotFound] = useState(false);
@@ -23,7 +23,7 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
             setLoading(false);
             return;
         }
-        if (project && extractId(project.id) === realId) {
+        if (project && SiteRoutes.extractId(project.id) === realId) {
             setLoading(false);
             return;
         }

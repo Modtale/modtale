@@ -1,6 +1,6 @@
 import type { Project } from '../types';
-import { getProjectUrl } from './slug';
-import {BACKEND_URL} from "@/utils/api.ts";
+import { SiteRoutes } from './routes';
+import { BACKEND_URL } from "@/utils/api";
 
 export const generateItemListSchema = (items: Project[]) => {
     if (!items || items.length === 0) return null;
@@ -9,7 +9,7 @@ export const generateItemListSchema = (items: Project[]) => {
         "@context": "https://schema.org",
         "@type": "ItemList",
         "itemListElement": items.map((item, index) => {
-            const url = `https://modtale.net${getProjectUrl(item)}`;
+            const url = `https://modtale.net${SiteRoutes.project(item)}`;
             const imageUrl = item.imageUrl
                 ? (item.imageUrl.startsWith('/api') ? `${BACKEND_URL}${item.imageUrl}` : item.imageUrl)
                 : undefined;
@@ -31,13 +31,13 @@ export const generateItemListSchema = (items: Project[]) => {
 };
 
 export const getBreadcrumbsForClassification = (classification: string | 'All') => {
-    const home = { name: 'Home', url: '/' };
+    const home = { name: 'Home', url: SiteRoutes.home() };
     switch (classification) {
-        case 'PLUGIN': return [home, { name: 'Plugins', url: '/plugins' }];
-        case 'MODPACK': return [home, { name: 'Modpacks', url: '/modpacks' }];
-        case 'SAVE': return [home, { name: 'Worlds', url: '/worlds' }];
-        case 'ART': return [home, { name: 'Art Assets', url: '/art' }];
-        case 'DATA': return [home, { name: 'Data Assets', url: '/data' }];
+        case 'PLUGIN': return [home, { name: 'Plugins', url: SiteRoutes.browse('PLUGIN') }];
+        case 'MODPACK': return [home, { name: 'Modpacks', url: SiteRoutes.browse('MODPACK') }];
+        case 'SAVE': return [home, { name: 'Worlds', url: SiteRoutes.browse('SAVE') }];
+        case 'ART': return [home, { name: 'Art Assets', url: SiteRoutes.browse('ART') }];
+        case 'DATA': return [home, { name: 'Data Assets', url: SiteRoutes.browse('DATA') }];
         default: return [home];
     }
 };

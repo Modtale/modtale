@@ -50,12 +50,6 @@ const ScrollToTop = () => {
     return null;
 };
 
-const LegacyUserRedirect = () => {
-    const { username } = useParams();
-    const location = useLocation();
-    return <Navigate to={`${SiteRoutes.creator(username || '')}${location.search}${location.hash}`} replace />;
-};
-
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
@@ -254,8 +248,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                                     onRefreshUser={fetchUser}
                                 />
                             } />
-                            <Route path="/user/:username" element={<LegacyUserRedirect />} />
-
                             <Route path="/verify" element={<VerifyEmail />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
                             <Route path="/mfa" element={<MfaVerify />} />
