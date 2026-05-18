@@ -93,7 +93,14 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [wikiData, wikiLoading, wikiPageSlug]);
 
     useEffect(() => {
-        if (project) {
+        if (project && id) {
+            const currentRouteId = SiteRoutes.extractId(id);
+            const loadedProjectId = SiteRoutes.extractId(project.id);
+
+            if (loadedProjectId !== currentRouteId) {
+                return;
+            }
+
             const canonicalPath = SiteRoutes.project(project);
             const currentPrefixMatch = location.pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
 
@@ -101,7 +108,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 const currentBase = currentPrefixMatch[0];
                 if (currentBase !== canonicalPath) {
                     const newPath = location.pathname.replace(currentBase, canonicalPath);
-                    console.log(`[DEBUG Redirect] Swapping base from ${currentBase} to canonical ${canonicalPath}`);
                     navigate(
                         { pathname: newPath, search: location.search, hash: location.hash },
                         { replace: true }
@@ -109,7 +115,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 }
             }
         }
-    }, [project, location.pathname, location.search, location.hash, navigate]);
+    }, [project, id, location.pathname, location.search, location.hash, navigate]);
 
     if (isNotFound) return <NotFound />;
     if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
