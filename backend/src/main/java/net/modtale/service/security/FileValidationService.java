@@ -7,8 +7,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -38,7 +36,7 @@ public class FileValidationService {
     private static final double MAX_COMPRESSION_RATIO = 100.0;
     private static final long MIN_RATIO_CHECK_SIZE = 100L * 1024 * 1024;
     private static final String PLUGIN_MANIFEST_PATH = "manifest.json";
-    private static final long MAX_IMAGE_FILE_SIZE = 5L * 1024 * 1024; // 5MB
+    private static final long MAX_IMAGE_FILE_SIZE = 10L * 1024 * 1024; // 5MB
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -155,13 +153,7 @@ public class FileValidationService {
                 }
             }
         }
-
         manifestFound = true;
-        /*
-        if ("PLUGIN".equals(classification) && !manifestFound) {
-            throw new IllegalArgumentException("Invalid Plugin: Missing manifest.json");
-        }
-        */
     }
 
     private void validatePluginManifest(InputStream is) {
@@ -201,7 +193,7 @@ public class FileValidationService {
 
     private void validateImage(MultipartFile file, double targetRatio, String type, String ratioLabel) {
         if (file.getSize() > MAX_IMAGE_FILE_SIZE) {
-            throw new IllegalArgumentException(type + " image size must not exceed 5MB.");
+            throw new IllegalArgumentException(type + " image size must not exceed 10MB.");
         }
 
         try (InputStream is = file.getInputStream()) {
