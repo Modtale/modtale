@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Globe, Archive, Tag, Link2, ToggleRight, ToggleLeft, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Globe, Archive, Tag, Link2, ToggleRight, ToggleLeft, Trash2, Settings as SettingsIcon } from 'lucide-react';
 import { theme } from '@/styles/theme';
-import { LICENSES } from '@/data/categories';
 import type { Project } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
 
@@ -29,6 +28,10 @@ export const Settings: React.FC<SettingsProps> = ({
                                                   }) => {
     return (
         <div className="space-y-6">
+            <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>
+                <h3 className={`text-xs font-bold ${theme.colors.textMuted} uppercase tracking-widest flex items-center gap-2`}><SettingsIcon className="w-3 h-3"/> Project Settings</h3>
+            </div>
+
             <div className={`${theme.colors.bgSurface} p-6 rounded-2xl border ${theme.colors.border}`}>
                 {(projectData?.status === 'PUBLISHED' || projectData?.status === 'UNLISTED') && (
                     <div className={`mb-6 pb-6 border-b ${theme.colors.borderFaint}`}>

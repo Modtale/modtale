@@ -1,5 +1,5 @@
 import React from 'react';
-import {Plus, Check, ChevronDown, Trash2, Shield, Settings} from 'lucide-react';
+import { Plus, Check, ChevronDown, Trash2, Shield, Settings } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Project, User } from '@/types';
@@ -66,7 +66,7 @@ export const Team: React.FC<TeamProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     {canInvite && (
-                        <div className={`relative z-20 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} p-6 rounded-2xl shadow-sm`}>
+                        <div className={`${theme.colors.bgSurface} p-6 rounded-2xl border ${theme.colors.border}`}>
                             <h3 className={`font-bold text-lg ${theme.colors.textPrimary} mb-4`}>Invite Contributor</h3>
                             {projectData?.projectRoles && projectData.projectRoles.length > 0 ? (
                                 <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 items-end">
@@ -113,8 +113,8 @@ export const Team: React.FC<TeamProps> = ({
                         </div>
                     )}
 
-                    <div className={`relative z-10 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-2xl overflow-hidden shadow-sm`}>
-                        <div className={`px-6 py-4 border-b ${theme.colors.borderFaint} flex justify-between items-center ${theme.colors.bgSurfaceHover}`}>
+                    <div className={`${theme.colors.bgSurface} border ${theme.colors.border} rounded-2xl overflow-hidden`}>
+                        <div className={`px-6 py-4 border-b ${theme.colors.borderFaint} flex justify-between items-center`}>
                             <h3 className={`font-bold ${theme.colors.textPrimary}`}>Active Team</h3>
                             <span className={`text-xs font-bold ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-lg ${theme.colors.textSecondary}`}>{(projectData?.teamMembers?.length || 0) + 1}</span>
                         </div>
@@ -188,8 +188,8 @@ export const Team: React.FC<TeamProps> = ({
                     </div>
 
                     {(projectData?.teamInvites?.length || 0) > 0 && (
-                        <div className={`relative z-0 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-2xl overflow-hidden shadow-sm`}>
-                            <div className={`px-6 py-4 border-b ${theme.colors.borderFaint} flex justify-between items-center ${theme.colors.bgSurfaceHover}`}>
+                        <div className={`${theme.colors.bgSurface} border ${theme.colors.border} rounded-2xl overflow-hidden`}>
+                            <div className={`px-6 py-4 border-b ${theme.colors.borderFaint} flex justify-between items-center`}>
                                 <h3 className={`font-bold ${theme.colors.textPrimary}`}>Pending Invites</h3>
                                 <span className={`text-xs font-bold ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-lg ${theme.colors.textSecondary}`}>{projectData?.teamInvites?.length || 0}</span>
                             </div>
@@ -219,7 +219,7 @@ export const Team: React.FC<TeamProps> = ({
                     )}
                 </div>
                 <div className="lg:col-span-1 space-y-6">
-                    <div className={`bg-slate-50 dark:bg-white/5 border ${theme.colors.border} p-5 rounded-2xl shadow-sm`}>
+                    <div className={`${theme.colors.bgSurface} border ${theme.colors.border} p-6 rounded-2xl`}>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className={`font-bold ${theme.colors.textPrimary}`}>Project Roles</h3>
                             {canManageRoles && <button type="button" onClick={() => { setEditingRole({ permissions: [] }); setRoleModalOpen(true); }} className={`${theme.colors.accent} hover:${theme.colors.accentHover} font-bold text-xs flex items-center gap-1 transition-colors`}><Plus className="w-3 h-3" /> New</button>}
