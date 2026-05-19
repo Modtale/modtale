@@ -1,5 +1,5 @@
-import React from 'react';
-import { UploadCloud, Trash2, ImageIcon } from 'lucide-react';
+import React, { useRef } from 'react';
+import { UploadCloud, Trash2, Image as ImageIcon } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import { Spinner } from '@/components/ui/Spinner';
@@ -10,15 +10,19 @@ interface GalleryProps {
     readOnly: boolean;
     hasProjectPermission: (perm: string) => boolean;
     handleGalleryDelete: (url: string) => Promise<void>;
-    getGalleryRootProps: any;
-    getGalleryInputProps: any;
-    isGalleryDragActive: boolean;
+    handleGallerySelect: (file: File) => void;
     isLoading: boolean;
 }
 
-export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProjectPermission, handleGalleryDelete, getGalleryRootProps, getGalleryInputProps, isGalleryDragActive, isLoading }) => {
+export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProjectPermission, handleGalleryDelete, handleGallerySelect, isLoading }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     return (
         <div className="space-y-6">
+            <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>
+                <h3 className={`text-xs font-bold ${theme.colors.textMuted} uppercase tracking-widest flex items-center gap-2`}><ImageIcon className="w-3 h-3"/> Gallery</h3>
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {projectData?.galleryImages?.map((img, idx) => (
                     <div key={idx} className={`relative group aspect-video bg-black/20 rounded-xl overflow-hidden border ${theme.colors.border}`}>
@@ -30,10 +34,33 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                         )}
                     </div>
                 ))}
+
                 {!readOnly && hasProjectPermission('PROJECT_GALLERY_ADD') && (
-                    <div {...getGalleryRootProps()} className={`aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${isGalleryDragActive ? 'border-modtale-accent bg-modtale-accent/5' : `${theme.colors.border} ${theme.colors.bgSurfaceAlt} hover:border-modtale-accent hover:${theme.colors.bgSurfaceHover}`}`}>
-                        <input {...getGalleryInputProps()} />
-                        {isLoading ? <Spinner className="w-6 h-6 text-modtale-accent" fullScreen={false} /> : <><UploadCloud className="w-8 h-8 text-slate-400 mb-2" /><span className="text-xs font-bold text-slate-500 uppercase">Upload Image</span></>}
+                    <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${theme.colors.border} ${theme.colors.bgSurfaceAlt} hover:border-modtale-accent hover:${theme.colors.bgSurfaceHover}`}
+                    >
+                        <input
+                            type="file"
+                            accept="image/png, image/jpeg, image/webp"
+                            className="hidden"
+                            ref={fileInputRef}
+                            onChange={(e) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                    handleGallerySelect(e.target.files[0]);
+                                    e.target.value = ''; // Reset input so same file can be selected again
+                                }
+                            }}
+                            disabled={isLoading}
+                        />
+                        {isLoading ? (
+                            <Spinner className="w-6 h-6 text-modtale-accent" fullScreen={false} />
+                        ) : (
+                            <>
+                                <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
+                                <span className="text-xs font-bold text-slate-500 uppercase">Upload Image</span>
+                            </>
+                        )}
                     </div>
                 )}
             </div>
