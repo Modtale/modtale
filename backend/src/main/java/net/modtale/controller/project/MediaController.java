@@ -10,6 +10,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/projects")
 public class MediaController {
@@ -44,11 +46,21 @@ public class MediaController {
         catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
     }
 
+
     @DeleteMapping("/{id}/gallery")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_REMOVE', authentication)")
-    public ResponseEntity<?> removeGalleryImage(@PathVariable String id, @RequestParam("imageUrl") String imageUrl) {
+    public ResponseEntity<?> removeGalleryImage(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body
+    ) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        String imageUrl = body.get("imageUrl");
+        if (imageUrl == null || imageUrl.isEmpty()) {
+            return ResponseEntity.badRequest().body("imageUrl is required");
+        }
+
         metadataService.removeGalleryImage(id, imageUrl, user);
         return ResponseEntity.ok().build();
     }

@@ -150,12 +150,17 @@ export const useProjectEditor = (
     const handleGalleryDelete = async (url: string) => {
         if (!projectData?.id) return;
         try {
-            const filename = url.split('/').pop();
-            const res = await api.delete(`/projects/${projectData.id}/gallery/${filename}`);
+            const res = await api.delete(`/projects/${projectData.id}/gallery`, {
+                data: { imageUrl: url }
+            });
+
             setProjectData(res.data);
             onShowStatus('success', 'Deleted', 'Image removed from gallery.');
         } catch (e: any) {
-            onShowStatus('error', 'Delete Failed', e.response?.data || 'Failed to delete image.');
+            const errorMsg = (e.response?.data && typeof e.response.data === 'object')
+                ? (e.response.data.message || "Failed to delete image.")
+                : (e.response?.data || e.message || 'Failed to delete image.');
+            onShowStatus('error', 'Delete Failed', errorMsg);
         }
     };
 
