@@ -104,7 +104,6 @@ public class UserController {
     }
 
     @GetMapping("/user/profile/{userId}")
-    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
     public ResponseEntity<UserDTO> getUserProfile(@PathVariable String userId) {
         User user = accountService.getPublicProfile(userId);
         if (user == null) return ResponseEntity.notFound().build();
@@ -218,7 +217,6 @@ public class UserController {
     }
 
     @GetMapping("/users/{userId}/following")
-    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
     public ResponseEntity<List<UserDTO>> getUserFollowing(@PathVariable String userId) {
         List<User> following = socialService.getFollowing(userId);
         return ResponseEntity.ok(following.stream()
@@ -227,7 +225,6 @@ public class UserController {
     }
 
     @GetMapping("/users/{userId}/followers")
-    @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
     public ResponseEntity<List<UserDTO>> getUserFollowers(@PathVariable String userId) {
         List<User> followers = socialService.getFollowers(userId);
         return ResponseEntity.ok(followers.stream()
@@ -248,7 +245,6 @@ public class UserController {
     }
 
     @GetMapping("/creators/{userId}/projects")
-    @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
     public ResponseEntity<Page<ProjectDTO>> getCreatorProjects(
             @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
