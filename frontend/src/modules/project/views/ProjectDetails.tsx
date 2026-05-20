@@ -29,6 +29,9 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { ShareModal } from '../components/dialogs/ShareModal';
 import { ReportModal } from '../components/dialogs/ReportModal';
 import { PostDownloadModal } from '../components/dialogs/PostDownloadModal';
+import { HistoryModal } from '../components/dialogs/HistoryModal';
+import { DownloadModal } from '../components/dialogs/DownloadModal';
+import { api } from '@/utils/api';
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -53,6 +56,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
+
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+    const [showExperimental, setShowExperimental] = useState(false);
 
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
     const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
@@ -93,6 +100,20 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [wikiData, wikiLoading, wikiPageSlug]);
 
     useEffect(() => {
+        if (!project) return;
+        if (location.pathname.endsWith('/download')) {
+            setIsDownloadOpen(true);
+            setIsHistoryOpen(false);
+        } else if (location.pathname.endsWith('/changelog')) {
+            setIsHistoryOpen(true);
+            setIsDownloadOpen(false);
+        } else {
+            setIsDownloadOpen(false);
+            setIsHistoryOpen(false);
+        }
+    }, [location.pathname, project]);
+
+    useEffect(() => {
         if (project && id) {
             const currentRouteId = SiteRoutes.extractId(id);
             const loadedProjectId = SiteRoutes.extractId(project.id);
@@ -123,6 +144,37 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const canEdit = project.canEdit ?? (currentUser && (currentUser.username === project.author || project.teamMembers?.some(m => m.userId === currentUser.id)));
     const projectUrl = SiteRoutes.project(project);
 
+    const handleDownloadClick = async (url: string, versionNumber: string, deps: any[], channel: string) => {
+        try {
+            const isBundle = project.classification === 'MODPACK';
+            const endpoint = isBundle
+                ? '/projects/' + project.id + '/versions/' + versionNumber + '/download-bundle-url'
+                : '/projects/' + project.id + '/versions/' + versionNumber + '/download-url';
+            
+            const res = await api.get(endpoint);
+            if (res.data?.downloadUrl) {
+                onDownload(project.id);
+                setLastDownloadWasBundle(isBundle);
+                setIsDownloadOpen(false);
+                setIsHistoryOpen(false);
+                navigate(SiteRoutes.project(project), { replace: true });
+                setShowPostDownloadModal(true);
+                window.location.href = res.data.downloadUrl;
+            }
+        } catch (e) {
+            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
+        }
+    };
+
+    const versionsByGame = (project.versions || []).reduce((acc: any, v: any) => {
+        const key = v.gameVersions?.[0] || 'Any';
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(v);
+        return acc;
+    }, {});
+
+    const sortedHistory = [...(project.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+
     const meta = generateProjectMeta(project);
     const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);
 
@@ -144,6 +196,24 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />
             <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />
             <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} />
+            
+            <HistoryModal 
+                show={isHistoryOpen} 
+                onClose={() => navigate(projectUrl)} 
+                history={sortedHistory} 
+                showExperimental={showExperimental} 
+                onToggleExperimental={() => setShowExperimental(!showExperimental)} 
+                onDownload={handleDownloadClick} 
+            />
+            <DownloadModal 
+                show={isDownloadOpen} 
+                onClose={() => navigate(projectUrl)} 
+                versionsByGame={versionsByGame} 
+                onDownload={handleDownloadClick} 
+                showExperimental={showExperimental} 
+                onToggleExperimental={() => setShowExperimental(!showExperimental)} 
+                onViewHistory={() => navigate(projectUrl + '/changelog')} 
+            />
 
             <ProjectLayout
                 bannerUrl={project.bannerUrl}
