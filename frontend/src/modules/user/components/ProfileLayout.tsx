@@ -227,7 +227,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const parallaxOffset = isEditing ? 0 : 500 * (1 - Math.exp(-scrollY / 600));
 
     return (
-        <div className={`relative z-0 overflow-x-hidden ${isEditing ? '' : 'mb-6 md:mb-16'}`}>
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
 
@@ -362,7 +362,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Downloads</span>
                                 </div>
                                 <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
-                                    <span className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1">{stats.favorites.toLocaleString()}</span>
+                                    <span className="text-slate-900 dark:text-white font-black text-lg line-clamp-1 mb-1">{stats.favorites.toLocaleString()}</span>
                                     <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Likes</span>
                                 </div>
                                 <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
