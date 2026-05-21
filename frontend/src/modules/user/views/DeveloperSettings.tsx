@@ -210,9 +210,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="xl:col-span-2 flex flex-col">
-                    <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full backdrop-blur-md">
+            <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full backdrop-blur-md">
                         <div className="p-5 border-b border-slate-200 dark:border-white/10 flex justify-between items-center shrink-0">
                             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <Shield className="w-4 h-4 text-modtale-accent" /> Active API Keys
@@ -377,8 +375,6 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
                             </form>
                         </div>
                     </div>
-                </div>
-            </div>
         </div>
     );
 };
