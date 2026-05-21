@@ -106,7 +106,6 @@ public class VersionController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-url")
-    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_DOWNLOAD', authentication)")
     public ResponseEntity<?> getDownloadUrl(@PathVariable String id, @PathVariable String version) {
         try {
             Project project = projectService.getProjectById(id);
@@ -169,7 +168,6 @@ public class VersionController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-bundle-url")
-    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_DOWNLOAD', authentication)")
     public ResponseEntity<?> getDownloadBundleUrl(
             @PathVariable String id,
             @PathVariable String version,
