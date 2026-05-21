@@ -1,6 +1,7 @@
 package net.modtale.service.project;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.security.FileValidationService;
@@ -13,9 +14,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @Service
 public class MetadataService {
+
+    private static final List<ProjectClassification> MUTABLE_CLASSIFICATIONS = List.of(
+            ProjectClassification.PLUGIN,
+            ProjectClassification.DATA,
+            ProjectClassification.ART
+    );
 
     @Autowired private ProjectRepository projectRepository;
     @Autowired private ProjectService projectService;
@@ -33,6 +41,16 @@ public class MetadataService {
         Project existing = projectService.getRawProjectById(id);
         if (existing == null || !accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")) throw new SecurityException("Denied.");
         lifecycleService.ensureEditable(existing);
+
+        if (updated.getClassification() != null && updated.getClassification() != existing.getClassification()) {
+            if (!MUTABLE_CLASSIFICATIONS.contains(existing.getClassification())) {
+                throw new IllegalArgumentException("This project type cannot be changed.");
+            }
+            if (!MUTABLE_CLASSIFICATIONS.contains(updated.getClassification())) {
+                throw new IllegalArgumentException("Projects cannot be changed to this type.");
+            }
+            existing.setClassification(updated.getClassification());
+        }
 
         if (updated.getTags() != null) existing.setTags(validationService.validateTags(updated.getTags()));
         if (updated.getRepositoryUrl() != null && !updated.getRepositoryUrl().isEmpty()) validationService.validateRepositoryUrl(updated.getRepositoryUrl());
