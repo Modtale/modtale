@@ -118,20 +118,22 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
     }, [latestDependencies]);
 
     useEffect(() => {
-        if (currentUser?.followingIds && project?.author) {
-            setIsFollowing(currentUser.followingIds.includes(project.author));
+        const authorId = (project as any)?.authorId || authorProfile?.id;
+        if (currentUser?.followingIds && authorId) {
+            setIsFollowing(currentUser.followingIds.includes(authorId));
         } else {
             setIsFollowing(false);
         }
-    }, [currentUser, project?.author]);
+    }, [currentUser, project, authorProfile]);
 
     const handleFollowToggle = async () => {
-        if (!currentUser || !project) return;
+        const authorId = (project as any)?.authorId || authorProfile?.id;
+        if (!currentUser || !project || !authorId) return;
         const oldState = isFollowing;
         setIsFollowing(!oldState);
         try {
-            if (oldState) await projectClient.unfollowUser(project.author);
-            else await projectClient.followUser(project.author);
+            if (oldState) await projectClient.unfollowUser(authorId);
+            else await projectClient.followUser(authorId);
         } catch (e) {
             setIsFollowing(oldState);
         }

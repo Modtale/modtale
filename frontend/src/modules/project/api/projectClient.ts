@@ -33,11 +33,11 @@ export const projectClient = {
         const res = await api.get(`/projects/${projectId}/meta`);
         return res.data;
     },
-    followUser: async (username: string) => {
-        await api.post(`/user/follow/${username}`);
+    followUser: async (targetId: string) => {
+        await api.post(`/user/follow/${targetId}`);
     },
-    unfollowUser: async (username: string) => {
-        await api.post(`/user/unfollow/${username}`);
+    unfollowUser: async (targetId: string) => {
+        await api.post(`/user/unfollow/${targetId}`);
     },
     getComments: async (projectId: string) => {
         const res = await api.get<Project>(`/projects/${projectId}`);
