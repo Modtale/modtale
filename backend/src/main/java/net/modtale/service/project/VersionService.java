@@ -50,6 +50,12 @@ public class VersionService {
     @Value("${app.limits.max-versions-per-day:5}") private int maxVersionsPerDay;
     @Value("${app.limits.max-versions-per-month:30}") private int maxVersionsPerMonth;
 
+    private static final List<ProjectClassification> MUTABLE_CLASSIFICATIONS = List.of(
+            ProjectClassification.PLUGIN,
+            ProjectClassification.DATA,
+            ProjectClassification.ART
+    );
+
     public ProjectVersion findVersion(Project pack, String versionNumber) {
         if ("latest".equalsIgnoreCase(versionNumber)) return pack.getVersions().isEmpty() ? null : pack.getVersions().get(0);
         return pack.getVersions().stream().filter(v -> v.getVersionNumber().equalsIgnoreCase(versionNumber)).findFirst().orElse(null);
@@ -122,8 +128,9 @@ public class VersionService {
             }
         }
 
-        boolean isModpack = project.getClassification() == ProjectClassification.MODPACK;
-        if (!isModpack) fileValidationService.validateProjectFile(file, project.getClassification().name());
+        ProjectClassification effectiveClassification = resolveClassificationForUpload(project, file);
+        boolean isModpack = effectiveClassification == ProjectClassification.MODPACK;
+        if (!isModpack) fileValidationService.validateProjectFile(file, effectiveClassification.name());
 
         String filePath = null;
         String fileHash = null;
@@ -143,7 +150,7 @@ public class VersionService {
                     throw new IllegalArgumentException("This file has already been uploaded to Modtale.");
                 }
             }
-            filePath = storageService.upload(file, "files/" + project.getClassification().name().toLowerCase());
+            filePath = storageService.upload(file, "files/" + effectiveClassification.name().toLowerCase());
         }
 
         ProjectVersion ver = new ProjectVersion();
@@ -183,6 +190,26 @@ public class VersionService {
         projectService.evictProjectCache(project);
 
         if (file != null && !isModpack) scanService.performBackgroundScan(project.getId(), ver.getId(), filePath, file.getOriginalFilename(), false);
+    }
+
+    private ProjectClassification resolveClassificationForUpload(Project project, MultipartFile file) {
+        ProjectClassification current = project.getClassification();
+        if (current == null || file == null || file.isEmpty()) return current;
+        if (current == ProjectClassification.MODPACK || current == ProjectClassification.SAVE) return current;
+        if (!MUTABLE_CLASSIFICATIONS.contains(current)) return current;
+
+        String name = file.getOriginalFilename();
+        if (name == null) return current;
+        String lowerName = name.toLowerCase();
+
+        ProjectClassification next = current;
+        if (lowerName.endsWith(".jar")) next = ProjectClassification.PLUGIN;
+        else if (lowerName.endsWith(".zip") && current == ProjectClassification.PLUGIN) next = ProjectClassification.DATA;
+
+        if (next != current) {
+            project.setClassification(next);
+        }
+        return next;
     }
 
     public ManifestInspectionResult inspectManifest(String id, MultipartFile file, User user) {

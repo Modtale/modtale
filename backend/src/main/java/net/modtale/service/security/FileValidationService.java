@@ -40,7 +40,8 @@ public class FileValidationService {
     private static final double MAX_COMPRESSION_RATIO = 100.0;
     private static final long MIN_RATIO_CHECK_SIZE = 100L * 1024 * 1024;
     private static final String PLUGIN_MANIFEST_PATH = "manifest.json";
-    private static final long MAX_IMAGE_FILE_SIZE = 10L * 1024 * 1024; // 5MB
+    private static final long MAX_IMAGE_FILE_SIZE = 10L * 1024 * 1024; // 10MB
+    private static final List<String> MUTABLE_CLASSIFICATIONS = Arrays.asList("PLUGIN", "DATA", "ART");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -49,21 +50,43 @@ public class FileValidationService {
             throw new IllegalArgumentException("A project file is required.");
         }
 
-        String name = file.getOriginalFilename().toLowerCase();
+        String effectiveClassification = resolveUploadClassification(classification, file);
+        String name = file.getOriginalFilename();
+        String lowerName = name == null ? "" : name.toLowerCase();
 
-        if ("PLUGIN".equals(classification)) {
-            if (!name.endsWith(".jar")) throw new IllegalArgumentException("Server Plugins must be .jar files.");
-        } else if (!name.endsWith(".zip")) {
-            throw new IllegalArgumentException(classification + " projects must be uploaded as .zip archives.");
+        if ("PLUGIN".equals(effectiveClassification)) {
+            if (!lowerName.endsWith(".jar")) throw new IllegalArgumentException("Server Plugins must be .jar files.");
+        } else if (!lowerName.endsWith(".zip")) {
+            throw new IllegalArgumentException(effectiveClassification + " projects must be uploaded as .zip archives.");
         }
 
         validateMagicNumber(file, ZIP_HEADER);
 
         try {
-            return validateZipContents(file, classification);
+            return validateZipContents(file, effectiveClassification);
         } catch (IOException e) {
             throw new RuntimeException("Failed to inspect archive contents.", e);
         }
+    }
+
+    public String resolveUploadClassification(String classification, MultipartFile file) {
+        if (classification == null) return null;
+        if (file == null || file.isEmpty()) return classification;
+
+        if ("MODPACK".equals(classification) || "SAVE".equals(classification)) {
+            return classification;
+        }
+        if (!MUTABLE_CLASSIFICATIONS.contains(classification)) {
+            return classification;
+        }
+
+        String name = file.getOriginalFilename();
+        if (name == null) return classification;
+        String lowerName = name.toLowerCase();
+
+        if (lowerName.endsWith(".jar")) return "PLUGIN";
+        if (lowerName.endsWith(".zip") && "PLUGIN".equals(classification)) return "DATA";
+        return classification;
     }
 
     private void validateMagicNumber(MultipartFile file, byte[] expectedHeader) {
