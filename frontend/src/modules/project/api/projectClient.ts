@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import type { Project, User, ProjectRole } from '@/types';
+import type { ManifestDependencySuggestion, Project, User, ProjectRole } from '@/types';
 
 export const projectClient = {
     getProject: async (id: string) => {
@@ -81,6 +81,14 @@ export const projectClient = {
     searchProjects: async (query: string) => {
         const res = await api.get(`/projects?search=${query}`);
         return res.data.content || [];
+    },
+    suggestManifestDependencies: async (projectId: string, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await api.post<ManifestDependencySuggestion[]>(`/projects/${projectId}/versions/dependency-suggestions`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return res.data;
     },
     getMetaGameVersions: async () => {
         const res = await api.get<string[]>('/meta/game-versions');

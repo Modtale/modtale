@@ -1,10 +1,13 @@
 package net.modtale.service.project;
 
+import net.modtale.model.dto.ManifestDependencySuggestion;
 import net.modtale.model.project.*;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.storage.StorageService;
 import net.modtale.service.security.FileValidationService;
+import net.modtale.service.security.FileValidationService.ManifestDependency;
+import net.modtale.service.security.FileValidationService.ManifestInspection;
 import net.modtale.service.security.SanitizationService;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.security.ScanService;
@@ -23,6 +26,7 @@ import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -178,6 +182,110 @@ public class VersionService {
         projectService.evictProjectCache(project);
 
         if (file != null && !isModpack) scanService.performBackgroundScan(project.getId(), ver.getId(), filePath, file.getOriginalFilename(), false);
+    }
+
+    public List<ManifestDependencySuggestion> suggestManifestDependencies(String id, MultipartFile file, User user) {
+        Project project = projectService.getRawProjectById(id);
+        if (project == null || !accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")) throw new SecurityException("Denied");
+        if (project.getClassification() != ProjectClassification.PLUGIN) return List.of();
+
+        ManifestInspection manifest = fileValidationService.validateProjectFile(file, project.getClassification().name());
+        if (manifest == null || manifest.getDependencies().isEmpty()) return List.of();
+
+        Query query = new Query(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED)
+                .and("deletedAt").is(null)
+                .and("_id").ne(project.getId())
+                .and("classification").is(ProjectClassification.PLUGIN));
+        query.fields().include("title").include("slug").include("versions");
+        List<Project> candidates = mongoTemplate.find(query, Project.class);
+
+        List<ManifestDependencySuggestion> suggestions = new ArrayList<>();
+        for (ManifestDependency dependency : manifest.getDependencies()) {
+            Project bestProject = null;
+            int bestScore = 0;
+
+            for (Project candidate : candidates) {
+                int score = scoreDependencyMatch(dependency, candidate);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestProject = candidate;
+                }
+            }
+
+            if (bestProject != null && bestScore >= 65) {
+                ProjectVersion version = selectSuggestedVersion(bestProject, dependency.getVersion());
+                if (version != null) {
+                    suggestions.add(new ManifestDependencySuggestion(
+                            dependency.getKey(),
+                            dependency.getVersion(),
+                            bestProject.getId(),
+                            bestProject.getTitle(),
+                            version.getVersionNumber(),
+                            dependency.isOptional(),
+                            bestScore
+                    ));
+                }
+            }
+        }
+
+        return suggestions;
+    }
+
+    private int scoreDependencyMatch(ManifestDependency dependency, Project candidate) {
+        String depName = normalizeDependencyName(dependency.getNamePart());
+        String depKey = normalizeDependencyName(dependency.getKey());
+        String title = normalizeDependencyName(candidate.getTitle());
+        String slug = normalizeDependencyName(candidate.getSlug());
+
+        if (!depName.isEmpty() && depName.equals(title)) return 100;
+        if (!depName.isEmpty() && depName.equals(slug)) return 95;
+        if (!depKey.isEmpty() && (depKey.equals(title) || depKey.equals(slug))) return 90;
+        if (!depName.isEmpty() && (title.contains(depName) || depName.contains(title))) return 85;
+        if (!depName.isEmpty() && (slug.contains(depName) || depName.contains(slug))) return 80;
+
+        int titleDistance = levenshtein(depName, title);
+        int slugDistance = levenshtein(depName, slug);
+        int distance = Math.min(titleDistance, slugDistance);
+        if (distance <= 2) return 75;
+        if (distance <= 3) return 65;
+        return 0;
+    }
+
+    private ProjectVersion selectSuggestedVersion(Project project, String requestedVersion) {
+        if (project.getVersions() == null || project.getVersions().isEmpty()) return null;
+        String exactVersion = requestedVersion == null ? "" : requestedVersion.replace(">=", "").replace("<=", "").replace(">", "").replace("<", "").replace("=", "").trim();
+        if (!exactVersion.isEmpty() && !"*".equals(exactVersion)) {
+            Optional<ProjectVersion> exact = project.getVersions().stream()
+                    .filter(v -> v.getVersionNumber() != null && v.getVersionNumber().equalsIgnoreCase(exactVersion))
+                    .findFirst();
+            if (exact.isPresent()) return exact.get();
+        }
+        return project.getVersions().stream()
+                .max(Comparator.comparing(ProjectVersion::getReleaseDate, Comparator.nullsLast(String::compareTo)))
+                .orElse(project.getVersions().get(0));
+    }
+
+    private String normalizeDependencyName(String value) {
+        if (value == null) return "";
+        return value.toLowerCase().replaceAll("[^a-z0-9]", "");
+    }
+
+    private int levenshtein(String a, String b) {
+        if (a == null || b == null || a.isEmpty() || b.isEmpty()) return Integer.MAX_VALUE;
+        int[] prev = new int[b.length() + 1];
+        int[] curr = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            curr[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev;
+            prev = curr;
+            curr = tmp;
+        }
+        return prev[b.length()];
     }
 
     public void deleteVersion(String id, String versionId, User user) {
