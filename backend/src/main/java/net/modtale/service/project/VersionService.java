@@ -212,7 +212,7 @@ public class VersionService {
                 }
             }
 
-            if (bestProject != null && bestScore >= 65) {
+            if (bestProject != null && bestScore >= 80) {
                 ProjectVersion version = selectSuggestedVersion(bestProject, dependency.getVersion());
                 if (version != null) {
                     suggestions.add(new ManifestDependencySuggestion(
@@ -237,18 +237,33 @@ public class VersionService {
         String title = normalizeDependencyName(candidate.getTitle());
         String slug = normalizeDependencyName(candidate.getSlug());
 
-        if (!depName.isEmpty() && depName.equals(title)) return 100;
-        if (!depName.isEmpty() && depName.equals(slug)) return 95;
-        if (!depKey.isEmpty() && (depKey.equals(title) || depKey.equals(slug))) return 90;
-        if (!depName.isEmpty() && (title.contains(depName) || depName.contains(title))) return 85;
-        if (!depName.isEmpty() && (slug.contains(depName) || depName.contains(slug))) return 80;
+        if (depName.isEmpty()) return 0;
 
-        int titleDistance = levenshtein(depName, title);
-        int slugDistance = levenshtein(depName, slug);
-        int distance = Math.min(titleDistance, slugDistance);
-        if (distance <= 2) return 75;
-        if (distance <= 3) return 65;
+        if (!title.isEmpty() && depName.equals(title)) return 100;
+        if (!slug.isEmpty() && depName.equals(slug)) return 95;
+        if (!depKey.isEmpty() && ((!title.isEmpty() && depKey.equals(title)) || (!slug.isEmpty() && depKey.equals(slug)))) return 90;
+        if (isStrongContainedMatch(depName, title)) return 85;
+        if (isStrongContainedMatch(depName, slug)) return 82;
+        if (isStrongFuzzyMatch(depName, title)) return 80;
+        if (isStrongFuzzyMatch(depName, slug)) return 80;
         return 0;
+    }
+
+    private boolean isStrongContainedMatch(String dependencyName, String candidateName) {
+        if (dependencyName.isEmpty() || candidateName.isEmpty()) return false;
+        int shorter = Math.min(dependencyName.length(), candidateName.length());
+        int longer = Math.max(dependencyName.length(), candidateName.length());
+        if (shorter < 6) return false;
+        if ((double) shorter / longer < 0.75) return false;
+        return candidateName.contains(dependencyName) || dependencyName.contains(candidateName);
+    }
+
+    private boolean isStrongFuzzyMatch(String dependencyName, String candidateName) {
+        if (dependencyName.isEmpty() || candidateName.isEmpty()) return false;
+        int longer = Math.max(dependencyName.length(), candidateName.length());
+        if (longer < 6) return false;
+        int distance = levenshtein(dependencyName, candidateName);
+        return distance <= 2 && ((double) distance / longer) <= 0.2;
     }
 
     private ProjectVersion selectSuggestedVersion(Project project, String requestedVersion) {
