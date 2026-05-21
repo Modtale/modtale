@@ -83,7 +83,7 @@ const DependencyRow: React.FC<{ dep: ProjectDependency; targetGameVersion: strin
     };
 
     return (
-        <div className={`flex items-center justify-between p-3 border-b ${theme.colors.borderFaint} last:border-0 ${theme.colors.bgSurfaceHover}`}>
+        <div className={`flex items-center justify-between p-4 border-b border-slate-200 dark:border-white/10 last:border-0 bg-white dark:bg-slate-800 transition-colors`}>
             <div className="flex-1 min-w-0 pr-4">
                 <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dep.projectTitle || dep.projectId}</div>
                 <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-2`}>
@@ -177,18 +177,18 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
 
     return (
         <div className={theme.components.modalOverlay}>
-            <div className={`${theme.components.modalContent} max-w-2xl`}>
-                <div className={theme.components.modalHeader}>
+            <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]`} onClick={e => e.stopPropagation()}>
+                <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
                     <div>
                         <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}>
                             <RefreshCw className={`w-5 h-5 ${theme.colors.accent}`} /> Update Dependencies
                         </h3>
                         <p className={`text-sm ${theme.colors.textMuted} mt-1`}>Select versions for the <strong>{previousDeps.length}</strong> projects from the previous release.</p>
                     </div>
-                    <button onClick={onClose}><X className={`w-6 h-6 ${theme.colors.textMuted} hover:${theme.colors.dangerText}`} /></button>
+                    <button onClick={onClose} className={`p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className={theme.components.modalBody}>
+                <div className={`p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1`}>
                     {!targetGameVersion && (
                         <div className={`mb-4 p-3 ${theme.colors.warningBg} border ${theme.colors.warningBorder} rounded-lg text-xs ${theme.colors.warningText} flex items-start gap-2`}>
                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -202,7 +202,7 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
                     </div>
                 </div>
 
-                <div className={theme.components.modalFooter}>
+                <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
                     <div className={`text-sm ${theme.colors.textMuted}`}><strong>{validCount}</strong> selected</div>
                     <div className="flex gap-3">
                         <button onClick={onClose} className={`px-4 py-2 font-bold ${theme.colors.textMuted} ${theme.colors.bgSurfaceHover} rounded-lg`}>Skip</button>
@@ -341,13 +341,13 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
             {selectedModForVersion && !disabled && (
                 <div className={theme.components.modalOverlay}>
-                    <div className={`${theme.components.modalContent} max-w-md max-h-[85dvh]`}>
-                        <div className={theme.components.modalHeader}>
-                            <h3 className={`font-bold ${theme.colors.textPrimary}`}>Select Version</h3>
-                            <button onClick={() => setSelectedModForVersion(null)}><X className={`w-5 h-5 ${theme.colors.textMuted} hover:${theme.colors.textPrimary}`} /></button>
+                    <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-md max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]`} onClick={e => e.stopPropagation()}>
+                        <div className={`p-4 sm:p-5 flex justify-between items-start shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
+                            <h3 className={`text-lg font-black text-slate-900 dark:text-white flex items-center gap-2`}>Select Version</h3>
+                            <button onClick={() => setSelectedModForVersion(null)} className={`p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                         </div>
 
-                        <div className={`p-3 ${theme.colors.bgSurface} border-b ${theme.colors.borderFaint} flex flex-col gap-2`}>
+                        <div className={`p-4 sm:p-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 flex flex-col gap-3 shrink-0`}>
                             <div className="flex items-center justify-between">
                                 <span className={`text-xs font-bold ${theme.colors.textMuted} uppercase tracking-wider`}>Show Alpha/Beta</span>
                                 <button onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
@@ -364,11 +364,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                             )}
                         </div>
 
-                        <div className="p-2 overflow-y-auto custom-scrollbar flex-1">
+                        <div className="p-3 sm:p-4 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
                             {filteredVersions.length > 0 ? filteredVersions.map(v => {
                                 const isCompatible = !targetGameVersion || v.gameVersions?.includes(targetGameVersion);
                                 return (
-                                    <button key={v.id} onClick={() => confirmVersion(v.versionNumber)} className={`w-full text-left px-4 py-3 flex justify-between items-center border-b ${theme.colors.borderFaint} last:border-0 transition-colors ${!isCompatible ? theme.colors.dangerBg : theme.colors.bgSurfaceHover}`}>
+                                    <button key={v.id} onClick={() => confirmVersion(v.versionNumber)} className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-all duration-300 shadow-sm border ${!isCompatible ? "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50"}`}>
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <span className={`font-bold text-sm ${!isCompatible ? theme.colors.dangerText : theme.colors.textPrimary}`}>{v.versionNumber}</span>
@@ -388,7 +388,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                             )}
                         </div>
                         {targetGameVersion && (
-                            <div className={`p-3 ${theme.colors.bgSurface} border-t ${theme.colors.borderFaint} text-center shrink-0`}>
+                            <div className={`p-4 bg-slate-50 dark:bg-slate-800/95 border-t border-slate-200 dark:border-white/10 text-center shrink-0`}>
                                 <button onClick={() => { setShowIncompatible(!showIncompatible); }} className={`text-xs font-bold ${theme.colors.accent} hover:underline`}>{showIncompatible ? 'Hide' : 'Show'} incompatible versions</button>
                             </div>
                         )}
