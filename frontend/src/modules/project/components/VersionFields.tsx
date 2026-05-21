@@ -52,13 +52,17 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
     const isFormatValid = STRICT_VERSION_REGEX.test(versionNum);
     const isDuplicate = existingVersions.includes(versionNum);
     const isValid = versionNum.length > 0 && isFormatValid && !isDuplicate;
+    const allowsAutoSwitch = projectType === 'PLUGIN' || projectType === 'DATA' || projectType === 'ART';
 
     const getAcceptTypes = (): Accept => {
         switch (projectType) {
-            case 'PLUGIN': return { 'application/java-archive': ['.jar'] };
             case 'SAVE':
+            case 'MODPACK':
+                return { 'application/zip': ['.zip'] };
             case 'ART':
-            case 'DATA': return { 'application/zip': ['.zip'] };
+            case 'DATA':
+                return { 'application/java-archive': ['.jar'], 'application/zip': ['.zip'] };
+            case 'PLUGIN': return { 'application/java-archive': ['.jar'], 'application/zip': ['.zip'] };
             default: return { 'application/java-archive': ['.jar'], 'application/zip': ['.zip'], 'application/json': ['.json'] };
         }
     };
@@ -71,7 +75,9 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         setManifestSuggestions([]);
         setManifestSuggestionError(null);
 
-        if (projectType === 'PLUGIN' && currentProjectId) {
+        const isJar = nextFile.name.toLowerCase().endsWith('.jar');
+
+        if (projectType === 'PLUGIN' && isJar && currentProjectId) {
             setLoadingManifestSuggestions(true);
             projectClient.inspectManifest(currentProjectId, nextFile)
                 .then((result) => {
@@ -124,7 +130,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         <div className={`space-y-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             {!isModpack && !hideFilePicker && (
                 <div>
-                    <Label required>Project File <span className={`${theme.colors.textMuted} font-normal normal-case ml-1`}>{projectType === 'PLUGIN' ? '(.jar)' : '(.zip)'}</span></Label>
+                    <Label required>Project File <span className={`${theme.colors.textMuted} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
                     <div
                         {...getRootProps()}
                         className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all group ${
@@ -155,7 +161,9 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         ) : (
                             <div>
                                 <div className={`font-bold ${theme.colors.textPrimary}`}>Click or drag file here</div>
-                                <div className={`text-xs ${theme.colors.textMuted} mt-1`}>{projectType === 'PLUGIN' ? 'Supports .jar files' : 'Supports .zip archives'}</div>
+                                <div className={`text-xs ${theme.colors.textMuted} mt-1`}>
+                                    {allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
+                                </div>
                             </div>
                         )}
                     </div>
