@@ -133,6 +133,10 @@ public class VersionService {
                 StringBuilder hex = new StringBuilder();
                 for (byte b : md.digest()) hex.append(String.format("%02x", b));
                 fileHash = hex.toString();
+                Query duplicateQuery = new Query(Criteria.where("versions.hash").is(fileHash).and("deletedAt").is(null));
+                if (mongoTemplate.exists(duplicateQuery, Project.class)) {
+                    throw new IllegalArgumentException("This file has already been uploaded to Modtale.");
+                }
             }
             filePath = storageService.upload(file, "files/" + project.getClassification().name().toLowerCase());
         }
