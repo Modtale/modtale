@@ -64,7 +64,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
     }, []);
 
     useEffect(() => {
-        setItemsPerPage(viewStyle === 'grid' ? 48 : 12);
+        setItemsPerPage(viewStyle === 'compact' ? 48 : 12);
     }, [viewStyle, setItemsPerPage]);
 
     const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
