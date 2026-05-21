@@ -236,6 +236,7 @@ public class SecurityConfig {
                                 "/api/v1/creators/**",
                                 "/api/v1/og/**",
                                 "/api/v1/download/**",
+                                "/api/v1/download-bundle/**",
                                 "/api/v1/meta/**",
                                 "/api/v1/status",
                                 "/api/v1/version/**",

@@ -146,20 +146,59 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleDownloadClick = async (url: string, versionNumber: string, deps: any[], channel: string) => {
         try {
-            const isBundle = project.classification === 'MODPACK';
-            const endpoint = isBundle
-                ? '/projects/' + project.id + '/versions/' + versionNumber + '/download-bundle-url'
-                : '/projects/' + project.id + '/versions/' + versionNumber + '/download-url';
-            
-            const res = await api.get(endpoint);
-            if (res.data?.downloadUrl) {
-                onDownload(project.id);
-                setLastDownloadWasBundle(isBundle);
+            if (!versionNumber) {
+                const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
+                const targetUrl = baseUrl + '/files/download/' + encodeURI(url);
+                window.open(targetUrl, '_blank');
+
+                if (project && !downloadedSessionIds.has(project.id)) {
+                    setProject(prev => prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : null);
+                    onDownload(project.id);
+                }
                 setIsDownloadOpen(false);
                 setIsHistoryOpen(false);
-                navigate(SiteRoutes.project(project), { replace: true });
-                setShowPostDownloadModal(true);
-                window.location.href = res.data.downloadUrl;
+                setLastDownloadWasBundle(false);
+
+                if (localStorage.getItem('hideInstallInstructions') !== 'true') {
+                    setShowPostDownloadModal(true);
+                }
+                if (location.pathname.endsWith('/download')) navigate(SiteRoutes.project(project), { replace: true });
+                return;
+            }
+
+            const selectedDeps = deps ? deps.map(d => d.modId || d).filter(Boolean) : [];
+            const isBundle = selectedDeps.length > 0;
+            const depsQuery = isBundle ? '?deps=' + selectedDeps.join(',') : '';
+
+            const endpoint = isBundle
+                ? `/projects/${project.id}/versions/${versionNumber}/download-bundle-url${depsQuery}`
+                : `/projects/${project.id}/versions/${versionNumber}/download-url`;
+
+            const res = await api.get(endpoint);
+
+            if (res.data && res.data.downloadUrl) {
+                let downloadUrl = res.data.downloadUrl;
+                if (!downloadUrl.startsWith('http')) {
+                    const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
+                    downloadUrl = baseUrl + downloadUrl;
+                }
+
+                window.open(downloadUrl, '_blank');
+
+                if (project && !downloadedSessionIds.has(project.id)) {
+                    setProject(prev => prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : null);
+                    onDownload(project.id);
+                }
+
+                setIsDownloadOpen(false);
+                setIsHistoryOpen(false);
+                setLastDownloadWasBundle(isBundle || project.classification === 'MODPACK');
+
+                if (localStorage.getItem('hideInstallInstructions') !== 'true') {
+                    setShowPostDownloadModal(true);
+                }
+
+                if (location.pathname.endsWith('/download')) navigate(SiteRoutes.project(project), { replace: true });
             }
         } catch (e) {
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
@@ -196,23 +235,23 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />
             <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />
             <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} />
-            
-            <HistoryModal 
-                show={isHistoryOpen} 
-                onClose={() => navigate(projectUrl)} 
-                history={sortedHistory} 
-                showExperimental={showExperimental} 
-                onToggleExperimental={() => setShowExperimental(!showExperimental)} 
-                onDownload={handleDownloadClick} 
+
+            <HistoryModal
+                show={isHistoryOpen}
+                onClose={() => navigate(projectUrl)}
+                history={sortedHistory}
+                showExperimental={showExperimental}
+                onToggleExperimental={() => setShowExperimental(!showExperimental)}
+                onDownload={handleDownloadClick}
             />
-            <DownloadModal 
-                show={isDownloadOpen} 
-                onClose={() => navigate(projectUrl)} 
-                versionsByGame={versionsByGame} 
-                onDownload={handleDownloadClick} 
-                showExperimental={showExperimental} 
-                onToggleExperimental={() => setShowExperimental(!showExperimental)} 
-                onViewHistory={() => navigate(projectUrl + '/changelog')} 
+            <DownloadModal
+                show={isDownloadOpen}
+                onClose={() => navigate(projectUrl)}
+                versionsByGame={versionsByGame}
+                onDownload={handleDownloadClick}
+                showExperimental={showExperimental}
+                onToggleExperimental={() => setShowExperimental(!showExperimental)}
+                onViewHistory={() => navigate(projectUrl + '/changelog')}
             />
 
             <ProjectLayout
