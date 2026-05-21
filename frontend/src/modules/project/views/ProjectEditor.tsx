@@ -23,6 +23,7 @@ import { api } from '@/utils/api';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
+import { StatusModal } from '@/components/ui/StatusModal';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
 
@@ -71,6 +72,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
     const [galleryCropImage, setGalleryCropImage] = useState<string | null>(null);
     const [statusModal, setStatusModal] = useState<any>(null);
+    const [isStatusChanging, setIsStatusChanging] = useState(false);
 
     useEffect(() => {
         if (projectData) {
@@ -190,6 +192,52 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
     };
 
+    const runStatusTransition = async (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
+        if (!projectData?.id || isStatusChanging) return;
+        setIsStatusChanging(true);
+
+        try {
+            const endpoint = nextStatus === 'PUBLISHED' ? 'publish' : nextStatus === 'UNLISTED' ? 'unlist' : 'archive';
+            await api.post(`/projects/${projectData.id}/${endpoint}`);
+            setProjectData(prev => prev ? { ...prev, status: nextStatus } : null);
+            onShowStatus('success', 'Status Updated', `Project status changed to ${nextStatus.toLowerCase()}.`);
+        } catch (e: any) {
+            onShowStatus('error', 'Status Update Failed', e.response?.data || 'Failed to update project status.');
+        } finally {
+            setIsStatusChanging(false);
+            setStatusModal(null);
+        }
+    };
+
+    const confirmStatusTransition = (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
+        const config = {
+            PUBLISHED: {
+                type: 'info' as const,
+                title: 'Publish Project?',
+                message: 'This will make your project visible to everyone in discovery.',
+                actionLabel: 'Publish'
+            },
+            UNLISTED: {
+                type: 'info' as const,
+                title: 'Unlist Project?',
+                message: 'This will hide your project from search and browse, but direct links will still work.',
+                actionLabel: 'Unlist'
+            },
+            ARCHIVED: {
+                type: 'warning' as const,
+                title: 'Archive Project?',
+                message: 'This will move the project into read-only mode for everyone.',
+                actionLabel: 'Archive'
+            }
+        }[nextStatus];
+
+        setStatusModal({
+            ...config,
+            secondaryLabel: 'Cancel',
+            onAction: () => runStatusTransition(nextStatus)
+        });
+    };
+
     return (
         <div className="relative">
             {galleryCropImage && createPortal(
@@ -201,6 +249,17 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                         setGalleryCropImage(null);
                         handleGalleryUpload(file);
                     }}
+                />,
+                document.body)}
+            {statusModal && createPortal(
+                <StatusModal
+                    type={statusModal.type}
+                    title={statusModal.title}
+                    message={statusModal.message}
+                    actionLabel={statusModal.actionLabel}
+                    secondaryLabel={statusModal.secondaryLabel}
+                    onAction={statusModal.onAction}
+                    onClose={() => !isStatusChanging && setStatusModal(null)}
                 />,
                 document.body)}
 
@@ -339,11 +398,14 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 setProjectData={setProjectData}
                                 readOnly={readOnly}
                                 hasProjectPermission={hasProjectPermission}
+                                handleRestore={() => confirmStatusTransition('PUBLISHED')}
+                                handleUnlist={() => confirmStatusTransition('UNLISTED')}
+                                handleArchive={() => confirmStatusTransition('ARCHIVED')}
                                 slugError={slugError}
                                 handleSlugChange={() => {}}
                                 getUrlPrefix={() => `https://modtale.net/${SiteRoutes.getProjectPrefix(projectData.classification)}/`}
                                 markDirty={markDirty}
-                                isLoading={false}
+                                isLoading={isStatusChanging}
                             />
                         )}
                         {activeTab === 'wiki' && (
