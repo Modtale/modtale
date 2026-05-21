@@ -139,8 +139,8 @@ public class ProjectService {
 
     public String getProjectLink(Project project) {
         String slug = project.getSlug() != null && !project.getSlug().isEmpty() ? project.getSlug() : project.getId();
-        if ("MODPACK".equals(project.getClassification())) return "/modpack/" + slug;
-        if ("SAVE".equals(project.getClassification())) return "/world/" + slug;
+        if ("MODPACK".equals(project.getClassification().name())) return "/modpack/" + slug;
+        if ("SAVE".equals(project.getClassification().name())) return "/world/" + slug;
         return "/mod/" + slug;
     }
 }
