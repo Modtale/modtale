@@ -60,7 +60,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 croppedAreaPixels.height
             );
 
-            let mimeType = 'image/jpeg'; // Safe fallback
+            let mimeType = 'image/jpeg';
             try {
                 const response = await fetch(imageSrc);
                 const blob = await response.blob();

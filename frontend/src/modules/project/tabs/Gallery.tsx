@@ -48,7 +48,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                             onChange={(e) => {
                                 if (e.target.files && e.target.files.length > 0) {
                                     handleGallerySelect(e.target.files[0]);
-                                    e.target.value = ''; // Reset input so same file can be selected again
+                                    e.target.value = '';
                                 }
                             }}
                             disabled={isLoading}

@@ -194,7 +194,6 @@ public class VersionController {
             DownloadTokenService.DownloadToken dt = downloadTokenService.validateAndConsume(token);
             if (dt == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-            // FIX: Use getRawProjectById here as well to bypass view-filtering
             Project project = projectService.getRawProjectById(dt.getProjectId());
             if (project == null) return ResponseEntity.notFound().build();
 

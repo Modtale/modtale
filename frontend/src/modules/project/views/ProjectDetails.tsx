@@ -166,7 +166,14 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            const selectedDeps = deps ? deps.map(d => d.modId || d).filter(Boolean) : [];
+            const selectedDeps = deps ? deps.map(d => {
+                if (typeof d === 'string') return d;
+                if (d && typeof d === 'object') {
+                    return d.modId || d.projectId || d.id || '';
+                }
+                return '';
+            }).filter(Boolean) : [];
+
             const isBundle = selectedDeps.length > 0;
             const depsQuery = isBundle ? '?deps=' + selectedDeps.join(',') : '';
 

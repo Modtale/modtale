@@ -79,7 +79,7 @@ const UptimeHeatmap: React.FC<UptimeHeatmapProps> = ({ serviceId, data, range, l
             case 'operational': return 'bg-emerald-500 dark:bg-emerald-500 hover:bg-emerald-400';
             case 'degraded': return 'bg-yellow-500 dark:bg-yellow-500 hover:bg-yellow-400';
             case 'down': return 'bg-red-500 dark:bg-red-500 hover:bg-red-400';
-            default: return 'bg-slate-100 dark:bg-white/5'; // No Data
+            default: return 'bg-slate-100 dark:bg-white/5';
         }
     };
 
