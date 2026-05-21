@@ -13,7 +13,7 @@ const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
 
 let userData = null;
-let title = ROUTE_SEO['/mods'].title; // Default title
+let title = ROUTE_SEO['/mods'].title;
 let description = ROUTE_SEO['/mods'].description;
 let image = "https://modtale.net/assets/favicon.svg";
 let jsonLd: any = undefined;
