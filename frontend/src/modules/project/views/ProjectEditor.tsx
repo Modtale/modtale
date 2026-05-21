@@ -18,6 +18,8 @@ import { Gallery } from '../tabs/Gallery';
 import { Team } from '../tabs/Team';
 import { Settings as SettingsTab } from '../tabs/Settings';
 import { WikiPreview } from '../tabs/WikiPreview';
+import { projectClient } from '../api/projectClient';
+import { api } from '@/utils/api';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
@@ -143,6 +145,51 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const isPublishable = publishRequirements.every(r => r.met);
     const metCount = publishRequirements.filter(r => r.met).length;
 
+    const handleUploadVersion = async () => {
+        if (!projectData?.id) return;
+        if (!isModpack && !versionData.file) {
+            onShowStatus('error', 'Upload Failed', 'A project file is required.');
+            return;
+        }
+        if (!versionData.versionNumber || versionData.gameVersions.length === 0) {
+            onShowStatus('error', 'Upload Failed', 'Version number and game versions are required.');
+            return;
+        }
+
+        setIsSavingVersion(true);
+        try {
+            const formData = new FormData();
+            formData.append('versionNumber', versionData.versionNumber);
+            versionData.gameVersions.forEach(version => formData.append('gameVersions', version));
+            if (versionData.file) formData.append('file', versionData.file);
+            (versionData.projectIds || []).forEach(dep => formData.append('modIds', dep));
+            if (versionData.changelog) formData.append('changelog', versionData.changelog);
+            formData.append('channel', versionData.channel || 'RELEASE');
+
+            await api.post(`/projects/${projectData.id}/versions`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            setVersionData({
+                projectIds: [],
+                versionNumber: '',
+                gameVersions: versionData.gameVersions,
+                changelog: '',
+                file: null,
+                dependencies: [],
+                modIds: [],
+                channel: 'RELEASE'
+            });
+            onShowStatus('success', 'Uploaded', 'Version uploaded successfully.');
+        } catch (e: any) {
+            onShowStatus('error', 'Upload Failed', e.response?.data || 'Failed to upload version.');
+        } finally {
+            setIsSavingVersion(false);
+        }
+    };
+
     return (
         <div className="relative">
             {galleryCropImage && createPortal(
@@ -242,7 +289,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <EditDetails metaData={metaData} setMetaData={setMetaData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} editorMode={editorMode} setEditorMode={setEditorMode} markDirty={markDirty} />
                         )}
                         {activeTab === 'files' && (
-                            <Files projectData={projectData} versionData={versionData} setVersionData={setVersionData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} classification={projectData.classification || 'PLUGIN'} handleUploadVersion={() => {}} handleEditVersion={() => {}} isLoading={false} />
+                            <Files projectData={projectData} versionData={versionData} setVersionData={setVersionData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} classification={projectData.classification || 'PLUGIN'} handleUploadVersion={handleUploadVersion} handleEditVersion={() => {}} isLoading={isSavingVersion} />
                         )}
                         {activeTab === 'gallery' && (
                             <Gallery

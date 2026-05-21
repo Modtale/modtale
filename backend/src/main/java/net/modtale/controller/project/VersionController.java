@@ -1,5 +1,6 @@
 package net.modtale.controller.project;
 
+import net.modtale.model.dto.ManifestDependencySuggestion;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
@@ -76,6 +77,19 @@ public class VersionController {
             versionService.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, ProjectVersion.Channel.valueOf(channel.toUpperCase()), user);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); }
+    }
+
+    @PostMapping("/projects/{id}/versions/dependency-suggestions")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_CREATE', authentication)")
+    public ResponseEntity<?> suggestManifestDependencies(@PathVariable String id, @RequestParam("file") MultipartFile file) {
+        User user = accountService.getCurrentUser();
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            List<ManifestDependencySuggestion> suggestions = versionService.suggestManifestDependencies(id, file, user);
+            return ResponseEntity.ok(suggestions);
+        } catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
         catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); }
     }
 

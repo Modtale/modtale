@@ -7,6 +7,7 @@ import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
+import type { ManifestDependencySuggestion } from '@/types';
 
 const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
@@ -18,12 +19,16 @@ interface VersionFieldsProps {
     existingVersions?: string[];
     disabled?: boolean;
     hideFilePicker?: boolean;
+    currentProjectId?: string;
 }
 
-export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], disabled, hideFilePicker = false }) => {
+export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], disabled, hideFilePicker = false, currentProjectId }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [availableGameVersions, setAvailableGameVersions] = useState<string[]>([]);
     const [loadingVersions, setLoadingVersions] = useState(false);
+    const [manifestSuggestions, setManifestSuggestions] = useState<ManifestDependencySuggestion[]>([]);
+    const [loadingManifestSuggestions, setLoadingManifestSuggestions] = useState(false);
+    const [manifestSuggestionError, setManifestSuggestionError] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -59,8 +64,24 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
     };
 
     const onFileDrop = useCallback((acceptedFiles: File[]) => {
-        if (acceptedFiles[0] && !disabled) onChange({ ...data, file: acceptedFiles[0] });
-    }, [data, onChange, disabled]);
+        const nextFile = acceptedFiles[0];
+        if (!nextFile || disabled) return;
+
+        onChange({ ...data, file: nextFile });
+        setManifestSuggestions([]);
+        setManifestSuggestionError(null);
+
+        if (projectType === 'PLUGIN' && currentProjectId) {
+            setLoadingManifestSuggestions(true);
+            projectClient.suggestManifestDependencies(currentProjectId, nextFile)
+                .then((suggestions) => setManifestSuggestions(suggestions || []))
+                .catch((error) => {
+                    const msg = typeof error.response?.data === 'string' ? error.response.data : 'Could not inspect manifest.json.';
+                    setManifestSuggestionError(msg);
+                })
+                .finally(() => setLoadingManifestSuggestions(false));
+        }
+    }, [data, onChange, disabled, projectType, currentProjectId]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop: onFileDrop, maxFiles: 1, accept: getAcceptTypes(), disabled: disabled
@@ -71,6 +92,16 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         const current = data.gameVersions || [];
         const next = current.includes(ver) ? current.filter(v => v !== ver) : [...current, ver];
         onChange({ ...data, gameVersions: next });
+    };
+
+    const addManifestSuggestions = (suggestions: ManifestDependencySuggestion[]) => {
+        const existingIds = new Set((data.projectIds || []).map(dep => dep.split(':')[0]));
+        const nextSuggestions = suggestions
+            .filter(suggestion => !existingIds.has(suggestion.projectId))
+            .map(suggestion => suggestion.dependencyEntry);
+        if (nextSuggestions.length === 0) return;
+        onChange({ ...data, projectIds: [...(data.projectIds || []), ...nextSuggestions] });
+        setManifestSuggestions(prev => prev.filter(suggestion => !nextSuggestions.includes(suggestion.dependencyEntry)));
     };
 
     useEffect(() => {
@@ -107,6 +138,11 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                                 <div className={`inline-flex items-center gap-1 text-xs font-bold ${theme.colors.successText} ${theme.colors.successBg} px-2 py-0.5 rounded-full`}>
                                     <Check className="w-3 h-3" /> Ready
                                 </div>
+                                {loadingManifestSuggestions && (
+                                    <div className={`mt-2 text-xs ${theme.colors.textMuted} flex items-center justify-center gap-1`}>
+                                        <Loader2 className="w-3 h-3 animate-spin" /> Reading manifest.json...
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div>
@@ -115,6 +151,12 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                             </div>
                         )}
                     </div>
+                    {manifestSuggestionError && (
+                        <div className={`mt-3 p-3 rounded-xl border ${theme.colors.dangerBorder} ${theme.colors.dangerBg} ${theme.colors.dangerText} text-xs font-bold flex items-start gap-2`}>
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>{manifestSuggestionError}</span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -206,11 +248,38 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                 <div className="mt-4">
                     <Label>Dependencies</Label>
                     <p className={`text-xs ${theme.colors.textMuted} mb-2`}>Does your project require other projects to work?</p>
+                    {manifestSuggestions.length > 0 && (
+                        <div className="mb-4 p-4 rounded-xl border border-blue-200 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/10">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <h4 className="text-sm font-black text-blue-900 dark:text-blue-100">Manifest dependencies found</h4>
+                                    <p className="text-xs text-blue-700 dark:text-blue-300">These Modtale projects look like matches for dependencies listed in manifest.json.</p>
+                                </div>
+                                <button type="button" onClick={() => addManifestSuggestions(manifestSuggestions)} className="text-xs font-bold bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors shadow-sm">
+                                    Add All
+                                </button>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                                {manifestSuggestions.map(suggestion => (
+                                    <div key={`${suggestion.manifestKey}:${suggestion.projectId}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-white/70 dark:bg-slate-950/40 border border-blue-100 dark:border-blue-900/30 p-3">
+                                        <div className="min-w-0">
+                                            <div className={`font-bold ${theme.colors.textPrimary} text-sm truncate`}>{suggestion.projectTitle} <span className={`font-mono ${theme.colors.textMuted}`}>v{suggestion.versionNumber}</span></div>
+                                            <div className={`text-xs ${theme.colors.textMuted}`}>{suggestion.manifestKey} {suggestion.optional ? '(optional)' : '(required)'}</div>
+                                        </div>
+                                        <button type="button" onClick={() => addManifestSuggestions([suggestion])} className={`text-xs font-bold ${theme.colors.accent} hover:underline shrink-0`}>
+                                            Add
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <DependencySelector
                         selectedDeps={data.projectIds || []}
                         onChange={(deps) => onChange({ ...data, projectIds: deps })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Dependency"
+                        currentProjectId={currentProjectId}
                         isModpack={false}
                         disabled={disabled}
                     />

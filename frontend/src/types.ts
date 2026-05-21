@@ -56,6 +56,17 @@ export interface ProjectDependency {
     isOptional?: boolean;
 }
 
+export interface ManifestDependencySuggestion {
+    manifestKey: string;
+    requestedVersion: string;
+    projectId: string;
+    projectTitle: string;
+    versionNumber: string;
+    optional: boolean;
+    confidence: number;
+    dependencyEntry: string;
+}
+
 export interface ScanIssue {
     severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
     type: string;
