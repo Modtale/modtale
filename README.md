@@ -147,10 +147,10 @@ Modtale is free software: you can redistribute it and/or modify it under the ter
 
 ## Community & Support
 
-* **API Documentation:** [modtale.net/api-docs]()
-* **Discord:** [Join the Developer Server]()
-* **X (Twitter):** [@modtalenet]()
-* **Bluesky:** [@modtale.net]()
+* **Docs:** [modtale.net/api-docs](https://modtale.net/api-docs)
+* **Discord:** [Join the Server](https://discord.gg/PcFaDVYqVe)
+* **X (Twitter):** [@modtalenet](https://x.com/modtalenet)
+* **Bluesky:** [@modtale.net](https://bsky.app/profile/modtale.net)
 
 ### Contributing
 
