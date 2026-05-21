@@ -1,6 +1,7 @@
 package net.modtale.service.project;
 
 import net.modtale.model.dto.ManifestDependencySuggestion;
+import net.modtale.model.dto.ManifestInspectionResult;
 import net.modtale.model.project.*;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
@@ -184,13 +185,13 @@ public class VersionService {
         if (file != null && !isModpack) scanService.performBackgroundScan(project.getId(), ver.getId(), filePath, file.getOriginalFilename(), false);
     }
 
-    public List<ManifestDependencySuggestion> suggestManifestDependencies(String id, MultipartFile file, User user) {
+    public ManifestInspectionResult inspectManifest(String id, MultipartFile file, User user) {
         Project project = projectService.getRawProjectById(id);
         if (project == null || !accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")) throw new SecurityException("Denied");
-        if (project.getClassification() != ProjectClassification.PLUGIN) return List.of();
+        if (project.getClassification() != ProjectClassification.PLUGIN) return new ManifestInspectionResult(null, List.of());
 
         ManifestInspection manifest = fileValidationService.validateProjectFile(file, project.getClassification().name());
-        if (manifest == null || manifest.getDependencies().isEmpty()) return List.of();
+        if (manifest == null) return new ManifestInspectionResult(null, List.of());
 
         Query query = new Query(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED)
                 .and("deletedAt").is(null)
@@ -228,7 +229,7 @@ public class VersionService {
             }
         }
 
-        return suggestions;
+        return new ManifestInspectionResult(manifest.getServerVersion(), suggestions);
     }
 
     private int scoreDependencyMatch(ManifestDependency dependency, Project candidate) {

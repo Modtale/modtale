@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import type { ManifestDependencySuggestion, Project, User, ProjectRole } from '@/types';
+import type { ManifestInspectionResult, Project, User, ProjectRole } from '@/types';
 
 export const projectClient = {
     getProject: async (id: string) => {
@@ -82,10 +82,10 @@ export const projectClient = {
         const res = await api.get(`/projects?search=${query}`);
         return res.data.content || [];
     },
-    suggestManifestDependencies: async (projectId: string, file: File) => {
+    inspectManifest: async (projectId: string, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
-        const res = await api.post<ManifestDependencySuggestion[]>(`/projects/${projectId}/versions/dependency-suggestions`, formData, {
+        const res = await api.post<ManifestInspectionResult>(`/projects/${projectId}/versions/dependency-suggestions`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return res.data;

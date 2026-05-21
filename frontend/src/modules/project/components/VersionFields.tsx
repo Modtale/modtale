@@ -73,8 +73,16 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
 
         if (projectType === 'PLUGIN' && currentProjectId) {
             setLoadingManifestSuggestions(true);
-            projectClient.suggestManifestDependencies(currentProjectId, nextFile)
-                .then((suggestions) => setManifestSuggestions(suggestions || []))
+            projectClient.inspectManifest(currentProjectId, nextFile)
+                .then((result) => {
+                    const manifestGameVersion = result?.gameVersion?.trim();
+                    onChange({
+                        ...data,
+                        file: nextFile,
+                        gameVersions: manifestGameVersion ? [manifestGameVersion] : data.gameVersions
+                    });
+                    setManifestSuggestions(result?.suggestions || []);
+                })
                 .catch((error) => {
                     const msg = typeof error.response?.data === 'string' ? error.response.data : 'Could not inspect manifest.json.';
                     setManifestSuggestionError(msg);
