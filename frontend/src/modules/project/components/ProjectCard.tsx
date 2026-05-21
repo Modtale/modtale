@@ -99,9 +99,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-xl ring-0 group-hover:ring-2 group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
                 <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
-                <div className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-20">
+                <Link to={canonicalPath} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
                     <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent object-cover" />
-                </div>
+                </Link>
                 <div className="flex-1 min-w-0 relative z-20 pointer-events-none">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
                         {title}
@@ -134,9 +134,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
                 <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-20">
+                <Link to={canonicalPath} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
                     <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
-                </div>
+                </Link>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center sm:justify-start relative z-20 pointer-events-none">
                     <div className="flex justify-between items-start gap-2 sm:gap-4">
@@ -224,7 +224,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent z-20 pointer-events-none">
-                <div className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-0 pointer-events-none">
+                <Link to={canonicalPath} aria-label={`View ${title}`} className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto focus:outline-none">
                     <OptimizedImage
                         key={`icon-${isMounted}`}
                         src={resolvedImage}
@@ -237,7 +237,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                             <Box className="w-3 h-3 mr-0.5" /> {childCount}
                         </div>
                     )}
-                </div>
+                </Link>
 
                 <div className="mt-12">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
