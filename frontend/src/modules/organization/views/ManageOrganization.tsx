@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { SiteRoutes } from '@/utils/routes';
 import { createPortal } from 'react-dom';
-import { Plus, Building2, ArrowLeft, X } from 'lucide-react';
+import { Plus, Building2, ArrowLeft, X, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -82,17 +84,22 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                     document.body
                 )}
 
-                <div className="flex items-center gap-4 mb-4">
-                    <button onClick={() => setSelectedOrg(null)} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-xl transition-colors`}>
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <h2 className={`text-2xl font-black ${theme.colors.textPrimary} flex items-center gap-3`}>
-                            {selectedOrg.username}
-                            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded uppercase tracking-wider font-bold border border-purple-200 dark:border-purple-800/30">Organization</span>
-                        </h2>
-                        <p className={theme.colors.textMuted}>Manage organization settings and members</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setSelectedOrg(null)} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-xl transition-colors`}>
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <h2 className={`text-2xl font-black ${theme.colors.textPrimary} flex items-center gap-3`}>
+                                {selectedOrg.username}
+                                <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded uppercase tracking-wider font-bold border border-purple-200 dark:border-purple-800/30">Organization</span>
+                            </h2>
+                            <p className={theme.colors.textMuted}>Manage organization settings and members</p>
+                        </div>
                     </div>
+                    <Link to={SiteRoutes.creator(selectedOrg.username)} className={`flex items-center gap-2 px-4 py-2 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} hover:${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold shadow-sm`}>
+                        <ExternalLink className="w-4 h-4" /> View Profile
+                    </Link>
                 </div>
 
                 <div className={`flex gap-4 border-b ${theme.colors.border}`}>
