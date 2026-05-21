@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '@/utils/api';
 import { Package, Users, ChevronLeft, ChevronRight, CornerDownLeft, Building2 } from 'lucide-react';
 import { SiteRoutes } from '@/utils/routes';
+import { useSSRData } from '@/context/SSRContext';
 import { ProfileLayout } from '../components/ProfileLayout';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { Spinner } from '@/components/ui/Spinner';
@@ -23,14 +24,22 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                                             onBack, likedModIds, onToggleFavorite, currentUser, onRefreshUser
                                                         }) => {
     const { username } = useParams<{ username: string }>();
+    const { initialData } = useSSRData();
     const navigate = useNavigate();
     const location = useLocation();
     const projectsTitleRef = useRef<HTMLHeadingElement>(null);
 
-    const [profileUser, setProfileUser] = useState<User | null>(null);
+
+    const [profileUser, setProfileUser] = useState<User | null>(() => {
+        if (initialData && initialData.username === username) {
+            return initialData;
+        }
+        return null;
+    });
+
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
     const [memberOrgs, setMemberOrgs] = useState<User[]>([]);
-    const [loadingUser, setLoadingUser] = useState(true);
+    const [loadingUser, setLoadingUser] = useState(!profileUser);
     const [notFound, setNotFound] = useState(false);
 
     const [projects, setProjects] = useState<Project[]>([]);
@@ -70,6 +79,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     useEffect(() => {
         const fetchUserData = async () => {
             if (!username) return;
+            if (profileUser && profileUser.username === username) {
+                setLoadingUser(false);
+                return;
+            }
             setLoadingUser(true);
             setNotFound(false);
             try {

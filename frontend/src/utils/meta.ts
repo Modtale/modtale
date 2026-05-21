@@ -36,3 +36,23 @@ export const generateProjectMeta = (item: Project | any) => {
 
     return { title, description, author };
 };
+
+export const generateUserMeta = (user: any) => {
+    if (!user) return null;
+
+    const name = user.displayName || user.username;
+    const title = `${name} | Modtale`;
+    
+    const followerCount = (user.followerIds?.length || 0).toLocaleString();
+    const isOrg = user.accountType === 'ORGANIZATION';
+    
+    let description = user.bio || `Check out ${name}'s ${isOrg ? 'organization' : 'profile'} on Modtale.`;
+    if (description.length > 160) {
+        description = description.substring(0, 157) + '...';
+    }
+
+    const statsLine = `👥 ${followerCount} follower${user.followerIds?.length === 1 ? '' : 's'}`;
+    description = `${description} — ${statsLine}`;
+
+    return { title, description };
+};
