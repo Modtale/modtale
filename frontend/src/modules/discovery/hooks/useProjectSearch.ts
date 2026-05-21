@@ -11,7 +11,8 @@ export type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'u
 export const useProjectSearch = (initialClassification: Classification | 'All', useSSRData: boolean, initialItems: Project[], initialTotalPages: number, initialTotalItems: number) => {
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const page = parseInt(searchParams.get('page') || '0');
+    const parsedPage = parseInt(searchParams.get('page') || '0', 10);
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 0;
     const sortBy = (searchParams.get('sort') as SortOption) || 'relevance';
     const activeViewId = searchParams.get('view') || 'all';
     const selectedVersion = searchParams.get('version') || 'Any';
@@ -90,9 +91,23 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 category: categoryParam,
             }, controller.signal);
 
+            const nextTotalPages = data?.totalPages || 0;
+            const nextTotalItems = data?.totalElements || 0;
+
+            if (nextTotalPages > 0 && page >= nextTotalPages) {
+                setSearchParams(prev => {
+                    const next = new URLSearchParams(prev);
+                    const lastPage = nextTotalPages - 1;
+                    if (lastPage === 0) next.delete('page');
+                    else next.set('page', lastPage.toString());
+                    return next;
+                }, { replace: true });
+                return;
+            }
+
             setItems(data?.content || []);
-            setTotalPages(data?.totalPages || 0);
-            setTotalItems(data?.totalElements || 0);
+            setTotalPages(nextTotalPages);
+            setTotalItems(nextTotalItems);
         } catch (err: any) {
             if (err.name !== 'Canceled') {
                 captureError(err);
@@ -105,7 +120,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 setLoading(false);
             }
         }
-    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId, useSSRData]);
+    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId, useSSRData, setSearchParams]);
 
     useEffect(() => {
         fetchData();
