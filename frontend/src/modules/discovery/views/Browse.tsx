@@ -45,7 +45,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const {
         page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
         searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, items,
-        itemsPerPage, updateParams
+        itemsPerPage, setItemsPerPage, updateParams
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
 
     const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>('grid');
@@ -62,6 +62,10 @@ export const Browse: React.FC<BrowseViewProps> = ({
             setViewStyle(saved as 'grid' | 'list' | 'compact');
         }
     }, []);
+
+    useEffect(() => {
+        setItemsPerPage(viewStyle === 'grid' ? 48 : 12);
+    }, [viewStyle, setItemsPerPage]);
 
     const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
     const breadcrumbSchema = useMemo(() => {
