@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Github, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 import type { User } from '@/types';
@@ -20,7 +20,6 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
-import { Gallery } from '../tabs/Gallery';
 import { Wiki } from '../tabs/Wiki';
 import { useHMWiki, WikiSidebar } from '../components/HMWiki';
 
@@ -36,6 +35,7 @@ import { DownloadModal } from '../components/dialogs/DownloadModal';
 import { DependencyModal } from '../components/dialogs/DependencyModal';
 import { api } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -76,7 +76,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const commentsRef = useRef<HTMLDivElement>(null);
 
     const isWikiRoute = location.pathname.includes('/wiki');
-    const isGalleryRoute = location.pathname.endsWith('/gallery');
+    const isGalleryRoute = /\/gallery\/?$/.test(location.pathname);
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
     const wikiPageSlug = wikiMatch?.[1];
 
@@ -89,12 +89,23 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const prevPathnameRef = useRef(location.pathname);
     const scrollPosRef = useRef(0);
     const downloadFxTimeoutRef = useRef<number | null>(null);
+    const [galleryIndex, setGalleryIndex] = useState(0);
+    const galleryImages = project?.galleryImages || [];
+
+    const openGalleryIndexFromHash = () => {
+        const hashIndex = Number((location.hash || '').replace('#', ''));
+        if (Number.isFinite(hashIndex) && hashIndex > 0) {
+            return Math.min(hashIndex - 1, Math.max(galleryImages.length - 1, 0));
+        }
+        return 0;
+    };
 
     useEffect(() => {
         const handleScroll = () => { scrollPosRef.current = window.scrollY; };
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+    useScrollLock(isGalleryRoute);
 
     useEffect(() => {
         return () => {
@@ -142,6 +153,31 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             setIsHistoryOpen(false);
         }
     }, [location.pathname, project]);
+
+    useEffect(() => {
+        if (!isGalleryRoute) return;
+        setGalleryIndex(openGalleryIndexFromHash());
+    }, [isGalleryRoute, location.hash, project?.galleryImages]);
+
+    useEffect(() => {
+        if (!isGalleryRoute || galleryImages.length <= 1) return;
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                setGalleryIndex((prev) => (prev + 1) % galleryImages.length);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                navigate(projectUrl);
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isGalleryRoute, galleryImages.length, navigate, projectUrl]);
 
     useEffect(() => {
         if (project && id) {
@@ -378,20 +414,68 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 mainContent={
                     isWikiRoute ? (
                         <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
-                    ) : isGalleryRoute ? (
-                        <Gallery
-                            projectData={project}
-                            readOnly={true}
-                            hasProjectPermission={() => false}
-                            handleGalleryDelete={async () => {}}
-                            handleGallerySelect={() => {}}
-                            isLoading={false}
-                        />
                     ) : (
                         <ViewDetails project={project} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} />
                     )
                 }
             />
+            {isGalleryRoute && typeof document !== 'undefined' && createPortal(
+                <div className={theme.components.modalOverlay} onClick={() => navigate(projectUrl)}>
+                    <div
+                        className={`${theme.components.modalContent} w-full max-w-6xl max-h-[90dvh]`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className={theme.components.modalHeader}>
+                            <h2 className={`text-lg font-black ${theme.colors.textPrimary}`}>Gallery</h2>
+                            <button
+                                type="button"
+                                onClick={() => navigate(projectUrl)}
+                                className={`px-3 py-1.5 rounded-lg border ${theme.colors.border} ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold`}
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <div className={`${theme.components.modalBody} !p-0`}>
+                            {galleryImages.length > 0 ? (
+                                <div className="relative bg-black/90">
+                                    <img
+                                        src={galleryImages[galleryIndex]}
+                                        alt={`${project.title} gallery image ${galleryIndex + 1}`}
+                                        className="w-full max-h-[72dvh] object-contain"
+                                        loading="eager"
+                                    />
+                                    {galleryImages.length > 1 && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                aria-label="Previous image"
+                                                onClick={() => setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length)}
+                                                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/55 hover:bg-black/75 text-white transition-colors"
+                                            >
+                                                <ChevronLeft className="w-6 h-6" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                aria-label="Next image"
+                                                onClick={() => setGalleryIndex((prev) => (prev + 1) % galleryImages.length)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/55 hover:bg-black/75 text-white transition-colors"
+                                            >
+                                                <ChevronRight className="w-6 h-6" />
+                                            </button>
+                                        </>
+                                    )}
+                                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
+                                        {galleryIndex + 1} / {galleryImages.length}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className={`p-10 text-center ${theme.colors.textMuted}`}>No images in this gallery.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </>
     );
 };
