@@ -59,7 +59,7 @@ public class GameVersionService {
         refreshCatalog();
     }
 
-    @Scheduled(fixedDelayString = "${app.hytale.maven.poll-ms:60000}")
+    @Scheduled(fixedDelayString = "${app.hytale.maven.poll-ms:3600000}")
     public void pollCatalog() {
         refreshCatalog();
     }
