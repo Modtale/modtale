@@ -1,5 +1,6 @@
 package net.modtale.controller.project;
 
+import net.modtale.model.dto.request.project.CommentRequest;
 import net.modtale.model.user.User;
 import net.modtale.service.social.SocialService;
 import net.modtale.service.user.AccountService;
@@ -8,8 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/projects")
@@ -29,19 +28,19 @@ public class SocialController {
 
     @PostMapping("/{id}/comments")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'COMMENT_CREATE', authentication)")
-    public ResponseEntity<?> addComment(@PathVariable String id, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> addComment(@PathVariable String id, @RequestBody CommentRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        try { socialService.addComment(id, user.getId(), (String) body.get("content")); return ResponseEntity.ok().build(); }
+        try { socialService.addComment(id, user.getId(), requestPayload.getContent()); return ResponseEntity.ok().build(); }
         catch (IllegalStateException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
     }
 
     @PutMapping("/{id}/comments/{commentId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'COMMENT_EDIT', authentication)")
-    public ResponseEntity<?> editComment(@PathVariable String id, @PathVariable String commentId, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> editComment(@PathVariable String id, @PathVariable String commentId, @RequestBody CommentRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        try { socialService.editComment(id, commentId, user.getId(), (String) body.get("content")); return ResponseEntity.ok().build(); }
+        try { socialService.editComment(id, commentId, user.getId(), requestPayload.getContent()); return ResponseEntity.ok().build(); }
         catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
     }
 

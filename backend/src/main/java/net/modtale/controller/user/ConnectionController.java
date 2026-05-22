@@ -2,6 +2,8 @@ package net.modtale.controller.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.modtale.mapper.UserResponseMapper;
+import net.modtale.model.dto.user.GitRepositoryDTO;
 import net.modtale.model.user.GitRepository;
 import net.modtale.model.user.User;
 import net.modtale.service.user.GithubService;
@@ -61,7 +63,7 @@ public class ConnectionController {
 
     @GetMapping("/user/repos/github")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepository>> getGithubRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<List<GitRepositoryDTO>> getGithubRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
@@ -81,7 +83,9 @@ public class ConnectionController {
         }
 
         try {
-            return ResponseEntity.ok(githubService.getUserRepos(accessToken));
+            return ResponseEntity.ok(githubService.getUserRepos(accessToken).stream()
+                    .map(UserResponseMapper::toGitRepositoryDTO)
+                    .toList());
         } catch (HttpClientErrorException.Unauthorized e) {
             accountService.unlinkAccount(user.getId(), "github");
             try {
@@ -93,7 +97,7 @@ public class ConnectionController {
 
     @GetMapping("/user/repos/gitlab")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepository>> getGitlabRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<List<GitRepositoryDTO>> getGitlabRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
@@ -160,7 +164,9 @@ public class ConnectionController {
                 }
             }
 
-            return ResponseEntity.ok(allRepos);
+            return ResponseEntity.ok(allRepos.stream()
+                    .map(UserResponseMapper::toGitRepositoryDTO)
+                    .toList());
         } catch (HttpClientErrorException.Unauthorized e) {
             accountService.unlinkAccount(user.getId(), "gitlab");
             try {
@@ -174,7 +180,7 @@ public class ConnectionController {
 
     @GetMapping("/user/repos")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepository>> getMyRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<List<GitRepositoryDTO>> getMyRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         return getGithubRepos(authentication, request, response);
     }
 
@@ -227,7 +233,7 @@ public class ConnectionController {
 
     @GetMapping("/orgs/{orgId}/repos/github")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepository>> getOrgGithubRepos(@PathVariable String orgId) {
+    public ResponseEntity<List<GitRepositoryDTO>> getOrgGithubRepos(@PathVariable String orgId) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
@@ -240,7 +246,9 @@ public class ConnectionController {
         if (accessToken == null) return ResponseEntity.status(404).body(List.of());
 
         try {
-            return ResponseEntity.ok(githubService.getUserRepos(accessToken));
+            return ResponseEntity.ok(githubService.getUserRepos(accessToken).stream()
+                    .map(UserResponseMapper::toGitRepositoryDTO)
+                    .toList());
         } catch (HttpClientErrorException.Unauthorized e) {
             return ResponseEntity.status(401).build();
         }

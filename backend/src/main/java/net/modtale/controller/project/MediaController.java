@@ -1,5 +1,6 @@
 package net.modtale.controller.project;
 
+import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
 import net.modtale.model.user.User;
 import net.modtale.service.project.MetadataService;
 import net.modtale.service.user.AccountService;
@@ -9,8 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/projects")
@@ -51,12 +50,12 @@ public class MediaController {
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_REMOVE', authentication)")
     public ResponseEntity<?> removeGalleryImage(
             @PathVariable String id,
-            @RequestBody Map<String, String> body
+            @RequestBody RemoveGalleryImageRequest requestPayload
     ) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-        String imageUrl = body.get("imageUrl");
+        String imageUrl = requestPayload.getImageUrl();
         if (imageUrl == null || imageUrl.isEmpty()) {
             return ResponseEntity.badRequest().body("imageUrl is required");
         }

@@ -1,5 +1,6 @@
 package net.modtale.controller.admin;
 
+import net.modtale.mapper.AdminMapper;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.AdminLogRepository;
 import net.modtale.service.user.AccountService;
@@ -47,6 +48,7 @@ public class AuditController {
         if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
-        return ResponseEntity.ok(adminLogRepository.findWithFilters(query, action, targetType, pageable));
+        return ResponseEntity.ok(adminLogRepository.findWithFilters(query, action, targetType, pageable)
+                .map(AdminMapper::toLogDTO));
     }
 }

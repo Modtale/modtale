@@ -1,4 +1,4 @@
-package net.modtale.model.dto;
+package net.modtale.model.dto.project;
 
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;

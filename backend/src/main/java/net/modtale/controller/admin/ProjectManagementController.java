@@ -1,6 +1,11 @@
 package net.modtale.controller.admin;
 
+import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.admin.AdminLog;
+import net.modtale.model.dto.admin.AdminAuthorStatsDTO;
+import net.modtale.model.dto.admin.AdminProjectReviewDTO;
+import net.modtale.model.dto.request.admin.RejectReasonRequest;
+import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.AdminLogRepository;
@@ -61,12 +66,14 @@ public class ProjectManagementController {
     }
 
     @GetMapping("/verification/queue")
-    public ResponseEntity<List<Project>> getVerificationQueue() {
+    public ResponseEntity<List<ProjectSummaryDTO>> getVerificationQueue() {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(searchService.getVerificationQueue());
+        return ResponseEntity.ok(searchService.getVerificationQueue().stream()
+                .map(p -> ProjectMapper.toSummaryDTO(p, true))
+                .toList());
     }
 
     @GetMapping("/projects/{id}/review-details")
@@ -84,17 +91,14 @@ public class ProjectManagementController {
             author = userRepository.findById(project.getAuthor()).orElse(null);
         }
 
-        Map<String, Object> authorStats = Map.of(
-                "accountAge", author != null ? author.getCreatedAt() : "Unknown",
-                "tier", author != null ? author.getTier().name() : "Unknown",
-                "avatarUrl", author != null ? (author.getAvatarUrl() != null ? author.getAvatarUrl() : "") : "",
-                "totalProjects", author != null ? searchService.getCreatorProjects(author.getId(), PageRequest.of(0, 10000)).getTotalElements() : 0
+        AdminAuthorStatsDTO authorStats = new AdminAuthorStatsDTO(
+                author != null ? author.getCreatedAt() : "Unknown",
+                author != null ? author.getTier().name() : "Unknown",
+                author != null ? (author.getAvatarUrl() != null ? author.getAvatarUrl() : "") : "",
+                author != null ? searchService.getCreatorProjects(author.getId(), PageRequest.of(0, 10000)).getTotalElements() : 0
         );
 
-        return ResponseEntity.ok(Map.of(
-                "mod", project,
-                "authorStats", authorStats
-        ));
+        return ResponseEntity.ok(new AdminProjectReviewDTO(ProjectMapper.toAdminDTO(project), authorStats));
     }
 
     @GetMapping("/projects/{id}")
@@ -104,7 +108,7 @@ public class ProjectManagementController {
 
         Project project = projectService.getAdminProjectDetails(id);
         if (project == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(project);
+        return ResponseEntity.ok(ProjectMapper.toAdminDTO(project));
     }
 
     @PutMapping("/projects/{id}/raw")
@@ -149,12 +153,12 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/reject")
-    public ResponseEntity<?> rejectVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> rejectVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
-            projectManagementService.rejectVersion(id, versionId, body.get("reason"));
-            logAction(currentUser.getId(), "REJECT_VERSION", id, "VERSION", "VerID: " + versionId + ", Reason: " + body.get("reason"));
+            projectManagementService.rejectVersion(id, versionId, requestPayload.getReason());
+            logAction(currentUser.getId(), "REJECT_VERSION", id, "VERSION", "VerID: " + versionId + ", Reason: " + requestPayload.getReason());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -162,14 +166,14 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/reject")
-    public ResponseEntity<?> rejectProject(@PathVariable String id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> rejectProject(@PathVariable String id, @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         try {
-            projectManagementService.rejectProject(id, body.get("reason"));
-            logAction(currentUser.getId(), "REJECT_PROJECT", id, "PROJECT", "Reason: " + body.get("reason"));
+            projectManagementService.rejectProject(id, requestPayload.getReason());
+            logAction(currentUser.getId(), "REJECT_PROJECT", id, "PROJECT", "Reason: " + requestPayload.getReason());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -250,11 +254,13 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/unlist")
-    public ResponseEntity<?> unlistProject(@PathVariable String id, @RequestBody(required = false) Map<String, String> body) {
+    public ResponseEntity<?> unlistProject(@PathVariable String id, @RequestBody(required = false) RejectReasonRequest requestPayload) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
-            String reason = (body != null && body.containsKey("reason")) ? body.get("reason") : "Administrative action.";
+            String reason = (requestPayload != null && requestPayload.getReason() != null && !requestPayload.getReason().isBlank())
+                    ? requestPayload.getReason()
+                    : "Administrative action.";
             Project targetProject = projectService.getRawProjectById(id);
             if (targetProject == null) return ResponseEntity.notFound().build();
 
@@ -298,9 +304,13 @@ public class ProjectManagementController {
         if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         if (deleted) {
-            return ResponseEntity.ok(searchService.searchDeletedProjects(query, PageRequest.of(0, 10)).getContent());
+            return ResponseEntity.ok(searchService.searchDeletedProjects(query, PageRequest.of(0, 10)).getContent().stream()
+                    .map(p -> ProjectMapper.toSummaryDTO(p, true))
+                    .toList());
         } else {
-            return ResponseEntity.ok(searchService.searchProjects(null, query, 0, 10, "relevance", null, null, null, null, null, null, null).getContent());
+            return ResponseEntity.ok(searchService.searchProjects(null, query, 0, 10, "relevance", null, null, null, null, null, null, null).getContent().stream()
+                    .map(p -> ProjectMapper.toSummaryDTO(p, true))
+                    .toList());
         }
     }
 

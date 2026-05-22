@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import net.modtale.mapper.UserResponseMapper;
 import net.modtale.model.user.User;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.user.AccountService;
@@ -21,7 +22,9 @@ public class NotificationController {
     public ResponseEntity<?> getUserNotifications() {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        return ResponseEntity.ok(notificationService.getUserNotifications(user.getId()));
+        return ResponseEntity.ok(notificationService.getUserNotifications(user.getId()).stream()
+                .map(UserResponseMapper::toNotificationDTO)
+                .toList());
     }
 
     @PostMapping("/{id}/read")

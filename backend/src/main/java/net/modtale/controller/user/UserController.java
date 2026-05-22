@@ -4,8 +4,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.mapper.UserMapper;
-import net.modtale.model.dto.ProjectDTO;
-import net.modtale.model.dto.UserDTO;
+import net.modtale.model.dto.project.ProjectSummaryDTO;
+import net.modtale.model.dto.request.user.UpdateProfileRequest;
+import net.modtale.model.dto.request.user.UsersBatchRequest;
+import net.modtale.model.dto.user.UserDTO;
+import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
@@ -49,23 +52,23 @@ public class UserController {
 
     @GetMapping("/users/search")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
-    public ResponseEntity<List<UserDTO>> searchUsers(@RequestParam String query) {
+    public ResponseEntity<List<UserSummaryDTO>> searchUsers(@RequestParam String query) {
         List<User> users = accountService.searchUsers(query);
         return ResponseEntity.ok(users.stream()
-                .map(u -> UserMapper.toDTO(u, false))
+                .map(UserMapper::toSummaryDTO)
                 .collect(Collectors.toList()));
     }
 
     @PostMapping("/users/batch")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
-    public ResponseEntity<List<UserDTO>> getUsersBatch(@RequestBody Map<String, List<String>> body) {
-        List<String> userIds = body.get("userIds");
+    public ResponseEntity<List<UserSummaryDTO>> getUsersBatch(@RequestBody UsersBatchRequest requestPayload) {
+        List<String> userIds = requestPayload.getUserIds();
         if (userIds == null || userIds.isEmpty()) {
             return ResponseEntity.ok(List.of());
         }
         List<User> users = accountService.getPublicProfilesByIds(userIds);
         return ResponseEntity.ok(users.stream()
-                .map(u -> UserMapper.toDTO(u, false))
+                .map(UserMapper::toSummaryDTO)
                 .collect(Collectors.toList()));
     }
 
@@ -112,12 +115,12 @@ public class UserController {
 
     @PutMapping("/user/profile")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BASIC', authentication)")
-    public ResponseEntity<?> updateProfile(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+    public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequest requestPayload, HttpServletRequest request) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String bio = (String) payload.get("bio");
-        String username = (String) payload.get("username");
+        String bio = requestPayload.getBio();
+        String username = requestPayload.getUsername();
 
         if (bio != null && bio.length() > 300) {
             return ResponseEntity.badRequest().body("Bio cannot exceed 300 characters.");
@@ -217,35 +220,32 @@ public class UserController {
     }
 
     @GetMapping("/users/{userId}/following")
-    public ResponseEntity<List<UserDTO>> getUserFollowing(@PathVariable String userId) {
+    public ResponseEntity<List<UserSummaryDTO>> getUserFollowing(@PathVariable String userId) {
         List<User> following = socialService.getFollowing(userId);
         return ResponseEntity.ok(following.stream()
-                .map(u -> UserMapper.toDTO(u, false))
+                .map(UserMapper::toSummaryDTO)
                 .collect(Collectors.toList()));
     }
 
     @GetMapping("/users/{userId}/followers")
-    public ResponseEntity<List<UserDTO>> getUserFollowers(@PathVariable String userId) {
+    public ResponseEntity<List<UserSummaryDTO>> getUserFollowers(@PathVariable String userId) {
         List<User> followers = socialService.getFollowers(userId);
         return ResponseEntity.ok(followers.stream()
-                .map(u -> UserMapper.toDTO(u, false))
+                .map(UserMapper::toSummaryDTO)
                 .collect(Collectors.toList()));
     }
 
     @GetMapping("/creators/search")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROFILE_READ', authentication)")
-    public ResponseEntity<List<User>> searchCreators(@RequestParam String query) {
+    public ResponseEntity<List<UserSummaryDTO>> searchCreators(@RequestParam String query) {
         List<User> creators = userRepository.findByUsernameContainingIgnoreCase(query, PageRequest.of(0, 10));
-        creators.forEach(u -> {
-            u.setEmail(null);
-            u.setGithubAccessToken(null);
-            u.setLikedModIds(null);
-        });
-        return ResponseEntity.ok(creators);
+        return ResponseEntity.ok(creators.stream()
+                .map(UserMapper::toSummaryDTO)
+                .collect(Collectors.toList()));
     }
 
     @GetMapping("/creators/{userId}/projects")
-    public ResponseEntity<Page<ProjectDTO>> getCreatorProjects(
+    public ResponseEntity<Page<ProjectSummaryDTO>> getCreatorProjects(
             @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
@@ -281,12 +281,13 @@ public class UserController {
             });
         }
 
-        return ResponseEntity.ok(pageResult.map(p -> ProjectMapper.toDTO(p, true)));
+        final boolean includeManagementFields = hasPrivilege;
+        return ResponseEntity.ok(pageResult.map(p -> ProjectMapper.toSummaryDTO(p, includeManagementFields)));
     }
 
     @GetMapping("/projects/user/contributed")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
-    public ResponseEntity<Page<ProjectDTO>> getContributedProjects(
+    public ResponseEntity<Page<ProjectSummaryDTO>> getContributedProjects(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
     ) {
@@ -300,6 +301,6 @@ public class UserController {
             p.setIsOwner(AccessControlService.isOwner(p, user));
         });
 
-        return ResponseEntity.ok(pageResult.map(p -> ProjectMapper.toDTO(p, true)));
+        return ResponseEntity.ok(pageResult.map(p -> ProjectMapper.toSummaryDTO(p, true)));
     }
 }

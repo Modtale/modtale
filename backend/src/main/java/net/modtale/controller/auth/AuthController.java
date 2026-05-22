@@ -3,6 +3,14 @@ package net.modtale.controller.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import net.modtale.model.dto.request.auth.ChangePasswordRequest;
+import net.modtale.model.dto.request.auth.ForgotPasswordRequest;
+import net.modtale.model.dto.request.auth.MfaLoginRequest;
+import net.modtale.model.dto.request.auth.RegisterRequest;
+import net.modtale.model.dto.request.auth.ResetPasswordRequest;
+import net.modtale.model.dto.request.auth.SignInRequest;
+import net.modtale.model.dto.request.auth.UpdateCredentialsRequest;
+import net.modtale.model.dto.request.auth.VerifyMfaRequest;
 import net.modtale.model.user.User;
 import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.AuthenticationService;
@@ -32,7 +40,11 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            User user = authenticationService.registerUser(request.username, request.email, request.password);
+            User user = authenticationService.registerUser(
+                    request.getUsername(),
+                    request.getEmail(),
+                    request.getPassword()
+            );
             return ResponseEntity.ok(Map.of("message", "User registered successfully", "username", user.getUsername()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -62,8 +74,8 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest requestPayload) {
+        String email = requestPayload.getEmail();
         if (email == null || email.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
         authenticationService.initiatePasswordReset(email);
         return ResponseEntity.ok(Map.of("message", "If an account exists for that email, a password reset link has been sent."));
@@ -72,7 +84,7 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
         try {
-            authenticationService.completePasswordReset(request.token, request.password);
+            authenticationService.completePasswordReset(request.getToken(), request.getPassword());
             return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now login."));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -80,12 +92,12 @@ public class AuthController {
     }
 
     @PutMapping("/credentials")
-    public ResponseEntity<?> updateCredentials(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> updateCredentials(@RequestBody UpdateCredentialsRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String email = payload.get("email");
-        String password = payload.get("password");
+        String email = requestPayload.getEmail();
+        String password = requestPayload.getPassword();
 
         try {
             authenticationService.addCredentials(user.getId(), email, password);
@@ -96,12 +108,12 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String currentPassword = payload.get("currentPassword");
-        String newPassword = payload.get("newPassword");
+        String currentPassword = requestPayload.getCurrentPassword();
+        String newPassword = requestPayload.getNewPassword();
 
         try {
             authenticationService.changePassword(user.getId(), currentPassword, newPassword);
@@ -125,11 +137,11 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<?> verifyMfaSetup(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> verifyMfaSetup(@RequestBody VerifyMfaRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String code = body.get("code");
+        String code = requestPayload.getCode();
         if (code == null || code.length() != 6) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid code format"));
         }
@@ -145,9 +157,9 @@ public class AuthController {
     }
 
     @PostMapping("/signin")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> body, HttpServletRequest request, HttpServletResponse response) {
-        String username = body.get("username");
-        String password = body.get("password");
+    public ResponseEntity<?> login(@RequestBody SignInRequest requestPayload, HttpServletRequest request, HttpServletResponse response) {
+        String username = requestPayload.getUsername();
+        String password = requestPayload.getPassword();
 
         try {
             User user = authenticationService.authenticate(username, password);
@@ -165,9 +177,9 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/validate-login")
-    public ResponseEntity<?> validateLoginMfa(@RequestBody Map<String, String> body, HttpServletRequest request, HttpServletResponse response) {
-        String preAuthToken = body.get("pre_auth_token");
-        String code = body.get("code");
+    public ResponseEntity<?> validateLoginMfa(@RequestBody MfaLoginRequest requestPayload, HttpServletRequest request, HttpServletResponse response) {
+        String preAuthToken = requestPayload.getPre_auth_token();
+        String code = requestPayload.getCode();
 
         User user = authenticationService.validatePreAuthToken(preAuthToken);
         if (user == null) {
@@ -201,14 +213,4 @@ public class AuthController {
         securityContextRepository.saveContext(context, request, response);
     }
 
-    public static class RegisterRequest {
-        public String username;
-        public String email;
-        public String password;
-    }
-
-    public static class ResetPasswordRequest {
-        public String token;
-        public String password;
-    }
 }

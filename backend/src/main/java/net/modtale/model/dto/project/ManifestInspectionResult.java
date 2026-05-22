@@ -1,4 +1,4 @@
-package net.modtale.model.dto;
+package net.modtale.model.dto.project;
 
 import java.util.List;
 

@@ -1,12 +1,29 @@
 package net.modtale.mapper;
 
-import net.modtale.model.dto.UserDTO;
+import net.modtale.model.dto.user.UserDTO;
+import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.user.User;
 
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 public class UserMapper {
+
+    public static UserSummaryDTO toSummaryDTO(User user) {
+        if (user == null) return null;
+        return new UserSummaryDTO(
+                user.getId(),
+                user.getUsername(),
+                user.getAvatarUrl(),
+                user.getBannerUrl(),
+                user.getBio(),
+                user.getCreatedAt(),
+                user.getTier(),
+                user.getRoles(),
+                user.getAccountType(),
+                user.getBadges()
+        );
+    }
 
     public static UserDTO toDTO(User user, boolean includePrivate) {
         if (user == null) return null;

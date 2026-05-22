@@ -1,4 +1,4 @@
-package net.modtale.model.dto;
+package net.modtale.model.dto.user;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import net.modtale.model.user.ApiKey;
