@@ -5,7 +5,6 @@ import { Label, Input } from './FormShared';
 import type { VersionFormData } from './FormShared';
 import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
-import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
 import type { ManifestDependencySuggestion } from '@/types';
 
@@ -36,7 +35,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             setLoadingVersions(true);
             try {
                 const versions = await projectClient.getMetaGameVersions();
-                setAvailableGameVersions(versions.sort((a: string, b: string) => compareSemVer(b, a)));
+                setAvailableGameVersions(versions);
             } catch (error) {} finally { setLoadingVersions(false); }
         };
         fetchVersions();
