@@ -106,18 +106,26 @@ export interface ProjectVersion {
 }
 
 export interface Reply {
+    userId?: string;
     user: string;
     userAvatarUrl?: string;
     content: string;
     date: string;
+    upvoteCount?: number;
+    downvoteCount?: number;
+    userVote?: 'up' | 'down' | null;
 }
 
 export interface Comment {
     id: string;
+    userId?: string;
     user: string;
     content: string;
     date: string;
     updatedAt?: string;
+    upvoteCount?: number;
+    downvoteCount?: number;
+    userVote?: 'up' | 'down' | null;
     developerReply?: Reply;
 }
 

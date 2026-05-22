@@ -1,7 +1,6 @@
-package net.modtale.model.dto;
+package net.modtale.model.dto.project;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
@@ -51,7 +50,7 @@ public class ProjectDTO {
     private List<String> contributors;
 
     private List<String> galleryImages;
-    private List<Comment> comments;
+    private List<ProjectCommentDTO> comments;
     private List<ProjectVersionDTO> versions;
     private boolean canEdit;
     private boolean isOwner;
@@ -132,8 +131,8 @@ public class ProjectDTO {
     public void setContributors(List<String> contributors) { this.contributors = contributors; }
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
-    public List<Comment> getComments() { return comments; }
-    public void setComments(List<Comment> comments) { this.comments = comments; }
+    public List<ProjectCommentDTO> getComments() { return comments; }
+    public void setComments(List<ProjectCommentDTO> comments) { this.comments = comments; }
     public List<ProjectVersionDTO> getVersions() { return versions; }
     public void setVersions(List<ProjectVersionDTO> versions) { this.versions = versions; }
     public boolean isCanEdit() { return canEdit; }

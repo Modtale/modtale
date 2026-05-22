@@ -1,5 +1,9 @@
 package net.modtale.controller.user;
 
+import net.modtale.mapper.AdminMapper;
+import net.modtale.model.dto.admin.ReportDTO;
+import net.modtale.model.dto.request.user.CreateReportRequest;
+import net.modtale.model.dto.request.user.ResolveReportRequest;
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
 import net.modtale.service.user.ReportService;
@@ -19,14 +23,14 @@ public class ReportController {
     @Autowired private AccountService accountService;
 
     @PostMapping("/reports")
-    public ResponseEntity<?> submitReport(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> submitReport(@RequestBody CreateReportRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String targetId = payload.get("targetId");
-        String targetTypeStr = payload.get("targetType");
-        String reason = payload.get("reason");
-        String description = payload.get("description");
+        String targetId = requestPayload.getTargetId();
+        String targetTypeStr = requestPayload.getTargetType();
+        String reason = requestPayload.getReason();
+        String description = requestPayload.getDescription();
 
         if (targetId == null || targetTypeStr == null || reason == null) {
             return ResponseEntity.badRequest().body("Target ID, Type, and Reason are required");
@@ -42,22 +46,24 @@ public class ReportController {
     }
 
     @GetMapping("/admin/reports/queue")
-    public ResponseEntity<List<Report>> getReportQueue(@RequestParam(defaultValue = "OPEN") String status) {
+    public ResponseEntity<List<ReportDTO>> getReportQueue(@RequestParam(defaultValue = "OPEN") String status) {
         try {
             Report.ReportStatus reportStatus = Report.ReportStatus.valueOf(status);
-            return ResponseEntity.ok(reportService.getReportsByStatus(reportStatus));
+            return ResponseEntity.ok(reportService.getReportsByStatus(reportStatus).stream()
+                    .map(AdminMapper::toReportDTO)
+                    .toList());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
     }
 
     @PostMapping("/admin/reports/{id}/resolve")
-    public ResponseEntity<?> resolveReport(@PathVariable String id, @RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> resolveReport(@PathVariable String id, @RequestBody ResolveReportRequest requestPayload) {
         User admin = accountService.getCurrentUser();
         if (admin == null) return ResponseEntity.status(401).build();
 
-        String statusStr = payload.get("status");
-        String note = payload.get("note");
+        String statusStr = requestPayload.getStatus();
+        String note = requestPayload.getNote();
 
         try {
             Report.ReportStatus status = Report.ReportStatus.valueOf(statusStr);

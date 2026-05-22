@@ -1,7 +1,7 @@
 package net.modtale.service.project;
 
-import net.modtale.model.dto.ManifestDependencySuggestion;
-import net.modtale.model.dto.ManifestInspectionResult;
+import net.modtale.model.dto.project.ManifestDependencySuggestion;
+import net.modtale.model.dto.project.ManifestInspectionResult;
 import net.modtale.model.project.*;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;

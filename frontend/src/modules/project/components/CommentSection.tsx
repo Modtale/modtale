@@ -109,6 +109,20 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
         return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     };
 
+    const getVoteScore = (item: any) => {
+        if (typeof item.upvoteCount === 'number' || typeof item.downvoteCount === 'number') {
+            return (item.upvoteCount || 0) - (item.downvoteCount || 0);
+        }
+        return (item.upvotes?.length || 0) - (item.downvotes?.length || 0);
+    };
+
+    const getUserVote = (item: any): 'up' | 'down' | null => {
+        if (item.userVote === 'up' || item.userVote === 'down') return item.userVote;
+        return currentUser && item.upvotes?.includes(currentUser.id)
+            ? 'up'
+            : (currentUser && item.downvotes?.includes(currentUser.id) ? 'down' : null);
+    };
+
     const startEditing = useCallback((comment: Comment) => {
         setText(comment.content);
         setEditingCommentId(comment.id);
@@ -234,8 +248,8 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                     const rawAvatar = authorId ? userProfiles[authorId]?.avatarUrl : null;
                     const authorAvatar = resolveAvatar(rawAvatar);
 
-                    const score = (anyC.upvotes?.length || 0) - (anyC.downvotes?.length || 0);
-                    const userVote = currentUser && anyC.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && anyC.downvotes?.includes(currentUser.id) ? 'down' : null);
+                    const score = getVoteScore(anyC);
+                    const userVote = getUserVote(anyC);
 
                     const profileLink = SiteRoutes.creator(authorUsername);
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
@@ -328,8 +342,8 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
 
                                     const replyProfileLink = SiteRoutes.creator(replyUsername);
 
-                                    const replyScore = (devReply.upvotes?.length || 0) - (devReply.downvotes?.length || 0);
-                                    const replyUserVote = currentUser && devReply.upvotes?.includes(currentUser.id) ? 'up' : (currentUser && devReply.downvotes?.includes(currentUser.id) ? 'down' : null);
+                                    const replyScore = getVoteScore(devReply);
+                                    const replyUserVote = getUserVote(devReply);
 
                                     return (
                                         <div className="mt-3 flex gap-3 relative">

@@ -1,4 +1,4 @@
-package net.modtale.model.dto;
+package net.modtale.model.dto.project;
 
 public class ManifestDependencySuggestion {
     private String manifestKey;

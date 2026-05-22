@@ -1,8 +1,10 @@
 package net.modtale.controller.admin;
 
+import net.modtale.mapper.AdminMapper;
 import net.modtale.mapper.UserMapper;
 import net.modtale.model.admin.AdminLog;
-import net.modtale.model.admin.BannedEmail;
+import net.modtale.model.dto.admin.BannedEmailDTO;
+import net.modtale.model.dto.request.admin.BanEmailRequest;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.AdminLogRepository;
@@ -61,22 +63,24 @@ public class UserManagementController {
     }
 
     @GetMapping("/users/bans")
-    public ResponseEntity<List<BannedEmail>> getBannedEmails() {
+    public ResponseEntity<List<BannedEmailDTO>> getBannedEmails() {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(userManagementService.getBannedEmails());
+        return ResponseEntity.ok(userManagementService.getBannedEmails().stream()
+                .map(AdminMapper::toBannedEmailDTO)
+                .toList());
     }
 
     @PostMapping("/users/bans")
-    public ResponseEntity<?> banEmail(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> banEmail(@RequestBody BanEmailRequest requestPayload) {
         User currentUser = getSafeUser();
         if (!isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        String email = body.get("email");
-        String reason = body.get("reason");
+        String email = requestPayload.getEmail();
+        String reason = requestPayload.getReason();
 
         Optional<User> targetByEmail = userRepository.findByEmail(email);
         if (targetByEmail.isPresent() && !canManageUser(currentUser, targetByEmail.get())) {

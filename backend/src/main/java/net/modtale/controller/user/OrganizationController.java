@@ -1,7 +1,13 @@
 package net.modtale.controller.user;
 
 import net.modtale.mapper.UserMapper;
-import net.modtale.model.dto.UserDTO;
+import net.modtale.model.dto.request.organization.AddOrganizationMemberRequest;
+import net.modtale.model.dto.request.organization.CreateOrganizationRequest;
+import net.modtale.model.dto.request.organization.OrganizationRoleRequest;
+import net.modtale.model.dto.request.organization.UpdateOrganizationMemberRoleRequest;
+import net.modtale.model.dto.request.organization.UpdateOrganizationRequest;
+import net.modtale.model.dto.user.UserDTO;
+import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.user.User;
 import net.modtale.service.storage.StorageService;
 import net.modtale.service.security.FileValidationService;
@@ -28,11 +34,11 @@ public class OrganizationController {
 
     @PostMapping("/orgs")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_CREATE', authentication)")
-    public ResponseEntity<?> createOrganization(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> createOrganization(@RequestBody CreateOrganizationRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String name = payload.get("name");
+        String name = requestPayload.getName();
         if (name == null || name.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Organization name is required.");
         }
@@ -69,7 +75,10 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_READ', authentication)")
     public ResponseEntity<?> getOrgMembers(@PathVariable String orgId) {
         try {
-            return ResponseEntity.ok(organizationService.getOrganizationMembers(orgId));
+            List<UserSummaryDTO> members = organizationService.getOrganizationMembers(orgId).stream()
+                    .map(UserMapper::toSummaryDTO)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(members);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
@@ -81,7 +90,7 @@ public class OrganizationController {
         try {
             List<User> invites = organizationService.getOrganizationInvites(orgId);
             return ResponseEntity.ok(invites.stream()
-                    .map(u -> UserMapper.toDTO(u, false))
+                    .map(UserMapper::toSummaryDTO)
                     .collect(Collectors.toList()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -90,7 +99,7 @@ public class OrganizationController {
 
     @PostMapping("/orgs/{orgId}/roles")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
-    public ResponseEntity<?> createOrgRole(@PathVariable String orgId, @RequestBody User.OrganizationRole payload) {
+    public ResponseEntity<?> createOrgRole(@PathVariable String orgId, @RequestBody OrganizationRoleRequest payload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
@@ -110,7 +119,7 @@ public class OrganizationController {
 
     @PutMapping("/orgs/{orgId}/roles/{roleId}")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
-    public ResponseEntity<?> updateOrgRole(@PathVariable String orgId, @PathVariable String roleId, @RequestBody User.OrganizationRole payload) {
+    public ResponseEntity<?> updateOrgRole(@PathVariable String orgId, @PathVariable String roleId, @RequestBody OrganizationRoleRequest payload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
@@ -142,12 +151,12 @@ public class OrganizationController {
 
     @PostMapping("/orgs/{orgId}/members")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_INVITE', authentication)")
-    public ResponseEntity<?> addOrgMember(@PathVariable String orgId, @RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> addOrgMember(@PathVariable String orgId, @RequestBody AddOrganizationMemberRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String targetUserId = payload.get("userId");
-        String roleId = payload.get("roleId");
+        String targetUserId = requestPayload.getUserId();
+        String roleId = requestPayload.getRoleId();
 
         if (roleId == null) {
             return ResponseEntity.badRequest().body("Role ID is required.");
@@ -188,11 +197,11 @@ public class OrganizationController {
 
     @PutMapping("/orgs/{orgId}/members/{userId}")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
-    public ResponseEntity<?> updateMemberRole(@PathVariable String orgId, @PathVariable String userId, @RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> updateMemberRole(@PathVariable String orgId, @PathVariable String userId, @RequestBody UpdateOrganizationMemberRoleRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String newRoleId = payload.get("roleId");
+        String newRoleId = requestPayload.getRoleId();
         if (newRoleId == null) return ResponseEntity.badRequest().body("Role ID is required.");
 
         try {
@@ -207,13 +216,13 @@ public class OrganizationController {
 
     @PutMapping("/orgs/{orgId}")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_METADATA', authentication)")
-    public ResponseEntity<?> updateOrganization(@PathVariable String orgId, @RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> updateOrganization(@PathVariable String orgId, @RequestBody UpdateOrganizationRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String name = payload.get("displayName");
-        if (name == null) name = payload.get("name");
-        String bio = payload.get("bio");
+        String name = requestPayload.getDisplayName();
+        if (name == null) name = requestPayload.getName();
+        String bio = requestPayload.getBio();
 
         try {
             User updated = organizationService.updateOrganization(orgId, name, bio, user);

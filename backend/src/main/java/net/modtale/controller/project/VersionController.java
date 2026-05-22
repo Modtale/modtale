@@ -1,6 +1,9 @@
 package net.modtale.controller.project;
 
-import net.modtale.model.dto.ManifestInspectionResult;
+import net.modtale.mapper.ProjectMapper;
+import net.modtale.model.dto.project.ManifestInspectionResult;
+import net.modtale.model.dto.project.ProjectDependencyDTO;
+import net.modtale.model.dto.request.project.UpdateVersionRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
@@ -52,12 +55,14 @@ public class VersionController {
 
     @GetMapping("/projects/{id}/versions/{version}/dependencies")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_READ', authentication)")
-    public ResponseEntity<List<ProjectDependency>> getDependencies(@PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<List<ProjectDependencyDTO>> getDependencies(@PathVariable String id, @PathVariable String version) {
         Project project = projectService.getProjectById(id);
         if (project == null) return ResponseEntity.notFound().build();
         ProjectVersion v = project.getVersions().stream().filter(ver -> ver.getVersionNumber().equalsIgnoreCase(version)).findFirst().orElse(null);
         if (v == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(v.getDependencies() != null ? v.getDependencies() : List.of());
+        return ResponseEntity.ok((v.getDependencies() != null ? v.getDependencies() : List.<ProjectDependency>of()).stream()
+                .map(ProjectMapper::toDependencyDTO)
+                .collect(Collectors.toList()));
     }
 
     @PostMapping("/projects/{id}/versions")
@@ -95,17 +100,17 @@ public class VersionController {
 
     @PutMapping("/projects/{id}/versions/{versionId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_EDIT', authentication)")
-    public ResponseEntity<?> updateVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> updateVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody UpdateVersionRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            List<String> projectIds = (List<String>) body.get("modIds");
-            List<String> gameVersions = (List<String>) body.get("gameVersions");
-            String channelStr = (String) body.get("channel");
+            List<String> projectIds = requestPayload.getModIds();
+            List<String> gameVersions = requestPayload.getGameVersions();
+            String channelStr = requestPayload.getChannel();
 
             ProjectVersion.Channel channel = channelStr != null ? ProjectVersion.Channel.valueOf(channelStr) : null;
 
-            versionService.updateVersion(id, versionId, projectIds, gameVersions, (String) body.get("changelog"), channel, user);
+            versionService.updateVersion(id, versionId, projectIds, gameVersions, requestPayload.getChangelog(), channel, user);
             return ResponseEntity.ok().build();
         } catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
     }
@@ -249,6 +254,6 @@ public class VersionController {
     @PreAuthorize("@apiSecurity.hasAnyPerm('VERSION_READ', authentication)")
     public ResponseEntity<?> getVersionByHash(@PathVariable String hash) {
         Optional<ProjectVersion> v = versionService.getVersionByHash(hash);
-        return v.isPresent() ? ResponseEntity.ok(v.get()) : ResponseEntity.notFound().build();
+        return v.isPresent() ? ResponseEntity.ok(ProjectMapper.toVersionDTO(v.get())) : ResponseEntity.notFound().build();
     }
 }

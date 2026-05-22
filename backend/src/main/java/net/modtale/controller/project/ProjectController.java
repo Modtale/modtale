@@ -1,7 +1,11 @@
 package net.modtale.controller.project;
 
 import net.modtale.mapper.ProjectMapper;
-import net.modtale.model.dto.ProjectDTO;
+import net.modtale.model.dto.project.ProjectDTO;
+import net.modtale.model.dto.project.ProjectMetaDTO;
+import net.modtale.model.dto.project.ProjectSummaryDTO;
+import net.modtale.model.dto.request.project.CreateProjectRequest;
+import net.modtale.model.dto.request.project.UpdateProjectRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
@@ -22,7 +26,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -41,7 +44,7 @@ public class ProjectController {
 
     @GetMapping("/projects")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
-    public ResponseEntity<Page<ProjectDTO>> getProjects(
+    public ResponseEntity<Page<ProjectSummaryDTO>> getProjects(
             @RequestParam(required = false) String tags, @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "relevance") String sort, @RequestParam(required = false) String gameVersion,
@@ -59,7 +62,7 @@ public class ProjectController {
         Page<Project> data = searchService.searchProjects(tagList, search, page, size, sort, gameVersion, classification, minDownloads, minFavorites, isApiKeyUser ? null : category, dateRange, effectiveAuthor);
 
         CacheControl cacheControl = ("Favorites".equals(isApiKeyUser ? null : category) || "Your Projects".equals(isApiKeyUser ? null : category)) ? CacheControl.noCache() : CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
-        return ResponseEntity.ok().cacheControl(cacheControl).body(data.map(p -> ProjectMapper.toDTO(p, true)));
+        return ResponseEntity.ok().cacheControl(cacheControl).body(data.map(ProjectMapper::toSummaryDTO));
     }
 
     @GetMapping("/projects/{id}")
@@ -79,15 +82,15 @@ public class ProjectController {
             project.setIsOwner(accessControlService.isOwner(project, user));
         }
 
-        return ResponseEntity.ok(ProjectMapper.toDTO(project, false));
+        return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user != null ? user.getId() : null));
     }
 
     @GetMapping("/projects/{id}/meta")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
-    public ResponseEntity<Map<String, Object>> getProjectMeta(@PathVariable String id) {
+    public ResponseEntity<ProjectMetaDTO> getProjectMeta(@PathVariable String id) {
         Project project = projectService.getProjectById(id);
         if (project == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(Map.of("title", project.getTitle(), "description", project.getDescription() != null ? project.getDescription() : "", "icon", project.getImageUrl() != null ? project.getImageUrl() : "", "author", project.getAuthor(), "classification", project.getClassification().name(), "downloads", project.getDownloadCount(), "repositoryUrl", project.getRepositoryUrl() != null ? project.getRepositoryUrl() : "", "slug", project.getSlug() != null ? project.getSlug() : project.getId()));
+        return ResponseEntity.ok(ProjectMapper.toMetaDTO(project));
     }
 
     @GetMapping("/tags")
@@ -107,22 +110,46 @@ public class ProjectController {
 
     @PostMapping("/projects")
     @PreAuthorize("@apiSecurity.hasCreateProjectPerm(#owner, authentication)")
-    public ResponseEntity<?> createProject(@RequestParam("title") String title, @RequestParam("classification") String classification, @RequestParam("description") String description, @RequestParam(value = "owner", required = false) String owner, @RequestParam(value = "slug", required = false) String slug) {
+    public ResponseEntity<?> createProject(@ModelAttribute CreateProjectRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            ProjectClassification classificationEnum = ProjectClassification.valueOf(classification.toUpperCase());
-            return ResponseEntity.ok(lifecycleService.createDraft(title, description, classificationEnum, user, owner, slug));
+            ProjectClassification classificationEnum = ProjectClassification.valueOf(requestPayload.getClassification().toUpperCase());
+            Project project = lifecycleService.createDraft(
+                    requestPayload.getTitle(),
+                    requestPayload.getDescription(),
+                    classificationEnum,
+                    user,
+                    requestPayload.getOwner(),
+                    requestPayload.getSlug()
+            );
+            project.setCanEdit(true);
+            project.setIsOwner(true);
+            return ResponseEntity.ok(ProjectMapper.toDTO(project, false));
         }
         catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
     }
 
     @PutMapping("/projects/{id}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_EDIT_METADATA', authentication)")
-    public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody Project updated) {
+    public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody UpdateProjectRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
+            Project updated = new Project();
+            updated.setTitle(requestPayload.getTitle());
+            updated.setSlug(requestPayload.getSlug());
+            updated.setDescription(requestPayload.getDescription());
+            updated.setAbout(requestPayload.getAbout());
+            updated.setTags(requestPayload.getTags());
+            updated.setLinks(requestPayload.getLinks());
+            updated.setRepositoryUrl(requestPayload.getRepositoryUrl());
+            updated.setLicense(requestPayload.getLicense());
+            if (requestPayload.getAllowModpacks() != null) updated.setAllowModpacks(requestPayload.getAllowModpacks());
+            if (requestPayload.getAllowComments() != null) updated.setAllowComments(requestPayload.getAllowComments());
+            if (requestPayload.getHmWikiEnabled() != null) updated.setHmWikiEnabled(requestPayload.getHmWikiEnabled());
+            updated.setHmWikiSlug(requestPayload.getHmWikiSlug());
+
             if (updated.getDescription() != null && updated.getDescription().length() > 250) return ResponseEntity.badRequest().body("Short Summary cannot exceed 250 characters.");
             if (updated.getAbout() != null && updated.getAbout().length() > 50000) return ResponseEntity.badRequest().body("Full Description cannot exceed 50,000 characters.");
             metadataService.updateMetadata(id, updated, user);
