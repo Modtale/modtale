@@ -34,6 +34,9 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, lates
     }, []);
 
     const resolveUrl = (url: string) => url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
+    const hasWiki = Boolean(project.hmWikiEnabled && project.hmWikiSlug);
+    const hasGallery = Boolean(project.galleryImages && project.galleryImages.length > 0);
+    const mediaButtonClass = hasWiki && hasGallery ? 'col-span-1 md:col-span-1' : 'col-span-2 md:col-span-1';
 
     return (
         <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between gap-3 2xl:gap-6 w-full">
@@ -51,13 +54,13 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, lates
                 <div className={`hidden md:block w-px h-10 ${theme.colors.bgSurfaceAlt} mx-1 lg:mx-2 shrink-0`}></div>
 
                 <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto shrink-0">
-                    {project.hmWikiEnabled && project.hmWikiSlug && (
-                        <Link to={`${projectUrl}/wiki`} className={`flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
+                    {hasWiki && (
+                        <Link to={`${projectUrl}/wiki`} className={`${mediaButtonClass} flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
                             <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
                         </Link>
                     )}
-                    {project.galleryImages && project.galleryImages.length > 0 && (
-                        <Link to={`${projectUrl}/gallery#1`} className={`col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
+                    {hasGallery && (
+                        <Link to={`${projectUrl}/gallery#1`} className={`${mediaButtonClass} flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
                             <ImageIcon className="w-4 h-4" aria-hidden="true" /> Gallery
                         </Link>
                     )}
