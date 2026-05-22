@@ -64,7 +64,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
             <div className={`${theme.components.modalContent} max-w-lg max-h-[85dvh]`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
                     <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}>
-                        <LinkIcon className={`w-5 h-5 ${theme.colors.successText}`} /> Dependencies
+                        <LinkIcon className={`w-5 h-5 ${theme.colors.accent}`} /> Dependencies
                     </h3>
                     <button type="button" onClick={onClose} className={`p-2 rounded-full ${theme.colors.bgSurfaceHover} ${theme.colors.textMuted} hover:${theme.colors.dangerText} transition-colors`}><X className="w-5 h-5" /></button>
                 </div>
@@ -90,7 +90,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                                     key={dep.projectId}
                                     className={`flex items-center justify-between p-4 rounded-2xl border shadow-sm transition-all cursor-pointer group ${
                                         isSelected
-                                            ? 'border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 hover:bg-emerald-50 dark:hover:bg-emerald-500/20'
+                                            ? 'border-blue-400/40 bg-blue-50/60 dark:bg-blue-500/10 hover:bg-blue-50 dark:hover:bg-blue-500/20'
                                             : isRequiredMissing
                                                 ? `${theme.colors.dangerBorder} ${theme.colors.dangerBg} hover:border-red-500`
                                                 : `${theme.colors.border} ${theme.colors.bgBase} hover:border-blue-400 dark:hover:border-blue-500`
@@ -103,7 +103,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                                 >
                                     <div className="flex items-center gap-4 min-w-0">
                                         {isSelected ? (
-                                            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
+                                            <div className="w-6 h-6 rounded-full bg-modtale-accent text-white flex items-center justify-center shrink-0 shadow-md">
                                                 <Check className="w-3.5 h-3.5" aria-hidden="true" />
                                             </div>
                                         ) : isRequiredMissing ? (
@@ -138,7 +138,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                                         {isRequiredMissing ? (
                                             <span className="text-[10px] font-black uppercase bg-red-500 text-white px-2.5 py-1 rounded-md shadow-md flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Required</span>
                                         ) : !dep.isOptional ? (
-                                            <span className={`text-[10px] font-bold uppercase ${theme.colors.successBg} ${theme.colors.successText} px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-500/30`}>Required</span>
+                                            <span className={`text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-500/30`}>Required</span>
                                         ) : (
                                             <span className={`text-[10px] font-bold uppercase ${theme.colors.bgSurfaceAlt} ${theme.colors.textSecondary} px-2.5 py-1 rounded-md border ${theme.colors.border}`}>Optional</span>
                                         )}

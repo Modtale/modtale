@@ -88,10 +88,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
 
     return (
         <div className={theme.components.modalOverlay} onClick={onClose}>
-            <div className={`${theme.components.modalContent} max-w-md`} onClick={e => e.stopPropagation()}>
+            <div className={`${theme.components.modalContent} max-w-2xl w-full overflow-visible`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
                     <h3 className={`font-bold ${theme.colors.textPrimary} flex items-center gap-2`}>
-                        <Flag className="w-5 h-5 text-red-500" />
+                        <Flag className="w-5 h-5 text-modtale-accent" />
                         Report {targetType === 'USER' ? 'User' : (targetType === 'COMMENT' ? 'Comment' : 'Project')}
                     </h3>
                     <button onClick={onClose} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-full transition-colors`}><X className="w-4 h-4" /></button>
@@ -115,7 +115,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className={`p-3 ${theme.colors.bgSurface} rounded-lg text-sm ${theme.colors.textSecondary}`}>
+                            <div className={`p-3 bg-blue-50/60 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg text-sm ${theme.colors.textSecondary}`}>
                                 Reporting <span className={`font-bold ${theme.colors.textPrimary}`}>{effectiveTitle}</span>
                             </div>
 
@@ -130,7 +130,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
                                 <button
                                     type="button"
                                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                                    className={`w-full p-3 rounded-xl ${theme.colors.bgSurface} border ${theme.colors.border} ${theme.colors.textPrimary} font-medium outline-none focus:ring-2 focus:ring-red-500 flex items-center justify-between transition-all`}
+                                    className={`w-full p-3 rounded-xl ${theme.colors.bgSurface} border ${theme.colors.border} ${theme.colors.textPrimary} font-medium outline-none focus:ring-2 focus:ring-modtale-accent flex items-center justify-between transition-all`}
                                 >
                                     <span>{selectedLabel}</span>
                                     <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted} transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
@@ -159,13 +159,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
                                     value={description}
                                     onChange={e => setDescription(e.target.value)}
                                     placeholder="Please provide details about the issue..."
-                                    className={`w-full p-3 rounded-xl ${theme.colors.bgSurface} border ${theme.colors.border} ${theme.colors.textPrimary} font-medium outline-none focus:ring-2 focus:ring-red-500 min-h-[100px] resize-none`}
+                                    className={`w-full p-3 rounded-xl ${theme.colors.bgSurface} border ${theme.colors.border} ${theme.colors.textPrimary} font-medium outline-none focus:ring-2 focus:ring-modtale-accent min-h-[100px] resize-none`}
                                     required
                                 />
                             </div>
 
                             <div className="pt-2">
-                                <button type="submit" disabled={loading} className={`w-full py-3 ${theme.components.buttonDanger} font-bold rounded-xl shadow-lg flex items-center justify-center gap-2`}>
+                                <button type="submit" disabled={loading} className={`w-full py-3 ${theme.components.buttonPrimary} font-bold rounded-xl shadow-lg flex items-center justify-center gap-2`}>
                                     {loading ? 'Submitting...' : 'Submit Report'}
                                 </button>
                             </div>
