@@ -197,7 +197,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 downloadUrl = baseUrl + downloadUrl;
             }
 
-            //window.open(downloadUrl, '_blank');
+            window.open(downloadUrl, '_blank');
             setShowDownloadFx(true);
             if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
             downloadFxTimeoutRef.current = window.setTimeout(() => setShowDownloadFx(false), 900);
@@ -226,7 +226,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             if (!versionNumber) {
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 const targetUrl = baseUrl + '/files/download/' + encodeURI(url);
-                //window.open(targetUrl, '_blank');
+                window.open(targetUrl, '_blank');
                 setShowDownloadFx(true);
                 if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
                 downloadFxTimeoutRef.current = window.setTimeout(() => setShowDownloadFx(false), 900);
