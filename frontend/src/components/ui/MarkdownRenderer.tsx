@@ -141,6 +141,9 @@ const markdownComponents = {
     ol({ node, children, ...props }: any) {
         return <ol className="list-decimal pl-6 my-3 space-y-1.5" {...props}>{children}</ol>;
     },
+    img({ node, ...props }: any) {
+        return <img className="inline-block align-middle max-w-full h-auto my-0" {...props} />;
+    },
 };
 
 export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
