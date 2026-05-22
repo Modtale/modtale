@@ -49,6 +49,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
 
     const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>('grid');
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     const [isScrolled, setIsScrolled] = useState(false);
     const isScrolledRef = useRef(false);
@@ -128,6 +129,10 @@ export const Browse: React.FC<BrowseViewProps> = ({
             return next;
         });
     }, [setSearchParams]);
+
+    const handleSortChange = useCallback((nextSort: string) => {
+        updateParams({ sort: nextSort });
+    }, [updateParams]);
 
     const getPageNumbers = () => {
         const total = totalPages;
@@ -215,7 +220,35 @@ export const Browse: React.FC<BrowseViewProps> = ({
                             <BrowseFilters
                                 categoryPills={<CategoryPillNav selectedClassification={selectedClassification} onClassificationChange={setSelectedClassification} currentSearchParams={searchParams} />}
                                 pageTitle={getPageTitle()}
-                                totalItems={totalItems} loading={loading} sortBy={sortBy} onSortChange={handlePageChange} selectedTags={selectedTags} onToggleTag={(tag) => { const next = selectedTags.includes(tag) ? selectedTags.filter(t => t !== tag) : [...selectedTags, tag]; updateParams({ tags: next.length ? next.join(',') : null }); }} onClearTags={() => updateParams({ tags: null })} activeFilterCount={0} onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, date: null, tags: null })} isFilterOpen={false} onToggleFilterMenu={() => {}} searchTerm={searchTerm} onSearchChange={setSearchTerm} selectedVersion={selectedVersion} setSelectedVersion={(v) => updateParams({ version: v !== 'Any' ? v : null })} minFavorites={minFavorites} setMinFavorites={(v) => updateParams({ minFav: v > 0 ? v.toString() : null })} minDownloads={minDownloads} setMinDownloads={(v) => updateParams({ minDl: v > 0 ? v.toString() : null })} filterDate={filterDate} setFilterDate={(v) => updateParams({ date: v })} setPage={handlePageChange} isMobile={isMobile} viewStyle={viewStyle} onViewStyleChange={handleViewStyleChange} isScrolled={isScrolled}
+                                totalItems={totalItems}
+                                loading={loading}
+                                sortBy={sortBy}
+                                onSortChange={handleSortChange}
+                                selectedTags={selectedTags}
+                                onToggleTag={(tag) => {
+                                    const next = selectedTags.includes(tag) ? selectedTags.filter(t => t !== tag) : [...selectedTags, tag];
+                                    updateParams({ tags: next.length ? next.join(',') : null });
+                                }}
+                                onClearTags={() => updateParams({ tags: null })}
+                                activeFilterCount={0}
+                                onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, date: null, tags: null })}
+                                isFilterOpen={isFilterOpen}
+                                onToggleFilterMenu={() => setIsFilterOpen(prev => !prev)}
+                                searchTerm={searchTerm}
+                                onSearchChange={setSearchTerm}
+                                selectedVersion={selectedVersion}
+                                setSelectedVersion={(v) => updateParams({ version: v !== 'Any' ? v : null })}
+                                minFavorites={minFavorites}
+                                setMinFavorites={(v) => updateParams({ minFav: v > 0 ? v.toString() : null })}
+                                minDownloads={minDownloads}
+                                setMinDownloads={(v) => updateParams({ minDl: v > 0 ? v.toString() : null })}
+                                filterDate={filterDate}
+                                setFilterDate={(v) => updateParams({ date: v })}
+                                setPage={handlePageChange}
+                                isMobile={isMobile}
+                                viewStyle={viewStyle}
+                                onViewStyleChange={handleViewStyleChange}
+                                isScrolled={isScrolled}
                             />
                         </div>
 
