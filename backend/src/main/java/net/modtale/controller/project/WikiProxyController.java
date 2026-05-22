@@ -11,10 +11,12 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientException;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
@@ -22,6 +24,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WikiProxyController {
 
     private static final Logger logger = LoggerFactory.getLogger(WikiProxyController.class);
+    private static final Set<String> HOP_BY_HOP_OR_UNSAFE_HEADERS = Set.of(
+            "connection",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "transfer-encoding",
+            "upgrade",
+            "host",
+            "content-length",
+            "content-encoding"
+    );
 
     @Value("${app.hytalemodding.wiki-key:}") private String wikiApiKey;
     @Value("${app.hytalemodding.wiki-url:https://wiki.hytalemodding.dev/api}") private String wikiApiUrl;
@@ -71,7 +86,8 @@ public class WikiProxyController {
     private ResponseEntity<String> cleanProxyResponse(ResponseEntity<String> response) {
         HttpHeaders cleanHeaders = new HttpHeaders();
         response.getHeaders().forEach((key, value) -> {
-            if (!key.toLowerCase().startsWith("access-control-")) {
+            String header = key.toLowerCase();
+            if (!header.startsWith("access-control-") && !HOP_BY_HOP_OR_UNSAFE_HEADERS.contains(header)) {
                 cleanHeaders.addAll(key, value);
             }
         });
@@ -97,6 +113,12 @@ public class WikiProxyController {
             return cleanProxyResponse(response);
         } catch (HttpStatusCodeException e) {
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (RestClientException e) {
+            logger.error("Wiki project proxy transport failure for slug '{}': {}", slug, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Wiki upstream is temporarily unavailable.");
+        } catch (Exception e) {
+            logger.error("Unexpected wiki project proxy error for slug '{}': {}", slug, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Failed to fetch wiki project data.");
         }
     }
 
@@ -126,6 +148,12 @@ public class WikiProxyController {
             return cleanProxyResponse(response);
         } catch (HttpStatusCodeException e) {
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (RestClientException e) {
+            logger.error("Wiki page proxy transport failure for slug '{}' page '{}': {}", slug, request.getRequestURI(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Wiki upstream is temporarily unavailable.");
+        } catch (Exception e) {
+            logger.error("Unexpected wiki page proxy error for slug '{}' page '{}': {}", slug, request.getRequestURI(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Failed to fetch wiki page data.");
         }
     }
 }
