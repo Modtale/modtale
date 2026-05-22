@@ -20,6 +20,7 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
+import { Gallery } from '../tabs/Gallery';
 import { Wiki } from '../tabs/Wiki';
 import { useHMWiki, WikiSidebar } from '../components/HMWiki';
 
@@ -75,6 +76,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const commentsRef = useRef<HTMLDivElement>(null);
 
     const isWikiRoute = location.pathname.includes('/wiki');
+    const isGalleryRoute = location.pathname.endsWith('/gallery');
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
     const wikiPageSlug = wikiMatch?.[1];
 
@@ -376,6 +378,15 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 mainContent={
                     isWikiRoute ? (
                         <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
+                    ) : isGalleryRoute ? (
+                        <Gallery
+                            projectData={project}
+                            readOnly={true}
+                            hasProjectPermission={() => false}
+                            handleGalleryDelete={async () => {}}
+                            handleGallerySelect={() => {}}
+                            isLoading={false}
+                        />
                     ) : (
                         <ViewDetails project={project} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} />
                     )
