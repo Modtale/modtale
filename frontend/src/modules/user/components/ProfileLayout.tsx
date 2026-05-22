@@ -187,8 +187,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const Avatar = ({ isMobile = false }: { isMobile?: boolean }) => {
         const baseClasses = isMobile
-            ? `w-32 h-32 rounded-3xl bg-transparent shadow-md border-4 ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group z-20`
-            : `w-56 h-56 rounded-3xl bg-transparent shadow-xl border-[8px] ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative z-20`;
+            ? `w-32 h-32 rounded-3xl bg-transparent shadow-md border-4 ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group z-20 transform-gpu will-change-transform [backface-visibility:hidden] [transform:translateZ(0)]`
+            : `w-56 h-56 rounded-3xl bg-transparent shadow-xl border-[8px] ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative z-20 transform-gpu will-change-transform [backface-visibility:hidden] [transform:translateZ(0)]`;
 
         return (
             <div className={baseClasses}>
@@ -198,7 +198,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         alt={`${user.username} Avatar`}
                         baseWidth={224}
                         priority={true}
-                        className="w-full h-full bg-transparent object-cover relative z-10"
+                        className="w-full h-full bg-transparent object-cover relative z-10 transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]"
                     />
                 ) : (
                     <div className={`w-full h-full bg-transparent flex flex-col items-center justify-center ${theme.colors.textSecondary} relative z-10 gap-2`}>
