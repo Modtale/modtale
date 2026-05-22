@@ -70,17 +70,17 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
         bg: theme.colors.accentBg,
         bgAlpha: theme.colors.accentAlpha,
         border: theme.colors.border,
-        iconGlow: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-500',
-        checkHover: 'group-hover:border-slate-300 dark:group-hover:border-white/30'
+        iconGlow: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400',
+        checkHover: 'group-hover:border-blue-300 dark:group-hover:border-blue-500/40'
     };
 
     return (
         <div className={theme.components.modalOverlay} onClick={handleClose}>
-            <div className={`${theme.components.modalContent} max-w-xl ring-1 ring-black/5 dark:ring-black/50`} onClick={e => e.stopPropagation()}>
+            <div className={`${theme.components.modalContent} max-w-xl ring-1 ring-slate-900/5 dark:ring-white/10`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shadow-inner ${themeColors.iconGlow}`}>
-                            <Download className={`w-6 h-6 ${channel === 'RELEASE' ? 'text-emerald-500' : themeColors.text}`} />
+                            <Download className={`w-6 h-6 ${channel === 'RELEASE' ? 'text-blue-500 dark:text-blue-400' : themeColors.text}`} />
                         </div>
                         <div>
                             <h3 className={`text-xl font-black ${theme.colors.textPrimary} tracking-tight`}>Download Started</h3>
@@ -112,7 +112,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                     )}
 
                     <div className="p-6">
-                        <div className={`flex rounded-xl p-1.5 border ${theme.colors.border} mb-6 bg-slate-200/50 dark:bg-black/40`}>
+                        <div className={`flex rounded-xl p-1.5 border ${theme.colors.border} mb-6 bg-slate-200/60 dark:bg-slate-800/70`}>
                             {(['windows', 'macos', 'linux'] as const).map(platform => (
                                 <button
                                     key={platform}
@@ -173,7 +173,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                         </div>
                         <span className={`text-xs font-bold ${theme.colors.textSecondary} group-hover:${theme.colors.textPrimary} transition-colors select-none uppercase tracking-wider`}>Don't show again</span>
                     </button>
-                    <button type="button" onClick={handleClose} className={`px-8 py-2.5 rounded-xl font-black bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors shadow-lg active:scale-95 text-sm`}>
+                    <button type="button" onClick={handleClose} className={`px-8 py-2.5 rounded-xl font-black ${theme.colors.accentBg} hover:bg-modtale-accentHover text-white transition-colors shadow-lg active:scale-95 text-sm`}>
                         Got it
                     </button>
                 </div>

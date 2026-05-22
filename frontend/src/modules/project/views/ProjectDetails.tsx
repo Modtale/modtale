@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, Github, Globe } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 import type { User } from '@/types';
 import { theme } from '@/styles/theme';
@@ -64,6 +65,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
     const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
+    const [showDownloadFx, setShowDownloadFx] = useState(false);
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; dependencies: any[] } | null>(null);
@@ -81,11 +83,18 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const prevPathnameRef = useRef(location.pathname);
     const scrollPosRef = useRef(0);
+    const downloadFxTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
         const handleScroll = () => { scrollPosRef.current = window.scrollY; };
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
+        };
     }, []);
 
     useEffect(() => {
@@ -173,7 +182,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 downloadUrl = baseUrl + downloadUrl;
             }
 
-            window.open(downloadUrl, '_blank');
+            //window.open(downloadUrl, '_blank');
+            setShowDownloadFx(true);
+            if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
+            downloadFxTimeoutRef.current = window.setTimeout(() => setShowDownloadFx(false), 900);
 
             if (project && !downloadedSessionIds.has(project.id)) {
                 setProject(prev => prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : null);
@@ -199,7 +211,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             if (!versionNumber) {
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 const targetUrl = baseUrl + '/files/download/' + encodeURI(url);
-                window.open(targetUrl, '_blank');
+                //window.open(targetUrl, '_blank');
+                setShowDownloadFx(true);
+                if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
+                downloadFxTimeoutRef.current = window.setTimeout(() => setShowDownloadFx(false), 900);
 
                 if (project && !downloadedSessionIds.has(project.id)) {
                     setProject(prev => prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : null);
@@ -249,6 +264,24 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     return (
         <>
+            {showDownloadFx && typeof document !== 'undefined' && createPortal(
+                <div className="download-screen-fx" aria-hidden="true">
+                    <div className="download-screen-fx-glow" />
+                    <div className="download-screen-fx-stage">
+                        <div className="download-screen-fx-beam" />
+                        <div className="download-screen-fx-arrow-shaft" />
+                        <div className="download-screen-fx-arrow-head" />
+                        <div className="download-screen-fx-packet download-screen-fx-packet-a" />
+                        <div className="download-screen-fx-packet download-screen-fx-packet-b" />
+                        <div className="download-screen-fx-packet download-screen-fx-packet-c" />
+                        <div className="download-screen-fx-tray" />
+                        <div className="download-screen-fx-impact" />
+                        <div className="download-screen-fx-ring download-screen-fx-ring-a" />
+                        <div className="download-screen-fx-ring download-screen-fx-ring-b" />
+                    </div>
+                </div>,
+                document.body
+            )}
             <Helmet>
                 <title>{meta?.title}</title>
                 <meta name="description" content={meta?.description} />

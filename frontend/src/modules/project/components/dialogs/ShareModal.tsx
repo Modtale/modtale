@@ -45,7 +45,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, ti
             <div className={`${theme.components.modalContent} max-w-md`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
                     <h3 className={`font-bold ${theme.colors.textPrimary} flex items-center gap-2`}>
-                        <Share2 className="w-5 h-5 text-blue-500" />
+                        <Share2 className="w-5 h-5 text-modtale-accent" />
                         Share Project
                     </h3>
                     <button type="button" onClick={onClose} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-full transition-colors`}>
@@ -64,7 +64,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, ti
                             <button
                                 type="button"
                                 onClick={handleCopy}
-                                className={`px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-sm transition-colors flex items-center gap-2 shrink-0 shadow-sm`}
+                                className={`px-4 py-2 ${theme.colors.accentBg} hover:bg-modtale-accentHover text-white rounded-lg font-bold text-sm transition-colors flex items-center gap-2 shrink-0 shadow-sm`}
                             >
                                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                                 {copied ? 'Copied!' : 'Copy'}
