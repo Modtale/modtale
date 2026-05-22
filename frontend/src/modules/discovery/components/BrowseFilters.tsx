@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Filter,
@@ -52,12 +52,24 @@ const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null,
     );
 };
 
-const FilterDropdown = ({ label, value, options, onChange }: { label: string, value: string, options: string[], onChange: (val: string) => void }) => {
+const FilterDropdown = ({
+    label,
+    value,
+    options,
+    onChange,
+    hideLabel = false
+}: {
+    label: string,
+    value: string,
+    options: string[],
+    onChange: (val: string) => void,
+    hideLabel?: boolean
+}) => {
     const [isOpen, setIsOpen] = useState(false);
     return (
         <div className="relative">
             <style>{` .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.3); border-radius: 20px; } `}</style>
-            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">{label}</label>
+            {!hideLabel && <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">{label}</label>}
             <button type="button" onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="w-full text-left px-3 py-2 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-white/[0.05] transition-colors shadow-sm">{value}<ChevronDown className={`w-4 h-4 text-slate-400 transition-transform pointer-events-none ${isOpen ? 'rotate-180' : ''}`} /></button>
             {isOpen && <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[250] max-h-48 overflow-y-auto py-1 custom-scrollbar">{options.map(opt => <button type="button" key={opt} onClick={(e) => { e.stopPropagation(); onChange(opt); setIsOpen(false); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${value === opt ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>{opt}{value === opt && <Check className="w-3 h-3" />}</button>)}</div>}
         </div>
@@ -109,7 +121,9 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     const [customFav, setCustomFav] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
     const [selectedDateObj, setSelectedDateObj] = useState<Date | null>(null);
-    const [gameVersionOptions, setGameVersionOptions] = useState<string[]>(['Any']);
+    const [allGameVersions, setAllGameVersions] = useState<string[]>([]);
+    const [preReleaseVersionSet, setPreReleaseVersionSet] = useState<Set<string>>(new Set());
+    const [showPreReleases, setShowPreReleases] = useState(false);
 
     useEffect(() => {
         if (isMobile && isFilterOpen) document.body.style.overflow = 'hidden';
@@ -131,11 +145,44 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     }, [isFilterOpen, onToggleFilterMenu, isMobile]);
 
     useEffect(() => {
-        projectClient.getProjectGameVersions().then((versions: string[]) => {
-            const sorted = versions.sort((a: string, b: string) => compareSemVer(b, a));
-            setGameVersionOptions(['Any', ...sorted]);
-        }).catch(() => {});
+        projectClient.getMetaGameVersionCatalog().then((catalog) => {
+            const ordered = catalog?.orderedVersions || catalog?.allVersions || [];
+            const pre = new Set(catalog?.preReleaseVersions || []);
+            setAllGameVersions(ordered);
+            setPreReleaseVersionSet(pre);
+        }).catch(async () => {
+            try {
+                const versions = await projectClient.getProjectGameVersions();
+                const sorted = versions.sort((a: string, b: string) => compareSemVer(b, a));
+                setAllGameVersions(sorted);
+                setPreReleaseVersionSet(new Set());
+            } catch {
+                setAllGameVersions([]);
+                setPreReleaseVersionSet(new Set());
+            }
+        });
     }, []);
+
+    useEffect(() => {
+        if (selectedVersion !== 'Any' && preReleaseVersionSet.has(selectedVersion)) {
+            setShowPreReleases(true);
+        }
+    }, [selectedVersion, preReleaseVersionSet]);
+
+    const gameVersionOptions = useMemo(() => {
+        const preReleaseVersions = allGameVersions.filter(v => preReleaseVersionSet.has(v));
+        const releaseVersions = allGameVersions.filter(v => !preReleaseVersionSet.has(v));
+        const ordered = showPreReleases
+            ? [...preReleaseVersions, ...releaseVersions]
+            : releaseVersions;
+        return ['Any', ...ordered];
+    }, [allGameVersions, preReleaseVersionSet, showPreReleases]);
+
+    useEffect(() => {
+        if (selectedVersion !== 'Any' && !gameVersionOptions.includes(selectedVersion)) {
+            setSelectedVersion('Any');
+        }
+    }, [selectedVersion, gameVersionOptions, setSelectedVersion]);
 
     const getDateStringDaysAgo = (days: number) => {
         const d = new Date();
@@ -170,7 +217,27 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
 
     const filterMenuBody = (
         <div className="space-y-5">
-            <FilterDropdown label="Game Version" value={selectedVersion} options={gameVersionOptions} onChange={setSelectedVersion} />
+            <div className="space-y-2">
+                <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Game Version</label>
+                    {preReleaseVersionSet.size > 0 && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPreReleases(prev => !prev);
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                        >
+                            <span className={`w-3 h-3 rounded-[3px] border flex items-center justify-center ${showPreReleases ? 'border-modtale-accent bg-modtale-accent/15 text-modtale-accent' : 'border-slate-300 dark:border-white/20 text-transparent'}`}>
+                                <Check className="w-2.5 h-2.5" />
+                            </span>
+                            <span>Pre Releases</span>
+                        </button>
+                    )}
+                </div>
+                <FilterDropdown label="Game Version" hideLabel value={selectedVersion} options={gameVersionOptions} onChange={setSelectedVersion} />
+            </div>
             <div>
                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
                 <div className="grid grid-cols-4 gap-1 mb-2">
