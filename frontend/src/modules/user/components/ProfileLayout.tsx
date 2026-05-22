@@ -187,12 +187,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const Avatar = ({ isMobile = false }: { isMobile?: boolean }) => {
         const baseClasses = isMobile
-            ? `w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group z-20`
-            : `w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative z-20`;
+            ? `w-32 h-32 rounded-3xl bg-transparent shadow-md border-4 ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group z-20`
+            : `w-56 h-56 rounded-3xl bg-transparent shadow-xl border-[8px] ${theme.colors.bgBase === 'bg-white' ? 'border-white' : 'border-slate-800'} ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative z-20`;
 
         return (
             <div className={baseClasses}>
-                <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                 {resolvedAvatar ? (
                     <OptimizedImage
                         src={resolvedAvatar}
