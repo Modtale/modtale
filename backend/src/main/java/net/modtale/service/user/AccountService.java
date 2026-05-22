@@ -20,11 +20,18 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AccountService {
@@ -36,6 +43,8 @@ public class AccountService {
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private TrackingService trackingService;
     @Autowired private SanitizationService sanitizer;
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final Map<String, LocalDateTime> avatarHealCooldown = new ConcurrentHashMap<>();
 
     public User getCurrentUser() {
         try {
@@ -68,6 +77,9 @@ public class AccountService {
     public User getPublicProfile(String userId) {
         User user = userRepository.findById(userId).orElse(null);
         if (user != null && user.isDeleted()) return null;
+        if (user != null) {
+            maybeHealOAuthAvatar(user);
+        }
         return user;
     }
 
@@ -75,7 +87,9 @@ public class AccountService {
         if (userIds == null || userIds.isEmpty()) return new ArrayList<>();
         Query query = new Query(Criteria.where("_id").in(userIds).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "accountType", "badges", "id", "roles", "tier");
-        return mongoTemplate.find(query, User.class);
+        List<User> users = mongoTemplate.find(query, User.class);
+        users.forEach(this::maybeHealOAuthAvatar);
+        return users;
     }
 
     public User updateUserProfile(String userId, String bio, String newUsername) {
@@ -240,5 +254,146 @@ public class AccountService {
 
         userRepository.deleteById(user.getId());
         logger.info("Permanently deleted user account: " + user.getUsername() + " (" + user.getId() + ")");
+    }
+
+    private void maybeHealOAuthAvatar(User user) {
+        if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) return;
+        if (user.getConnectedAccounts() == null || user.getConnectedAccounts().isEmpty()) return;
+        if (!isOAuthManagedAvatar(user)) return;
+
+        LocalDateTime lastAttempt = avatarHealCooldown.get(user.getId());
+        if (lastAttempt != null && lastAttempt.isAfter(LocalDateTime.now().minusMinutes(30))) return;
+        avatarHealCooldown.put(user.getId(), LocalDateTime.now());
+
+        if (isImageUrlReachable(user.getAvatarUrl())) return;
+
+        String refreshed = refreshAvatarFromLinkedProvider(user);
+        if (refreshed != null && !refreshed.isBlank() && isImageUrlReachable(refreshed)) {
+            user.setAvatarUrl(refreshed);
+            userRepository.save(user);
+            logger.info("Healed broken provider avatar for user {} using linked provider.", user.getId());
+            return;
+        }
+
+        user.setAvatarUrl("https://ui-avatars.com/api/?name=" + user.getUsername() + "&background=random");
+        userRepository.save(user);
+        logger.warn("Reset broken provider avatar to default for user {}", user.getId());
+    }
+
+    private boolean isOAuthManagedAvatar(User user) {
+        String avatarUrl = user.getAvatarUrl();
+        if (avatarUrl == null) return false;
+
+        boolean hasDiscord = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider() == OAuthProvider.DISCORD);
+        boolean hasGithub = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider() == OAuthProvider.GITHUB);
+        boolean hasGitlab = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider() == OAuthProvider.GITLAB);
+        boolean hasGoogle = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider() == OAuthProvider.GOOGLE);
+        boolean hasTwitter = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider() == OAuthProvider.TWITTER);
+        boolean hasBluesky = user.getConnectedAccounts().stream().anyMatch(a -> a.getProvider() == OAuthProvider.BLUESKY);
+
+        return (hasDiscord && avatarUrl.contains("cdn.discordapp.com/avatars/")) ||
+                (hasGithub && (avatarUrl.contains("githubusercontent.com") || avatarUrl.contains("avatars.githubusercontent.com"))) ||
+                (hasGitlab && avatarUrl.contains("gitlab")) ||
+                (hasGoogle && (avatarUrl.contains("googleusercontent.com") || avatarUrl.contains("googleapis.com"))) ||
+                (hasTwitter && (avatarUrl.contains("twimg.com") || avatarUrl.contains("twitter.com"))) ||
+                (hasBluesky && avatarUrl.contains("bsky"));
+    }
+
+    private boolean isImageUrlReachable(String rawUrl) {
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL(rawUrl).openConnection();
+            connection.setInstanceFollowRedirects(true);
+            connection.setConnectTimeout(2500);
+            connection.setReadTimeout(2500);
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("User-Agent", "ModtaleAvatarHealth/1.0");
+            int status = connection.getResponseCode();
+            return status >= 200 && status < 400;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private String refreshAvatarFromLinkedProvider(User user) {
+        for (User.ConnectedAccount account : user.getConnectedAccounts()) {
+            if (account == null || account.getProvider() == null) continue;
+            try {
+                switch (account.getProvider()) {
+                    case GITHUB -> {
+                        String url = refreshGithubAvatar(user, account);
+                        if (url != null) return url;
+                    }
+                    case GITLAB -> {
+                        String url = refreshGitlabAvatar(user, account);
+                        if (url != null) return url;
+                    }
+                    case DISCORD -> {
+                        String url = resolveDiscordDefaultAvatar(account.getProviderId());
+                        if (url != null) return url;
+                    }
+                    default -> {
+                        // No reliable server-side refresh path for this provider without stored tokens.
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private String refreshGithubAvatar(User user, User.ConnectedAccount account) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        if (user.getGithubAccessToken() != null && !user.getGithubAccessToken().isBlank()) {
+            headers.setBearerAuth(user.getGithubAccessToken());
+            ResponseEntity<Map> me = restTemplate.exchange("https://api.github.com/user", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            if (me.getStatusCode().is2xxSuccessful() && me.getBody() != null) {
+                Object avatar = me.getBody().get("avatar_url");
+                if (avatar instanceof String s && !s.isBlank()) return s;
+            }
+        }
+
+        if (account.getUsername() != null && !account.getUsername().isBlank()) {
+            ResponseEntity<Map> publicProfile = restTemplate.getForEntity("https://api.github.com/users/" + account.getUsername(), Map.class);
+            if (publicProfile.getStatusCode().is2xxSuccessful() && publicProfile.getBody() != null) {
+                Object avatar = publicProfile.getBody().get("avatar_url");
+                if (avatar instanceof String s && !s.isBlank()) return s;
+            }
+        }
+        return null;
+    }
+
+    private String refreshGitlabAvatar(User user, User.ConnectedAccount account) {
+        if (user.getGitlabAccessToken() != null && !user.getGitlabAccessToken().isBlank()) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(user.getGitlabAccessToken());
+            ResponseEntity<Map> me = restTemplate.exchange("https://gitlab.com/api/v4/user", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            if (me.getStatusCode().is2xxSuccessful() && me.getBody() != null) {
+                Object avatar = me.getBody().get("avatar_url");
+                if (avatar instanceof String s && !s.isBlank()) return s;
+            }
+        }
+
+        if (account.getUsername() != null && !account.getUsername().isBlank()) {
+            ResponseEntity<List> users = restTemplate.getForEntity("https://gitlab.com/api/v4/users?username=" + account.getUsername(), List.class);
+            if (users.getStatusCode().is2xxSuccessful() && users.getBody() != null && !users.getBody().isEmpty()) {
+                Object first = users.getBody().get(0);
+                if (first instanceof Map<?, ?> firstMap) {
+                    Object avatar = firstMap.get("avatar_url");
+                    if (avatar instanceof String s && !s.isBlank()) return s;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String resolveDiscordDefaultAvatar(String providerId) {
+        if (providerId == null || providerId.isBlank()) return null;
+        try {
+            long id = Long.parseLong(providerId);
+            int index = (int) ((id >> 22) % 6);
+            return "https://cdn.discordapp.com/embed/avatars/" + index + ".png";
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 }
