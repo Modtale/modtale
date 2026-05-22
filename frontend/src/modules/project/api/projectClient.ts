@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import type { ManifestInspectionResult, Project, User, ProjectRole } from '@/types';
+import type { ManifestInspectionResult, Project, User, ProjectRole, GameVersionCatalog } from '@/types';
 
 export const projectClient = {
     getProject: async (id: string) => {
@@ -93,6 +93,10 @@ export const projectClient = {
     getMetaGameVersions: async () => {
         const res = await api.get<string[]>('/meta/game-versions');
         return Array.isArray(res.data) ? res.data : [];
+    },
+    getMetaGameVersionCatalog: async () => {
+        const res = await api.get<GameVersionCatalog>('/meta/game-versions/catalog');
+        return res.data;
     },
     getGitRepos: async (provider: 'github' | 'gitlab') => {
         const res = await api.get(`/user/repos/${provider}`);

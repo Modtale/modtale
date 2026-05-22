@@ -34,6 +34,7 @@ import { HistoryModal } from '../components/dialogs/HistoryModal';
 import { DownloadModal } from '../components/dialogs/DownloadModal';
 import { DependencyModal } from '../components/dialogs/DependencyModal';
 import { api } from '@/utils/api';
+import { projectClient } from '../api/projectClient';
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -66,6 +67,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
     const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
     const [showDownloadFx, setShowDownloadFx] = useState(false);
+    const [preReleaseGameVersions, setPreReleaseGameVersions] = useState<string[]>([]);
+    const [orderedGameVersions, setOrderedGameVersions] = useState<string[]>([]);
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; dependencies: any[] } | null>(null);
@@ -95,6 +98,18 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return () => {
             if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
         };
+    }, []);
+
+    useEffect(() => {
+        projectClient.getMetaGameVersionCatalog()
+            .then((catalog) => {
+                setPreReleaseGameVersions(catalog?.preReleaseVersions || []);
+                setOrderedGameVersions(catalog?.orderedVersions || catalog?.allVersions || []);
+            })
+            .catch(() => {
+                setPreReleaseGameVersions([]);
+                setOrderedGameVersions([]);
+            });
     }, []);
 
     useEffect(() => {
@@ -305,6 +320,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 show={isDownloadOpen}
                 onClose={() => navigate(projectUrl)}
                 versionsByGame={versionsByGame}
+                preReleaseGameVersions={preReleaseGameVersions}
+                orderedGameVersions={orderedGameVersions}
                 onDownload={handleDownloadClick}
                 showExperimental={showExperimental}
                 onToggleExperimental={() => setShowExperimental(!showExperimental)}

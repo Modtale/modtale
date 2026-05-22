@@ -57,6 +57,8 @@ interface DownloadModalProps {
     show: boolean;
     onClose: () => void;
     versionsByGame: Record<string, any[]>;
+    preReleaseGameVersions?: string[];
+    orderedGameVersions?: string[];
     onDownload: (url: string, number: string, deps: any[], channel: string) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
@@ -64,24 +66,49 @@ interface DownloadModalProps {
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({
-                                                                show, onClose, versionsByGame, onDownload, showExperimental, onToggleExperimental, onViewHistory
+                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory
                                                             }) => {
     useScrollLock(show);
     const [selectedGameVer, setSelectedGameVer] = useState<string>('');
     const [isListExpanded, setIsListExpanded] = useState(false);
+    const [showPreReleaseGameVersions, setShowPreReleaseGameVersions] = useState(false);
+    const preReleaseGameVersionSet = useMemo(() => new Set(preReleaseGameVersions), [preReleaseGameVersions]);
 
     const hasExperimentalVersions = useMemo(() => {
         return Object.values(versionsByGame).flat().some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA');
     }, [versionsByGame]);
 
+    const hasPreReleaseGameVersionEntries = useMemo(() => {
+        return Object.keys(versionsByGame).some(version => preReleaseGameVersionSet.has(version));
+    }, [versionsByGame, preReleaseGameVersionSet]);
+
+    const gameVersions = useMemo(() => {
+        const available = new Set(Object.keys(versionsByGame));
+        const orderedAvailable = orderedGameVersions.filter(version => available.has(version));
+        const orderedSet = new Set(orderedAvailable);
+        const unordered = Object.keys(versionsByGame)
+            .filter(version => !orderedSet.has(version))
+            .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+        const all = [...orderedAvailable, ...unordered];
+        if (showPreReleaseGameVersions) return all;
+        return all.filter(version => !preReleaseGameVersionSet.has(version));
+    }, [versionsByGame, showPreReleaseGameVersions, preReleaseGameVersionSet, orderedGameVersions]);
+
     useEffect(() => {
         if (show) {
-            const keys = Object.keys(versionsByGame).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-            if (keys.length > 0 && (!selectedGameVer || !keys.includes(selectedGameVer))) {
-                setSelectedGameVer(keys[0]);
+            if (gameVersions.length > 0 && (!selectedGameVer || !gameVersions.includes(selectedGameVer))) {
+                setSelectedGameVer(gameVersions[0]);
             }
         }
-    }, [show, versionsByGame, selectedGameVer]);
+    }, [show, gameVersions, selectedGameVer]);
+
+    useEffect(() => {
+        if (!hasPreReleaseGameVersionEntries) return;
+        const hasReleaseGameVersionEntries = Object.keys(versionsByGame).some(version => !preReleaseGameVersionSet.has(version));
+        if (!hasReleaseGameVersionEntries && !showPreReleaseGameVersions) {
+            setShowPreReleaseGameVersions(true);
+        }
+    }, [hasPreReleaseGameVersionEntries, versionsByGame, preReleaseGameVersionSet, showPreReleaseGameVersions]);
 
     useEffect(() => {
         const currentVersions = versionsByGame[selectedGameVer] || [];
@@ -95,7 +122,6 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     if (!show) return null;
 
-    const gameVersions = Object.keys(versionsByGame).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
     const currentVersions = versionsByGame[selectedGameVer] || [];
     const visibleVersions = currentVersions.filter((v: any) => showExperimental || (!v.channel || v.channel === 'RELEASE'));
 
@@ -127,6 +153,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
                     <div>
                         <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><Download className={`w-5 h-5 ${theme.colors.accent}`} /> Download</h3>
+                        {hasPreReleaseGameVersionEntries && (
+                            <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
+                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
+                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
+                                </div>
+                                <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Pre-Release Game Versions</span>
+                            </div>
+                        )}
                         {hasExperimentalVersions && (
                             <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
                                 <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>

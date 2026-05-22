@@ -2,10 +2,10 @@ package net.modtale.service.project;
 
 import net.modtale.model.project.ProjectClassification;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,13 +28,10 @@ public class ValidationService {
     private static final Map<String, String> CANONICAL_TAG_MAP = ALLOWED_TAGS.stream()
             .collect(Collectors.toMap(String::toLowerCase, Function.identity()));
 
-    private static final Set<String> ALLOWED_GAME_VERSIONS = Set.of(
-            "2026.01.13-dcad8778f", "2026.01.17-4b0f30090", "2026.01.24-6e2d4fc36", "2026.01.28-87d03be09", "2026.02.06-aa1b071c2", "2026.02.17-255364b8e", "2026.02.19-1a311a592", "2026.03.26-89796e57b"
-    );
-
     private static final Pattern STRICT_VERSION_PATTERN = Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
     private static final Pattern REPO_URL_PATTERN = Pattern.compile("^https:\\/\\/(github\\.com|gitlab\\.com|codeberg\\.org)\\/[\\w.-]+\\/[\\w.-]+$");
     private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$");
+    @Autowired private GameVersionService gameVersionService;
 
     public List<String> validateTags(List<String> tags) {
         if (tags == null || tags.isEmpty()) return new ArrayList<>();
@@ -76,7 +73,15 @@ public class ValidationService {
     }
 
     public List<String> getAllowedGameVersions() {
-        return ALLOWED_GAME_VERSIONS.stream().sorted(Comparator.reverseOrder()).collect(Collectors.toList());
+        return gameVersionService.getCatalog().allVersions();
+    }
+
+    public List<String> getAllowedReleaseGameVersions() {
+        return gameVersionService.getCatalog().releaseVersions();
+    }
+
+    public List<String> getAllowedPreReleaseGameVersions() {
+        return gameVersionService.getCatalog().preReleaseVersions();
     }
 
     public List<String> getAllowedClassifications() {

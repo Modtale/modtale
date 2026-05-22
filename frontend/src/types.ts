@@ -72,6 +72,13 @@ export interface ManifestInspectionResult {
     suggestions: ManifestDependencySuggestion[];
 }
 
+export interface GameVersionCatalog {
+    releaseVersions: string[];
+    preReleaseVersions: string[];
+    allVersions: string[];
+    orderedVersions: string[];
+}
+
 export interface ScanIssue {
     severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
     type: string;

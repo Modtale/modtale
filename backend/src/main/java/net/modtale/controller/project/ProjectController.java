@@ -108,6 +108,17 @@ public class ProjectController {
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(24, TimeUnit.HOURS).cachePublic()).body(validationService.getAllowedGameVersions());
     }
 
+    @GetMapping("/meta/game-versions/catalog")
+    public ResponseEntity<java.util.Map<String, List<String>>> getGameVersionCatalog() {
+        java.util.Map<String, List<String>> payload = java.util.Map.of(
+                "releaseVersions", validationService.getAllowedReleaseGameVersions(),
+                "preReleaseVersions", validationService.getAllowedPreReleaseGameVersions(),
+                "allVersions", validationService.getAllowedGameVersions(),
+                "orderedVersions", validationService.getAllowedGameVersions()
+        );
+        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(24, TimeUnit.HOURS).cachePublic()).body(payload);
+    }
+
     @PostMapping("/projects")
     @PreAuthorize("@apiSecurity.hasCreateProjectPerm(#owner, authentication)")
     public ResponseEntity<?> createProject(@ModelAttribute CreateProjectRequest requestPayload) {
