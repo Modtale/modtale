@@ -15,9 +15,6 @@ import NotFound from '@/components/ui/error/NotFound';
 
 import { Onboarding } from '@/modules/user/components/Onboarding';
 
-import { Home } from '@/modules/home/views/Home';
-import { Browse } from '@/modules/discovery/views/Browse';
-import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
 
 import { SSRProvider } from '@/context/SSRContext';
 import { ExternalLinkProvider } from '@/context/ExternalLinkContext';
@@ -31,6 +28,9 @@ import type { Classification } from '@/data/categories';
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
 const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
+const Home = lazy(() => import('@/modules/home/views/Home').then((module) => ({ default: module.Home })));
+const Browse = lazy(() => import('@/modules/discovery/views/Browse').then((module) => ({ default: module.Browse })));
+const ProjectDetails = lazy(() => import('@/modules/project/views/ProjectDetails').then((module) => ({ default: module.ProjectDetails })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
 const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((module) => ({ default: module.Dashboard })));
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));

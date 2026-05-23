@@ -41,6 +41,10 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     }, [urlSearchTerm]);
 
     useEffect(() => {
+        setSelectedClassification(initialClassification);
+    }, [initialClassification]);
+
+    useEffect(() => {
         const handler = setTimeout(() => {
             if (searchTerm !== urlSearchTerm) {
                 setSearchParams(prev => {
