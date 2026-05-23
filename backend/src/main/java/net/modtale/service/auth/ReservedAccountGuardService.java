@@ -38,8 +38,7 @@ public class ReservedAccountGuardService {
         return !normalizedHost.equals("localhost")
                 && !normalizedHost.equals("127.0.0.1")
                 && !normalizedHost.equals("::1")
-                && !normalizedHost.endsWith(".run.app")
-                && !normalizedHost.equals("dev.modtale.net");
+                && !normalizedHost.endsWith(".run.app");
     }
 
     public void purgeReservedAccountsIfProduction() {
