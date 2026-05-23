@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, User } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
-import {Trophy, Plus, ArrowLeft, Calendar, Users, AlertCircle, LayoutGrid} from 'lucide-react';
+import { Trophy, Plus, ArrowLeft, Calendar, Users, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JamBuilder } from '@/modules/jam/components/JamBuilder';
 
@@ -91,12 +91,6 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
     );
 };
 
-const formatDay = (date: Date) => {
-    const d = date.getDate();
-    const suffix = ['th', 'st', 'nd', 'rd'][(d % 10 > 3 || Math.floor(d % 100 / 10) === 1) ? 0 : d % 10];
-    return `${d}${suffix}`;
-};
-
 export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
     const navigate = useNavigate();
     const [jams, setJams] = useState<Modjam[]>([]);
@@ -126,63 +120,12 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
     const [activeTab, setActiveTab] = useState<'details' | 'categories' | 'settings'>('details');
 
-    const DAY_WIDTH = 80;
-    const TRACK_HEIGHT = 60;
-    const TRACK_GAP = 12;
-
     useEffect(() => {
         api.get('/modjams').then(res => {
             setJams(res.data);
             setLoading(false);
         }).catch(() => setLoading(false));
     }, []);
-
-    const { startDate, endDate, totalDays, days } = useMemo(() => {
-        const start = new Date();
-        start.setDate(start.getDate() - 2); // 48 hours back
-        start.setHours(0, 0, 0, 0);
-        const total = 90;
-        const end = new Date(start);
-        end.setDate(end.getDate() + total);
-
-        const dArr = Array.from({length: total}).map((_, i) => {
-            const date = new Date(start);
-            date.setDate(date.getDate() + i);
-            return date;
-        });
-
-        return { startDate: start, endDate: end, totalDays: total, days: dArr };
-    }, []);
-
-    const { tracks, jamTracks, sortedJams } = useMemo(() => {
-        const t: Modjam[][] = [];
-        const jt: Record<string, number> = {};
-
-        const sj = [...jams]
-            .filter(jam => jam.startDate && (jam.votingEndDate || jam.endDate))
-            .filter(jam => new Date(jam.votingEndDate || jam.endDate).getTime() >= startDate.getTime() && new Date(jam.startDate).getTime() <= endDate.getTime())
-            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-
-        sj.forEach(jam => {
-            let placed = false;
-            for (let i = 0; i < t.length; i++) {
-                const track = t[i];
-                const lastJam = track[track.length - 1];
-                if (new Date(lastJam.votingEndDate || lastJam.endDate).getTime() + (1000 * 60 * 60 * 24 * 1) < new Date(jam.startDate).getTime()) {
-                    track.push(jam);
-                    jt[jam.id] = i;
-                    placed = true;
-                    break;
-                }
-            }
-            if (!placed) {
-                t.push([jam]);
-                jt[jam.id] = t.length - 1;
-            }
-        });
-
-        return { tracks: t, jamTracks: jt, sortedJams: sj };
-    }, [jams, startDate, endDate]);
 
     const validateSlugFormat = (val: string) => {
         if (!val) return "Slug is required.";
@@ -372,33 +315,52 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
         return <div className="min-h-screen flex items-center justify-center"><Spinner className="w-8 h-8" fullScreen={false} /></div>;
     }
 
-    const startMonth = startDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    const endMonth = endDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    const monthLabel = startMonth === endMonth ? startMonth : `${startMonth} - ${endMonth}`;
+    const timelineJams = jams
+        .filter(jam => jam.startDate && jam.endDate)
+        .sort((a, b) => new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime());
 
-    const now = new Date().getTime();
-    const isNowInWindow = now >= startDate.getTime() && now <= endDate.getTime();
-    const nowLeftPx = ((now - startDate.getTime()) / (1000 * 60 * 60 * 24)) * DAY_WIDTH;
+    const timelineStart = timelineJams.length
+        ? new Date(Math.min(...timelineJams.map(jam => new Date(jam.startDate || 0).getTime())))
+        : new Date();
+    timelineStart.setHours(0, 0, 0, 0);
 
-    // A past jam is one that is VOTING or COMPLETED AND its end date is completely before the calendar's 48h lookback window
-    const pastJams = jams.filter(jam => {
-        if (!['VOTING', 'COMPLETED'].includes(jam.status)) return false;
-        if (!jam.votingEndDate && !jam.endDate) return false;
-        const jamEndMs = new Date(jam.votingEndDate || jam.endDate).getTime();
-        return jamEndMs < startDate.getTime();
-    });
+    const timelineEnd = timelineJams.length
+        ? new Date(Math.max(...timelineJams.map(jam => new Date(jam.endDate || 0).getTime())))
+        : new Date();
+    timelineEnd.setHours(0, 0, 0, 0);
+
+    const totalTimelineDays = Math.max(
+        14,
+        Math.ceil((timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)) + 14
+    );
+
+    const dayWidth = 24;
+    const timelineWidth = totalTimelineDays * dayWidth;
+
+    const monthTicks: { label: string; left: number }[] = [];
+    if (timelineJams.length > 0) {
+        const cursor = new Date(timelineStart);
+        cursor.setDate(1);
+        while (cursor.getTime() <= timelineEnd.getTime() + 1000 * 60 * 60 * 24 * 30) {
+            const daysFromStart = Math.floor((cursor.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysFromStart >= 0 && daysFromStart <= totalTimelineDays) {
+                monthTicks.push({
+                    label: cursor.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }),
+                    left: daysFromStart * dayWidth
+                });
+            }
+            cursor.setMonth(cursor.getMonth() + 1);
+        }
+    }
 
     return (
-        <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-8 md:pt-16 pb-32">
+        <div className="max-w-[112rem] mx-auto px-4 sm:px-8 md:px-12 lg:px-16 pt-8 md:pt-12 pb-28">
             <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-8 border-b border-slate-200 dark:border-white/10 pb-6">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="flex items-center gap-3">
                             <Calendar className="w-8 h-8 text-modtale-accent" />
-                            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">Event Calendar</h1>
-                        </div>
-                        <div className="text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-md border border-slate-200 dark:border-white/5 sm:ml-2">
-                            {monthLabel}
+                            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">Jam Events</h1>
                         </div>
                     </div>
                     {currentUser && (
@@ -408,119 +370,72 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                     )}
                 </div>
 
-                <div className="overflow-x-auto custom-scrollbar pb-12 pt-2 relative w-full">
-                    <div style={{ width: `${totalDays * DAY_WIDTH}px`, minHeight: `${Math.max(tracks.length * (TRACK_HEIGHT + TRACK_GAP) + 60, 240)}px` }} className="relative">
-                        <div className="flex absolute top-0 left-0 right-0 h-10 border-b border-slate-200 dark:border-white/10 z-0">
-                            {days.map((day, i) => {
-                                const isFirstDayOfMonth = day.getDate() === 1;
-                                return (
-                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 flex flex-col justify-end pb-1 text-left border-l border-slate-200/40 dark:border-white/5 pl-2 ${isFirstDayOfMonth ? 'border-dashed border-slate-400 dark:border-white/20 bg-slate-100/30 dark:bg-white/[0.02]' : ''}`}>
-                                        {isFirstDayOfMonth || i === 0 ? (
-                                            <span className="text-[9px] font-black uppercase tracking-widest text-modtale-accent leading-none mb-0.5">
-                                                {day.toLocaleString('default', { month: 'short' })}
-                                            </span>
-                                        ) : null}
-                                        <span className="text-[10px] font-bold text-slate-500 leading-none">
-                                            {formatDay(day)}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="absolute top-10 left-0 right-0 bottom-0 flex pointer-events-none z-0">
-                            {days.map(day => {
-                                const isFirstDayOfMonth = day.getDate() === 1;
-                                return (
-                                    <div key={day.toISOString()} style={{ width: `${DAY_WIDTH}px` }} className={`shrink-0 border-l border-slate-200/40 dark:border-white/5 ${isFirstDayOfMonth ? 'border-dashed border-slate-400 dark:border-white/20 bg-slate-100/30 dark:bg-white/[0.01]' : ''}`} />
-                                );
-                            })}
-                        </div>
-
-                        {isNowInWindow && (
-                            <div className="absolute top-0 bottom-0 w-px bg-modtale-accent z-20" style={{ left: `${nowLeftPx}px` }}>
-                                <div className="absolute top-1 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-modtale-accent text-white text-[8px] font-black uppercase tracking-widest rounded shadow-sm">Now</div>
-                            </div>
-                        )}
-
-                        <div className="absolute top-14 left-0 right-0 z-10">
-                            {sortedJams.map(jam => {
-                                const startMs = new Date(jam.startDate).getTime();
-                                const endMs = new Date(jam.votingEndDate || jam.endDate).getTime();
-                                const windowStartMs = startDate.getTime();
-
-                                const renderStart = Math.max(startMs, windowStartMs);
-                                const renderEnd = Math.min(endMs, endDate.getTime());
-
-                                const leftPx = ((renderStart - windowStartMs) / (1000 * 60 * 60 * 24)) * DAY_WIDTH;
-                                const widthPx = ((renderEnd - renderStart) / (1000 * 60 * 60 * 24)) * DAY_WIDTH;
-
-                                const trackIdx = jamTracks[jam.id] || 0;
-                                const topPx = trackIdx * (TRACK_HEIGHT + TRACK_GAP);
-
-                                const jamIcon = resolveUrl((jam as any).imageUrl || null);
-
-                                return (
-                                    <Link
-                                        key={jam.id}
-                                        to={`/jam/${jam.slug}`}
-                                        className="absolute flex flex-col justify-center px-3 py-2 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer backdrop-blur-md border border-modtale-accent/20 hover:border-modtale-accent/40 group overflow-hidden bg-modtale-accent/5 dark:bg-modtale-accent/10"
-                                        style={{
-                                            left: `${leftPx}px`,
-                                            width: `${Math.max(widthPx, 220)}px`,
-                                            top: `${topPx}px`,
-                                            height: `${TRACK_HEIGHT}px`
-                                        }}
-                                        title={`${jam.title} (${jam.participantIds?.length || 0} joined)`}
-                                    >
-                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-modtale-accent" />
-
-                                        <div className="relative z-10 flex items-center w-full min-w-0 px-1">
-                                            <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center mr-3 shrink-0 shadow-sm overflow-hidden border border-slate-200 dark:border-white/10">
-                                                {jamIcon ? <img src={jamIcon} className="w-full h-full object-cover" alt="" /> : <Trophy className="w-5 h-5 opacity-40 text-slate-500" />}
-                                            </div>
-
-                                            <div className="flex flex-col flex-1 min-w-0 pr-1">
-                                                <span className="font-bold text-sm text-slate-900 dark:text-white truncate drop-shadow-sm leading-tight mb-0.5 group-hover:text-modtale-accent transition-colors">{jam.title}</span>
-                                                <div className="flex items-center gap-1.5">
-                                                    <Users className="w-3 h-3 text-slate-500 dark:text-slate-400" />
-                                                    <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 truncate">
-                                                        {jam.participantIds?.length || 0}
-                                                    </span>
-                                                </div>
+                <section className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/70 shadow-sm">
+                    {timelineJams.length > 0 ? (
+                        <div
+                            className="overflow-x-auto overflow-y-hidden px-4 sm:px-6 pb-6 pt-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                        >
+                            <div className="relative min-h-[8rem]" style={{ width: `${timelineWidth}px` }}>
+                                <div className="sticky left-0 top-0 z-10 mb-4 h-8 bg-gradient-to-r from-white via-white/90 to-transparent dark:from-slate-900 dark:via-slate-900/90 dark:to-transparent" />
+                                <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.2)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(100,116,139,0.2)_1px,transparent_1px)] bg-[size:24px_100%] pointer-events-none" />
+                                <div className="relative h-12 mb-3 border-b border-slate-200 dark:border-white/10">
+                                    {monthTicks.map(tick => (
+                                        <div key={`${tick.label}-${tick.left}`} className="absolute top-0 h-full" style={{ left: `${tick.left}px` }}>
+                                            <div className="h-4 border-l border-slate-300/80 dark:border-slate-500/70" />
+                                            <div className="mt-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                {tick.label}
                                             </div>
                                         </div>
-                                    </Link>
-                                );
-                            })}
-
-                            {sortedJams.length === 0 && (
-                                <div className="absolute top-4 left-10 right-10 text-center text-slate-500 py-16">
-                                    <Calendar className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                                    <p className="text-base font-bold text-slate-500 dark:text-slate-400">No active jams scheduled.</p>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <div className="mt-16 space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                <section>
-                    <div className="flex items-center gap-4 mb-8 border-b border-slate-200 dark:border-white/10 pb-4">
-                        <LayoutGrid className="w-6 h-6 text-modtale-accent" />
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Past Events</h2>
-                    </div>
+                                <div className="space-y-2.5">
+                                    {timelineJams.map(jam => {
+                                        const start = new Date(jam.startDate || 0);
+                                        const end = new Date(jam.endDate || 0);
+                                        const offsetDays = Math.max(0, Math.floor((start.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
+                                        const durationDays = Math.max(2, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+                                        const barWidth = durationDays * dayWidth;
+                                        const isActive = jam.status === 'ACTIVE';
+                                        const isDone = ['VOTING', 'COMPLETED'].includes(jam.status);
 
-                    {pastJams.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {pastJams.map(jam => (
-                                <JamCard key={jam.id} jam={jam} />
-                            ))}
+                                        return (
+                                            <Link
+                                                key={jam.id}
+                                                to={`/jam/${jam.slug}`}
+                                                className={`group relative block h-12 rounded-xl border shadow-sm transition-all ${
+                                                    isActive
+                                                        ? 'bg-modtale-accent text-white border-modtale-accent'
+                                                        : isDone
+                                                            ? 'bg-slate-200/80 dark:bg-slate-700/70 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100'
+                                                            : 'bg-white dark:bg-slate-800 border-slate-300/90 dark:border-slate-600 text-slate-900 dark:text-white'
+                                                }`}
+                                                style={{ marginLeft: `${offsetDays * dayWidth}px`, width: `${barWidth}px` }}
+                                            >
+                                                <div className="h-full px-3 flex items-center justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-black uppercase tracking-wide truncate">{jam.title}</p>
+                                                        <p className={`text-[11px] font-semibold truncate ${isActive ? 'text-white/90' : 'text-slate-500 dark:text-slate-300'}`}>
+                                                            {start.toLocaleDateString()} - {end.toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                    <div className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border ${
+                                                        isActive
+                                                            ? 'bg-white/15 border-white/25 text-white'
+                                                            : 'bg-slate-100 dark:bg-slate-900/80 border-slate-300 dark:border-slate-500'
+                                                    }`}>
+                                                        {jam.status}
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     ) : (
-                        <div className="py-24 text-center text-slate-500 border border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
-                            <p className="text-sm font-bold">No past events yet.</p>
+                        <div className="px-6 py-14 text-center text-slate-500 dark:text-slate-400">
+                            <p className="text-sm font-bold">No jams to show yet.</p>
                         </div>
                     )}
                 </section>
