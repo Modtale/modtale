@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { HeartHandshake, X } from 'lucide-react';
+import { Check, HeartHandshake, X } from 'lucide-react';
 import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface DonationPromptModalProps {
     show: boolean;
-    projectTitle: string;
     currency?: string;
     suggestedAmountCents: number;
     recurringDefault: boolean;
-    platformCutPercent: number;
     onClose: () => void;
     onSkip: () => void;
     onDonate: (amountCents: number, recurring: boolean) => void;
@@ -17,11 +15,9 @@ interface DonationPromptModalProps {
 
 export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
     show,
-    projectTitle,
     currency = 'USD',
     suggestedAmountCents,
     recurringDefault,
-    platformCutPercent,
     onClose,
     onSkip,
     onDonate,
@@ -47,7 +43,6 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                 <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2"><HeartHandshake className="w-5 h-5 text-modtale-accent" /> Support this creator</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{projectTitle}</p>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
                         <X className="w-5 h-5" />
@@ -69,15 +64,17 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                             onChange={(e) => setAmount(e.target.value)}
                             className="w-full rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900 px-3 py-2.5 text-slate-900 dark:text-white font-bold"
                         />
-                        <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium">
-                            <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
+                        <button
+                            type="button"
+                            onClick={() => setRecurring((prev) => !prev)}
+                            className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium"
+                            aria-pressed={recurring}
+                        >
+                            <span className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${recurring ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-white/20 text-transparent'}`}>
+                                <Check className="w-3.5 h-3.5" />
+                            </span>
                             Make this a recurring monthly donation
-                        </label>
-                    </div>
-
-                    <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3">
-                        <p className="text-xs text-amber-700 dark:text-amber-200 font-bold uppercase tracking-wider">Transparency</p>
-                        <p className="text-xs text-amber-700 dark:text-amber-100 mt-1">Modtale cut: {platformCutPercent.toFixed(1)}%. Creator receives the rest.</p>
+                        </button>
                     </div>
                 </div>
 
