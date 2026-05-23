@@ -18,11 +18,16 @@ const SECURITY_CSP = [
     "trusted-types default",
 ].join('; ');
 
+const isLocalHostname = (hostname: string) => {
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+};
+
 export const onRequest: MiddlewareHandler = async ({ url }, next) => {
     const response = await next();
     const contentType = response.headers.get('content-type') || '';
+    const isLocal = isLocalHostname(url.hostname);
 
-    if (contentType.includes('text/html')) {
+    if (contentType.includes('text/html') && !isLocal) {
         response.headers.set('Content-Security-Policy', SECURITY_CSP);
         response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
