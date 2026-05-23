@@ -51,7 +51,7 @@ public class GameVersionService {
     @Value("${app.hytale.maven.pre-release-url:https://maven.hytale.com/pre-release/com/hypixel/hytale/Server/maven-metadata.xml}")
     private String preReleaseMetadataUrl;
 
-    private volatile GameVersionCatalog cachedCatalog = new GameVersionCatalog(List.of(), List.of(), List.of());
+    private volatile GameVersionCatalog cachedCatalog = new GameVersionCatalog(List.of(), List.of(), List.of(), List.of());
     private final Object refreshLock = new Object();
 
     @PostConstruct
@@ -94,11 +94,18 @@ public class GameVersionService {
                 List<String> sortedPreRelease = sortDescDistinct(preRelease);
                 List<String> sortedAll = sortDescDistinct(mergeLists(sortedRelease, sortedPreRelease));
 
-                cachedCatalog = new GameVersionCatalog(
-                        sortedRelease,
-                        sortedPreRelease,
-                        sortedAll
-                );
+                List<GameVersionEntry> entries = new ArrayList<>(sortedAll.size());
+                for (String version : sortedAll) {
+                    if (releaseSet.contains(version)) {
+                        entries.add(new GameVersionEntry(version, false, releaseMetadataUrl));
+                    } else if (preReleaseSet.contains(version)) {
+                        entries.add(new GameVersionEntry(version, true, preReleaseMetadataUrl));
+                    } else {
+                        entries.add(new GameVersionEntry(version, true, "indexed"));
+                    }
+                }
+
+                cachedCatalog = new GameVersionCatalog(sortedRelease, sortedPreRelease, sortedAll, entries);
             } catch (Exception e) {
                 logger.error("Failed to refresh Hytale game versions from Maven metadata.", e);
             }
@@ -244,5 +251,6 @@ public class GameVersionService {
         return merged;
     }
 
-    public record GameVersionCatalog(List<String> releaseVersions, List<String> preReleaseVersions, List<String> allVersions) {}
+    public record GameVersionEntry(String version, boolean preRelease, String sourceUrl) {}
+    public record GameVersionCatalog(List<String> releaseVersions, List<String> preReleaseVersions, List<String> allVersions, List<GameVersionEntry> versions) {}
 }

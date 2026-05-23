@@ -19,7 +19,6 @@ public class ReservedAccountGuardService {
     private static final Set<String> RESERVED_EMAILS = Set.of(
             "admin@modtale.net",
             "super_admin@modtale.net",
-            "user@modale.net",
             "user@modtale.net"
     );
 
