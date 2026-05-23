@@ -79,7 +79,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     }, [versionsByGame]);
 
     const hasPreReleaseGameVersionEntries = useMemo(() => {
-        return Object.keys(versionsByGame).some(version => preReleaseGameVersionSet.has(version));
+        return Object.entries(versionsByGame).some(([version, builds]) => preReleaseGameVersionSet.has(version) && Array.isArray(builds) && builds.length > 0);
     }, [versionsByGame, preReleaseGameVersionSet]);
 
     const gameVersions = useMemo(() => {
@@ -104,7 +104,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     useEffect(() => {
         if (!hasPreReleaseGameVersionEntries) return;
-        const hasReleaseGameVersionEntries = Object.keys(versionsByGame).some(version => !preReleaseGameVersionSet.has(version));
+        const hasReleaseGameVersionEntries = Object.entries(versionsByGame).some(([version, builds]) => !preReleaseGameVersionSet.has(version) && Array.isArray(builds) && builds.length > 0);
         if (!hasReleaseGameVersionEntries && !showPreReleaseGameVersions) {
             setShowPreReleaseGameVersions(true);
         }
