@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, BadgeDollarSign, Building2, CalendarClock, ChevronDown, CreditCard, RefreshCw, Wallet } from 'lucide-react';
 import { financeClient } from '@/modules/finance/api/financeClient';
 import { LineChart } from '@/components/ui/charts/LineChart';
@@ -238,7 +239,10 @@ export const FinanceManager: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />}
+            {status && typeof document !== 'undefined' && createPortal(
+                <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />,
+                document.body
+            )}
 
             <div className={theme.components.panel + ' p-5'}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
