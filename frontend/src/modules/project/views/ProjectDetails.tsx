@@ -115,16 +115,27 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, []);
 
     useEffect(() => {
+        if (!isDownloadOpen) return;
+        if (orderedGameVersions.length > 0 || preReleaseGameVersions.length > 0) return;
+
+        let isCancelled = false;
+
         projectClient.getMetaGameVersionCatalog()
             .then((catalog) => {
+                if (isCancelled) return;
                 setPreReleaseGameVersions(catalog?.preReleaseVersions || []);
                 setOrderedGameVersions(catalog?.orderedVersions || catalog?.allVersions || []);
             })
             .catch(() => {
+                if (isCancelled) return;
                 setPreReleaseGameVersions([]);
                 setOrderedGameVersions([]);
             });
-    }, []);
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isDownloadOpen, orderedGameVersions.length, preReleaseGameVersions.length]);
 
     useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
@@ -7,9 +7,6 @@ import { SiteRoutes } from '@/utils/routes';
 import type { Project } from '@/types';
 
 export const FeaturedModCard = ({ project, priority = false }: { project: Project, priority?: boolean }) => {
-    const [isMounted, setIsMounted] = useState(false);
-    useEffect(() => setIsMounted(true), []);
-
     const iconUrl = project.imageUrl
         ? (project.imageUrl.startsWith('/api') ? `${BACKEND_URL}${project.imageUrl}` : project.imageUrl)
         : '/assets/favicon.svg';
@@ -31,7 +28,6 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
             <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 rounded-t-2xl overflow-hidden shrink-0 ${bannerUrl ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {bannerUrl ? (
                     <OptimizedImage
-                        key={`banner-${isMounted}`}
                         src={bannerUrl}
                         alt={`${project.title} Banner`}
                         baseWidth={400}
@@ -46,7 +42,6 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
             <div className="px-4 sm:px-6 pb-4 sm:pb-6 relative flex flex-col flex-1 bg-transparent">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl absolute -top-6 sm:-top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
                     <OptimizedImage
-                        key={`icon-${isMounted}`}
                         src={iconUrl}
                         alt={`${project.title} Icon`}
                         baseWidth={64}

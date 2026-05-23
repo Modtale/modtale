@@ -11,7 +11,6 @@ import { BROWSE_VIEWS, PROJECT_TYPES } from '@/data/categories';
 import type { Classification } from '@/data/categories';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BACKEND_URL } from '@/utils/api';
-import { SiteRoutes } from '@/utils/routes';
 
 import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
@@ -42,6 +41,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
 
     const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
     const useSSR = initialData?.browseData && !hasComplexParams;
+    const canRenderHydratedContent = useSSR || isMounted;
 
     const {
         page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
@@ -83,7 +83,6 @@ export const Browse: React.FC<BrowseViewProps> = ({
     }, [items]);
 
     useEffect(() => {
-        let lastScrollY = window.scrollY;
         let ticking = false;
         const handleScroll = () => {
             if (!ticking) {
@@ -253,7 +252,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                             />
                         </div>
 
-                        {!isMounted || (loading && items.length === 0) ? (
+                        {!canRenderHydratedContent || (loading && items.length === 0) ? (
                             <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />
                         ) : items.length > 0 ? (
                             <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
@@ -263,7 +262,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                             </div>
                         )}
 
-                        {totalPages > 1 && isMounted && (
+                        {totalPages > 1 && canRenderHydratedContent && (
                             <nav aria-label="Pagination" className="mt-12 flex flex-col md:flex-row justify-center items-center gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                 <div className="rounded-2xl border border-modtale-accent/20 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl px-2 py-2 flex items-center gap-1">
                                     {page === 0 ? (

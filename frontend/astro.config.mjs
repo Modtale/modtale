@@ -27,18 +27,7 @@ export default defineConfig({
         },
         build: {
             target: 'esnext',
-            cssCodeSplit: true,
-            rollupOptions: {
-                output: {
-                    manualChunks: (id) => {
-                        if (id.includes('node_modules')) {
-                            if (id.includes('react')) return 'vendor-react';
-                            if (id.includes('lucide')) return 'vendor-icons';
-                            return 'vendor';
-                        }
-                    }
-                }
-            }
+            cssCodeSplit: true
         }
     }
 });

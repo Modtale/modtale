@@ -268,7 +268,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                         ) : (
                             <div className="flex items-center justify-end flex-1 gap-2">
                                 {user && <NotificationMenu />}
-                                <button id="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 focus:outline-none">
+                                <button
+                                    id="mobile-menu-btn"
+                                    type="button"
+                                    aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                                    aria-expanded={isMobileMenuOpen}
+                                    aria-controls="mobile-nav-menu"
+                                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                    className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 focus:outline-none"
+                                >
                                     {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                                 </button>
                             </div>
@@ -278,7 +286,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {isMobile && isMobileMenuOpen && (
-                <div ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
+                <div id="mobile-nav-menu" ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
                     <div className="space-y-1">
                         <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Browse</div>
                         <Link to={SiteRoutes.browse()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
