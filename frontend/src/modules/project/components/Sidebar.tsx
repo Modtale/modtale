@@ -7,6 +7,7 @@ import { getLicenseInfo } from '@/utils/modHelpers';
 import { SiteRoutes } from '@/utils/routes';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project, User, ProjectDependency } from '@/types';
+import { SponsoredAdCard } from './ads/SponsoredAdCard';
 
 interface SidebarProps {
     project: Project;
@@ -224,6 +225,12 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             </div>
                         )}
                     </div>
+                </SidebarSection>
+            )}
+
+            {project.adsEnabled !== false && (
+                <SidebarSection title="Sponsored">
+                    <SponsoredAdCard projectId={project.id} />
                 </SidebarSection>
             )}
 
