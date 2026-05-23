@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2 } from 'lucide-react';
+import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle } from 'lucide-react';
 
 import type { User, Project, ProjectVersion } from '@/types';
 import { theme } from '@/styles/theme';
@@ -70,6 +70,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [editingVersion, setEditingVersion] = useState<ProjectVersion | null>(null);
     const [editVersionData, setEditVersionData] = useState<VersionFormData | null>(null);
     const [isSavingVersion, setIsSavingVersion] = useState(false);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
     const [galleryCropImage, setGalleryCropImage] = useState<string | null>(null);
     const [statusModal, setStatusModal] = useState<any>(null);
@@ -92,6 +93,17 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             if (projectData.bannerUrl) setBannerPreview(projectData.bannerUrl);
         }
     }, [projectData]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (!isDirty) return;
+            event.preventDefault();
+            event.returnValue = '';
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
 
     if (loading || !projectData) return <div className="min-h-screen flex items-center justify-center"><Spinner /></div>;
 
@@ -317,6 +329,12 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             </div>
                         )}
 
+                        {isDirty && (
+                            <div className="flex items-center px-2 h-8 rounded border border-amber-300/60 dark:border-amber-400/30 bg-amber-50/80 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 animate-pulse">
+                                <span className="text-[9px] font-semibold tracking-wide">Not Saved</span>
+                            </div>
+                        )}
+
                         <button onClick={handleSave} disabled={!isDirty || isSaving} className={`px-6 h-10 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg ${isDirty ? 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-modtale-accent/20' : `${theme.colors.bgSurface} ${theme.colors.textMuted} border ${theme.colors.border} cursor-not-allowed`}`}>
                             {isSaving ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : <Save className="w-4 h-4" />}
                             Save
@@ -325,7 +343,32 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 }
                 headerContent={
                     <div>
-                        <input value={metaData.title} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, title: e.target.value}); }} className={`text-4xl md:text-5xl font-black ${theme.colors.textPrimary} bg-transparent border-b border-transparent outline-none w-full hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Project Title"/>
+                        {isEditingTitle && !readOnly ? (
+                            <div className="relative w-full max-w-full">
+                                <input
+                                    value={metaData.title}
+                                    onChange={e => { markDirty(); setMetaData({...metaData, title: e.target.value}); }}
+                                    className={`text-4xl md:text-5xl font-black ${theme.colors.textPrimary} bg-transparent border-b border-slate-300 dark:border-white/20 outline-none w-full focus:border-modtale-accent pb-1 pr-10`}
+                                    placeholder="Project Title"
+                                    autoFocus
+                                />
+                                <button
+                                    onClick={() => { setMetaData({...metaData, title: projectData.title || ''}); setIsEditingTitle(false); }}
+                                    className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                    aria-label="Cancel title editing"
+                                >
+                                    <XCircle className="w-5 h-5" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div
+                                className={`flex items-center gap-3 group rounded-2xl -ml-3 px-3 py-1.5 ${readOnly ? '' : 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5'} transition-colors`}
+                                onClick={() => { if (!readOnly) setIsEditingTitle(true); }}
+                            >
+                                <h1 className={`text-4xl md:text-5xl font-black ${theme.colors.textPrimary} tracking-tighter break-words`}>{metaData.title || 'Project Title'}</h1>
+                                {!readOnly && <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                            </div>
+                        )}
                         <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} className={`text-lg ${theme.colors.textSecondary} font-medium bg-transparent border-b border-transparent outline-none w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Short summary..."/>
                     </div>
                 }
@@ -380,14 +423,14 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, license: e.target.value }); }}
                                                 placeholder="License Name"
                                                 disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
-                                                className={`w-full ${theme.colors.bgPrimary} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs`}
+                                                className={`w-full ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs`}
                                             />
                                             <input
                                                 value={metaData.links.LICENSE || ''}
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, links: { ...metaData.links, LICENSE: e.target.value } }); }}
                                                 placeholder="License URL"
                                                 disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
-                                                className={`w-full ${theme.colors.bgPrimary} border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : theme.colors.border}`}
+                                                className={`w-full ${theme.colors.bgSurfaceAlt} border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : theme.colors.border}`}
                                             />
                                             {!metaData.links.LICENSE && (
                                                 <p className="text-[10px] text-red-500 font-bold px-1">URL is required for custom licenses.</p>

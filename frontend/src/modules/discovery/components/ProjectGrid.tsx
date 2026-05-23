@@ -1,10 +1,10 @@
 import React from 'react';
 import { PackageSearch } from 'lucide-react';
-import { theme } from '@/styles/theme';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SiteRoutes } from '@/utils/routes';
 import type { Project } from '@/types';
+import { BrowseSkeletons } from './BrowseSkeletons';
 
 interface ProjectGridProps {
     items: Project[];
@@ -20,15 +20,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                                                             items, loading, viewStyle, itemsPerPage, likedProjectIds, onToggleFavorite, isLoggedIn
                                                         }) => {
     if (loading) {
-        return (
-            <div className={viewStyle === 'grid' ? "grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-5 mt-4" : viewStyle === 'compact' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4" : "space-y-4 mt-4"}>
-                {[...Array(itemsPerPage)].map((_, i) => (
-                    <div key={i} className={`${viewStyle === 'grid' ? 'h-[154px]' : viewStyle === 'list' ? 'h-32' : 'h-16'} bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-2xl animate-pulse border ${theme.colors.border} relative overflow-hidden`}>
-                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-                    </div>
-                ))}
-            </div>
-        );
+        return <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />;
     }
 
     if (items.length === 0) {

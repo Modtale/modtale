@@ -399,7 +399,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                 background-color: rgba(255,255,255,0.02) !important;
                             }
                         `}</style>
-                        <div className="sort-override-wrapper">
+                        <div className="sort-override-wrapper flex-1 lg:flex-none h-10">
                             <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={() => setIsTagsOpen(false)} isMobile={isMobile} />
                         </div>
                     </div>
