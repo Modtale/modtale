@@ -1,0 +1,346 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid, Trophy } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { NotificationMenu } from '@/modules/user/components/NotificationMenu';
+import { FollowingModal } from '@/modules/user/components/FollowingModal';
+import { SignInModal } from '@/modules/auth/components/SignInModal.tsx';
+import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
+import { useMobile } from '@/context/MobileContext';
+import { SiteRoutes } from '@/utils/routes';
+import type { User } from "@/types.ts";
+
+interface NavbarProps {
+    user: User | null;
+    onLogout: () => void;
+    currentPage: string;
+    onNavigate: (page: string) => void;
+    isDarkMode: boolean;
+    toggleDarkMode: () => void;
+    onUserClick: (username: string) => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+                                                  user, onLogout, currentPage, isDarkMode, toggleDarkMode
+                                              }) => {
+    const { isMobile } = useMobile();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isFollowingOpen, setIsFollowingOpen] = useState(false);
+    const [isSignInOpen, setIsSignInOpen] = useState(false);
+    const [isBrowseDropdownOpen, setIsBrowseDropdownOpen] = useState(false);
+
+    const profileRef = useRef<HTMLDivElement>(null);
+    const mobileMenuRef = useRef<HTMLDivElement>(null);
+    const browseDropdownRef = useRef<HTMLDivElement>(null);
+
+    const logoSrc = isDarkMode ? '/assets/logo_light.svg' : '/assets/logo.svg';
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+                setIsProfileOpen(false);
+            }
+            if (browseDropdownRef.current && !browseDropdownRef.current.contains(event.target as Node)) {
+                setIsBrowseDropdownOpen(false);
+            }
+            if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node) && !(event.target as Element).closest('#mobile-menu-btn')) {
+                setIsMobileMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [currentPage]);
+
+    useEffect(() => {
+        if (!isMobile) {
+            setIsMobileMenuOpen(false);
+        }
+    }, [isMobile]);
+
+    const browsePages = ['mods', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
+    const isBrowseActive = browsePages.includes(currentPage);
+
+    const widthClass = "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
+
+    const isJamPage = currentPage === 'jams' || currentPage.startsWith('jam/');
+
+    return (
+        <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
+            <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
+
+            {isFollowingOpen && user && (
+                <FollowingModal userId={user.id} onClose={() => setIsFollowingOpen(false)} />
+            )}
+
+            <div className="flex justify-center w-full h-full">
+                <div className={`${widthClass} w-full h-full transition-[padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]`}>
+                    <div className="flex items-center justify-between h-full">
+
+                        <Link to={SiteRoutes.home()} className="flex items-center cursor-pointer group flex-shrink-0 mr-8">
+                            <img
+                                src={logoSrc}
+                                alt="Modtale"
+                                width="140"
+                                height="36"
+                                className="h-8 md:h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-105 mt-1"
+                            />
+                        </Link>
+
+                        <div className="flex-1"></div>
+
+                        {!isMobile ? (
+                            <div className="flex items-center gap-2">
+                                <div className="relative" ref={browseDropdownRef}>
+                                    <button
+                                        onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
+                                        className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                            isBrowseActive && !isJamPage
+                                                ? 'text-modtale-accent bg-modtale-accent/10'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
+                                        }`}
+                                    >
+                                        <LayoutGrid className="w-4 h-4 mr-2" />
+                                        Mods
+                                        <ChevronDown className={`w-3.5 h-3.5 ml-1 transition-transform duration-200 opacity-60 ${isBrowseDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {isBrowseDropdownOpen && (
+                                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                            <Link
+                                                to={SiteRoutes.browse()}
+                                                onClick={() => setIsBrowseDropdownOpen(false)}
+                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                            >
+                                                <Layout className="w-4 h-4 mr-3 text-slate-400" />
+                                                All Projects
+                                            </Link>
+                                            <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>
+                                            <Link
+                                                to={SiteRoutes.browse('PLUGIN')}
+                                                onClick={() => setIsBrowseDropdownOpen(false)}
+                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                            >
+                                                <FileCode className="w-4 h-4 mr-3 text-slate-400" />
+                                                Plugins
+                                            </Link>
+                                            <Link
+                                                to={SiteRoutes.browse('MODPACK')}
+                                                onClick={() => setIsBrowseDropdownOpen(false)}
+                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                            >
+                                                <Layers className="w-4 h-4 mr-3 text-slate-400" />
+                                                Modpacks
+                                            </Link>
+                                            <Link
+                                                to={SiteRoutes.browse('SAVE')}
+                                                onClick={() => setIsBrowseDropdownOpen(false)}
+                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                            >
+                                                <Save className="w-4 h-4 mr-3 text-slate-400" />
+                                                Worlds
+                                            </Link>
+                                            <Link
+                                                to={SiteRoutes.browse('ART')}
+                                                onClick={() => setIsBrowseDropdownOpen(false)}
+                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                            >
+                                                <Palette className="w-4 h-4 mr-3 text-slate-400" />
+                                                Art Assets
+                                            </Link>
+                                            <Link
+                                                to={SiteRoutes.browse('DATA')}
+                                                onClick={() => setIsBrowseDropdownOpen(false)}
+                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                            >
+                                                <Database className="w-4 h-4 mr-3 text-slate-400" />
+                                                Data Assets
+                                            </Link>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <Link
+                                    to={SiteRoutes.apiDocs()}
+                                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                        currentPage === 'api-docs'
+                                            ? 'text-modtale-accent bg-modtale-accent/10'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
+                                    }`}
+                                >
+                                    <Code2 className="w-4 h-4 mr-2" />
+                                    API
+                                </Link>
+
+                                <Link
+                                    to={SiteRoutes.jams()}
+                                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                        isJamPage
+                                            ? 'text-modtale-accent bg-modtale-accent/10'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
+                                    }`}
+                                >
+                                    <Trophy className="w-4 h-4 mr-2" />
+                                    Jams
+                                </Link>
+
+                                {user && (
+                                    <>
+                                        <Link
+                                            to={SiteRoutes.dashboard()}
+                                            className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                                currentPage.startsWith('dashboard')
+                                                    ? 'text-modtale-accent bg-modtale-accent/10'
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <LayoutDashboard className="w-4 h-4 mr-2" />
+                                            Dashboard
+                                        </Link>
+                                        <Link
+                                            to={SiteRoutes.upload()}
+                                            className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                                currentPage === 'upload'
+                                                    ? 'text-modtale-accent bg-modtale-accent/10'
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <Upload className="w-4 h-4 mr-2" />
+                                            Create
+                                        </Link>
+                                    </>
+                                )}
+
+                                <div className="h-5 w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
+
+                                {user && <NotificationMenu />}
+
+                                <AnimatedThemeToggler
+                                    onToggle={toggleDarkMode}
+                                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors"
+                                />
+
+                                {user ? (
+                                    <div className="relative" ref={profileRef}>
+                                        <button
+                                            onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                            className={`group relative flex items-center justify-center rounded-full transition-all duration-200 ${
+                                                isProfileOpen
+                                                    ? 'ring-2 ring-modtale-accent ring-offset-2 dark:ring-offset-[#141d30]'
+                                                    : 'hover:ring-2 hover:ring-slate-200 dark:hover:ring-white/10 ring-offset-2 dark:ring-offset-[#141d30]'
+                                            }`}
+                                        >
+                                            <img
+                                                src={user.avatarUrl}
+                                                alt={user.username}
+                                                className="h-9 w-9 rounded-full transition-transform group-active:scale-95"
+                                            />
+                                        </button>
+
+                                        {isProfileOpen && (
+                                            <div className="absolute right-0 mt-4 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 origin-top-right">
+                                                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 mb-2 bg-slate-50/50 dark:bg-white/5 mx-2 rounded-xl">
+                                                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Signed in as</p>
+                                                    <p className="text-base font-black text-slate-900 dark:text-white truncate">{user.username}</p>
+                                                </div>
+
+                                                <div className="px-2 space-y-0.5">
+                                                    <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                        <UserIcon className="w-4 h-4 text-slate-400" /> Your Profile
+                                                    </Link>
+                                                    <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                        <Users className="w-4 h-4 text-slate-400" /> Following
+                                                    </button>
+                                                    <Link to={SiteRoutes.dashboard()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                        <LayoutDashboard className="w-4 h-4 text-slate-400" /> User Dashboard
+                                                    </Link>
+                                                    {user.roles?.includes('ADMIN') && (
+                                                        <Link to={SiteRoutes.admin()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
+                                                            <Shield className="w-4 h-4" /> Admin Panel
+                                                        </Link>
+                                                    )}
+                                                </div>
+
+                                                <div className="border-t border-slate-100 dark:border-white/5 my-2 mx-4"></div>
+
+                                                <div className="px-2">
+                                                    <button onClick={() => { setIsProfileOpen(false); onLogout(); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-3 transition-colors">
+                                                        <LogOut className="w-4 h-4" /> Sign Out
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <button onClick={() => setIsSignInOpen(true)} className="flex items-center bg-slate-900 dark:bg-modtale-accent text-white dark:text-white hover:opacity-90 font-black py-2 px-5 rounded-lg transition-all text-sm shadow-sm dark:shadow-none ml-2 hover:scale-105 active:scale-95">
+                                        <LogIn className="w-4 h-4 mr-2" /> Sign in
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-end flex-1 gap-2">
+                                {user && <NotificationMenu />}
+                                <button id="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 focus:outline-none">
+                                    {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {isMobile && isMobileMenuOpen && (
+                <div ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
+                    <div className="space-y-1">
+                        <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Browse</div>
+                        <Link to={SiteRoutes.browse()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
+                        <Link to={SiteRoutes.browse('PLUGIN')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Plugins</Link>
+                        <Link to={SiteRoutes.browse('MODPACK')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Modpacks</Link>
+                        <Link to={SiteRoutes.browse('SAVE')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Worlds</Link>
+                        <Link to={SiteRoutes.browse('ART')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Palette className="w-4 h-4 mr-3" /> Art Assets</Link>
+                        <Link to={SiteRoutes.browse('DATA')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Database className="w-4 h-4 mr-3" /> Data Assets</Link>
+                    </div>
+
+                    <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
+
+                    <Link to={SiteRoutes.apiDocs()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> API</Link>
+                    <Link to={SiteRoutes.jams()} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center p-3 rounded-lg font-bold text-left ${isJamPage ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5'}`}><Trophy className="w-4 h-4 mr-3" /> Modjams</Link>
+                    {user && (
+                        <>
+                            <Link to={SiteRoutes.dashboard()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
+                            <Link to={SiteRoutes.upload()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Upload className="w-4 h-4 mr-3" /> Create Project</Link>
+                        </>
+                    )}
+
+                    {user?.roles?.includes('ADMIN') && (
+                        <Link to={SiteRoutes.admin()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
+                    )}
+
+                    <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
+
+                    <div className="flex items-center justify-between p-3">
+                        <span className="font-bold text-slate-700 dark:text-slate-200">Theme</span>
+                        <AnimatedThemeToggler onToggle={toggleDarkMode} className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg text-slate-600 dark:text-slate-300" />
+                    </div>
+
+                    {user ? (
+                        <>
+                            <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
+                                <img src={user.avatarUrl} className="w-6 h-6 rounded-full" alt="" /> Profile
+                            </Link>
+                            <button onClick={() => { setIsFollowingOpen(true); setIsMobileMenuOpen(false); }} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
+                                <Users className="w-5 h-5" /> Following
+                            </button>
+                            <button onClick={onLogout} className="p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-500 flex items-center gap-3"><LogOut className="w-5 h-5" /> Sign Out</button>
+                        </>
+                    ) : (
+                        <button onClick={() => { setIsSignInOpen(true); setIsMobileMenuOpen(false); }} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-bold mt-2 flex items-center justify-center gap-2"><LogIn className="w-4 h-4" /> Sign In</button>
+                    )}
+                </div>
+            )}
+        </nav>
+    );
+};

@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
-import { getProjectUrl } from '../../utils/slug';
+import { SiteRoutes } from '../../utils/routes';
 import { isBotUserAgent } from '../../utils/seo';
 import { generateProjectMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
@@ -28,7 +28,7 @@ if (isBot && slug) {
         if (res.ok) {
             modData = await res.json();
 
-            const canonicalUrl = getProjectUrl(modData);
+            const canonicalUrl = SiteRoutes.project(modData);
             if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
                 return Astro.redirect(canonicalUrl, 301);
             }

@@ -29,7 +29,7 @@ export interface User {
     email?: string;
     emailVerified?: boolean;
     createdAt?: string;
-    likedModIds: string[];
+    likedProjectIds: string[];
     followingIds?: string[];
     followerIds?: string[];
     joinedModjamIds?: string[];
@@ -50,11 +50,34 @@ export interface User {
     pendingOrgInvites?: OrganizationMember[];
 }
 
-export interface ModDependency {
-    modId: string;
-    modTitle: string;
+export interface ProjectDependency {
+    projectId: string;
+    projectTitle: string;
     versionNumber: string;
     isOptional?: boolean;
+}
+
+export interface ManifestDependencySuggestion {
+    manifestKey: string;
+    requestedVersion: string;
+    projectId: string;
+    projectTitle: string;
+    versionNumber: string;
+    optional: boolean;
+    confidence: number;
+    dependencyEntry: string;
+}
+
+export interface ManifestInspectionResult {
+    gameVersion?: string;
+    suggestions: ManifestDependencySuggestion[];
+}
+
+export interface GameVersionCatalog {
+    releaseVersions: string[];
+    preReleaseVersions: string[];
+    allVersions: string[];
+    orderedVersions: string[];
 }
 
 export interface ScanIssue {
@@ -83,7 +106,7 @@ export interface ProjectVersion {
     downloadCount: number;
     releaseDate: string;
     changelog?: string;
-    dependencies?: ModDependency[];
+    dependencies?: ProjectDependency[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     scanResult?: ScanResult;
     reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -91,18 +114,26 @@ export interface ProjectVersion {
 }
 
 export interface Reply {
+    userId?: string;
     user: string;
     userAvatarUrl?: string;
     content: string;
     date: string;
+    upvoteCount?: number;
+    downvoteCount?: number;
+    userVote?: 'up' | 'down' | null;
 }
 
 export interface Comment {
     id: string;
+    userId?: string;
     user: string;
     content: string;
     date: string;
     updatedAt?: string;
+    upvoteCount?: number;
+    downvoteCount?: number;
+    userVote?: 'up' | 'down' | null;
     developerReply?: Reply;
 }
 
@@ -120,7 +151,7 @@ export interface ProjectMember {
     avatarUrl?: string;
 }
 
-export interface Mod {
+export interface Project {
     id: string;
     slug?: string;
     title: string;
@@ -138,7 +169,7 @@ export interface Mod {
     favoriteCount: number;
     updatedAt: string;
     createdAt?: string;
-    modIds?: string[];
+    projectIds?: string[];
     childProjectIds?: string[];
     modjamIds?: string[];
     sizeBytes?: number;
@@ -161,9 +192,6 @@ export interface Mod {
     canEdit?: boolean;
     isOwner?: boolean;
 }
-
-export type Modpack = Mod;
-export type World = Mod;
 
 export interface AnalyticsDataPoint {
     date: string;
@@ -191,7 +219,6 @@ export interface Report {
     resolvedBy?: string;
     resolutionNote?: string;
 }
-
 export interface ModjamCategory {
     id: string;
     name: string;

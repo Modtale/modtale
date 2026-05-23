@@ -22,11 +22,26 @@ export const getCloudflareUrl = (url: string, width: number, quality: number) =>
         return url;
     }
 
-    const steppedWidth = getSteppedWidth(width);
-    const isAbsolute = url.startsWith('http');
+    if (url.startsWith('http')) {
+        if (typeof window !== 'undefined') {
+            try {
+                const srcHost = new URL(url).hostname;
+                const appHost = window.location.hostname;
+                const isSameHost = srcHost === appHost;
+                const isSubdomainOfAppHost = srcHost.endsWith(`.${appHost}`);
+                const isFirstPartyCdn = srcHost === 'cdn.modtale.net';
+                if (!isSameHost && !isSubdomainOfAppHost && !isFirstPartyCdn) return url;
+            } catch {
+                return url;
+            }
+        } else {
+            return url;
+        }
+    }
 
+    const steppedWidth = getSteppedWidth(width);
     let absoluteUrl = url;
-    if (!isAbsolute) {
+    if (!url.startsWith('http')) {
         const origin = typeof window !== 'undefined' ? window.location.origin : 'https://modtale.net';
         absoluteUrl = `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
     }

@@ -11,7 +11,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -38,30 +40,53 @@ public class FileValidationService {
     private static final double MAX_COMPRESSION_RATIO = 100.0;
     private static final long MIN_RATIO_CHECK_SIZE = 100L * 1024 * 1024;
     private static final String PLUGIN_MANIFEST_PATH = "manifest.json";
-    private static final long MAX_IMAGE_FILE_SIZE = 5L * 1024 * 1024; // 5MB
+    private static final long MAX_IMAGE_FILE_SIZE = 10L * 1024 * 1024; // 10MB
+    private static final List<String> MUTABLE_CLASSIFICATIONS = Arrays.asList("PLUGIN", "DATA", "ART");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public void validateProjectFile(MultipartFile file, String classification) {
+    public ManifestInspection validateProjectFile(MultipartFile file, String classification) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("A project file is required.");
         }
 
-        String name = file.getOriginalFilename().toLowerCase();
+        String effectiveClassification = resolveUploadClassification(classification, file);
+        String name = file.getOriginalFilename();
+        String lowerName = name == null ? "" : name.toLowerCase();
 
-        if ("PLUGIN".equals(classification)) {
-            if (!name.endsWith(".jar")) throw new IllegalArgumentException("Server Plugins must be .jar files.");
-        } else if (!name.endsWith(".zip")) {
-            throw new IllegalArgumentException(classification + " projects must be uploaded as .zip archives.");
+        if ("PLUGIN".equals(effectiveClassification)) {
+            if (!lowerName.endsWith(".jar")) throw new IllegalArgumentException("Server Plugins must be .jar files.");
+        } else if (!lowerName.endsWith(".zip")) {
+            throw new IllegalArgumentException(effectiveClassification + " projects must be uploaded as .zip archives.");
         }
 
         validateMagicNumber(file, ZIP_HEADER);
 
         try {
-            validateZipContents(file, classification);
+            return validateZipContents(file, effectiveClassification);
         } catch (IOException e) {
             throw new RuntimeException("Failed to inspect archive contents.", e);
         }
+    }
+
+    public String resolveUploadClassification(String classification, MultipartFile file) {
+        if (classification == null) return null;
+        if (file == null || file.isEmpty()) return classification;
+
+        if ("MODPACK".equals(classification) || "SAVE".equals(classification)) {
+            return classification;
+        }
+        if (!MUTABLE_CLASSIFICATIONS.contains(classification)) {
+            return classification;
+        }
+
+        String name = file.getOriginalFilename();
+        if (name == null) return classification;
+        String lowerName = name.toLowerCase();
+
+        if (lowerName.endsWith(".jar")) return "PLUGIN";
+        if (lowerName.endsWith(".zip") && "PLUGIN".equals(classification)) return "DATA";
+        return classification;
     }
 
     private void validateMagicNumber(MultipartFile file, byte[] expectedHeader) {
@@ -76,12 +101,13 @@ public class FileValidationService {
         }
     }
 
-    private void validateZipContents(MultipartFile file, String classification) throws IOException {
+    private ManifestInspection validateZipContents(MultipartFile file, String classification) throws IOException {
         long totalSize = 0;
         int fileCount = 0;
         boolean manifestFound = false;
         long compressedSize = file.getSize();
         byte[] buffer = new byte[8192];
+        ManifestInspection manifestInspection = null;
 
         try (ZipInputStream zis = new ZipInputStream(file.getInputStream())) {
             ZipEntry entry;
@@ -99,7 +125,7 @@ public class FileValidationService {
                 }
 
                 if ("PLUGIN".equals(classification) && entryName.equals(PLUGIN_MANIFEST_PATH)) {
-                    /*manifestFound = true;
+                    manifestFound = true;
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     int bytesRead;
                     while ((bytesRead = zis.read(buffer)) != -1) {
@@ -114,7 +140,7 @@ public class FileValidationService {
                             }
                         }
                     }
-                    validatePluginManifest(new ByteArrayInputStream(baos.toByteArray()));*/
+                    manifestInspection = validatePluginManifest(new ByteArrayInputStream(baos.toByteArray()));
                 } else if (!entry.isDirectory()) {
                     long claimedSize = entry.getSize();
                     if (claimedSize > MAX_UNCOMPRESSED_SIZE) {
@@ -155,20 +181,17 @@ public class FileValidationService {
                 }
             }
         }
-
-        manifestFound = true;
-        /*
         if ("PLUGIN".equals(classification) && !manifestFound) {
-            throw new IllegalArgumentException("Invalid Plugin: Missing manifest.json");
+            throw new IllegalArgumentException("Plugin archive must include manifest.json at the archive root.");
         }
-        */
+        return manifestInspection;
     }
 
-    private void validatePluginManifest(InputStream is) {
+    private ManifestInspection validatePluginManifest(InputStream is) {
         try {
             JsonNode root = objectMapper.readTree(is);
 
-            String[] requiredFields = {"Group", "Name", "Version", "Main"};
+            String[] requiredFields = {"Group", "Name", "Version", "Description", "ServerVersion", "Main"};
             for (String field : requiredFields) {
                 if (!root.has(field) || root.get(field).asText().isEmpty()) {
                     throw new IllegalArgumentException("Plugin manifest.json is missing required field: " + field);
@@ -179,8 +202,83 @@ public class FileValidationService {
                 throw new IllegalArgumentException("Plugin manifest.json must contain at least one Author.");
             }
 
+            for (JsonNode author : root.get("Authors")) {
+                if (!author.has("Name") || author.get("Name").asText().isBlank()) {
+                    throw new IllegalArgumentException("Plugin manifest.json Authors entries must include Name.");
+                }
+            }
+
+            List<ManifestDependency> dependencies = new ArrayList<>();
+            readManifestDependencies(root.get("Dependencies"), false, dependencies);
+            readManifestDependencies(root.get("OptionalDependencies"), true, dependencies);
+
+            return new ManifestInspection(
+                    root.get("Group").asText(),
+                    root.get("Name").asText(),
+                    root.get("Version").asText(),
+                    root.get("ServerVersion").asText(),
+                    dependencies
+            );
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to parse manifest.json. Ensure it is valid JSON.");
+        }
+    }
+
+    private void readManifestDependencies(JsonNode node, boolean optional, List<ManifestDependency> dependencies) {
+        if (node == null || node.isMissingNode() || node.isNull()) return;
+        if (!node.isObject()) {
+            throw new IllegalArgumentException((optional ? "OptionalDependencies" : "Dependencies") + " must be a JSON object.");
+        }
+
+        node.fields().forEachRemaining(entry -> {
+            String key = entry.getKey();
+            if (key == null || key.isBlank()) return;
+            if (key.regionMatches(true, 0, "Hytale:", 0, "Hytale:".length())) return;
+
+            String version = entry.getValue().isTextual() ? entry.getValue().asText() : entry.getValue().toString();
+            dependencies.add(new ManifestDependency(key, version, optional));
+        });
+    }
+
+    public static class ManifestInspection {
+        private final String group;
+        private final String name;
+        private final String version;
+        private final String serverVersion;
+        private final List<ManifestDependency> dependencies;
+
+        public ManifestInspection(String group, String name, String version, String serverVersion, List<ManifestDependency> dependencies) {
+            this.group = group;
+            this.name = name;
+            this.version = version;
+            this.serverVersion = serverVersion;
+            this.dependencies = Collections.unmodifiableList(new ArrayList<>(dependencies));
+        }
+
+        public String getGroup() { return group; }
+        public String getName() { return name; }
+        public String getVersion() { return version; }
+        public String getServerVersion() { return serverVersion; }
+        public List<ManifestDependency> getDependencies() { return dependencies; }
+    }
+
+    public static class ManifestDependency {
+        private final String key;
+        private final String version;
+        private final boolean optional;
+
+        public ManifestDependency(String key, String version, boolean optional) {
+            this.key = key;
+            this.version = version;
+            this.optional = optional;
+        }
+
+        public String getKey() { return key; }
+        public String getVersion() { return version; }
+        public boolean isOptional() { return optional; }
+        public String getNamePart() {
+            int separator = key.indexOf(':');
+            return separator >= 0 && separator < key.length() - 1 ? key.substring(separator + 1) : key;
         }
     }
 
@@ -201,7 +299,7 @@ public class FileValidationService {
 
     private void validateImage(MultipartFile file, double targetRatio, String type, String ratioLabel) {
         if (file.getSize() > MAX_IMAGE_FILE_SIZE) {
-            throw new IllegalArgumentException(type + " image size must not exceed 5MB.");
+            throw new IllegalArgumentException(type + " image size must not exceed 10MB.");
         }
 
         try (InputStream is = file.getInputStream()) {

@@ -1,15 +1,17 @@
 package net.modtale.service.auth;
 
-import net.modtale.model.resources.Mod;
+import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.repository.resources.ModRepository;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.user.UserService;
+import net.modtale.service.security.AccessControlService;
+import net.modtale.service.user.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,8 +26,11 @@ public class ApiKeyService {
 
     @Autowired private ApiKeyRepository apiKeyRepository;
     @Autowired private UserRepository userRepository;
-    @Autowired private UserService userService;
-    @Autowired private ModRepository modRepository;
+    @Autowired private ProjectRepository projectRepository;
+    @Autowired private AccessControlService accessControlService;
+
+    @Lazy
+    @Autowired private OrganizationService organizationService;
 
     @Qualifier("taskExecutor")
     @Autowired private Executor taskExecutor;
@@ -45,7 +50,7 @@ public class ApiKeyService {
             throw new IllegalStateException("You have reached the maximum limit of " + maxApiKeys + " API keys.");
         }
 
-        List<User> userOrgs = userService.getUserOrganizations(userId);
+        List<User> userOrgs = organizationService.getUserOrganizations(userId);
         Map<String, Set<ApiKey.ApiPermission>> validatedContexts = new HashMap<>();
 
         for (Map.Entry<String, Set<ApiKey.ApiPermission>> entry : requestedContexts.entrySet()) {
@@ -81,30 +86,19 @@ public class ApiKeyService {
                     }
                     if (!allowedPerms.isEmpty()) validatedContexts.put(contextId, allowedPerms);
                 } else {
-                    Mod project = modRepository.findById(contextId).orElse(null);
+                    Project project = projectRepository.findById(contextId).orElse(null);
                     if (project != null) {
                         Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
 
-                        boolean isAuthor = project.getAuthorId() != null && project.getAuthorId().equals(userId);
-                        boolean isOrgAdmin = false;
-
-                        if (!isAuthor && project.getAuthorId() != null) {
-                            User authorUser = userRepository.findById(project.getAuthorId()).orElse(null);
-                            if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
-                                isOrgAdmin = authorUser.getOrganizationMembers().stream()
-                                        .anyMatch(m -> m.getUserId().equals(userId) && "ADMIN".equals(m.getRole()));
-                            }
-                        }
-
-                        if (isAuthor || isOrgAdmin) {
+                        if (accessControlService.isOwner(project, user)) {
                             allowedPerms.addAll(requestedPerms);
                         } else {
-                            Mod.ProjectMember member = project.getTeamMembers() != null ?
+                            Project.ProjectMember member = project.getTeamMembers() != null ?
                                     project.getTeamMembers().stream().filter(m -> m.getUserId().equals(userId)).findFirst().orElse(null) : null;
 
                             if (member == null) throw new SecurityException("You are not a contributor to project: " + contextId);
 
-                            Mod.ProjectRole role = project.getProjectRoles() != null && member.getRoleId() != null ?
+                            Project.ProjectRole role = project.getProjectRoles() != null && member.getRoleId() != null ?
                                     project.getProjectRoles().stream().filter(r -> r.getId().equals(member.getRoleId())).findFirst().orElse(null) : null;
 
                             if (role != null && role.getPermissions() != null) {
@@ -233,31 +227,22 @@ public class ApiKeyService {
                     }
                 }
             } else {
-                Mod mod = modRepository.findById(contextId).orElse(null);
-                if (mod != null && !"DELETED".equals(mod.getStatus())) {
-                    boolean isAuthor = mod.getAuthorId() != null && mod.getAuthorId().equals(apiKey.getUserId());
-                    boolean isOrgAdmin = false;
+                Project project = projectRepository.findById(contextId).orElse(null);
+                if (project != null && !project.getStatus().name().equals("DELETED")) {
+                    User user = userRepository.findById(apiKey.getUserId()).orElse(null);
 
-                    if (!isAuthor && mod.getAuthorId() != null) {
-                        User authorUser = userRepository.findById(mod.getAuthorId()).orElse(null);
-                        if (authorUser != null && !authorUser.isDeleted() && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
-                            isOrgAdmin = authorUser.getOrganizationMembers() != null && authorUser.getOrganizationMembers().stream()
-                                    .anyMatch(m -> m.getUserId().equals(apiKey.getUserId()) && "ADMIN".equals(m.getRole()));
-                        }
-                    }
-
-                    if (isAuthor || isOrgAdmin) {
+                    if (accessControlService.isOwner(project, user)) {
                         hasAccess = true;
                         maxAllowedPerms.addAll(EnumSet.allOf(ApiKey.ApiPermission.class));
-                    } else if (mod.getTeamMembers() != null) {
-                        Mod.ProjectMember member = mod.getTeamMembers().stream()
+                    } else if (project.getTeamMembers() != null) {
+                        Project.ProjectMember member = project.getTeamMembers().stream()
                                 .filter(m -> m.getUserId().equals(apiKey.getUserId()))
                                 .findFirst().orElse(null);
 
                         if (member != null) {
                             hasAccess = true;
-                            Mod.ProjectRole role = mod.getProjectRoles() != null && member.getRoleId() != null ?
-                                    mod.getProjectRoles().stream().filter(r -> r.getId().equals(member.getRoleId())).findFirst().orElse(null) : null;
+                            Project.ProjectRole role = project.getProjectRoles() != null && member.getRoleId() != null ?
+                                    project.getProjectRoles().stream().filter(r -> r.getId().equals(member.getRoleId())).findFirst().orElse(null) : null;
 
                             if (role != null && role.getPermissions() != null) {
                                 for (String p : role.getPermissions()) {

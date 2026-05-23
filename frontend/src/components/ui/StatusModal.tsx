@@ -154,6 +154,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, 
                 <div className="p-4 flex justify-center gap-3">
                     {(type === 'warning' || type === 'info') && (
                         <button
+                            type="button"
                             onClick={onClose}
                             className="px-6 py-3 rounded-lg font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
                         >
@@ -161,6 +162,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, 
                         </button>
                     )}
                     <button
+                        type="button"
                         onClick={() => { if (onAction) onAction(); else onClose(); }}
                         className={`flex items-center gap-2 px-8 py-3 rounded-lg font-bold text-white transition-transform active:scale-95 ${buttonClass}`}
                     >

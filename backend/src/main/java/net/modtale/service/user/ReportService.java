@@ -3,13 +3,14 @@ package net.modtale.service.user;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
-import net.modtale.model.resources.Mod;
+import net.modtale.model.project.Project;
 import net.modtale.model.user.Report;
-import net.modtale.model.resources.Comment;
+import net.modtale.model.project.Comment;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.ReportRepository;
-import net.modtale.repository.resources.ModRepository;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.communication.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,9 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class ReportService {
 
-    @Autowired private UserService userService;
+    @Autowired private AccountService accountService;
     @Autowired private ReportRepository reportRepository;
-    @Autowired private ModRepository modRepository;
+    @Autowired private ProjectRepository projectRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private NotificationService notificationService;
 
@@ -49,9 +50,9 @@ public class ReportService {
         String targetSummary = "Unknown Target";
 
         if (targetType == Report.TargetType.PROJECT) {
-            Mod mod = modRepository.findById(targetId)
+            Project project = projectRepository.findById(targetId)
                     .orElseThrow(() -> new IllegalArgumentException("Project not found"));
-            targetSummary = mod.getTitle();
+            targetSummary = project.getTitle();
         }
         else if (targetType == Report.TargetType.USER) {
             User user = userRepository.findById(targetId)
@@ -59,16 +60,20 @@ public class ReportService {
             targetSummary = user.getUsername();
         }
         else if (targetType == Report.TargetType.COMMENT) {
-            Mod mod = modRepository.findByCommentsId(targetId)
+            Project project = projectRepository.findByCommentsId(targetId)
                     .orElseThrow(() -> new IllegalArgumentException("Comment not found (or associated project deleted)"));
 
-            Optional<Comment> commentOpt = mod.getComments().stream()
+            Optional<Comment> commentOpt = project.getComments().stream()
                     .filter(c -> c.getId().equals(targetId))
                     .findFirst();
 
             if (commentOpt.isPresent()) {
                 String content = commentOpt.get().getContent();
-                targetSummary = "Comment by " + userService.getPublicProfile(commentOpt.get().getId()).getUsername() + ": " +
+
+                User commentAuthor = accountService.getPublicProfile(commentOpt.get().getUserId());
+                String authorName = commentAuthor != null ? commentAuthor.getUsername() : "Unknown User";
+
+                targetSummary = "Comment by " + authorName + ": " +
                         (content.length() > 50 ? content.substring(0, 47) + "..." : content);
             }
         }

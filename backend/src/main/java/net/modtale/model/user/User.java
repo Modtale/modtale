@@ -177,14 +177,14 @@ public class User implements Serializable {
     public static class ConnectedAccount implements Serializable {
         private static final long serialVersionUID = 1L;
 
-        private String provider;
+        private OAuthProvider provider;
         private String providerId;
         private String username;
         private String profileUrl;
         private boolean visible;
 
         public ConnectedAccount() {}
-        public ConnectedAccount(String provider, String providerId, String username, String profileUrl, boolean visible) {
+        public ConnectedAccount(OAuthProvider provider, String providerId, String username, String profileUrl, boolean visible) {
             this.provider = provider;
             this.providerId = providerId;
             this.username = username;
@@ -192,8 +192,8 @@ public class User implements Serializable {
             this.visible = visible;
         }
 
-        public String getProvider() { return provider; }
-        public void setProvider(String provider) { this.provider = provider; }
+        public OAuthProvider getProvider() { return provider; }
+        public void setProvider(OAuthProvider provider) { this.provider = provider; }
         public String getProviderId() { return providerId; }
         public void setProviderId(String providerId) { this.providerId = providerId; }
         public String getUsername() { return username; }

@@ -1,0 +1,83 @@
+import React from 'react';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { User, Package, Users, Code, BarChart2, Bell, Trophy } from 'lucide-react';
+import type { User as UserType } from '@/types';
+import { SiteRoutes } from '@/utils/routes';
+
+import { ManageProjects } from './ManageProjects';
+import { DeveloperSettings } from './DeveloperSettings';
+import { Analytics } from './Analytics';
+import { Notifications } from './Notifications';
+import { ManageProfile } from './ManageProfile';
+import { ManageOrganization } from '@/modules/organization/views/ManageOrganization';
+import { ManageJams } from './ManageJams';
+
+interface DashboardProps {
+    user: UserType | null;
+    onRefreshUser?: () => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => {
+    if (!user) return <Navigate to={SiteRoutes.home()} replace />;
+
+    const SidebarLink = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => (
+        <NavLink
+            to={to}
+            className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${
+                isActive
+                    ? 'bg-modtale-accent text-white shadow-md shadow-modtale-accent/20'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+            }`}
+        >
+            <Icon className="w-4 h-4" />
+            {label}
+        </NavLink>
+    );
+
+    return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+            <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-8 transition-[max-width,padding] duration-300">
+                <div className="flex flex-col lg:flex-row gap-8">
+                    <aside className="w-full lg:w-64 flex-shrink-0">
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-2xl sticky top-28">
+                            <div className="flex items-center gap-3 px-4 py-4 mb-4 border-b border-slate-100 dark:border-white/5">
+                                <img src={user.avatarUrl} alt="" className="w-10 h-10 rounded-full border border-slate-200 dark:border-white/10" />
+                                <div className="overflow-hidden">
+                                    <h2 className="font-black text-slate-900 dark:text-white truncate">{user.username}</h2>
+                                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Creator</p>
+                                </div>
+                            </div>
+
+                            <nav className="space-y-1">
+                                <SidebarLink to={SiteRoutes.dashboardProfile()} icon={User} label="Manage Profile" />
+                                <SidebarLink to={SiteRoutes.dashboardProjects()} icon={Package} label="Manage Projects" />
+                                <SidebarLink to={`${SiteRoutes.dashboard()}/jams`} icon={Trophy} label="Manage Jams" />
+                                <SidebarLink to={SiteRoutes.dashboardOrgs()} icon={Users} label="Organizations" />
+                                <SidebarLink to={SiteRoutes.dashboardAnalytics()} icon={BarChart2} label="Analytics" />
+                                <SidebarLink to={SiteRoutes.dashboardNotifications()} icon={Bell} label="Notifications" />
+                                <div className="h-px bg-slate-100 dark:bg-white/5 my-2 mx-4" />
+                                <SidebarLink to={SiteRoutes.dashboardDeveloper()} icon={Code} label="Developer Settings" />
+                            </nav>
+                        </div>
+                    </aside>
+
+                    <div className="flex-1 min-w-0">
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-2xl">
+                            <Routes>
+                                <Route path="/" element={<Navigate to="projects" replace />} />
+                                <Route path="profile" element={<ManageProfile user={user} onUpdate={onRefreshUser || (() => {})} />} />
+                                <Route path="projects" element={<ManageProjects user={user} />} />
+                                <Route path="jams" element={<ManageJams user={user} />} />
+                                <Route path="orgs" element={<ManageOrganization user={user} />} />
+                                <Route path="analytics" element={<Analytics />} />
+                                <Route path="analytics/project/:id" element={<Analytics />} />
+                                <Route path="notifications" element={<Notifications user={user} />} />
+                                <Route path="developer" element={<DeveloperSettings user={user} />} />
+                            </Routes>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};

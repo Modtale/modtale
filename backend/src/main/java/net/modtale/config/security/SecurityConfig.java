@@ -1,11 +1,12 @@
 package net.modtale.config.security;
 
 import net.modtale.config.auth.ApiKeyAuthFilter;
-import net.modtale.config.auth.CustomOAuth2UserService;
-import net.modtale.config.auth.CustomOidcUserService;
-import net.modtale.service.auth.CustomUserDetailsService;
-import net.modtale.service.user.UserService;
 import net.modtale.model.user.User;
+import net.modtale.service.auth.AuthenticationService;
+import net.modtale.service.auth.LocalUserDetailsService;
+import net.modtale.service.auth.OAuth2LoginService;
+import net.modtale.service.auth.OidcLoginService;
+import net.modtale.service.user.AccountService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,12 +62,14 @@ public class SecurityConfig {
 
     @Autowired private ApiKeyAuthFilter apiKeyAuthFilter;
     @Autowired private RateLimitFilter rateLimitFilter;
-    @Autowired private CustomOAuth2UserService customOAuth2UserService;
-    @Autowired private CustomOidcUserService customOidcUserService;
+    @Autowired private OAuth2LoginService oauth2LoginService;
+    @Autowired private OidcLoginService oidcLoginService;
     @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
-    @Autowired private CustomUserDetailsService userDetailsService;
+    @Autowired private LocalUserDetailsService userDetailsService;
     @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private UserService userService;
+
+    @Autowired private AccountService accountService;
+    @Autowired private AuthenticationService authenticationService;
 
     @PostConstruct
     public void logConfig() {
@@ -99,10 +102,15 @@ public class SecurityConfig {
         }
     }
 
+    private boolean isLocalhost() {
+        String cleanUrl = getCleanFrontendUrl();
+        return cleanUrl != null && (cleanUrl.contains("localhost") || cleanUrl.contains("127.0.0.1"));
+    }
+
     @Bean
     public CookieSerializer cookieSerializer() {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
-        serializer.setUseSecureCookie(true);
+        serializer.setUseSecureCookie(!isLocalhost());
         serializer.setCookiePath("/");
 
         boolean isPreview = isPreviewEnvironment();
@@ -113,10 +121,10 @@ public class SecurityConfig {
         } else {
             serializer.setSameSite("Lax");
 
-            if (cleanUrl != null && !cleanUrl.isBlank()) {
+            if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
                 try {
                     String host = URI.create(cleanUrl).getHost();
-                    if (host != null && !host.equalsIgnoreCase("localhost")) {
+                    if (host != null) {
                         String[] parts = host.split("\\.");
                         if (parts.length >= 2) {
                             String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
@@ -135,7 +143,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
         tokenRepository.setCookieHttpOnly(false);
-        tokenRepository.setSecure(true);
+        tokenRepository.setSecure(!isLocalhost());
         tokenRepository.setCookiePath("/");
 
         tokenRepository.setCookieCustomizer(cookie -> {
@@ -147,10 +155,10 @@ public class SecurityConfig {
                 cookie.domain(null);
             } else {
                 cookie.sameSite("Lax");
-                if (cleanUrl != null && !cleanUrl.isBlank()) {
+                if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
                     try {
                         String host = URI.create(cleanUrl).getHost();
-                        if (host != null && !host.equalsIgnoreCase("localhost")) {
+                        if (host != null) {
                             String[] parts = host.split("\\.");
                             if (parts.length >= 2) {
                                 String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
@@ -186,7 +194,7 @@ public class SecurityConfig {
                 })
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
-                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
+                .addFilterAfter(new net.modtale.config.security.CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
@@ -198,8 +206,8 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService)
-                                .oidcUserService(customOidcUserService)
+                                .userService(oauth2LoginService)
+                                .oidcUserService(oidcLoginService)
                         )
                         .authorizedClientRepository(authorizedClientRepository)
                         .successHandler(oauthSuccessHandler())
@@ -226,18 +234,17 @@ public class SecurityConfig {
                                 "/api/v1/tags",
                                 "/api/v1/files/**",
                                 "/api/v1/user/profile/**",
-                                "/api/v1/users/search",
-                                "/api/v1/users/*/organizations",
-                                "/api/v1/users/*/following",
-                                "/api/v1/users/*/followers",
+                                "/api/v1/users/**",
                                 "/api/v1/orgs/*/members",
                                 "/api/v1/creators/**",
                                 "/api/v1/og/**",
                                 "/api/v1/download/**",
+                                "/api/v1/download-bundle/**",
                                 "/api/v1/meta/**",
                                 "/api/v1/status",
                                 "/api/v1/version/**",
-                                "/api/v1/analytics/platform/stats"
+                                "/api/v1/analytics/platform/stats",
+                                "/api/v1/wiki/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
@@ -391,19 +398,19 @@ public class SecurityConfig {
                         LocalDateTime expiresAt = client.getAccessToken().getExpiresAt() != null ?
                                 LocalDateTime.ofInstant(client.getAccessToken().getExpiresAt(), ZoneId.systemDefault()) : null;
 
-                        User user = userService.getPublicProfile(login);
+                        User user = accountService.getPublicProfile(login);
                         if (user != null) {
-                            userService.updateProviderTokens(user.getId(), "gitlab", accessToken, refreshToken, expiresAt);
+                            accountService.updateProviderTokens(user.getId(), "gitlab", accessToken, refreshToken, expiresAt);
                         }
                     }
                 }
             }
 
-            User user = userService.getPublicProfile(login);
+            User user = accountService.getPublicProfile(login);
             boolean isLinking = Boolean.TRUE.equals(oauthUser.getAttribute("is_linking"));
 
             if (user != null && user.isMfaEnabled() && !isLinking) {
-                String preAuthToken = userService.generatePreAuthToken(user.getId());
+                String preAuthToken = authenticationService.generatePreAuthToken(user.getId());
 
                 SecurityContextHolder.clearContext();
 

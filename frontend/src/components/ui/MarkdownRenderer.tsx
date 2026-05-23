@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -76,7 +76,8 @@ const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
 
 const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
     const [svg, setSvg] = useState<string>('');
-    const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+
+    const id = useMemo(() => `mermaid-${Math.random().toString(36).substr(2, 9)}`, []);
 
     useEffect(() => {
         const isDark = document.documentElement.classList.contains('dark');
@@ -88,17 +89,27 @@ const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
             fontFamily: 'inherit'
         });
 
+        let isMounted = true;
+
         const renderChart = async () => {
             try {
                 const { svg: renderedSvg } = await mermaid.render(id, chart);
-                setSvg(renderedSvg);
+                if (isMounted) {
+                    setSvg(renderedSvg);
+                }
             } catch (e) {
                 console.error('Mermaid rendering failed', e);
-                setSvg(`<div class="text-red-500 bg-red-50 p-4 rounded-lg border border-red-200 text-sm">Failed to render diagram</div>`);
+                if (isMounted) {
+                    setSvg(`<div class="text-red-500 bg-red-50 p-4 rounded-lg border border-red-200 text-sm">Failed to render diagram</div>`);
+                }
             }
         };
 
         renderChart();
+
+        return () => {
+            isMounted = false;
+        };
     }, [chart, id]);
 
     if (!svg) {
@@ -129,6 +140,9 @@ const markdownComponents = {
     },
     ol({ node, children, ...props }: any) {
         return <ol className="list-decimal pl-6 my-3 space-y-1.5" {...props}>{children}</ol>;
+    },
+    img({ node, ...props }: any) {
+        return <img className="inline-block align-middle max-w-full h-auto my-0" {...props} />;
     },
 };
 

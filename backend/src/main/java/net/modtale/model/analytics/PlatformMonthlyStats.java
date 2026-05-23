@@ -64,11 +64,11 @@ public class PlatformMonthlyStats {
     public static class DayStats {
         private int v;
         private int d;
-        private int a; // api downloads
-        private int f; // frontend downloads
-        private int n; // new projects
-        private int u; // new users
-        private int o; // new orgs
+        private int a;
+        private int f;
+        private int n;
+        private int u;
+        private int o;
 
         public int getV() { return v; }
         public void setV(int v) { this.v = v; }

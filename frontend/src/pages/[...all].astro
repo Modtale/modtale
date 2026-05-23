@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import App from '../App';
-import { getProjectUrl } from '../utils/slug';
+import { SiteRoutes } from '../utils/routes';
 import { isBotUserAgent } from '../utils/seo';
 import { DEFAULT_SEO, ROUTE_SEO, generateDynamicSEO } from '../data/seo-constants';
 import { generateProjectMeta } from '../utils/meta';
@@ -205,8 +205,7 @@ if (classification) {
         const res = await fetch(`${BACKEND_URL}/api/v1/projects/${identifier}`);
         if (res.ok) {
             const modData = await res.json();
-            const projectUrl = getProjectUrl(modData);
-
+            const projectUrl = SiteRoutes.project(modData);
             if (cleanPath !== projectUrl.replace(/\/$/, "")) {
                 return Astro.redirect(projectUrl, 301);
             }
