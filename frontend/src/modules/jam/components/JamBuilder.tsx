@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon, Link2 } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon, Link2, Edit3, XCircle } from 'lucide-react';
 import { JamLayout } from '@/modules/jam/components/JamLayout';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -425,6 +425,8 @@ export const JamBuilder: React.FC<any> = ({
                                           }) => {
     const [isDirty, setIsDirty] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [titleBeforeEdit, setTitleBeforeEdit] = useState('');
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
     const [rulesEditorMode, setRulesEditorMode] = useState<'generate' | 'write' | 'preview'>('generate');
     const [gameVersionOptions, setGameVersionOptions] = useState<{label: string, value: string}[]>([]);
@@ -474,6 +476,16 @@ export const JamBuilder: React.FC<any> = ({
             }
         }
     }, [activeTab, metaData.judgeIds, judgeProfiles]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (!isDirty) return;
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
 
     const [genState, setGenState] = useState({
         allowNSFW: false,
@@ -710,18 +722,45 @@ export const JamBuilder: React.FC<any> = ({
             onIconUpload={(f, p) => { markDirty(); setMetaData((prev: any) => ({ ...prev, imageUrl: p, iconFile: f })); }}
             titleContent={
                 <div className="w-full">
-                    <div className="relative flex items-center w-full">
-                        <input
-                            value={metaData.title}
-                            onChange={e => updateField('title', e.target.value)}
-                            placeholder="Enter Jam Title"
-                            className="text-4xl md:text-5xl font-black bg-transparent border-b border-transparent outline-none w-full hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-slate-900 dark:text-white"
-                        />
-                    </div>
+                    {isEditingTitle ? (
+                        <div className="relative w-full max-w-full">
+                            <input
+                                value={metaData.title}
+                                onChange={e => updateField('title', e.target.value)}
+                                placeholder="Enter Jam Title"
+                                className="text-4xl md:text-5xl font-black bg-transparent border-b border-slate-300 dark:border-white/20 outline-none w-full focus:border-modtale-accent pb-1 pr-10 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-slate-900 dark:text-white"
+                                autoFocus
+                            />
+                            <button
+                                type="button"
+                                onClick={() => { setMetaData((prev: any) => ({ ...prev, title: titleBeforeEdit })); setIsEditingTitle(false); }}
+                                className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                aria-label="Cancel title editing"
+                            >
+                                <XCircle className="w-5 h-5" />
+                            </button>
+                        </div>
+                    ) : (
+                        <div
+                            className="flex items-center gap-3 group rounded-2xl -ml-3 px-3 py-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                            onClick={() => {
+                                setTitleBeforeEdit(metaData.title || '');
+                                setIsEditingTitle(true);
+                            }}
+                        >
+                            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter break-words">{metaData.title || 'Enter Jam Title'}</h1>
+                            <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                    )}
                 </div>
             }
             actionContent={
                 <div className="flex items-center gap-3">
+                    {isDirty && (
+                        <div className="flex items-center px-2 h-8 rounded border border-amber-300/60 dark:border-amber-400/30 bg-amber-50/80 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 animate-pulse">
+                            <span className="text-[9px] font-semibold tracking-wide">Unsaved changes</span>
+                        </div>
+                    )}
                     <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); performSave(); }}
