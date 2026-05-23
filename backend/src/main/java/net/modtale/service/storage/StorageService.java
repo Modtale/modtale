@@ -36,6 +36,8 @@ public class StorageService {
     private static final String DEFAULT_IMAGE = "default.png";
 
     private static final String CACHE_CONTROL_HEADER = "public, max-age=31536000, immutable";
+    private static final long MAX_UPLOAD_BYTES = 100L * 1024 * 1024;
+    private static final String MAX_UPLOAD_ERROR_MESSAGE = "File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.";
 
     private static final Map<String, String> MIME_TYPES = new HashMap<>();
     static {
@@ -49,6 +51,7 @@ public class StorageService {
     }
 
     public String upload(MultipartFile file, String pathPrefix) throws IOException {
+        validateUploadSize(file);
         if (bucketName == null || bucketName.isEmpty()) {
             throw new IOException("Storage configuration error: Bucket name is not set.");
         }
@@ -84,6 +87,7 @@ public class StorageService {
     }
 
     public String uploadAndResize(MultipartFile file, String pathPrefix, int targetWidth) throws IOException {
+        validateUploadSize(file);
         String fileName = pathPrefix + "/" + UUID.randomUUID() + ".jpg";
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -186,6 +190,12 @@ public class StorageService {
             return publicDomain + "/" + fileName;
         }
         return "/api/files/proxy/" + fileName;
+    }
+
+    public void validateUploadSize(MultipartFile file) {
+        if (file != null && file.getSize() > MAX_UPLOAD_BYTES) {
+            throw new IllegalArgumentException(MAX_UPLOAD_ERROR_MESSAGE);
+        }
     }
 
     private String sanitizeFilename(String filename) {
