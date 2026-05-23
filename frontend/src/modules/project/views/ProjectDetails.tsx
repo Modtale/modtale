@@ -314,11 +314,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     };
 
-    const shouldPromptDonation = Boolean(project?.donationsEnabled && (donationConfig?.donationsEnabled ?? true));
+    const shouldPromptDonation = Boolean(donationConfig?.donationsEnabled ?? project?.donationsEnabled ?? false);
 
     const queueOrStartDownload = async (versionNumber: string, selectedDeps: string[]) => {
         if (shouldPromptDonation) {
             setPendingFinalDownload({ versionNumber, selectedDeps });
+            setIsDownloadOpen(false);
             setShowDonationPrompt(true);
             setIsDepModalOpen(false);
             setPendingDownload(null);
@@ -453,11 +454,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} />
             <DonationPromptModal
                 show={showDonationPrompt}
-                projectTitle={project.title}
                 currency={(donationConfig?.currency || 'USD').toUpperCase()}
                 suggestedAmountCents={Math.max(100, Number(donationConfig?.suggestedDonationCents || project.suggestedDonationCents || 500))}
                 recurringDefault={Boolean(donationConfig?.donationRecurringDefault ?? project.donationRecurringDefault)}
-                platformCutPercent={Number(donationConfig?.donationPlatformCutPercent || 0)}
                 onClose={() => {
                     setShowDonationPrompt(false);
                     setPendingFinalDownload(null);

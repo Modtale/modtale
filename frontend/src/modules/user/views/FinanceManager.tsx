@@ -1,20 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BadgeDollarSign, Building2, CalendarClock, Check, ChevronDown, CreditCard, RefreshCw, Wallet } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, BadgeDollarSign, Building2, CalendarClock, ChevronDown, CreditCard, RefreshCw, Wallet } from 'lucide-react';
 import { financeClient } from '@/modules/finance/api/financeClient';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { theme } from '@/styles/theme';
-
-interface ProjectDraft {
-    id: string;
-    title: string;
-    adsEnabled: boolean;
-    donationsEnabled: boolean;
-    suggestedDonationCents: number;
-    donationRecurringDefault: boolean;
-    donationPlatformCutBps: number;
-    lifetimeRevenueCents: number;
-}
 
 interface OrgPolicyMember {
     userId: string;
@@ -24,7 +13,6 @@ interface OrgPolicyMember {
 }
 
 const inputNoNativeUi = `${theme.components.inputField} appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
-const selectNoNativeUi = `${theme.components.inputField} appearance-none pr-10`;
 
 const SummaryCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
@@ -39,38 +27,20 @@ const SummaryCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
     </div>
 );
 
-const RowSwitch = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
-    <label className={theme.components.panel + ' flex h-full items-center justify-between px-3 py-2.5'}>
-        <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{label}</span>
-        <button
-            type="button"
-            onClick={() => onChange(!checked)}
-            className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wider transition-colors ${
-                checked
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300'
-                    : 'border-slate-300 bg-slate-100 text-slate-600 dark:border-white/20 dark:bg-white/5 dark:text-slate-400'
-            }`}
-        >
-            {checked ? <Check className="mr-1 h-3 w-3" /> : null}
-            {checked ? 'On' : 'Off'}
-        </button>
-    </label>
-);
-
 export const FinanceManager: React.FC = () => {
     const [range, setRange] = useState('30d');
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
     const [payoutAmount, setPayoutAmount] = useState('');
-    const [savingProjectId, setSavingProjectId] = useState<string | null>(null);
-    const [drafts, setDrafts] = useState<Record<string, ProjectDraft>>({});
     const [contexts, setContexts] = useState<any[]>([]);
     const [selectedOwnerId, setSelectedOwnerId] = useState('');
+    const [isContextDropdownOpen, setIsContextDropdownOpen] = useState(false);
     const [orgMembers, setOrgMembers] = useState<OrgPolicyMember[]>([]);
     const [orgPayoutMode, setOrgPayoutMode] = useState<'DIRECT_TO_ORG_STRIPE' | 'DISTRIBUTE_TO_MEMBERS'>('DIRECT_TO_ORG_STRIPE');
     const [orgShares, setOrgShares] = useState<Record<string, number>>({});
     const [savingOrgPolicy, setSavingOrgPolicy] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; msg: string } | null>(null);
+    const contextDropdownRef = useRef<HTMLDivElement>(null);
 
     const currency = (data?.currency || 'usd').toUpperCase();
     const isOrgContext = data?.ownerAccountType === 'ORGANIZATION';
@@ -79,23 +49,6 @@ export const FinanceManager: React.FC = () => {
         style: 'currency',
         currency: currency.length === 3 ? currency : 'USD'
     }).format((cents || 0) / 100);
-
-    const hydrateDrafts = (payload: any) => {
-        const next: Record<string, ProjectDraft> = {};
-        for (const project of payload?.projects || []) {
-            next[project.id] = {
-                id: project.id,
-                title: project.title,
-                adsEnabled: !!project.adsEnabled,
-                donationsEnabled: !!project.donationsEnabled,
-                suggestedDonationCents: Math.max(100, Number(project.suggestedDonationCents || 500)),
-                donationRecurringDefault: !!project.donationRecurringDefault,
-                donationPlatformCutBps: Math.max(0, Math.round(Number(project.donationPlatformCutPercent || 10) * 100)),
-                lifetimeRevenueCents: Number(project.lifetimeRevenueCents || 0)
-            };
-        }
-        setDrafts(next);
-    };
 
     const loadContexts = async () => {
         const available = await financeClient.getFinanceContexts();
@@ -109,7 +62,6 @@ export const FinanceManager: React.FC = () => {
         try {
             const overview = await financeClient.getCreatorOverview(selectedRange, ownerId);
             setData(overview);
-            hydrateDrafts(overview);
 
             if (overview?.ownerAccountType === 'ORGANIZATION') {
                 const policy = await financeClient.getOrgPayoutPolicy(ownerId);
@@ -142,6 +94,16 @@ export const FinanceManager: React.FC = () => {
     useEffect(() => {
         if (selectedOwnerId) load(range, selectedOwnerId);
     }, [range, selectedOwnerId]);
+
+    useEffect(() => {
+        const onClickOutside = (event: MouseEvent) => {
+            if (contextDropdownRef.current && !contextDropdownRef.current.contains(event.target as Node)) {
+                setIsContextDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, []);
 
     const chartData = useMemo(() => {
         const mapSeries = (series: any[]) => (series || []).map(point => ({ date: point.date, value: Number(point.count || 0) }));
@@ -181,32 +143,6 @@ export const FinanceManager: React.FC = () => {
             await load(range, selectedOwnerId);
         } catch (e: any) {
             setStatus({ type: 'error', title: 'Payout Failed', msg: e?.response?.data || 'Could not request payout.' });
-        }
-    };
-
-    const setDraftField = (id: string, key: keyof ProjectDraft, value: any) => {
-        setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [key]: value } }));
-    };
-
-    const saveProjectSettings = async (projectId: string) => {
-        const project = drafts[projectId];
-        if (!project) return;
-
-        setSavingProjectId(projectId);
-        try {
-            await financeClient.updateProjectMonetization(projectId, {
-                adsEnabled: project.adsEnabled,
-                donationsEnabled: project.donationsEnabled,
-                suggestedDonationCents: Math.max(100, Math.round(project.suggestedDonationCents || 100)),
-                donationRecurringDefault: project.donationRecurringDefault,
-                donationPlatformCutBps: Math.max(0, Math.min(10000, Math.round(project.donationPlatformCutBps || 0)))
-            });
-            setStatus({ type: 'success', title: 'Saved', msg: `Monetization settings updated for ${project.title}.` });
-            await load(range, selectedOwnerId);
-        } catch (e: any) {
-            setStatus({ type: 'error', title: 'Save Failed', msg: e?.response?.data || 'Could not save project monetization settings.' });
-        } finally {
-            setSavingProjectId(null);
         }
     };
 
@@ -254,13 +190,40 @@ export const FinanceManager: React.FC = () => {
                     </div>
 
                     <div className="flex flex-col gap-2 sm:flex-row">
-                        <div className="relative">
-                            <select value={selectedOwnerId} onChange={(e) => setSelectedOwnerId(e.target.value)} className={selectNoNativeUi}>
-                                {contexts.map((ctx: any) => (
-                                    <option key={ctx.id} value={ctx.id}>{ctx.username} {ctx.isPersonal ? '(Personal)' : '(Organization)'}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <div className="relative" ref={contextDropdownRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsContextDropdownOpen((prev) => !prev)}
+                                className={`${theme.components.inputField} min-w-[250px] flex items-center justify-between text-left`}
+                            >
+                                <span className="truncate text-slate-900 dark:text-white font-medium">
+                                    {selectedContext
+                                        ? `${selectedContext.username} ${selectedContext.isPersonal ? '(Personal)' : '(Organization)'}`
+                                        : 'Select context'}
+                                </span>
+                                <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isContextDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isContextDropdownOpen && (
+                                <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-900">
+                                    {contexts.map((ctx: any) => (
+                                        <button
+                                            key={ctx.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedOwnerId(ctx.id);
+                                                setIsContextDropdownOpen(false);
+                                            }}
+                                            className={`w-full px-3 py-2.5 text-left text-sm transition-colors ${
+                                                selectedOwnerId === ctx.id
+                                                    ? 'bg-modtale-accent text-white font-bold'
+                                                    : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
+                                            }`}
+                                        >
+                                            {ctx.username} {ctx.isPersonal ? '(Personal)' : '(Organization)'}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-white/5">
@@ -407,72 +370,6 @@ export const FinanceManager: React.FC = () => {
                 </div>
             </div>
 
-            <div className={theme.components.panel + ' space-y-4 p-5'}>
-                <div>
-                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Project Monetization Controls</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Configure ads, donations, and the donation platform cut for each project.</p>
-                </div>
-
-                <div className="space-y-3">
-                    {Object.values(drafts).map(project => (
-                        <div key={project.id} className={theme.components.panel + ' p-4'}>
-                            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
-                                    <h3 className="font-black text-slate-900 dark:text-white">{project.title}</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Lifetime recorded revenue: {formatMoney(project.lifetimeRevenueCents)}</p>
-                                </div>
-                                <button onClick={() => saveProjectSettings(project.id)} disabled={savingProjectId === project.id} className={theme.components.buttonPrimary + ' px-3 py-2 text-xs'}>
-                                    {savingProjectId === project.id ? 'Saving...' : 'Save'}
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                <RowSwitch label="Ads Enabled" checked={project.adsEnabled} onChange={(v) => setDraftField(project.id, 'adsEnabled', v)} />
-                                <RowSwitch label="Donations Enabled" checked={project.donationsEnabled} onChange={(v) => setDraftField(project.id, 'donationsEnabled', v)} />
-                                <RowSwitch label="Recurring by Default" checked={project.donationRecurringDefault} onChange={(v) => setDraftField(project.id, 'donationRecurringDefault', v)} />
-                                <div className={theme.components.panel + ' p-3'}>
-                                    <div className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Suggested Donation ({currency})</div>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        step="0.01"
-                                        value={(project.suggestedDonationCents / 100).toFixed(2)}
-                                        onChange={(e) => {
-                                            const cents = Math.max(100, Math.round(Number(e.target.value || 0) * 100));
-                                            setDraftField(project.id, 'suggestedDonationCents', cents);
-                                        }}
-                                        className={inputNoNativeUi + ' mt-2'}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className={theme.components.panel + ' mt-3 p-3'}>
-                                <div className="mb-1 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                    <span>Donation Platform Cut</span>
-                                    <span className="text-slate-700 dark:text-slate-200">{(project.donationPlatformCutBps / 100).toFixed(1)}%</span>
-                                </div>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                    value={(project.donationPlatformCutBps / 100).toFixed(1)}
-                                    onChange={(e) => {
-                                        const bps = Math.max(0, Math.min(10000, Math.round(Number(e.target.value || 0) * 100)));
-                                        setDraftField(project.id, 'donationPlatformCutBps', bps);
-                                    }}
-                                    className={inputNoNativeUi}
-                                />
-                                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Applies only to donations for this project. Ad split is platform-managed.</p>
-                            </div>
-
-                            {!project.adsEnabled && <p className="mt-3 text-xs font-bold text-amber-600 dark:text-amber-400">Ads are disabled for this project. Ad revenue attribution is paused.</p>}
-                        </div>
-                    ))}
-
-                    {Object.values(drafts).length === 0 && <div className="text-sm text-slate-500 dark:text-slate-400">No managed projects found.</div>}
-                </div>
-            </div>
         </div>
     );
 };
