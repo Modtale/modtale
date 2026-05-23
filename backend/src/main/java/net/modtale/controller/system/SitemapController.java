@@ -1,6 +1,8 @@
 package net.modtale.controller.system;
 
+import net.modtale.model.jam.Modjam;
 import net.modtale.model.project.Project;
+import net.modtale.service.ModjamService;
 import net.modtale.service.project.SearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
@@ -18,6 +21,7 @@ import java.util.Set;
 public class SitemapController {
 
     @Autowired private SearchService searchService;
+    @Autowired private ModjamService modjamService;
 
     @Value("${app.frontend.url:https://modtale.net}")
     private String baseUrl;
@@ -34,17 +38,35 @@ public class SitemapController {
         addUrl(xml, baseUrl + "/worlds", "0.9", LocalDate.now());
         addUrl(xml, baseUrl + "/data", "0.9", LocalDate.now());
         addUrl(xml, baseUrl + "/art", "0.9", LocalDate.now());
+        addUrl(xml, baseUrl + "/jams", "0.9", LocalDate.now());
 
         addUrl(xml, baseUrl + "/api-docs", "0.8", LocalDate.now());
 
         Set<String> activeAuthors = new HashSet<>();
 
+        List<Modjam> jams = modjamService.getAllJams();
+        for (Modjam jam : jams) {
+            if ("DRAFT".equals(jam.getStatus())) continue;
+
+            String priority = "COMPLETED".equals(jam.getStatus()) ? "0.6" : "0.8";
+            LocalDate lastMod = jam.getUpdatedAt() != null
+                    ? jam.getUpdatedAt().atZone(ZoneOffset.UTC).toLocalDate()
+                    : LocalDate.now();
+
+            addUrl(xml, baseUrl + "/jam/" + jam.getSlug(), priority, lastMod);
+
+            if (jam.getHostName() != null) {
+                activeAuthors.add(jam.getHostName());
+            }
+        }
+
         List<Project> projects = searchService.getPublishedProjects();
 
         for (Project p : projects) {
+            if (p.getClassification() == null) continue;
             String prefix = "/mod/";
-            if ("MODPACK".equals(p.getClassification())) prefix = "/modpack/";
-            else if ("SAVE".equals(p.getClassification())) prefix = "/world/";
+            if ("MODPACK".equals(p.getClassification().name())) prefix = "/modpack/";
+            else if ("SAVE".equals(p.getClassification().name())) prefix = "/world/";
 
             String slug = (p.getSlug() != null && !p.getSlug().isBlank()) ? p.getSlug() : createSlug(p.getTitle(), p.getId());
 
@@ -74,8 +96,8 @@ public class SitemapController {
 
     private LocalDate parseDate(String dateStr) {
         try {
-            if (dateStr == null) return LocalDate.now();
-            return LocalDate.parse(dateStr);
+            if (dateStr == null || dateStr.length() < 10) return LocalDate.now();
+            return LocalDate.parse(dateStr.substring(0, 10));
         } catch (Exception e) {
             return LocalDate.now();
         }

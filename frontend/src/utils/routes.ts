@@ -3,6 +3,8 @@ export class SiteRoutes {
     static upload() { return '/upload'; }
     static admin() { return '/admin'; }
     static apiDocs() { return '/api-docs'; }
+    static jams() { return '/jams'; }
+    static jam(slug: string) { return `/jam/${slug}`; }
 
     static browse(classification?: string) {
         if (classification === 'PLUGIN') return '/plugins';

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Route, Routes, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
@@ -32,6 +32,8 @@ import { ProjectEditorView } from '@/modules/project/views/ProjectEditor';
 import { AdminPanel } from '@/modules/admin/views/AdminPanel';
 
 import { ApiDocs } from '@/modules/core/views/ApiDocs';
+import { JamsList } from '@/modules/jam/views/JamsList';
+import { JamDetail } from '@/modules/jam/views/JamDetail';
 
 import { SSRProvider } from '@/context/SSRContext';
 import { ExternalLinkProvider } from '@/context/ExternalLinkContext';
@@ -44,7 +46,22 @@ import type { Classification } from '@/data/categories';
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
+    const previousPathname = useRef<string | null>(null);
     useEffect(() => {
+        const prev = previousPathname.current;
+        previousPathname.current = pathname;
+        if (!prev) return;
+
+        const jamTabPattern = /^\/jam\/[^/]+\/(overview|rules|entries)$/;
+        const prevJamTabMatch = prev.match(jamTabPattern);
+        const nextJamTabMatch = pathname.match(jamTabPattern);
+
+        if (prevJamTabMatch && nextJamTabMatch) {
+            const prevJamBase = prev.replace(/\/(overview|rules|entries)$/, '');
+            const nextJamBase = pathname.replace(/\/(overview|rules|entries)$/, '');
+            if (prevJamBase === nextJamBase) return;
+        }
+
         window.scrollTo(0, 0);
     }, [pathname]);
     return null;
@@ -53,7 +70,6 @@ const ScrollToTop = () => {
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
-    const [mounted, setMounted] = useState(false);
     const [downloadedSessionIds, setDownloadedSessionIds] = useState<Set<string>>(new Set());
     const [globalError, setGlobalError] = useState<string | null>(null);
     const [showOnboarding, setShowOnboarding] = useState(false);
@@ -112,7 +128,6 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     };
 
     useEffect(() => {
-        setMounted(true);
         fetchUser();
     }, []);
 
@@ -212,6 +227,10 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/worlds" element={renderBrowse('SAVE')} />
                             <Route path="/art" element={renderBrowse('ART')} />
                             <Route path="/data" element={renderBrowse('DATA')} />
+
+                            <Route path={SiteRoutes.jams()} element={<JamsList currentUser={user} />} />
+                            <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
+                            <Route path="/jam/:id/edit" element={<JamDetail currentUser={user} />} />
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
