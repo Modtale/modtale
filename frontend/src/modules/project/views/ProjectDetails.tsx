@@ -432,7 +432,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             {isGalleryRoute && typeof document !== 'undefined' && createPortal(
                 <div className={theme.components.modalOverlay} onClick={() => navigate(projectUrl)}>
                     <div
-                        className={`${theme.components.modalContent} w-full max-w-6xl max-h-[90dvh]`}
+                        className={`${theme.components.modalContent} w-full max-w-6xl h-[90dvh]`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className={theme.components.modalHeader}>
@@ -447,11 +447,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         </div>
                         <div className={`${theme.components.modalBody} !p-0`}>
                             {galleryImages.length > 0 ? (
-                                <div className="relative bg-black/90">
+                                <div className="relative h-[72dvh] bg-black">
                                     <img
                                         src={galleryImages[galleryIndex]}
                                         alt={`${project.title} gallery image ${galleryIndex + 1}`}
-                                        className="w-full max-h-[72dvh] object-contain"
+                                        className="w-full h-full object-contain"
                                         loading="eager"
                                     />
                                     {galleryImages.length > 1 && (
