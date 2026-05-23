@@ -91,6 +91,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const downloadFxTimeoutRef = useRef<number | null>(null);
     const [galleryIndex, setGalleryIndex] = useState(0);
     const galleryImages = project?.galleryImages || [];
+    const projectUrl = project ? SiteRoutes.project(project) : '';
 
     const openGalleryIndexFromHash = () => {
         const hashIndex = Number((location.hash || '').replace('#', ''));
@@ -208,7 +209,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
 
     const canEdit = project.canEdit ?? (currentUser && (currentUser.username === project.author || project.teamMembers?.some(m => m.userId === currentUser.id)));
-    const projectUrl = SiteRoutes.project(project);
 
     const getDependencyId = (dep: any) => {
         if (typeof dep === 'string') return dep;
