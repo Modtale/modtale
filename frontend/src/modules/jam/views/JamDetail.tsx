@@ -16,115 +16,109 @@ import { JamBuilder } from '@/modules/jam/components/JamBuilder';
 import { JamSubmissionWizard } from '@/modules/jam/components/JamSubmissionWizard';
 import NotFound from '@/components/ui/error/NotFound';
 
-const EventTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => {
+const MiniTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => {
     if (now === 0) return null;
 
-    const start = new Date(jam.startDate).getTime();
-    const end = new Date(jam.endDate).getTime();
-    const voting = new Date(jam.votingEndDate).getTime();
+    const safeTs = (value: string | undefined | null, fallback: number) => {
+        const ts = new Date(value || '').getTime();
+        return Number.isFinite(ts) ? ts : fallback;
+    };
 
+    const start = safeTs(jam.startDate, now);
+    const end = safeTs(jam.endDate, start);
+    const voting = safeTs(jam.votingEndDate, end);
     const phases = [
-        { label: 'Start', time: start, dateStr: new Date(jam.startDate).toLocaleDateString() },
-        { label: 'Submissions', time: end, dateStr: new Date(jam.endDate).toLocaleDateString() },
-        { label: 'Voting', time: voting, dateStr: new Date(jam.votingEndDate).toLocaleDateString() }
+        { label: 'Start', ts: start },
+        { label: 'Submissions', ts: end },
+        { label: 'Voting', ts: voting }
     ];
 
     let target = start;
-    let label = 'Jam Starts In';
-    let progress = 0;
+    let timerLabel = 'Jam Starts In';
 
-    if (jam.status === 'COMPLETED') {
-        return null;
-    } else if (now < start) {
+    if (jam.status === 'DRAFT' || jam.status === 'UPCOMING') {
         target = start;
-        label = 'Jam Starts In';
-        progress = 0;
-    } else if (now < end) {
+        timerLabel = 'Jam Starts In';
+    } else if (jam.status === 'ACTIVE') {
         target = end;
-        label = 'Submissions Close In';
-        progress = ((now - start) / (end - start)) * 50;
-    } else if (now < voting) {
+        timerLabel = 'Submissions Close In';
+    } else if (jam.status === 'VOTING') {
         target = voting;
-        label = 'Voting Ends In';
-        progress = 50 + ((now - end) / (voting - end)) * 50;
+        timerLabel = 'Voting Ends In';
     } else {
         target = 0;
-        label = 'Voting Closed';
-        progress = 100;
+        timerLabel = 'Voting Closed';
     }
 
-    const diff = target - now;
-    let timeStr = '--';
-
-    if (diff > 0 && jam.status !== 'AWAITING_WINNERS') {
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        timeStr = days > 0 ? `${days}d ${pad(hours)}h ${pad(minutes)}m` : `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
-    } else {
-        timeStr = 'Awaiting Winners';
-    }
-
-    const [hydrated, setHydrated] = useState(false);
-    useEffect(() => {
-        setHydrated(true);
-    }, []);
-
-    if (!hydrated) {
-        return (
-            <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 shadow-sm w-full">
-                <div className="flex flex-col shrink-0 min-w-[220px] text-center md:text-left opacity-0">
-                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-center md:justify-start gap-2">
-                        <Clock className="w-4 h-4" /> {label}
-                    </span>
-                    <span className={`text-3xl md:text-4xl font-black font-mono drop-shadow-sm leading-none text-modtale-accent`}>--</span>
-                </div>
-                <div className="flex-1 w-full pt-6 md:pt-0 pl-0 md:pl-8 opacity-0">
-                    <div className="relative flex items-start justify-between w-full">
-                        <div className="absolute top-3 left-14 right-14 h-2 bg-slate-200/50 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-modtale-accent transition-all duration-1000 rounded-full" style={{ width: `0%` }} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const diff = Math.max(0, target - now);
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const timeStr = target === 0
+        ? 'Awaiting Winners'
+        : d > 0
+            ? `${d}d ${pad(h)}h ${pad(m)}m ${pad(s)}s`
+            : `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
+    const progressRange = Math.max(1, voting - start);
+    const clampedNow = Math.min(Math.max(now, start), voting);
+    const progressPct = Math.max(0, Math.min(100, ((clampedNow - start) / progressRange) * 100));
 
     return (
-        <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 shadow-sm w-full mb-10">
-            <div className="flex flex-col shrink-0 min-w-[220px] text-center md:text-left">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-center md:justify-start gap-2">
-                        <Clock className="w-4 h-4" /> {label}
+        <aside className="w-full rounded-2xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl p-5 shadow-sm">
+            <div className="mb-5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" /> {timerLabel}
                 </span>
-                <span className={`text-3xl md:text-4xl font-black font-mono drop-shadow-sm leading-none text-modtale-accent`}>{timeStr}</span>
+                <div className="mt-1 text-xl font-black text-modtale-accent">{timeStr}</div>
             </div>
 
-            <div className="flex-1 w-full pt-6 md:pt-0 pl-0 md:pl-8">
-                <div className="relative flex items-start justify-between w-full">
-                    <div className="absolute top-3 left-14 right-14 h-2 bg-slate-200/50 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-modtale-accent transition-all duration-1000 rounded-full" style={{ width: `${progress}%` }} />
+                <div className="grid grid-cols-[1.25rem_1fr] gap-3">
+                    <div className="relative h-[132px]">
+                        <div className="absolute z-0 left-1/2 -translate-x-1/2 top-[10px] bottom-[10px] w-0.5 bg-slate-200 dark:bg-slate-700/70 rounded-full" />
+                        <div
+                            className="absolute z-10 left-1/2 -translate-x-1/2 bottom-[10px] w-1 bg-blue-500 rounded-full transition-all duration-500"
+                            style={{ height: `${progressPct}%` }}
+                        />
+                        <div className="absolute inset-0 z-20 flex flex-col justify-between">
+                        {phases.map((phase, idx) => {
+                            const isPast = now >= phase.ts;
+                            const isCurrent =
+                                (idx === 0 && now < start) ||
+                                (idx === 1 && now >= start && now < end) ||
+                                (idx === 2 && now >= end);
+                            return (
+                                <div
+                                    key={phase.label}
+                                    className={`w-5 h-5 rounded-full border-[4px] bg-white dark:bg-slate-900 ${isPast ? 'border-blue-500' : 'border-slate-300 dark:border-slate-600'} ${isCurrent ? 'ring-4 ring-blue-500/20' : ''}`}
+                                />
+                            );
+                        })}
                     </div>
-                    {phases.map((phase, idx) => {
-                        const isPast = now >= phase.time || jam.status === 'AWAITING_WINNERS';
-                        const isCurrent = jam.status !== 'AWAITING_WINNERS' && (
-                            (idx === 0 && now >= start && now < end) ||
-                            (idx === 1 && now >= end && now < voting) ||
-                            (idx === 2 && now >= voting)
-                        );
+                </div>
 
+                <div className="h-[132px] flex flex-col justify-between">
+                    {phases.map((phase, idx) => {
+                        const isPast = now >= phase.ts;
+                        const isCurrent =
+                            (idx === 0 && now < start) ||
+                            (idx === 1 && now >= start && now < end) ||
+                            (idx === 2 && now >= end);
                         return (
-                            <div key={phase.label} className="flex flex-col items-center w-28 relative z-10">
-                                <div className={`w-8 h-8 rounded-full border-[5px] transition-colors bg-white dark:bg-slate-900 mb-3.5 flex items-center justify-center ${isPast ? 'border-modtale-accent' : 'border-slate-300 dark:border-slate-700'} ${isCurrent ? 'ring-4 ring-modtale-accent/20 scale-110' : ''}`} />
-                                <span className={`text-[11px] font-black uppercase tracking-widest transition-colors ${isPast || isCurrent ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>{phase.label}</span>
-                                <span suppressHydrationWarning className="text-[10px] font-bold text-slate-400 mt-1">{phase.dateStr}</span>
+                            <div key={phase.label} className="min-w-0">
+                                <div className={`text-[11px] font-black uppercase tracking-widest ${isPast || isCurrent ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                                    {phase.label}
+                                </div>
+                                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    {new Date(phase.ts).toLocaleDateString()}
+                                </div>
                             </div>
                         );
                     })}
                 </div>
             </div>
-        </div>
+        </aside>
     );
 };
 
@@ -272,14 +266,9 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 setLoading(false);
             }
 
-            if (currentUser) {
+            if (currentUser?.id) {
                 try {
-                    let projRes;
-                    try {
-                        projRes = await api.get(`/user/projects?size=100`);
-                    } catch (e) {
-                        projRes = await api.get(`/creators/${currentUser.username}/projects?size=100`);
-                    }
+                    const projRes = await api.get(`/creators/${currentUser.id}/projects?size=100`);
                     const allProjects: Project[] = projRes.data.content || [];
                     setMyProjects(allProjects);
                 } catch (e) {
@@ -288,7 +277,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
             }
         };
         fetchJamData();
-    }, [slug, id, currentUser]);
+    }, [slug, id, currentUser?.id, currentUser?.username]);
 
     useEffect(() => {
         if (jam && isEditRoute && currentUser?.id !== jam.hostId) {
@@ -297,7 +286,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     }, [jam, isEditRoute, currentUser, navigate]);
 
     useEffect(() => {
-        if (jam && isEditRoute && metaData?.id !== jam.id) {
+        if (jam && isEditRoute) {
             setMetaData({
                 id: jam.id,
                 slug: jam.slug,
@@ -321,7 +310,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 status: jam.status
             });
         }
-    }, [jam, isEditRoute, metaData]);
+    }, [jam, isEditRoute]);
 
     const handleFollowToggle = async () => {
         if (!jam || !currentUser) return;
@@ -776,71 +765,76 @@ const JamDetailView: React.FC<{
             bannerUrl={jam.bannerUrl}
             iconUrl={(jam as any).imageUrl}
             backTo="/jams"
+            actionVerticalAlign="start"
             titleContent={
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-xl leading-tight">
-                    {jam.title}
-                </h1>
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-sm leading-tight break-words">{jam.title}</h1>
+                </div>
             }
             hostContent={
-                <div className="flex flex-col gap-2 mt-2">
-                    <div className="flex items-center gap-3">
-                        <span className="text-base md:text-lg font-medium text-slate-600 dark:text-slate-400">by <Link to={`/creator/${jam.hostName}`} className="font-black text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{jam.hostName}</Link></span>
-                        {currentUser && currentUser.username !== jam.hostName && (
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
+                    <div className="flex items-center gap-2">
+                        <span>by <Link to={`/creator/${jam.hostName}`} className="font-bold text-slate-800 dark:text-white hover:text-modtale-accent hover:underline decoration-2 underline-offset-4 transition-all">{jam.hostName}</Link></span>
+                        {currentUser && currentUser.id !== jam.hostId && (
                             <button
                                 onClick={handleFollowToggle}
-                                className={`h-6 px-3 rounded-lg text-[9px] uppercase font-black tracking-[0.1em] transition-all ${isFollowing ? 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-500' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
+                                className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${isFollowing ? 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-400' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20'}`}
                             >
                                 {isFollowing ? 'Unfollow' : 'Follow'}
                             </button>
                         )}
                     </div>
-                    <div className="flex items-center gap-4 text-xs font-black uppercase tracking-[0.1em] text-slate-500">
-                        <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {(jam.participantIds || []).length} participants</span>
-                        {jam.judgeIds && jam.judgeIds.length > 0 && (
+                    <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-500">•</span>
+                    <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider opacity-80">
+                        <Users className="w-3 h-3" /> {(jam.participantIds || []).length} Participants
+                    </span>
+                    {jam.judgeIds && jam.judgeIds.length > 0 && (
+                        <>
+                            <span suppressHydrationWarning className="hidden md:inline text-slate-400 dark:text-slate-500">•</span>
                             <button
                                 onClick={onShowJudges}
-                                className="flex items-center gap-1.5 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors hover:underline decoration-blue-500/30 underline-offset-2"
+                                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                             >
-                                <ShieldCheck className="w-4 h-4" /> {jam.judgeIds.length} judges
+                                <ShieldCheck className="w-3 h-3" /> {jam.judgeIds.length} Judges
                             </button>
-                        )}
-                    </div>
+                        </>
+                    )}
                 </div>
             }
             actionContent={
                 <>
                     {currentUser?.id === jam.hostId && (
-                        <div className="flex gap-2.5 shrink-0">
+                        <div className="flex gap-2 shrink-0">
                             {(jam.status === 'AWAITING_WINNERS' || (jam.status === 'VOTING' && jam.votingEndDate && now > new Date(jam.votingEndDate).getTime())) && (
-                                <button onClick={() => setPickingWinners(true)} className="h-12 md:h-14 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95" title="Finalize Jam">
+                                <button onClick={() => setPickingWinners(true)} className="h-12 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all active:scale-95" title="Finalize Jam">
                                     <Trophy className="w-4 h-4" /> Pick Winners
                                 </button>
                             )}
-                            <button onClick={startEditing} className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 hover:border-modtale-accent text-slate-900 dark:text-white shadow-sm flex items-center justify-center transition-all hover:scale-105 active:scale-95 group" title="Edit Jam">
-                                <Edit3 className="w-5 h-5 group-hover:text-modtale-accent transition-colors" />
+                            <button onClick={startEditing} className="h-12 px-5 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/20 transition-all text-sm font-bold" title="Edit Jam">
+                                <Edit3 className="w-4 h-4 transition-colors" /> Edit
                             </button>
-                            <button onClick={handleDelete} className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 hover:border-red-500 text-slate-900 dark:text-white shadow-sm flex items-center justify-center transition-all hover:scale-105 active:scale-95 group" title="Delete Jam">
-                                <Trash2 className="w-5 h-5 group-hover:text-red-500 transition-colors" />
+                            <button onClick={handleDelete} className="h-12 px-5 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-red-500 hover:border-red-500/30 transition-all text-sm font-bold" title="Delete Jam">
+                                <Trash2 className="w-4 h-4 transition-colors" /> Delete
                             </button>
                         </div>
                     )}
 
                     {!currentUser ? (
-                        <div className="h-12 md:h-14 px-6 md:px-8 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-sm flex items-center gap-3 text-sm font-bold text-slate-600 dark:text-slate-300">
+                        <div className="h-12 px-6 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-white/10 shadow-sm flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300">
                             <AlertCircle className="w-4 h-4" /> Sign in to join
                         </div>
                     ) : !isParticipating ? (
-                        <button onClick={handleJoin} className="h-12 md:h-14 px-8 md:px-10 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-base md:text-lg shadow-lg shadow-modtale-accent/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
-                            <Users className="w-5 h-5" /> Join Jam
+                        <button onClick={handleJoin} className="h-12 px-6 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl font-black text-sm shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 flex items-center gap-2">
+                            <Users className="w-4 h-4" /> Join Jam
                         </button>
                     ) : (jam.status === 'ACTIVE' || jam.status === 'UPCOMING') && !hasSubmitted ? (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             {jam.status === 'ACTIVE' && (
-                                <button onClick={() => setIsSubmittingModalOpen(true)} className="h-12 md:h-14 px-8 md:px-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-base md:text-lg shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2 border border-slate-700 dark:border-white/20">
-                                    <Upload className="w-6 h-6" /> Submit Project
+                                <button onClick={() => setIsSubmittingModalOpen(true)} className="h-12 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-sm shadow-lg hover:opacity-90 transition-all active:scale-95 flex items-center gap-2 border border-slate-700 dark:border-white/20">
+                                    <Upload className="w-4 h-4" /> Submit Project
                                 </button>
                             )}
-                            <button onClick={handleLeave} className="h-12 md:h-14 px-6 md:px-8 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-50 hover:text-white rounded-xl font-black text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+                            <button onClick={handleLeave} className="h-12 px-5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-red-500 hover:border-red-500/30 font-bold text-sm transition-all active:scale-95 flex items-center gap-2">
                                 <LogOut className="w-4 h-4" /> Leave
                             </button>
                         </div>
@@ -848,38 +842,53 @@ const JamDetailView: React.FC<{
                 </>
             }
             tabsAndTimers={
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-2 border-slate-200/50 dark:border-white/5 pb-0 min-h-[4rem]">
-                    <div className="flex items-center gap-8 md:gap-10 w-full overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-3 pb-1 md:pt-3 md:pb-1">
+                    <div className="flex items-center gap-2 w-full overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                         <Link
                             to={`/jam/${jam.slug}/overview`}
-                            className={`pb-4 text-base font-black uppercase tracking-widest transition-colors whitespace-nowrap ${activeTab === 'overview' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                            preventScrollReset
+                            className={`h-10 flex items-center justify-center gap-1.5 px-4 lg:px-5 text-xs lg:text-sm font-bold rounded-xl border transition-colors whitespace-nowrap ${activeTab === 'overview' ? 'bg-slate-200 dark:bg-white/10 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-white/20' : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:text-slate-900 dark:hover:text-white'}`}
                         >
-                            Overview
+                            <BookOpen className="w-3.5 h-3.5" /> Overview
                         </Link>
                         <Link
                             to={`/jam/${jam.slug}/rules`}
-                            className={`pb-4 text-base font-black uppercase tracking-widest transition-colors whitespace-nowrap ${activeTab === 'rules' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                            preventScrollReset
+                            className={`h-10 flex items-center justify-center gap-1.5 px-4 lg:px-5 text-xs lg:text-sm font-bold rounded-xl border transition-colors whitespace-nowrap ${activeTab === 'rules' ? 'bg-slate-200 dark:bg-white/10 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-white/20' : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:text-slate-900 dark:hover:text-white'}`}
                         >
-                            Rules
+                            <Scale className="w-3.5 h-3.5" /> Rules
                         </Link>
                         <Link
                             to={`/jam/${jam.slug}/entries`}
-                            className={`pb-4 text-base font-black uppercase tracking-widest transition-all flex items-center gap-2.5 whitespace-nowrap ${activeTab === 'entries' ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                            preventScrollReset
+                            className={`h-10 flex items-center justify-center gap-2 px-4 lg:px-5 text-xs lg:text-sm font-bold rounded-xl border transition-colors whitespace-nowrap ${activeTab === 'entries' ? 'bg-slate-200 dark:bg-white/10 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-white/20' : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:text-slate-900 dark:hover:text-white'}`}
                         >
-                            Entries {!isSecretPhase && <span className={`px-2.5 py-0.5 rounded-full text-[11px] ml-1 transition-colors ${activeTab === 'entries' ? 'bg-modtale-accent/20 text-modtale-accent' : 'bg-slate-200 dark:bg-white/10'}`}>{submissions.length}</span>}
+                            <LayoutGrid className="w-3.5 h-3.5" /> Entries
                         </Link>
                     </div>
 
                     {jam.status === 'COMPLETED' && (
-                        <div className="pb-4 flex items-center gap-2.5 text-slate-500 whitespace-nowrap shrink-0">
-                            <Clock className="w-4 h-4" />
-                            <span className="text-[11px] font-black uppercase tracking-widest">Finished on {new Date(jam.updatedAt || jam.votingEndDate).toLocaleDateString()}</span>
+                        <div className="flex items-center gap-2 text-slate-500 whitespace-nowrap shrink-0">
+                            <Clock className="w-3 h-3" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Finished {new Date(jam.updatedAt || jam.votingEndDate).toLocaleDateString()}</span>
                         </div>
                     )}
                 </div>
             }
             mainContent={
-                <div className="animate-in fade-in slide-in-from-bottom-2 mt-8 md:mt-10">
+                <div className="animate-in fade-in slide-in-from-bottom-2 mt-0 md:mt-0">
+                    {jam.status !== 'COMPLETED' && (
+                        <>
+                            <div className="xl:hidden mb-8 md:mb-10">
+                                <MiniTimeline jam={jam} now={now} />
+                            </div>
+                            <div className="hidden xl:block float-right w-72 ml-8 mb-8">
+                                <div className="sticky top-6">
+                                    <MiniTimeline jam={jam} now={now} />
+                                </div>
+                            </div>
+                        </>
+                    )}
 
                     {isInvitedJudge && (
                         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between shadow-2xl gap-6 mb-10 border border-white/20">
@@ -917,6 +926,7 @@ const JamDetailView: React.FC<{
                         </Link>
                     )}
 
+                    <div className={jam.status !== 'COMPLETED' ? 'xl:mr-80' : ''}>
                     {activeTab === 'overview' ? (
                         <div className="space-y-10">
                             <div className="prose dark:prose-invert prose-lg max-w-none w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl p-8 md:p-10 shadow-sm">
@@ -950,8 +960,6 @@ const JamDetailView: React.FC<{
                         </div>
                     ) : (
                         <div className="space-y-10">
-                            <EventTimeline jam={jam} now={now} />
-
                             {isSecretPhase && (
                                 <div className="flex flex-col items-center justify-center py-24 px-6 text-center bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border-2 border-dashed border-white/60 dark:border-white/10 rounded-[2.5rem] animate-in fade-in zoom-in-95">
                                     <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
@@ -1155,6 +1163,7 @@ const JamDetailView: React.FC<{
                             </div>
                         </div>
                     )}
+                    </div>
                 </div>
             }
         />
