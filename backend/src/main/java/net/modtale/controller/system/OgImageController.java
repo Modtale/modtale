@@ -442,12 +442,21 @@ public class OgImageController {
 
     private int drawStatWithIcon(Graphics2D g2d, int x, int y, String iconType, String value) {
         FontMetrics fm = g2d.getFontMetrics();
-        int textXOffset = 38;
+        int textHeight = fm.getAscent() + fm.getDescent();
+        int iconSize = textHeight;
+        int iconToTextGap = 12;
+        int textXOffset = iconSize + iconToTextGap;
 
         if (x != -1000) {
+            double iconMinY = 2.5;
+            double iconMaxY = 21.5;
+            double iconSourceHeight = iconMaxY - iconMinY;
+            double scale = iconSize / iconSourceHeight;
+            double iconTopY = y - fm.getAscent();
+
             Graphics2D iconG = (Graphics2D) g2d.create();
-            iconG.translate(x, y - fm.getAscent() + 2);
-            iconG.scale(1.4, 1.4);
+            iconG.translate(x, iconTopY - (iconMinY * scale));
+            iconG.scale(scale, scale);
             iconG.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
             if ("download".equals(iconType)) {
