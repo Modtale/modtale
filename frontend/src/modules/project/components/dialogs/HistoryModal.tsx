@@ -110,6 +110,39 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
     return (
         <div className={theme.components.modalOverlay} onClick={onClose}>
+            <style>{`
+                .history-modal-scrollbar {
+                    scrollbar-width: thin;
+                    scrollbar-color: rgba(148, 163, 184, 0.65) transparent;
+                }
+                .history-modal-scrollbar::-webkit-scrollbar {
+                    width: 10px;
+                }
+                .history-modal-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .history-modal-scrollbar::-webkit-scrollbar-thumb {
+                    background: linear-gradient(to bottom, rgba(148, 163, 184, 0.85), rgba(100, 116, 139, 0.8));
+                    border: 2px solid transparent;
+                    border-radius: 9999px;
+                    background-clip: padding-box;
+                }
+                .history-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: linear-gradient(to bottom, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.92));
+                    background-clip: padding-box;
+                }
+                .dark .history-modal-scrollbar {
+                    scrollbar-color: rgba(100, 116, 139, 0.9) transparent;
+                }
+                .dark .history-modal-scrollbar::-webkit-scrollbar-thumb {
+                    background: linear-gradient(to bottom, rgba(71, 85, 105, 0.95), rgba(51, 65, 85, 0.9));
+                    background-clip: padding-box;
+                }
+                .dark .history-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: linear-gradient(to bottom, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.95));
+                    background-clip: padding-box;
+                }
+            `}</style>
             <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-3xl max-h-[85dvh] flex flex-col z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
                 <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
                     <div>
@@ -126,7 +159,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                     <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className={`p-6 overflow-y-auto custom-scrollbar flex-1 relative`}>
+                <div className={`p-6 overflow-y-auto custom-scrollbar history-modal-scrollbar flex-1 relative`}>
                     <div className="space-y-6">
                         {visibleHistory.map((ver: any) => {
                             return (
