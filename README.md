@@ -14,6 +14,8 @@
     <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-3.3-green?style=flat-square&logo=springboot" alt="Spring Boot"></a>
     <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-21-red?style=flat-square&logo=openjdk" alt="Java 21"></a>
     <a href="https://www.mongodb.com"><img src="https://img.shields.io/badge/Database-MongoDB-forestgreen?style=flat-square&logo=mongodb" alt="MongoDB"></a>
+    <a href="https://github.com/Modtale/modtale"><img src="https://img.shields.io/tokei/lines/github/Modtale/modtale?style=flat-square" alt="Lines of code"></a>
+    <a href="https://github.com/Modtale/modtale"><img src="https://img.shields.io/tokei/files/github/Modtale/modtale?style=flat-square" alt="Tracked files"></a>
 </p>
 </div>
 
@@ -61,15 +63,6 @@ modtale/
 |  | **MongoDB** | Primary NoSQL document data store |
 |  | **Bucket4j / Caffeine** | Token-bucket rate limiting and high-speed in-memory caching |
 | **Infrastructure** | **Cloudflare R2** | Zero-egress, S3-compatible Object Storage for mod files & images |
-
----
-
-## Codebase Size (LoC)
-
-Auto-updating GitHub badges:
-
-* ![Lines of code](https://img.shields.io/tokei/lines/github/Modtale/modtale?style=flat-square&label=Total%20LoC)
-* ![Files](https://img.shields.io/tokei/files/github/Modtale/modtale?style=flat-square&label=Tracked%20Files)
 
 ---
 
