@@ -18,6 +18,7 @@ import { BrowseFilters } from '../components/BrowseFilters';
 import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { BrowseAdPlacement } from '../components/BrowseAdPlacement';
+import { BrowseSkeletons } from '../components/BrowseSkeletons';
 
 const getResolvedImageUrl = (url?: string) => {
     if (!url) return null;
@@ -262,13 +263,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         </div>
 
                         {!isMounted || (loading && items.length === 0) ? (
-                            <div className={viewStyle === 'grid' ? "grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-5 mt-4" : viewStyle === 'compact' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4" : "space-y-4 mt-4"}>
-                                {[...Array(itemsPerPage)].map((_, i) => (
-                                    <div key={i} className={`${viewStyle === 'grid' ? 'h-[154px]' : viewStyle === 'list' ? 'h-32' : 'h-16'} bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-2xl animate-pulse border border-slate-200 dark:border-white/10 relative overflow-hidden`}>
-                                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-                                    </div>
-                                ))}
-                            </div>
+                            <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />
                         ) : items.length > 0 ? (
                             <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
                         ) : (

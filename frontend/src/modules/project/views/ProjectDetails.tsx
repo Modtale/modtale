@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
@@ -98,6 +98,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const downloadFxTimeoutRef = useRef<number | null>(null);
     const [galleryIndex, setGalleryIndex] = useState(0);
     const galleryImages = project?.galleryImages || [];
+    const projectUrl = project ? SiteRoutes.project(project) : '';
 
     const openGalleryIndexFromHash = () => {
         const hashIndex = Number((location.hash || '').replace('#', ''));
@@ -259,12 +260,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     }, [project, id, location.pathname, location.search, location.hash, navigate]);
 
-    if (isNotFound) return <NotFound />;
-    if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
-
-    const canEdit = project.canEdit ?? (currentUser && (currentUser.username === project.author || project.teamMembers?.some(m => m.userId === currentUser.id)));
-    const projectUrl = SiteRoutes.project(project);
-
     const getDependencyId = (dep: any) => {
         if (typeof dep === 'string') return dep;
         if (dep && typeof dep === 'object') {
@@ -274,12 +269,14 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     };
 
     const finishVersionDownload = async (versionNumber: string, selectedDeps: string[]) => {
+        if (!project) return;
+        const currentProject = project;
         const isBundle = selectedDeps.length > 0;
         const depsQuery = isBundle ? `?deps=${selectedDeps.map(encodeURIComponent).join(',')}` : '';
 
         const endpoint = isBundle
-            ? `/projects/${project.id}/versions/${versionNumber}/download-bundle-url${depsQuery}`
-            : `/projects/${project.id}/versions/${versionNumber}/download-url`;
+            ? `/projects/${currentProject.id}/versions/${versionNumber}/download-bundle-url${depsQuery}`
+            : `/projects/${currentProject.id}/versions/${versionNumber}/download-url`;
 
         const res = await api.get(endpoint);
 
@@ -295,22 +292,22 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
             downloadFxTimeoutRef.current = window.setTimeout(() => setShowDownloadFx(false), 900);
 
-            if (project && !downloadedSessionIds.has(project.id)) {
+            if (!downloadedSessionIds.has(currentProject.id)) {
                 setProject(prev => prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : null);
-                onDownload(project.id);
+                onDownload(currentProject.id);
             }
 
             setIsDownloadOpen(false);
             setIsHistoryOpen(false);
             setIsDepModalOpen(false);
             setPendingDownload(null);
-            setLastDownloadWasBundle(isBundle || project.classification === 'MODPACK');
+            setLastDownloadWasBundle(isBundle || currentProject.classification === 'MODPACK');
 
             if (localStorage.getItem('hideInstallInstructions') !== 'true') {
                 setShowPostDownloadModal(true);
             }
 
-            if (location.pathname.endsWith('/download')) navigate(SiteRoutes.project(project), { replace: true });
+            if (location.pathname.endsWith('/download')) navigate(SiteRoutes.project(currentProject), { replace: true });
         }
     };
 
@@ -404,14 +401,27 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     };
 
-    const versionsByGame = (project.versions || []).reduce((acc: any, v: any) => {
-        const key = v.gameVersions?.[0] || 'Any';
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(v);
-        return acc;
-    }, {});
+    const versionsByGame = useMemo(() => {
+        return (project?.versions || []).reduce((acc: any, v: any) => {
+            const key = v.gameVersions?.[0] || 'Any';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(v);
+            return acc;
+        }, {});
+    }, [project?.versions]);
 
-    const sortedHistory = [...(project.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    const sortedHistory = useMemo(() => {
+        return [...(project?.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    }, [project?.versions]);
+
+    const toggleExperimental = useCallback(() => {
+        setShowExperimental((prev) => !prev);
+    }, []);
+
+    if (isNotFound) return <NotFound />;
+    if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
+
+    const canEdit = project.canEdit ?? (currentUser && (currentUser.username === project.author || project.teamMembers?.some(m => m.userId === currentUser.id)));
 
     const meta = generateProjectMeta(project);
     const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);
@@ -472,7 +482,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 onClose={() => navigate(projectUrl)}
                 history={sortedHistory}
                 showExperimental={showExperimental}
-                onToggleExperimental={() => setShowExperimental(!showExperimental)}
+                onToggleExperimental={toggleExperimental}
                 onDownload={handleDownloadClick}
             />
             <DownloadModal
@@ -483,7 +493,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 orderedGameVersions={orderedGameVersions}
                 onDownload={handleDownloadClick}
                 showExperimental={showExperimental}
-                onToggleExperimental={() => setShowExperimental(!showExperimental)}
+                onToggleExperimental={toggleExperimental}
                 onViewHistory={() => navigate(projectUrl + '/changelog')}
             />
             {isDepModalOpen && pendingDownload && (

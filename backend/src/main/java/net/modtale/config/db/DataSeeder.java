@@ -107,6 +107,18 @@ public class DataSeeder implements CommandLineRunner {
                 }
             }
 
+            Set<String> selectedProjectIds = compiledProjects.stream()
+                    .map(doc -> doc.get("_id"))
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+
+            List<Document> dependencyProjects = collectDependencyProjects(sourceProjectsCol, selectedProjectIds);
+            if (!dependencyProjects.isEmpty()) {
+                compiledProjects.addAll(dependencyProjects);
+                logger.info("Included {} dependency projects for selected projects.", dependencyProjects.size());
+            }
+
             if (compiledProjects.isEmpty()) {
                 logger.info("No projects successfully retrieved from source. Seeding finished.");
                 return;
@@ -284,5 +296,79 @@ public class DataSeeder implements CommandLineRunner {
         } catch (Exception e) {
             logger.warn("Could not clone subset of {}", collectionName);
         }
+    }
+
+    private List<Document> collectDependencyProjects(MongoCollection<Document> sourceProjectsCol, Set<String> initialProjectIds) {
+        if (initialProjectIds.isEmpty()) return List.of();
+
+        Set<String> visited = new HashSet<>(initialProjectIds);
+        Set<String> dependencyIds = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>(initialProjectIds);
+
+        while (!queue.isEmpty()) {
+            String projectId = queue.removeFirst();
+            Document project = findProjectById(sourceProjectsCol, projectId);
+            if (project == null) {
+                continue;
+            }
+
+            for (String dependencyId : extractDependencyIds(project)) {
+                if (dependencyId == null || dependencyId.isBlank() || visited.contains(dependencyId)) {
+                    continue;
+                }
+                visited.add(dependencyId);
+                dependencyIds.add(dependencyId);
+                queue.addLast(dependencyId);
+            }
+        }
+
+        return dependencyIds.stream()
+                .map(depId -> findProjectById(sourceProjectsCol, depId))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    private Document findProjectById(MongoCollection<Document> sourceProjectsCol, String projectId) {
+        if (projectId == null || projectId.isBlank()) return null;
+
+        ObjectId objectId = getSafeObjectId(projectId);
+        if (objectId != null) {
+            Document project = sourceProjectsCol.find(Filters.eq("_id", objectId)).first();
+            if (project != null) return project;
+        }
+
+        return sourceProjectsCol.find(Filters.eq("_id", projectId)).first();
+    }
+
+    private Set<String> extractDependencyIds(Document project) {
+        Object rawVersions = project.get("versions");
+        if (!(rawVersions instanceof List<?> versions)) {
+            return Set.of();
+        }
+
+        Set<String> dependencyIds = new LinkedHashSet<>();
+
+        for (Object versionObj : versions) {
+            if (!(versionObj instanceof Document versionDoc)) {
+                continue;
+            }
+
+            Object rawDependencies = versionDoc.get("dependencies");
+            if (!(rawDependencies instanceof List<?> dependencies)) {
+                continue;
+            }
+
+            for (Object dependencyObj : dependencies) {
+                if (!(dependencyObj instanceof Document dependencyDoc)) {
+                    continue;
+                }
+                Object rawModId = dependencyDoc.get("modId");
+                if (rawModId != null) {
+                    dependencyIds.add(rawModId.toString());
+                }
+            }
+        }
+
+        return dependencyIds;
     }
 }
