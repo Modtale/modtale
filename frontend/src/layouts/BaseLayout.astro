@@ -65,7 +65,6 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : 
 
     <link rel="preconnect" href={BACKEND_URL} crossorigin />
     <link rel="dns-prefetch" href={BACKEND_URL} />
-    <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
 
     {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
 

@@ -279,7 +279,7 @@ if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
         pagePrev={pagePrev}
 >
     {shouldHydrateAsIdle ? (
-        <App client:idle={{ timeout: 1500 }} initialPath={path} ssrData={initialData} />
+        <App client:idle={{ timeout: 3500 }} initialPath={path} ssrData={initialData} />
     ) : (
         <App client:load initialPath={path} ssrData={initialData} />
     )}

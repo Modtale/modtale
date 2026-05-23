@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Search, Upload, ChevronRight, Github, Code } from 'lucide-react';
+import '@fontsource-variable/inter';
 import { api } from '@/utils/api';
 import type { Project } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
@@ -53,10 +54,29 @@ export const Home: React.FC = () => {
         const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
         window.addEventListener('resize', handleResize, { passive: true });
 
-        const idleTimer = setTimeout(() => {
+        let hasRunHeavyUi = false;
+        const enableHeavyUi = () => {
+            if (hasRunHeavyUi) return;
+            hasRunHeavyUi = true;
             setReadyForHeavyUI(true);
+        };
 
-            if (!ssrData?.homeProjects?.length) {
+        let uiIdleHandle: number | null = null;
+        if ('requestIdleCallback' in window) {
+            uiIdleHandle = (window as Window & { requestIdleCallback: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number })
+                .requestIdleCallback(() => enableHeavyUi(), { timeout: 1000 });
+        }
+        const uiFallbackTimer = window.setTimeout(() => enableHeavyUi(), 250);
+
+        const shouldFetchFallbackProjects = !ssrData?.homeProjects?.length;
+        const shouldFetchFallbackStats = !ssrData?.stats?.totalProjects;
+
+        let hasRunFallbackRequests = false;
+        const runFallbackRequests = () => {
+            if (hasRunFallbackRequests) return;
+            hasRunFallbackRequests = true;
+
+            if (shouldFetchFallbackProjects) {
                 api.get('/projects', { params: { size: 16, sort: 'trending' } })
                     .then(res => {
                         if (res.data?.content) setProjects(res.data.content);
@@ -64,18 +84,45 @@ export const Home: React.FC = () => {
                     .catch(() => {});
             }
 
-            if (!ssrData?.stats?.totalProjects) {
+            if (shouldFetchFallbackStats) {
                 api.get('/analytics/platform/stats')
                     .then(res => setStats(res.data))
                     .catch(() => {});
             }
-        }, 100);
+        };
+
+        let fetchIdleHandle: number | null = null;
+        const scheduleFallbackRequests = () => {
+            if (!shouldFetchFallbackProjects && !shouldFetchFallbackStats) return;
+            if ('requestIdleCallback' in window) {
+                fetchIdleHandle = (window as Window & { requestIdleCallback: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number })
+                    .requestIdleCallback(() => runFallbackRequests(), { timeout: 6000 });
+            }
+        };
+
+        if (document.readyState === 'complete') {
+            scheduleFallbackRequests();
+        } else {
+            window.addEventListener('load', scheduleFallbackRequests, { once: true });
+        }
+
+        const requestFallbackTimer = window.setTimeout(() => {
+            runFallbackRequests();
+        }, 7000);
 
         return () => {
             window.removeEventListener('resize', handleResize);
-            clearTimeout(idleTimer);
+            window.removeEventListener('load', scheduleFallbackRequests);
+            window.clearTimeout(uiFallbackTimer);
+            window.clearTimeout(requestFallbackTimer);
+            if (uiIdleHandle !== null && 'cancelIdleCallback' in window) {
+                (window as Window & { cancelIdleCallback: (handle: number) => void }).cancelIdleCallback(uiIdleHandle);
+            }
+            if (fetchIdleHandle !== null && 'cancelIdleCallback' in window) {
+                (window as Window & { cancelIdleCallback: (handle: number) => void }).cancelIdleCallback(fetchIdleHandle);
+            }
         };
-    }, []);
+    }, [ssrData?.homeProjects?.length, ssrData?.stats?.totalProjects]);
 
     const validFeaturedProjects = useMemo(() => {
         if (!readyForHeavyUI) return [];
@@ -91,7 +138,10 @@ export const Home: React.FC = () => {
     const col2Projects = useMemo(() => validFeaturedProjects.filter((_, i) => i % 2 === 1), [validFeaturedProjects]);
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative selection:bg-blue-500 selection:text-white overflow-x-hidden transition-colors duration-300">
+        <div
+            className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative selection:bg-blue-500 selection:text-white overflow-x-hidden transition-colors duration-300"
+            style={{ fontFamily: '"Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
+        >
             <Helmet>
                 <title>Modtale - The Hytale Community Repository</title>
                 <meta name="description" content="The community repository for Hytale. Discover, download, and share Hytale worlds, plugins, asset packs, worlds, and projectpacks." />

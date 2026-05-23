@@ -36,6 +36,7 @@ import { DependencyModal } from '../components/dialogs/DependencyModal';
 import { api } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import '../styles/downloadFx.css';
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
