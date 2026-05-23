@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X } from 'lucide-react';
+import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2 } from 'lucide-react';
 
 import type { User, Project, ProjectVersion } from '@/types';
 import { theme } from '@/styles/theme';
 import { SiteRoutes } from '@/utils/routes';
-import { LICENSES } from '@/data/categories';
+import { GLOBAL_TAGS, LICENSES } from '@/data/categories';
 import { useHMWiki, WikiSidebar } from '@/modules/project/components/HMWiki';
 import { SidebarSection, ProjectLayout } from '../components/ProjectLayout';
 
@@ -25,6 +25,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
+import { ThemedInput } from '../components/FormShared';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
 
 interface ProjectEditorViewProps {
@@ -97,6 +98,16 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const readOnly = projectData.status === 'PENDING' || projectData.status === 'ARCHIVED';
     const isModpack = projectData.classification === 'MODPACK';
     const hasProjectPermission = (perm: string) => true;
+    const toggleTag = (tag: string) => {
+        if (readOnly) return;
+        markDirty();
+        setMetaData(prev => ({
+            ...prev,
+            tags: prev.tags.includes(tag)
+                ? prev.tags.filter(t => t !== tag)
+                : [...prev.tags, tag]
+        }));
+    };
 
     const availableTabs = [
         {id: 'details', icon: FileText, label: 'Details'},
@@ -338,6 +349,83 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 <div className="pointer-events-none select-none">
                                     <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} />
                                 </div>
+                            </div>
+                        </SidebarSection>
+                        {!isModpack && (
+                            <SidebarSection title="License" icon={Scale} defaultOpen={false}>
+                                <div className={`bg-slate-50 dark:bg-slate-950/50 border ${theme.colors.border} rounded-xl p-2 max-h-80 overflow-y-auto custom-scrollbar`}>
+                                    {LICENSES.map(lic => (
+                                        <button
+                                            key={lic.id}
+                                            disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                            onClick={() => { markDirty(); setMetaData({ ...metaData, license: lic.id }); }}
+                                            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${metaData.license === lic.id ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
+                                        >
+                                            <span>{lic.name}</span>
+                                            {metaData.license === lic.id && <Check className="w-3 h-3" />}
+                                        </button>
+                                    ))}
+                                    <button
+                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        onClick={() => { markDirty(); if (!metaData.license || LICENSES.some(l => l.id === metaData.license)) setMetaData({ ...metaData, license: '' }); }}
+                                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between border-t ${theme.colors.border} mt-1 pt-2 ${isCustomLicense ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
+                                    >
+                                        <span>Custom License</span>
+                                        {isCustomLicense ? <Check className="w-3 h-3" /> : <Edit2 className="w-3 h-3" />}
+                                    </button>
+                                    {isCustomLicense && (
+                                        <div className="mt-2 p-2 bg-slate-100 dark:bg-black/20 rounded-lg space-y-2 animate-in slide-in-from-top-2">
+                                            <input
+                                                value={metaData.license || ''}
+                                                onChange={(e) => { markDirty(); setMetaData({ ...metaData, license: e.target.value }); }}
+                                                placeholder="License Name"
+                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                                className={`w-full ${theme.colors.bgPrimary} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs`}
+                                            />
+                                            <input
+                                                value={metaData.links.LICENSE || ''}
+                                                onChange={(e) => { markDirty(); setMetaData({ ...metaData, links: { ...metaData.links, LICENSE: e.target.value } }); }}
+                                                placeholder="License URL"
+                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                                className={`w-full ${theme.colors.bgPrimary} border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : theme.colors.border}`}
+                                            />
+                                            {!metaData.links.LICENSE && (
+                                                <p className="text-[10px] text-red-500 font-bold px-1">URL is required for custom licenses.</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </SidebarSection>
+                        )}
+                        <SidebarSection title="Tags" icon={Tag} defaultOpen={false}>
+                            <div className="flex flex-wrap gap-2">
+                                {GLOBAL_TAGS.map(tag => (
+                                    <button
+                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        key={tag}
+                                        onClick={() => toggleTag(tag)}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${metaData.tags.includes(tag) ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10'}`}
+                                    >
+                                        {tag}
+                                    </button>
+                                ))}
+                            </div>
+                        </SidebarSection>
+                        <SidebarSection title="External Links" icon={LinkIcon} defaultOpen={false}>
+                            <div className="space-y-3">
+                                {['WEBSITE', 'WIKI', 'ISSUE_TRACKER', 'DISCORD'].map(k => (
+                                    <ThemedInput
+                                        key={k}
+                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        label={k.replace('_', ' ')}
+                                        value={metaData.links[k] || ''}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                            markDirty();
+                                            setMetaData(prev => ({ ...prev, links: { ...prev.links, [k]: e.target.value } }));
+                                        }}
+                                        placeholder="https://..."
+                                    />
+                                ))}
                             </div>
                         </SidebarSection>
                     </>
