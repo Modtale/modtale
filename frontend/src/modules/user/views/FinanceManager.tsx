@@ -27,6 +27,65 @@ const SummaryCard = ({ title, value, subtitle, icon: Icon, color }: any) => (
     </div>
 );
 
+const FinanceManagerSkeleton = () => (
+    <div className="space-y-6 animate-pulse">
+        <div className={theme.components.panel + ' p-5'}>
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="space-y-2">
+                    <div className="h-9 w-72 rounded-xl bg-slate-200 dark:bg-white/10" />
+                    <div className="h-4 w-56 rounded-lg bg-slate-200 dark:bg-white/10" />
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="h-11 w-[250px] rounded-xl bg-slate-200 dark:bg-white/10" />
+                    <div className="h-11 w-44 rounded-xl bg-slate-200 dark:bg-white/10" />
+                </div>
+            </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="rounded-3xl border border-slate-200 bg-white/40 p-6 dark:border-white/10 dark:bg-white/5">
+                    <div className="mb-4 flex items-center justify-between">
+                        <div className="h-12 w-12 rounded-2xl bg-slate-200 dark:bg-white/10" />
+                        <div className="h-3 w-20 rounded bg-slate-200 dark:bg-white/10" />
+                    </div>
+                    <div className="h-10 w-32 rounded-xl bg-slate-200 dark:bg-white/10" />
+                    <div className="mt-3 h-3 w-24 rounded bg-slate-200 dark:bg-white/10" />
+                </div>
+            ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            {[0, 1].map((i) => (
+                <div key={i} className={theme.components.panel + ' p-5'}>
+                    <div className="mb-4 h-4 w-36 rounded bg-slate-200 dark:bg-white/10" />
+                    <div className="h-[320px] rounded-2xl bg-slate-200 dark:bg-white/10" />
+                </div>
+            ))}
+        </div>
+
+        <div className={theme.components.panel + ' space-y-4 p-5'}>
+            <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                    <div className="h-6 w-44 rounded-lg bg-slate-200 dark:bg-white/10" />
+                    <div className="h-4 w-64 rounded bg-slate-200 dark:bg-white/10" />
+                </div>
+                <div className="flex gap-2">
+                    <div className="h-10 w-44 rounded-xl bg-slate-200 dark:bg-white/10" />
+                    <div className="h-10 w-44 rounded-xl bg-slate-200 dark:bg-white/10" />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                {[0, 1, 2].map((i) => <div key={i} className="h-20 rounded-xl bg-slate-200 dark:bg-white/10" />)}
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                <div className="h-20 rounded-xl bg-slate-200 dark:bg-white/10" />
+                <div className="h-[46px] w-44 rounded-xl bg-slate-200 dark:bg-white/10" />
+            </div>
+        </div>
+    </div>
+);
+
 export const FinanceManager: React.FC = () => {
     const [range, setRange] = useState('30d');
     const [loading, setLoading] = useState(true);
@@ -153,8 +212,8 @@ export const FinanceManager: React.FC = () => {
             .filter(item => item.percent > 0);
 
         const total = shares.reduce((sum, item) => sum + item.percent, 0);
-        if (orgPayoutMode === 'DISTRIBUTE_TO_MEMBERS' && total !== 100) {
-            setStatus({ type: 'warning', title: 'Invalid Distribution', msg: 'Distributed payout shares must total exactly 100%.' });
+        if (orgPayoutMode === 'DISTRIBUTE_TO_MEMBERS' && total < 100) {
+            setStatus({ type: 'warning', title: 'Invalid Distribution', msg: 'Distributed payout shares must total at least 100%.' });
             return;
         }
 
@@ -170,7 +229,7 @@ export const FinanceManager: React.FC = () => {
         }
     };
 
-    if (loading) return <div className="py-16 text-center font-bold text-slate-500 dark:text-slate-400">Loading finance manager...</div>;
+    if (loading) return <FinanceManagerSkeleton />;
 
     const selectedContext = contexts.find(ctx => ctx.id === selectedOwnerId);
     const orgShareTotal = Object.values(orgShares).reduce((sum, n) => sum + Math.max(0, Math.round(Number(n || 0))), 0);
@@ -362,12 +421,12 @@ export const FinanceManager: React.FC = () => {
                             placeholder="Leave empty to payout full available balance"
                             className={inputNoNativeUi}
                         />
-                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Minimum payout: {formatMoney(data?.minPayoutCents || 1000)}</p>
                     </div>
                     <button onClick={handleRequestPayout} className={theme.components.buttonPrimary + ' h-[46px]'}>
                         <CreditCard className="h-4 w-4" /> Request Payout
                     </button>
                 </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Minimum payout: {formatMoney(data?.minPayoutCents || 1000)}</p>
             </div>
 
         </div>
