@@ -16,12 +16,19 @@ public class LocalUserDetailsService implements UserDetailsService {
 
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private ReservedAccountGuardService reservedAccountGuardService;
 
     @Override
     public UserDetails loadUserByUsername(String login) throws UsernameNotFoundException {
         User user = userRepository.findByUsernameIgnoreCase(login)
                 .or(() -> userRepository.findByEmail(login))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with identifier: " + login));
+        try {
+            reservedAccountGuardService.rejectReservedUserInProduction(user);
+        } catch (IllegalArgumentException ex) {
+            throw new UsernameNotFoundException("User not found with identifier: " + login);
+        }
 
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
