@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 @Service("apiSecurity")
 public class AccessControlService {
+    private static final String LEGACY_SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
     @Autowired private AccountService accountService;
     @Autowired private UserRepository userRepository;
@@ -20,6 +21,13 @@ public class AccessControlService {
 
     public boolean isAdmin(User user) {
         return user != null && user.getRoles() != null && user.getRoles().contains("ADMIN");
+    }
+
+    public boolean isSuperAdmin(User user) {
+        return user != null && (
+                user.getRoles() != null && user.getRoles().contains("SUPER_ADMIN")
+                        || LEGACY_SUPER_ADMIN_ID.equals(user.getId())
+        );
     }
 
     public boolean hasAnyPerm(String perm, Authentication authentication) {
