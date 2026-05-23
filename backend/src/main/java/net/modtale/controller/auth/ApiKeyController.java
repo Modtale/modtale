@@ -1,8 +1,11 @@
 package net.modtale.controller.auth;
 
+import net.modtale.mapper.AuthMapper;
+import net.modtale.model.dto.auth.ApiKeyDTO;
+import net.modtale.model.dto.request.auth.CreateApiKeyRequest;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.user.UserService;
+import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.ApiKeyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -11,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/user/api-keys")
@@ -21,33 +23,20 @@ public class ApiKeyController {
     private ApiKeyService apiKeyService;
 
     @Autowired
-    private UserService userService;
-
-    public static class CreateKeyRequest {
-        private String name;
-        private Map<String, Set<ApiKey.ApiPermission>> contextPermissions;
-
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-        public Map<String, Set<ApiKey.ApiPermission>> getContextPermissions() { return contextPermissions; }
-        public void setContextPermissions(Map<String, Set<ApiKey.ApiPermission>> contextPermissions) { this.contextPermissions = contextPermissions; }
-    }
+    private AccountService accountService;
 
     @GetMapping
-    public ResponseEntity<List<ApiKey>> getMyKeys() {
-        User user = userService.getCurrentUser();
+    public ResponseEntity<List<ApiKeyDTO>> getMyKeys() {
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         List<ApiKey> keys = apiKeyService.getMyKeys(user.getId());
-
-        keys.forEach(k -> k.setKeyHash(null));
-
-        return ResponseEntity.ok(keys);
+        return ResponseEntity.ok(keys.stream().map(AuthMapper::toApiKeyDTO).toList());
     }
 
     @PostMapping
-    public ResponseEntity<?> createKey(@RequestBody CreateKeyRequest payload) {
-        User user = userService.getCurrentUser();
+    public ResponseEntity<?> createKey(@RequestBody CreateApiKeyRequest payload) {
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         if (!user.isEmailVerified()) {
@@ -72,7 +61,7 @@ public class ApiKeyController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> revokeKey(@PathVariable String id) {
-        User user = userService.getCurrentUser();
+        User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         apiKeyService.revokeKey(id, user.getId());

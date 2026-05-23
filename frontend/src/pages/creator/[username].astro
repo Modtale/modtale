@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import App from '../../App';
+import { isBotUserAgent } from '../../utils/seo';
+import { generateUserMeta } from '../../utils/meta';
+import { ROUTE_SEO } from '../../data/seo-constants';
+import { BACKEND_URL } from "@/utils/api.ts";
+
+const { username } = Astro.params;
+const path = Astro.url.pathname;
+
+const userAgent = Astro.request.headers.get('user-agent') || '';
+const isBot = isBotUserAgent(userAgent);
+
+let userData = null;
+let title = ROUTE_SEO['/mods'].title;
+let description = ROUTE_SEO['/mods'].description;
+let image = "https://modtale.net/assets/favicon.svg";
+let jsonLd: any = undefined;
+let ssrSuccessfullyCompleted = false;
+let ogType = "website";
+
+if (isBot && username) {
+    try {
+        const lookupRes = await fetch(`${BACKEND_URL}/api/v1/users/lookup/${username}`);
+        if (lookupRes.ok) {
+            const lookupData = await lookupRes.json();
+            const userId = lookupData.id;
+            const res = await fetch(`${BACKEND_URL}/api/v1/user/profile/${userId}`);
+
+            if (res.ok) {
+                userData = await res.json();
+                
+                const meta = generateUserMeta(userData);
+                if (meta) {
+                    title = meta.title;
+                    description = meta.description;
+                }
+
+                if (userData.avatarUrl) {
+                    image = userData.avatarUrl;
+                }
+                
+                ogType = userData.accountType === 'ORGANIZATION' ? 'website' : 'profile';
+
+                const personSchema = {
+                    "@context": "https://schema.org",
+                    "@type": userData.accountType === 'ORGANIZATION' ? "Organization" : "",
+                    "name": userData.displayName || userData.username,
+                    "description": userData.bio,
+                    "image": userData.avatarUrl,
+                    "url": `https://modtale.net/creator/${userData.username}`
+                };
+
+                jsonLd = [personSchema];
+                ssrSuccessfullyCompleted = true;
+            }
+        }
+    } catch (e) {}
+}
+
+if (ssrSuccessfullyCompleted) {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=86400');
+} else {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
+}
+---
+
+<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={userData} ogType={ogType}>
+    <App client:load initialPath={path} ssrData={userData} />
+</BaseLayout>

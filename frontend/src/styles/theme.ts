@@ -1,0 +1,38 @@
+export const theme = {
+    colors: {
+        accent: 'text-modtale-accent',
+        accentBg: 'bg-modtale-accent',
+        accentHover: 'hover:bg-modtale-accentHover',
+        accentAlpha: 'bg-modtale-accent/10 dark:bg-modtale-accent/20',
+        textPrimary: 'text-slate-900 dark:text-white',
+        textSecondary: 'text-slate-600 dark:text-slate-300',
+        textMuted: 'text-slate-500 dark:text-slate-400',
+        bgBase: 'bg-white dark:bg-slate-950',
+        bgSurface: 'bg-slate-50 dark:bg-slate-900',
+        bgSurfaceAlt: 'bg-slate-100 dark:bg-white/5',
+        bgSurfaceHover: 'hover:bg-slate-100 dark:hover:bg-white/10',
+        border: 'border-slate-200 dark:border-white/10',
+        borderFaint: 'border-slate-200 dark:border-white/5',
+        dangerText: 'text-red-600 dark:text-red-500',
+        dangerBg: 'bg-red-50 dark:bg-red-500/10',
+        dangerBorder: 'border-red-200 dark:border-red-500/20',
+        warningText: 'text-amber-600 dark:text-amber-500',
+        warningBg: 'bg-amber-500/10 dark:bg-amber-500/20',
+        warningBorder: 'border-amber-500/30',
+        successText: 'text-emerald-600 dark:text-emerald-500',
+        successBg: 'bg-emerald-50 dark:bg-emerald-500/10',
+    },
+    components: {
+        panel: 'bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 shadow-sm rounded-xl',
+        buttonPrimary: 'bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
+        buttonSecondary: 'bg-slate-100 dark:bg-white/5 text-slate-770 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-5 py-2.5 rounded-xl font-bold transition-colors border border-slate-200 dark:border-white/5 flex items-center justify-center gap-2 disabled:opacity-50',
+        buttonDanger: 'bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-50',
+        modalOverlay: 'fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/45 dark:bg-slate-900/70 backdrop-blur-sm p-4 animate-in fade-in duration-200',
+        modalContent: 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden relative flex flex-col',
+        modalHeader: 'p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50/70 dark:bg-slate-800/55 shrink-0',
+        modalBody: 'p-6 space-y-4 overflow-y-auto custom-scrollbar bg-transparent flex-1',
+        modalFooter: 'p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50/85 dark:bg-slate-800/55 shrink-0 flex justify-between items-center',
+        badge: 'px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider',
+        inputField: 'w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent outline-none transition-all placeholder:text-slate-400 dark:text-white font-medium'
+    }
+};

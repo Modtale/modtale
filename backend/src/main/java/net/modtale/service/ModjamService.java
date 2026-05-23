@@ -2,19 +2,18 @@ package net.modtale.service;
 
 import net.modtale.model.jam.Modjam;
 import net.modtale.model.jam.ModjamSubmission;
-import net.modtale.model.resources.Mod;
-import net.modtale.model.resources.ModVersion;
+import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectStatus;
+import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.jam.ModjamRepository;
 import net.modtale.repository.jam.ModjamSubmissionRepository;
-import net.modtale.repository.resources.ModRepository;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.resources.ModService;
-import net.modtale.service.resources.StorageService;
-import net.modtale.service.user.UserService;
+import net.modtale.service.storage.StorageService;
+import net.modtale.service.user.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -47,14 +46,10 @@ public class ModjamService {
     @Autowired private ModjamRepository modjamRepository;
     @Autowired private ModjamSubmissionRepository submissionRepository;
     @Autowired private UserRepository userRepository;
-    @Autowired private ModRepository modRepository;
+    @Autowired private ProjectRepository projectRepository;
     @Autowired private StorageService storageService;
     @Autowired private MongoTemplate mongoTemplate;
-    @Autowired private UserService userService;
-
-    @Autowired
-    @Lazy
-    private ModService modService;
+    @Autowired private AccountService accountService;
 
     @Value("${app.r2.public-domain:#{null}}")
     private String publicDomain;
@@ -177,9 +172,9 @@ public class ModjamService {
         }
 
         Map<String, Integer> userCommentCount = new HashMap<>();
-        for (Mod p : projectMap.values()) {
+        for (Project p : projectMap.values()) {
             if (visibleProjectIds.contains(p.getId()) && p.getComments() != null) {
-                for (net.modtale.model.resources.Comment c : p.getComments()) {
+                for (net.modtale.model.project.Comment c : p.getComments()) {
                     if (!c.getUserId().equals(p.getAuthorId())) {
                         userCommentCount.put(c.getUserId(), userCommentCount.getOrDefault(c.getUserId(), 0) + 1);
                     }
@@ -188,7 +183,7 @@ public class ModjamService {
         }
 
         for (ModjamSubmission sub : subs) {
-            Mod project = projectMap.get(sub.getProjectId());
+            Project project = projectMap.get(sub.getProjectId());
             if (project != null) {
                 sub.setProjectTitle(project.getTitle());
                 sub.setProjectImageUrl(project.getImageUrl());
@@ -204,7 +199,7 @@ public class ModjamService {
     private void enrichSubmissions(String jamId, List<ModjamSubmission> subs) {
         if (subs == null || subs.isEmpty()) return;
         List<String> projectIds = subs.stream().map(ModjamSubmission::getProjectId).toList();
-        Iterable<Mod> projectsIterable = modRepository.findAllById(projectIds);
+        Iterable<Mod> projectsIterable = projectRepository.findAllById(projectIds);
         Map<String, Mod> projectMap = new HashMap<>();
         projectsIterable.forEach(p -> projectMap.put(p.getId(), p));
         enrichSubmissions(jamId, subs, projectMap);
@@ -347,7 +342,7 @@ public class ModjamService {
 
         if (jam.isHideSubmissions() && !List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(oldStatus)
                 && List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(targetStatus)) {
-            modService.revealHiddenJamMods(jam.getId());
+            revealHiddenJamProjects(jam.getId());
         }
 
         return enrichAndReturn(modjamRepository.save(jam));
@@ -489,26 +484,26 @@ public class ModjamService {
 
         if (allSubs == null || allSubs.isEmpty()) return new ArrayList<>();
 
-        User currentUser = userService.getCurrentUser();
+        User currentUser = accountService.getCurrentUser();
         boolean isAdmin = currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("ADMIN");
         boolean isHost = currentUser != null && currentUser.getId().equals(jam.getHostId());
 
         boolean isJamHiding = jam.isHideSubmissions() && List.of("DRAFT", "UPCOMING", "ACTIVE").contains(jam.getStatus());
 
         List<String> projectIds = allSubs.stream().map(ModjamSubmission::getProjectId).toList();
-        Iterable<Mod> projectsIterable = modRepository.findAllById(projectIds);
+        Iterable<Mod> projectsIterable = projectRepository.findAllById(projectIds);
         Map<String, Mod> projectMap = new HashMap<>();
         projectsIterable.forEach(p -> projectMap.put(p.getId(), p));
 
         List<ModjamSubmission> visibleSubs = new ArrayList<>();
 
         for (ModjamSubmission sub : allSubs) {
-            Mod project = projectMap.get(sub.getProjectId());
+            Project project = projectMap.get(sub.getProjectId());
             if (project == null) continue;
 
             boolean isSubmitter = currentUser != null && currentUser.getId().equals(sub.getSubmitterId());
             boolean canSeeHidden = isAdmin || isHost || isSubmitter;
-            boolean isPublicProject = "PUBLISHED".equals(project.getStatus()) || "ARCHIVED".equals(project.getStatus());
+            boolean isPublicProject = project.getStatus() == ProjectStatus.PUBLISHED || project.getStatus() == ProjectStatus.ARCHIVED;
 
             if (!canSeeHidden) {
                 if (!isPublicProject || isJamHiding) {
@@ -606,18 +601,18 @@ public class ModjamService {
             throw new IllegalArgumentException("Submissions are closed.");
         }
 
-        Mod project = modRepository.findById(projectId)
+        Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found"));
 
         if (!project.getAuthorId().equals(userId)) {
             throw new SecurityException("Not your project");
         }
 
-        if (!List.of("PUBLISHED", "PENDING", "APPROVED_HIDDEN", "DRAFT").contains(project.getStatus())) {
+        if (!List.of(ProjectStatus.PUBLISHED, ProjectStatus.PENDING, ProjectStatus.UNLISTED, ProjectStatus.DRAFT).contains(project.getStatus())) {
             throw new IllegalArgumentException("Project cannot be submitted in its current state.");
         }
 
-        if (jam.isHideSubmissions() && "PUBLISHED".equals(project.getStatus())) {
+        if (jam.isHideSubmissions() && project.getStatus() == ProjectStatus.PUBLISHED) {
             throw new IllegalArgumentException("This jam hides submissions until voting opens. You cannot submit an already-public project.");
         }
 
@@ -631,10 +626,11 @@ public class ModjamService {
             throw new IllegalArgumentException("Already submitted.");
         }
 
-        if ("DRAFT".equals(project.getStatus())) {
+        if (project.getStatus() == ProjectStatus.DRAFT) {
             try {
-                modService.submitMod(projectId, userId);
-                project = modRepository.findById(projectId).orElseThrow(() -> new IllegalArgumentException("Project not found"));
+                project.setStatus(ProjectStatus.PENDING);
+                projectRepository.save(project);
+                project = projectRepository.findById(projectId).orElseThrow(() -> new IllegalArgumentException("Project not found"));
             } catch (Exception e) {
                 throw new IllegalArgumentException(e.getMessage());
             }
@@ -643,8 +639,8 @@ public class ModjamService {
         Modjam.Restrictions res = jam.getRestrictions();
         if (res != null) {
             if (res.isRequireNoPriorProjects() || res.isRequirePriorProjects()) {
-                long priorPublishedProjects = modRepository.findByAuthorIdList(userId).stream()
-                        .filter(p -> !p.getId().equals(projectId) && "PUBLISHED".equals(p.getStatus()))
+                long priorPublishedProjects = projectRepository.findByAuthorIdList(userId).stream()
+                        .filter(p -> !p.getId().equals(projectId) && p.getStatus() == ProjectStatus.PUBLISHED)
                         .count();
 
                 if (res.isRequireNoPriorProjects() && priorPublishedProjects > 0) {
@@ -685,7 +681,7 @@ public class ModjamService {
             }
 
             if (res.getAllowedClassifications() != null && !res.getAllowedClassifications().isEmpty()) {
-                if (!res.getAllowedClassifications().contains(project.getClassification())) {
+                if (!res.getAllowedClassifications().contains(project.getClassification().name())) {
                     throw new IllegalArgumentException("Project classification is not allowed for this jam.");
                 }
             }
@@ -699,7 +695,7 @@ public class ModjamService {
             if (res.getAllowedGameVersions() != null && !res.getAllowedGameVersions().isEmpty()) {
                 boolean hasValidVersion = false;
                 if (project.getVersions() != null) {
-                    for (ModVersion pv : project.getVersions()) {
+                    for (ProjectVersion pv : project.getVersions()) {
                         if (pv.getGameVersions() != null) {
                             for (String gv : pv.getGameVersions()) {
                                 if (res.getAllowedGameVersions().contains(gv)) {
@@ -764,7 +760,7 @@ public class ModjamService {
                     throw new IllegalArgumentException("Project has no uploaded files to check.");
                 }
 
-                ModVersion latestVersion = project.getVersions().get(project.getVersions().size() - 1);
+                ProjectVersion latestVersion = project.getVersions().get(project.getVersions().size() - 1);
                 String fileUrl = latestVersion.getFileUrl();
                 if (fileUrl == null || fileUrl.isEmpty()) {
                     throw new IllegalArgumentException("Project version has no file associated.");
@@ -805,7 +801,7 @@ public class ModjamService {
         if (project.getModjamIds() == null) project.setModjamIds(new ArrayList<>());
         if (!project.getModjamIds().contains(jamId)) {
             project.getModjamIds().add(jamId);
-            modRepository.save(project);
+            projectRepository.save(project);
         }
 
         enrichSubmissions(jamId, Collections.singletonList(sub));
@@ -947,7 +943,7 @@ public class ModjamService {
 
                 if (jam.isHideSubmissions() && !List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(oldStatus)
                         && List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(newStatus)) {
-                    modService.revealHiddenJamMods(jam.getId());
+                    revealHiddenJamProjects(jam.getId());
                 }
             }
         }
@@ -960,6 +956,19 @@ public class ModjamService {
         for (Modjam jam : staleDrafts) {
             submissionRepository.deleteAll(submissionRepository.findByJamId(jam.getId()));
             modjamRepository.delete(jam);
+        }
+    }
+
+    private void revealHiddenJamProjects(String jamId) {
+        Query query = new Query(
+                Criteria.where("modjamIds").is(jamId)
+                        .and("status").is(ProjectStatus.UNLISTED)
+                        .and("deletedAt").is(null)
+        );
+        List<Project> hidden = mongoTemplate.find(query, Project.class);
+        for (Project project : hidden) {
+            project.setStatus(ProjectStatus.PUBLISHED);
+            projectRepository.save(project);
         }
     }
 }

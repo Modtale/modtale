@@ -3,44 +3,47 @@ import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
-import { api, BACKEND_URL } from './utils/api';
+import { api, BACKEND_URL } from '@/utils/api';
 
-import { Navbar } from './components/Navbar';
-import { Footer } from './components/Footer.tsx';
-import { SEOHead } from './components/SEOHead';
-import { Spinner } from './components/ui/Spinner';
-import { StatusModal } from './components/ui/StatusModal';
-import { OnboardingModal } from './components/user/OnboardingModal';
-import { ErrorBoundary } from './components/ui/error/ErrorBoundary';
+import { Navbar } from '@/modules/core/components/Navbar';
+import { Footer } from '@/modules/core/components/Footer';
+import { SEOHead } from '@/modules/core/components/SEOHead';
+import { TermsOfService } from '@/modules/core/views/TermsOfService';
+import { PrivacyPolicy } from '@/modules/core/views/PrivacyPolicy';
+import { Status } from '@/modules/core/views/Status';
 
-import type { Mod, Modpack, World, User } from './types';
-import { createSlug } from './utils/slug';
-import type { Classification } from './data/categories';
-import { SSRProvider } from './context/SSRContext';
-import { ExternalLinkProvider } from './context/ExternalLinkContext';
-import { NotificationProvider } from './context/NotificationsContext.tsx';
-import { ToastProvider } from './components/ui/Toast';
-import { MobileProvider } from './context/MobileContext';
+import { Spinner } from '@/components/ui/Spinner';
+import { StatusModal } from '@/components/ui/StatusModal';
+import { ErrorBoundary } from '@/components/ui/error/ErrorBoundary';
+import NotFound from '@/components/ui/error/NotFound';
 
-import { Home } from './react-pages/Home';
-import { Browse } from './react-pages/Browse';
-import { Upload } from './react-pages/resources/Upload';
-import { CreatorProfile } from './react-pages/user/CreatorProfile.tsx';
-import { ModDetail } from './react-pages/resources/ModDetail';
-import { EditMod } from './react-pages/resources/EditMod';
-import { TermsOfService } from './react-pages/TermsOfService';
-import { PrivacyPolicy } from './react-pages/PrivacyPolicy';
-import { Dashboard } from './react-pages/user/Dashboard.tsx';
-import { AdminPanel } from './react-pages/AdminPanel.tsx';
-import { ApiDocs } from './react-pages/ApiDocs.tsx';
-import { Status } from './react-pages/Status';
-import { VerifyEmail } from './react-pages/auth/VerifyEmail.tsx';
-import { ResetPassword } from './react-pages/auth/ResetPassword.tsx';
-import { MfaVerify } from './react-pages/auth/MfaVerify';
-import { Analytics } from './components/dashboard/Analytics.tsx';
-import NotFound from './components/ui/error/NotFound.tsx';
-import { JamsList } from './react-pages/jams/JamsList';
-import { JamDetail } from './react-pages/jams/JamDetail';
+import { Onboarding } from '@/modules/user/components/Onboarding';
+import { UserProfile } from '@/modules/user/views/UserProfile';
+import { Dashboard } from '@/modules/user/views/Dashboard';
+import { VerifyEmail } from '@/modules/auth/views/VerifyEmail';
+import { ResetPassword } from '@/modules/auth/views/ResetPassword';
+import { MfaVerify } from '@/modules/auth/views/MfaVerify';
+
+import { Home } from '@/modules/home/views/Home';
+import { Browse } from '@/modules/discovery/views/Browse';
+import { CreateProject } from '@/modules/project/views/CreateProject';
+import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
+import { ProjectEditorView } from '@/modules/project/views/ProjectEditor';
+import { AdminPanel } from '@/modules/admin/views/AdminPanel';
+
+import { ApiDocs } from '@/modules/core/views/ApiDocs';
+import { JamsList } from '@/modules/jam/views/JamsList';
+import { JamDetail } from '@/modules/jam/views/JamDetail';
+
+import { SSRProvider } from '@/context/SSRContext';
+import { ExternalLinkProvider } from '@/context/ExternalLinkContext';
+import { NotificationProvider } from '@/context/NotificationsContext';
+import { ToastProvider } from '@/components/ui/Toast';
+import { MobileProvider } from '@/context/MobileContext';
+import type { User } from '@/types';
+import { SiteRoutes } from '@/utils/routes';
+import type { Classification } from '@/data/categories';
+
 const ScrollToTop = () => {
     const { pathname } = useLocation();
     useEffect(() => {
@@ -52,11 +55,11 @@ const ScrollToTop = () => {
 const AppContent: React.FC<{ initialClassification?: Classification }> = ({ initialClassification }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
-    const [mounted, setMounted] = useState(false);
     const [downloadedSessionIds, setDownloadedSessionIds] = useState<Set<string>>(new Set());
     const [globalError, setGlobalError] = useState<string | null>(null);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(true);
+    const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; msg: string } | null>(null);
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -110,49 +113,42 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
     };
 
     useEffect(() => {
-        setMounted(true);
         fetchUser();
     }, []);
 
     const handleLogout = async () => {
         try { await api.post(`${BACKEND_URL}/logout`); } catch (e) {}
         setUser(null);
-        navigate('/');
+        navigate(SiteRoutes.home());
     };
 
-    const handleNavigate = (page: string) => { navigate(page === 'home' ? '/' : `/${page}`); };
-    const handleAuthorClick = (authorUsername: string) => { navigate(`/creator/${authorUsername}`); };
-    const handleModClick = (mod: Mod) => { navigate(`/mod/${createSlug(mod.title, mod.id)}`); }
-    const handleWorldClick = (world: World) => { navigate(`/world/${createSlug(world.title, world.id)}`); }
+    const handleNavigate = (page: string) => { navigate(page === 'home' ? SiteRoutes.home() : `/${page}`); };
+    const handleUserClick = (username: string) => { navigate(SiteRoutes.creator(username)); };
 
     const handleToggleFavorite = async (id: string) => {
         if (!user) return;
-        const isLiked = user.likedModIds?.includes(id);
-        const newModLikes = isLiked ? (user.likedModIds || []).filter(lid => lid !== id) : [...(user.likedModIds || []), id];
-        setUser({ ...user, likedModIds: newModLikes });
+        const isLiked = user.likedProjectIds?.includes(id);
+        const newProjectLikes = isLiked ? (user.likedProjectIds || []).filter(lid => lid !== id) : [...(user.likedProjectIds || []), id];
+        setUser({ ...user, likedProjectIds: newProjectLikes });
         try { await api.post(`/projects/${id}/favorite`); } catch (e) { fetchUser(); }
     };
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
+    const onShowStatus = (type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string) => setStatusModal({ type, title, msg });
 
     const renderBrowse = (classification?: Classification) => (
         <Browse
-            onModClick={handleModClick}
-            onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
-            onWorldClick={handleWorldClick}
-            onAuthorClick={handleAuthorClick}
-            likedModIds={user?.likedModIds || []}
-            onToggleFavoriteMod={handleToggleFavorite}
-            onToggleFavoriteModpack={handleToggleFavorite}
+            likedProjectIds={user?.likedProjectIds || []}
+            onToggleFavorite={handleToggleFavorite}
             isLoggedIn={!!user}
             initialClassification={classification}
         />
     );
 
-    const renderModDetail = () => (
-        <ModDetail
+    const renderProjectDetail = () => (
+        <ProjectDetails
             onToggleFavorite={handleToggleFavorite}
-            isLiked={(id) => user?.likedModIds?.includes(id) || false}
+            isLiked={(id) => user?.likedProjectIds?.includes(id) || false}
             currentUser={user}
             onRefresh={async () => {}}
             onDownload={handleDownload}
@@ -174,8 +170,17 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                     />
                 )}
 
+                {statusModal && (
+                    <StatusModal
+                        type={statusModal.type}
+                        title={statusModal.title}
+                        message={statusModal.msg}
+                        onClose={() => setStatusModal(null)}
+                    />
+                )}
+
                 {user && (
-                    <OnboardingModal
+                    <Onboarding
                         isOpen={showOnboarding}
                         onClose={() => setShowOnboarding(false)}
                         currentUsername={user.username}
@@ -192,7 +197,7 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                     onNavigate={handleNavigate}
                     isDarkMode={isDarkMode}
                     toggleDarkMode={toggleDarkMode}
-                    onAuthorClick={handleAuthorClick}
+                    onUserClick={handleUserClick}
                 />
 
                 <div className="flex-1">
@@ -201,109 +206,68 @@ const AppContent: React.FC<{ initialClassification?: Classification }> = ({ init
                             <Route path="/" element={<Home user={user} />} />
 
                             <Route path="/mods" element={renderBrowse()} />
-                            <Route path="/projects" element={<Navigate to="/mods" replace />} />
+                            <Route path="/projects" element={<Navigate to={SiteRoutes.browse()} replace />} />
                             <Route path="/plugins" element={renderBrowse('PLUGIN')} />
                             <Route path="/modpacks" element={renderBrowse('MODPACK')} />
                             <Route path="/worlds" element={renderBrowse('SAVE')} />
                             <Route path="/art" element={renderBrowse('ART')} />
                             <Route path="/data" element={renderBrowse('DATA')} />
 
-                            <Route path="/jams" element={<JamsList currentUser={user} />} />
+                            <Route path={SiteRoutes.jams()} element={<JamsList currentUser={user} />} />
                             <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
                             <Route path="/jam/:id/edit" element={<JamDetail currentUser={user} />} />
 
                             <Route path="/upload" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    <Upload onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
+                                    <CreateProject onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
                             } />
 
                             <Route path="/dashboard/*" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
-                                        <Navigate to="/" />
+                                        <Navigate to={SiteRoutes.home()} />
                             } />
 
-                            <Route path="/analytics/project/:id" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <Analytics /> :
-                                        <Navigate to="/" />
-                            } />
-
-                            <Route path="/mod/:id" element={renderModDetail()} />
-                            <Route path="/mod/:id/download" element={renderModDetail()} />
-                            <Route path="/mod/:id/changelog" element={renderModDetail()} />
-                            <Route path="/mod/:id/gallery" element={renderModDetail()} />
-                            <Route path="/mod/:id/wiki/*" element={renderModDetail()} />
-                            <Route path="/mod/:id/edit" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <EditMod currentUser={user} /> :
-                                        <Navigate to="/" />
-                            } />
-
-                            <Route path="/modpack/:id" element={renderModDetail()} />
-                            <Route path="/modpack/:id/download" element={renderModDetail()} />
-                            <Route path="/modpack/:id/changelog" element={renderModDetail()} />
-                            <Route path="/modpack/:id/gallery" element={renderModDetail()} />
-                            <Route path="/modpack/:id/wiki/*" element={renderModDetail()} />
-                            <Route path="/modpack/:id/edit" element={
-                                loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
-                                    user ? <EditMod currentUser={user} /> :
-                                        <Navigate to="/" />
-                            } />
-
-                            <Route path="/world/:id" element={renderModDetail()} />
-                            <Route path="/world/:id/download" element={renderModDetail()} />
-                            <Route path="/world/:id/changelog" element={renderModDetail()} />
-                            <Route path="/world/:id/gallery" element={renderModDetail()} />
-                            <Route path="/world/:id/wiki/*" element={renderModDetail()} />
+                            {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
+                                <React.Fragment key={path}>
+                                    <Route path={path} element={renderProjectDetail()} />
+                                    <Route path={`${path}/download`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/changelog`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/gallery`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/wiki/*`} element={renderProjectDetail()} />
+                                    <Route path={`${path}/edit`} element={
+                                        loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
+                                            user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
+                                                <Navigate to={SiteRoutes.home()} />
+                                    } />
+                                </React.Fragment>
+                            ))}
 
                             <Route path="/creator/:username" element={
-                                <CreatorProfile
-                                    onModClick={handleModClick}
-                                    onModpackClick={(pack: Modpack) => handleModClick(pack as unknown as Mod)}
-                                    onBack={() => handleNavigate('home')}
-                                    likedModIds={user?.likedModIds || []}
+                                <UserProfile
+                                    onBack={() => navigate(SiteRoutes.home())}
+                                    likedModIds={user?.likedProjectIds || []}
                                     onToggleFavorite={handleToggleFavorite}
-                                    onToggleFavoriteModpack={handleToggleFavorite}
                                     currentUser={user}
                                     onRefreshUser={fetchUser}
                                 />
                             } />
-
-                            <Route path="/verify" element={
-                                <VerifyEmail
-                                    user={user}
-                                    isDarkMode={isDarkMode}
-                                    toggleDarkMode={toggleDarkMode}
-                                    onLogout={handleLogout}
-                                    onNavigate={handleNavigate}
-                                    currentPage={location.pathname.replace('/', '')}
-                                    onAuthorClick={handleAuthorClick}
-                                />
-                            } />
-
+                            <Route path="/verify" element={<VerifyEmail />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
-
-                            <Route path="/mfa" element={
-                                <MfaVerify
-                                    user={user}
-                                    isDarkMode={isDarkMode}
-                                    toggleDarkMode={toggleDarkMode}
-                                    onLogout={handleLogout}
-                                    onNavigate={handleNavigate}
-                                    currentPage={location.pathname.replace('/', '')}
-                                    onAuthorClick={handleAuthorClick}
-                                />
-                            } />
+                            <Route path="/mfa" element={<MfaVerify />} />
 
                             <Route path="/terms" element={<TermsOfService />} />
                             <Route path="/privacy" element={<PrivacyPolicy />} />
+                            <Route path="/status" element={<Status />} />
+
                             <Route path="/api-docs" element={<ApiDocs />} />
+
                             <Route path="/admin" element={
                                 loadingAuth ? <div className="p-20 flex justify-center"><Spinner /></div> :
                                     user ? <AdminPanel currentUser={user} /> :
-                                        <Navigate to="/" />
+                                        <Navigate to={SiteRoutes.home()} />
                             } />
+
                             <Route path="*" element={<NotFound />} />
                         </Routes>
                     </ErrorBoundary>

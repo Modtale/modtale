@@ -1,6 +1,6 @@
-import type { Mod, Modpack, World } from '../types';
+import type { Project } from '../types';
 
-export const generateProjectMeta = (item: Mod | Modpack | World | any) => {
+export const generateProjectMeta = (item: Project | any) => {
     if (!item) return null;
 
     const title = `${item.title} | Modtale`;
@@ -35,4 +35,17 @@ export const generateProjectMeta = (item: Mod | Modpack | World | any) => {
     const description = `${plainText.substring(0, 150)}${plainText.length > 150 ? '...' : ''} — ${statsLine}`;
 
     return { title, description, author };
+};
+
+export const generateUserMeta = (user: any) => {
+    if (!user) return null;
+
+    const name = user.displayName || user.username;
+    const title = `${name} | Modtale`;
+    
+    const followerCount = (user.followerIds?.length || 0).toLocaleString();
+
+    const description = `👥 ${followerCount} follower${user.followerIds?.length === 1 ? '' : 's'}`;
+
+    return { title, description };
 };

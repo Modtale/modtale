@@ -1,274 +1,159 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Check, ZoomIn } from 'lucide-react';
-import { getCroppedImg, createImage } from '../../utils/canvasUtils';
+import React, { useState, useCallback } from 'react';
+import Cropper from 'react-easy-crop';
+import { X, Check } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface ImageCropperModalProps {
     imageSrc: string;
+    aspect: number;
     onCancel: () => void;
-    onCropComplete: (croppedFile: File) => void;
-    aspect?: number;
+    onCropComplete: (file: File) => void;
 }
+
+const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+        const image = new Image();
+        image.addEventListener('load', () => resolve(image));
+        image.addEventListener('error', (error) => reject(error));
+        image.setAttribute('crossOrigin', 'anonymous');
+        image.src = url;
+    });
 
 export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                                                                         imageSrc,
+                                                                        aspect,
                                                                         onCancel,
-                                                                        onCropComplete,
-                                                                        aspect = 1
+                                                                        onCropComplete
                                                                     }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
-
-    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
-    const [baseScale, setBaseScale] = useState(0.1);
-    const [coverZoom, setCoverZoom] = useState(1);
-    const [minZoom, setMinZoom] = useState(1);
-    const [maxZoom, setMaxZoom] = useState(1);
-
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-    const [layout, setLayout] = useState({ cropBoxWidth: 0, cropBoxHeight: 0 });
-
-    useEffect(() => {
-        createImage(imageSrc).then((img) => {
-            setImageObj(img);
-        });
-    }, [imageSrc]);
-
-    const calculateLayout = useCallback(() => {
-        if (!containerRef.current || !imageObj) return;
-
-        const container = containerRef.current.getBoundingClientRect();
-
-        const padding = 40;
-        const availableWidth = container.width - padding;
-        const availableHeight = container.height - padding;
-
-        let cropBoxWidth, cropBoxHeight;
-
-        if (availableWidth / availableHeight > aspect) {
-            cropBoxHeight = availableHeight;
-            cropBoxWidth = cropBoxHeight * aspect;
-        } else {
-            cropBoxWidth = availableWidth;
-            cropBoxHeight = cropBoxWidth / aspect;
-        }
-
-        const scaleW = cropBoxWidth / imageObj.naturalWidth;
-        const scaleH = cropBoxHeight / imageObj.naturalHeight;
-
-        const fitScale = Math.min(scaleW, scaleH);
-        const fillScale = Math.max(scaleW, scaleH);
-
-        const calculatedCoverZoom = fillScale / fitScale;
-
-        setBaseScale(fitScale);
-        setCoverZoom(calculatedCoverZoom);
-
-        setMinZoom(1);
-        setMaxZoom(Math.max(5, calculatedCoverZoom * 2));
-
-        setZoom(calculatedCoverZoom);
-        setOffset({ x: 0, y: 0 });
-
-        return { cropBoxWidth, cropBoxHeight };
-
-    }, [imageObj, aspect]);
-
-    useEffect(() => {
-        const dims = calculateLayout();
-        if (dims) setLayout(dims);
-
-        window.addEventListener('resize', () => {
-            const d = calculateLayout();
-            if (d) setLayout(d);
-        });
-    }, [calculateLayout]);
-
-    const clampOffset = (x: number, y: number, currentZoom: number) => {
-        if (!imageObj) return { x, y };
-
-        const currentScale = baseScale * currentZoom;
-        const renderW = imageObj.naturalWidth * currentScale;
-        const renderH = imageObj.naturalHeight * currentScale;
-
-        let limitX = 0;
-        if (renderW > layout.cropBoxWidth) {
-            limitX = (renderW - layout.cropBoxWidth) / 2;
-        }
-
-        let limitY = 0;
-        if (renderH > layout.cropBoxHeight) {
-            limitY = (renderH - layout.cropBoxHeight) / 2;
-        }
-
-        return {
-            x: Math.max(-limitX, Math.min(limitX, x)),
-            y: Math.max(-limitY, Math.min(limitY, y))
-        };
-    };
-
-    const getSnappedZoom = (z: number) => {
-        const SNAP_THRESHOLD = 0.15;
-        if (Math.abs(z - coverZoom) < SNAP_THRESHOLD) {
-            return coverZoom;
-        }
-        return z;
-    };
-
-    const handleWheel = (e: React.WheelEvent) => {
-        e.stopPropagation();
-        const delta = -e.deltaY * 0.005;
-        let newZoom = Math.max(minZoom, Math.min(maxZoom, zoom + delta));
-
-        newZoom = getSnappedZoom(newZoom);
-
-        const clamped = clampOffset(offset.x, offset.y, newZoom);
-        setZoom(newZoom);
-        setOffset(clamped);
-    };
-
-    const handlePointerDown = (e: React.PointerEvent) => {
-        e.preventDefault();
-        setIsDragging(true);
-        setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
-    };
-
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isDragging) return;
-        e.preventDefault();
-
-        const rawX = e.clientX - dragStart.x;
-        const rawY = e.clientY - dragStart.y;
-
-        const clamped = clampOffset(rawX, rawY, zoom);
-        setOffset(clamped);
-    };
-
-    const handlePointerUp = () => {
-        setIsDragging(false);
-    };
+    const onCropCompleteChange = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
 
     const handleSave = async () => {
-        if (!imageObj) return;
+        if (!croppedAreaPixels) return;
+        setIsProcessing(true);
 
         try {
-            const currentScreenScale = baseScale * zoom;
-            const sourceCropWidth = layout.cropBoxWidth / currentScreenScale;
+            const image = await createImage(imageSrc);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
 
-            const targetWidth = Math.min(3840, Math.floor(sourceCropWidth));
-            const targetHeight = Math.floor(targetWidth / aspect);
+            if (!ctx) throw new Error('No 2d context available');
 
-            const scaleFactor = targetWidth / layout.cropBoxWidth;
+            canvas.width = croppedAreaPixels.width;
+            canvas.height = croppedAreaPixels.height;
 
-            const highResScale = (baseScale * zoom) * scaleFactor;
-            const highResOffset = {
-                x: offset.x * scaleFactor,
-                y: offset.y * scaleFactor
-            };
-
-            const file = await getCroppedImg(
-                imageSrc,
-                { x: highResOffset.x, y: highResOffset.y, zoom: highResScale },
-                { width: targetWidth, height: targetHeight },
-                "cropped.png"
+            ctx.drawImage(
+                image,
+                croppedAreaPixels.x,
+                croppedAreaPixels.y,
+                croppedAreaPixels.width,
+                croppedAreaPixels.height,
+                0,
+                0,
+                croppedAreaPixels.width,
+                croppedAreaPixels.height
             );
-            onCropComplete(file);
+
+            let mimeType = 'image/jpeg';
+            try {
+                const response = await fetch(imageSrc);
+                const blob = await response.blob();
+                if (blob.type) {
+                    mimeType = blob.type;
+                }
+            } catch (e) {
+                console.warn('Could not determine original MIME type, falling back to JPEG');
+            }
+
+            const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!supportedTypes.includes(mimeType)) {
+                mimeType = 'image/png';
+            }
+
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) {
+                        setIsProcessing(false);
+                        return;
+                    }
+                    const extension = mimeType.split('/')[1];
+                    const file = new File([blob], `cropped-image.${extension}`, { type: mimeType });
+                    onCropComplete(file);
+                },
+                mimeType,
+                0.92
+            );
         } catch (e) {
-            console.error(e);
+            console.error('Failed to crop image', e);
+            setIsProcessing(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-             onPointerUp={handlePointerUp}
-             onPointerLeave={handlePointerUp}
-        >
-            <div className="bg-white dark:bg-modtale-card w-full max-w-lg rounded-xl overflow-hidden shadow-2xl flex flex-col h-[80dvh] md:h-[600px]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col h-[80vh] md:h-[600px] animate-in zoom-in-95 duration-200">
 
-                <div className="p-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-white dark:bg-modtale-card z-10">
-                    <h3 className="font-black text-lg text-slate-900 dark:text-white">Crop Image</h3>
-                    <button onClick={onCancel} className="text-slate-500 hover:text-red-500 transition-colors">
+                <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">Crop Image</h2>
+                    <button
+                        onClick={onCancel}
+                        disabled={isProcessing}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors disabled:opacity-50"
+                    >
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                <div
-                    ref={containerRef}
-                    className="relative flex-1 bg-slate-900 overflow-hidden cursor-move flex items-center justify-center select-none"
-                    onWheel={handleWheel}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    style={{ touchAction: 'none' }}
-                >
-                    {imageObj && layout.cropBoxWidth > 0 && (
-                        <>
-                            <div
-                                style={{
-                                    width: layout.cropBoxWidth,
-                                    height: layout.cropBoxHeight,
-                                    outline: '2000px solid rgba(0,0,0,0.5)',
-                                    zIndex: 20,
-                                    pointerEvents: 'none',
-                                    border: '2px solid rgba(255,255,255,0.5)',
-                                    position: 'relative'
-                                }}
-                            >
-                                <div className="absolute top-1/3 left-0 w-full h-px bg-white/40 shadow-sm" />
-                                <div className="absolute top-2/3 left-0 w-full h-px bg-white/40 shadow-sm" />
-                                <div className="absolute top-0 left-1/3 w-px h-full bg-white/40 shadow-sm" />
-                                <div className="absolute top-0 left-2/3 w-px h-full bg-white/40 shadow-sm" />
-                            </div>
-
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    transform: `translate(${offset.x}px, ${offset.y}px) scale(${baseScale * zoom})`,
-                                    transformOrigin: 'center center',
-                                    width: imageObj.naturalWidth,
-                                    height: imageObj.naturalHeight,
-                                    zIndex: 10,
-                                }}
-                            >
-                                <img
-                                    src={imageSrc}
-                                    alt=""
-                                    className="w-full h-full pointer-events-none block"
-                                    draggable={false}
-                                />
-                            </div>
-                        </>
-                    )}
+                <div className="relative flex-1 bg-slate-950">
+                    <Cropper
+                        image={imageSrc}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={aspect}
+                        onCropChange={setCrop}
+                        onCropComplete={onCropCompleteChange}
+                        onZoomChange={setZoom}
+                    />
                 </div>
 
-                <div className="p-6 bg-white dark:bg-modtale-card border-t border-slate-200 dark:border-white/10 space-y-4">
-                    <div className="flex items-center gap-4">
-                        <ZoomIn className="w-5 h-5 text-slate-400" />
+                <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="w-full sm:w-1/2 flex items-center gap-3">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Zoom</span>
                         <input
                             type="range"
                             value={zoom}
-                            min={minZoom}
-                            max={maxZoom}
-                            step={0.01}
-                            onChange={(e) => {
-                                const val = Number(e.target.value);
-                                const newZoom = getSnappedZoom(val);
-                                setZoom(newZoom);
-                                setOffset(clampOffset(offset.x, offset.y, newZoom));
-                            }}
-                            className="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-modtale-accent"
+                            min={1}
+                            max={3}
+                            step={0.1}
+                            aria-labelledby="Zoom"
+                            onChange={(e) => setZoom(Number(e.target.value))}
+                            className="w-full accent-modtale-accent h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer"
                         />
                     </div>
-                    <div className="flex justify-end gap-3">
-                        <button onClick={onCancel} className="px-4 py-2 rounded-lg font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">Cancel</button>
-                        <button onClick={handleSave} className="px-6 py-2 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95">
-                            <Check className="w-4 h-4" /> Save Crop
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <button
+                            onClick={onCancel}
+                            disabled={isProcessing}
+                            className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-bold text-sm bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 transition-all disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={isProcessing}
+                            className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-bold text-sm bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {isProcessing ? <Spinner className="w-4 h-4 text-white" /> : <Check className="w-4 h-4" />}
+                            Apply Crop
                         </button>
                     </div>
                 </div>
-
             </div>
         </div>
     );
