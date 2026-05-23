@@ -83,7 +83,12 @@ export interface GameVersionCatalog {
     releaseVersions: string[];
     preReleaseVersions: string[];
     allVersions: string[];
-    orderedVersions: string[];
+    orderedVersions?: string[];
+    versions?: {
+        version: string;
+        preRelease: boolean;
+        sourceUrl: string;
+    }[];
 }
 
 export interface ScanIssue {

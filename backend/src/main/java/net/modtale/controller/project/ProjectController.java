@@ -38,6 +38,7 @@ public class ProjectController {
     @Autowired private LifecycleService lifecycleService;
     @Autowired private MetadataService metadataService;
     @Autowired private ValidationService validationService;
+    @Autowired private GameVersionService gameVersionService;
     @Autowired private AccessControlService accessControlService;
     @Autowired private AccountService accountService;
     @Autowired private UserRepository userRepository;
@@ -109,14 +110,10 @@ public class ProjectController {
     }
 
     @GetMapping("/meta/game-versions/catalog")
-    public ResponseEntity<java.util.Map<String, List<String>>> getGameVersionCatalog() {
-        java.util.Map<String, List<String>> payload = java.util.Map.of(
-                "releaseVersions", validationService.getAllowedReleaseGameVersions(),
-                "preReleaseVersions", validationService.getAllowedPreReleaseGameVersions(),
-                "allVersions", validationService.getAllowedGameVersions(),
-                "orderedVersions", validationService.getAllowedGameVersions()
-        );
-        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(24, TimeUnit.HOURS).cachePublic()).body(payload);
+    public ResponseEntity<GameVersionService.GameVersionCatalog> getGameVersionCatalog() {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(24, TimeUnit.HOURS).cachePublic())
+                .body(gameVersionService.getCatalog());
     }
 
     @PostMapping("/projects")

@@ -147,7 +147,15 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     useEffect(() => {
         projectClient.getMetaGameVersionCatalog().then((catalog) => {
             const ordered = catalog?.orderedVersions || catalog?.allVersions || [];
-            const pre = new Set(catalog?.preReleaseVersions || []);
+            const pre = new Set<string>();
+            if (catalog?.versions?.length) {
+                for (const entry of catalog.versions) {
+                    if (entry.preRelease) pre.add(entry.version);
+                }
+            } else {
+                for (const version of (catalog?.preReleaseVersions || [])) pre.add(version);
+                for (const version of (catalog?.releaseVersions || [])) pre.delete(version);
+            }
             setAllGameVersions(ordered);
             setPreReleaseVersionSet(pre);
         }).catch(async () => {

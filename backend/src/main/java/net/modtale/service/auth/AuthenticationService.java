@@ -38,6 +38,7 @@ public class AuthenticationService {
     @Autowired private TrackingService trackingService;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailService emailService;
+    @Autowired private ReservedAccountGuardService reservedAccountGuardService;
 
     @Value("${app.security.pre-auth-secret:default-secret-change-in-prod}")
     private String preAuthSigningKey;
@@ -46,6 +47,8 @@ public class AuthenticationService {
     private long preAuthExpirySeconds;
 
     public User registerUser(String username, String email, String password) {
+        reservedAccountGuardService.rejectReservedEmailInProduction(email);
+
         if (username == null || username.length() < 3 || !username.matches("^[a-zA-Z0-9_.-]+$")) {
             throw new IllegalArgumentException("Invalid username. Must be at least 3 characters and alphanumeric.");
         }
@@ -89,9 +92,13 @@ public class AuthenticationService {
     }
 
     public User authenticate(String login, String password) {
+        reservedAccountGuardService.rejectReservedEmailInProduction(login);
+        reservedAccountGuardService.purgeReservedAccountsIfProduction();
+
         User user = userRepository.findByUsernameIgnoreCase(login)
                 .or(() -> userRepository.findByEmail(login))
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+        reservedAccountGuardService.rejectReservedUserInProduction(user);
 
         if (user.isDeleted()) throw new IllegalArgumentException("Account deleted.");
         if (bannedEmailRepository.existsByEmailIgnoreCase(user.getEmail())) throw new SecurityException("This account has been suspended.");
@@ -129,6 +136,8 @@ public class AuthenticationService {
     }
 
     public User validatePreAuthToken(String token) {
+        reservedAccountGuardService.purgeReservedAccountsIfProduction();
+
         try {
             String decoded = new String(Base64.getDecoder().decode(token), StandardCharsets.UTF_8);
             String[] parts = decoded.split(":");
@@ -145,6 +154,7 @@ public class AuthenticationService {
 
             User user = userRepository.findById(userId).orElse(null);
             if (user != null && user.isDeleted()) return null;
+            if (user != null) reservedAccountGuardService.rejectReservedUserInProduction(user);
             return user;
         } catch (Exception e) {
             return null;
@@ -164,6 +174,7 @@ public class AuthenticationService {
 
     public void addCredentials(String userId, String email, String password) {
         User user = userRepository.findById(userId).orElseThrow();
+        reservedAccountGuardService.rejectReservedEmailInProduction(email);
 
         if (email == null || !EMAIL_PATTERN.matcher(email).matches()) throw new IllegalArgumentException("Invalid email format.");
         if (password == null || password.length() < 6) throw new IllegalArgumentException("Password must be at least 6 characters.");
@@ -236,6 +247,11 @@ public class AuthenticationService {
     }
 
     public void initiatePasswordReset(String email) {
+        if (reservedAccountGuardService.isProductionDeployment() && reservedAccountGuardService.isReservedEmail(email)) {
+            reservedAccountGuardService.purgeReservedAccountsIfProduction();
+            return;
+        }
+
         if (bannedEmailRepository.existsByEmailIgnoreCase(email)) return;
 
         Optional<User> userOpt = userRepository.findByEmail(email);
@@ -277,6 +293,8 @@ public class AuthenticationService {
     }
 
     public DefaultOAuth2User processUserLogin(String providerStr, OAuth2User oauthUser, String accessToken) {
+        reservedAccountGuardService.purgeReservedAccountsIfProduction();
+
         OAuthProvider provider = OAuthProvider.fromString(providerStr);
         if (provider == null) throw new IllegalArgumentException("Unsupported OAuth provider: " + providerStr);
 
@@ -285,6 +303,7 @@ public class AuthenticationService {
         String oauthAvatar = extractAvatarUrl(providerStr, oauthUser, providerId);
         String email = oauthUser.getAttribute("email");
         String profileUrl = extractProfileUrl(providerStr, oauthUser, oauthUsername, providerId);
+        reservedAccountGuardService.rejectReservedEmailInProduction(email);
 
         boolean isVisible = provider != OAuthProvider.GOOGLE;
         User user = null;
@@ -296,10 +315,12 @@ public class AuthenticationService {
         Optional<User> linkedUser = userRepository.findByConnectedAccountsProviderId(providerId);
         if (linkedUser.isPresent()) {
             user = linkedUser.get();
+            reservedAccountGuardService.rejectReservedUserInProduction(user);
         } else if (email != null && !email.isEmpty()) {
             Optional<User> emailUser = userRepository.findByEmail(email);
             if (emailUser.isPresent()) {
                 user = emailUser.get();
+                reservedAccountGuardService.rejectReservedUserInProduction(user);
                 if (!user.isEmailVerified()) {
                     user.setEmailVerified(true);
                     user.setVerificationToken(null);
