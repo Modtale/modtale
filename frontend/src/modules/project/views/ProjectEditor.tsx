@@ -21,6 +21,10 @@ import { WikiPreview } from '../tabs/WikiPreview';
 import { projectClient } from '../api/projectClient';
 import { api } from '@/utils/api';
 
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -180,6 +184,10 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
         if (!versionData.versionNumber || versionData.gameVersions.length === 0) {
             onShowStatus('error', 'Upload Failed', 'Version number and game versions are required.');
+            return;
+        }
+        if (versionData.file && isFileOverUploadLimit(versionData.file)) {
+            onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
             return;
         }
 
@@ -484,12 +492,18 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <Files projectData={projectData} versionData={versionData} setVersionData={setVersionData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} classification={projectData.classification || 'PLUGIN'} handleUploadVersion={handleUploadVersion} handleEditVersion={() => {}} isLoading={isSavingVersion} />
                         )}
                         {activeTab === 'gallery' && (
-                            <Gallery
+                <Gallery
                                 projectData={projectData}
                                 readOnly={readOnly}
                                 hasProjectPermission={hasProjectPermission}
                                 handleGalleryDelete={handleGalleryDelete}
-                                handleGallerySelect={(f) => setGalleryCropImage(URL.createObjectURL(f))}
+                    handleGallerySelect={(f) => {
+                        if (isFileOverUploadLimit(f)) {
+                            onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
+                            return;
+                        }
+                        setGalleryCropImage(URL.createObjectURL(f));
+                    }}
                                 isLoading={isSaving}
                             />
                         )}

@@ -4,10 +4,15 @@ import { theme } from '@/styles/theme';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { StatusModal } from '@/components/ui/StatusModal';
 import type { User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { Link } from 'react-router-dom';
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
 const DiscordIcon = ({ className }: { className?: string }) => (
     <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
@@ -52,6 +57,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
     const [uploadingBanner, setUploadingBanner] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const bannerParallaxRef = useRef<HTMLDivElement>(null);
     const bannerFadeRef = useRef<HTMLDivElement>(null);
 
@@ -120,6 +126,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
         const file = e.target.files[0];
+        if (isFileOverUploadLimit(file)) {
+            setUploadError(MAX_UPLOAD_ERROR_MESSAGE);
+            e.target.value = '';
+            return;
+        }
+        setUploadError(null);
         const url = URL.createObjectURL(file);
         if (type === 'banner') setBannerToCrop(url);
         else setAvatarToCrop(url);
@@ -261,6 +273,14 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
+            {uploadError && (
+                <StatusModal
+                    type="error"
+                    title="Upload Failed"
+                    message={uploadError}
+                    onClose={() => setUploadError(null)}
+                />
+            )}
 
             <div
                 ref={bannerParallaxRef}

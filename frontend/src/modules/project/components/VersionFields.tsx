@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useDropzone, type Accept } from 'react-dropzone';
+import { useDropzone, type Accept, type FileRejection } from 'react-dropzone';
 import { UploadCloud, CheckCircle2, AlertCircle, ChevronDown, Check, Beaker, Zap, Loader2 } from 'lucide-react';
 import { Label, Input } from './FormShared';
 import type { VersionFormData } from './FormShared';
@@ -7,6 +7,9 @@ import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
 import type { ManifestDependencySuggestion } from '@/types';
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 
 const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
@@ -28,6 +31,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
     const [manifestSuggestions, setManifestSuggestions] = useState<ManifestDependencySuggestion[]>([]);
     const [loadingManifestSuggestions, setLoadingManifestSuggestions] = useState(false);
     const [manifestSuggestionError, setManifestSuggestionError] = useState<string | null>(null);
+    const [fileError, setFileError] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -71,6 +75,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         if (!nextFile || disabled) return;
 
         onChange({ ...data, file: nextFile });
+        setFileError(null);
         setManifestSuggestions([]);
         setManifestSuggestionError(null);
 
@@ -96,8 +101,18 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         }
     }, [data, onChange, disabled, projectType, currentProjectId]);
 
+    const onFileDropRejected = useCallback((rejections: FileRejection[]) => {
+        const tooLarge = rejections.some(r => r.errors.some(e => e.code === 'file-too-large'));
+        setFileError(tooLarge ? MAX_UPLOAD_ERROR_MESSAGE : 'Invalid file type. Please upload a supported file.');
+    }, []);
+
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop: onFileDrop, maxFiles: 1, accept: getAcceptTypes(), disabled: disabled
+        onDrop: onFileDrop,
+        onDropRejected: onFileDropRejected,
+        maxFiles: 1,
+        maxSize: MAX_UPLOAD_BYTES,
+        accept: getAcceptTypes(),
+        disabled: disabled
     });
 
     const toggleGameVersion = (ver: string) => {
@@ -163,9 +178,16 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                                 <div className={`text-xs ${theme.colors.textMuted} mt-1`}>
                                     {allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
                                 </div>
+                                <div className={`text-xs ${theme.colors.textMuted} mt-1`}>Maximum file size: 100MB</div>
                             </div>
                         )}
                     </div>
+                    {fileError && (
+                        <div className={`mt-3 p-3 rounded-xl border ${theme.colors.dangerBorder} ${theme.colors.dangerBg} ${theme.colors.dangerText} text-xs font-bold flex items-start gap-2`}>
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>{fileError}</span>
+                        </div>
+                    )}
                     {manifestSuggestionError && (
                         <div className={`mt-3 p-3 rounded-xl border ${theme.colors.dangerBorder} ${theme.colors.dangerBg} ${theme.colors.dangerText} text-xs font-bold flex items-start gap-2`}>
                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
