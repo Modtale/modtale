@@ -17,6 +17,7 @@ public class PlatformFinanceSettings {
     private int defaultAdRevenuePerClickCents = 3;
     private int minPayoutCents = 1000;
     private boolean adTestModeEnabled = false;
+    private boolean mockStripeEnabled = false;
     private String currency = "usd";
     private LocalDateTime updatedAt = LocalDateTime.now();
 
@@ -74,6 +75,14 @@ public class PlatformFinanceSettings {
 
     public void setAdTestModeEnabled(boolean adTestModeEnabled) {
         this.adTestModeEnabled = adTestModeEnabled;
+    }
+
+    public boolean isMockStripeEnabled() {
+        return mockStripeEnabled;
+    }
+
+    public void setMockStripeEnabled(boolean mockStripeEnabled) {
+        this.mockStripeEnabled = mockStripeEnabled;
     }
 
     public String getCurrency() {

@@ -7,9 +7,10 @@ interface DonationPromptModalProps {
     currency?: string;
     suggestedAmountCents: number;
     recurringDefault: boolean;
+    allowRecurring?: boolean;
     onClose: () => void;
     onSkip: () => void;
-    onDonate: (amountCents: number, recurring: boolean) => void;
+    onDonate: (amountCents: number, recurring: boolean, guestCheckout: boolean) => void;
     isProcessing?: boolean;
 }
 
@@ -18,6 +19,7 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
     currency = 'USD',
     suggestedAmountCents,
     recurringDefault,
+    allowRecurring = true,
     onClose,
     onSkip,
     onDonate,
@@ -26,12 +28,14 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
     useScrollLock(show);
     const [amount, setAmount] = useState((suggestedAmountCents / 100).toFixed(2));
     const [recurring, setRecurring] = useState(recurringDefault);
+    const [guestCheckout, setGuestCheckout] = useState(true);
 
     useEffect(() => {
         if (!show) return;
         setAmount((Math.max(100, suggestedAmountCents) / 100).toFixed(2));
-        setRecurring(recurringDefault);
-    }, [show, suggestedAmountCents, recurringDefault]);
+        setRecurring(allowRecurring ? recurringDefault : false);
+        setGuestCheckout(true);
+    }, [show, suggestedAmountCents, recurringDefault, allowRecurring]);
 
     if (!show) return null;
 
@@ -64,16 +68,33 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                             onChange={(e) => setAmount(e.target.value)}
                             className="w-full rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900 px-3 py-2.5 text-slate-900 dark:text-white font-bold"
                         />
+                        {allowRecurring && (
+                            <button
+                                type="button"
+                                onClick={() => setRecurring((prev) => !prev)}
+                                className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium"
+                                aria-pressed={recurring}
+                            >
+                                <span className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${recurring ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-white/20 text-transparent'}`}>
+                                    <Check className="w-3.5 h-3.5" />
+                                </span>
+                                Make this a recurring monthly donation
+                            </button>
+                        )}
                         <button
                             type="button"
-                            onClick={() => setRecurring((prev) => !prev)}
+                            onClick={() => {
+                                const nextGuest = !guestCheckout;
+                                setGuestCheckout(nextGuest);
+                                if (nextGuest) setRecurring(false);
+                            }}
                             className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium"
-                            aria-pressed={recurring}
+                            aria-pressed={guestCheckout}
                         >
-                            <span className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${recurring ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-white/20 text-transparent'}`}>
+                            <span className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${guestCheckout ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-white/20 text-transparent'}`}>
                                 <Check className="w-3.5 h-3.5" />
                             </span>
-                            Make this a recurring monthly donation
+                            Donate as guest (one-time)
                         </button>
                     </div>
                 </div>
@@ -87,7 +108,7 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                         Continue Without Donating
                     </button>
                     <button
-                        onClick={() => onDonate(normalizedCents, recurring)}
+                        onClick={() => onDonate(normalizedCents, guestCheckout ? false : recurring, guestCheckout)}
                         disabled={isProcessing}
                         className="px-4 py-2.5 rounded-xl bg-modtale-accent text-white font-bold hover:bg-modtale-accentHover disabled:opacity-60"
                     >

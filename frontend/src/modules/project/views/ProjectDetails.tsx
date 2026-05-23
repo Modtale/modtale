@@ -339,18 +339,18 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         });
     };
 
-    const handleDonateAndContinue = async (amountCents: number, recurring: boolean) => {
+    const handleDonateAndContinue = async (amountCents: number, recurring: boolean, guestCheckout: boolean) => {
         const pending = pendingFinalDownload;
         if (!pending || !project?.id) return;
 
         setProcessingDonation(true);
         try {
-            const donation = await financeClient.createDonationCheckout(project.id, amountCents, recurring);
+            const donation = await financeClient.createDonationCheckout(project.id, amountCents, recurring, guestCheckout);
             if (donation?.checkoutUrl) {
                 window.open(donation.checkoutUrl, '_blank', 'noopener,noreferrer');
             }
-            if (donation?.simulated) {
-                setStatusModal({ type: 'success', title: 'Donation Recorded', msg: 'Thank you for supporting this creator.' });
+            if (donation?.simulated || donation?.mockStripeEnabled) {
+                setStatusModal({ type: 'info', title: 'Mock Stripe Checkout', msg: 'Mock Stripe is enabled. This donation will not be counted as paid.' });
             } else {
                 setStatusModal({ type: 'info', title: 'Donation Opened', msg: 'Donation checkout opened in a new tab.' });
             }
@@ -457,6 +457,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 currency={(donationConfig?.currency || 'USD').toUpperCase()}
                 suggestedAmountCents={Math.max(100, Number(donationConfig?.suggestedDonationCents || project.suggestedDonationCents || 500))}
                 recurringDefault={Boolean(donationConfig?.donationRecurringDefault ?? project.donationRecurringDefault)}
+                allowRecurring={Boolean(currentUser)}
                 onClose={() => {
                     setShowDonationPrompt(false);
                     setPendingFinalDownload(null);

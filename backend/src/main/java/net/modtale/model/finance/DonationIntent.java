@@ -30,6 +30,8 @@ public class DonationIntent {
 
     @Indexed
     private String creatorId;
+    private String donorUserId;
+    private boolean guestDonation;
 
     private long amountCents;
     private long creatorCents;
@@ -69,6 +71,22 @@ public class DonationIntent {
 
     public void setCreatorId(String creatorId) {
         this.creatorId = creatorId;
+    }
+
+    public String getDonorUserId() {
+        return donorUserId;
+    }
+
+    public void setDonorUserId(String donorUserId) {
+        this.donorUserId = donorUserId;
+    }
+
+    public boolean isGuestDonation() {
+        return guestDonation;
+    }
+
+    public void setGuestDonation(boolean guestDonation) {
+        this.guestDonation = guestDonation;
     }
 
     public long getAmountCents() {
