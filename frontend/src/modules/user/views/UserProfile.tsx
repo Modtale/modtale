@@ -123,6 +123,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             const params = {
                 page,
                 size: itemsPerPage,
+                sort: 'relevance',
             };
 
             const projectsRes = await api.get(`/creators/${profileUser.id}/projects`, { params });
