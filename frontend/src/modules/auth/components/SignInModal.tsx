@@ -1,34 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Github, ArrowRight, Loader2, ArrowLeft, Mail } from 'lucide-react';
+import { X, Github, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
+import { DiscordBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { useNavigate } from 'react-router-dom';
 import { BACKEND_URL } from '@/utils/api';
 import { useToast } from '@/components/ui/Toast';
 import { authClient } from '../api/authClient';
-
-const GitLabIcon = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-        <path d="M22.65 14.39L12 22.13L1.35 14.39L4.74 3.99C4.82 3.73 5.12 3.63 5.33 3.82L8.99 7.5L12 10.5L15.01 7.5L18.67 3.82C18.88 3.63 19.18 3.73 19.26 3.99L22.65 14.39Z" />
-    </svg>
-);
-
-const DiscordIcon = ({ className }: { className?: string }) => (
-    <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
-        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19a77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-4.2-48.62-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
-    </svg>
-);
-
-const GoogleIcon = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-        <path d="M23.75,16A7.7446,7.7446,0,0,1,8.7177,18.6259L4.2849,22.1721A13.244,13.244,0,0,0,29.25,16" fill="#00ac47" />
-        <path d="M23.75,16a7.7387,7.7387,0,0,1-3.2516,6.2987l4.3824,3.5059A13.2042,13.2042,0,0,0,29.25,16" fill="#4285f4" />
-        <path d="M8.25,16a7.698,7.698,0,0,1,.4677-2.6259L4.2849,9.8279a13.177,13.177,0,0,0,0,12.3442l4.4328-3.5462A7.698,7.698,0,0,1,8.25,16Z" fill="#ffba00" />
-        <polygon fill="#2ab2db" points="8.718 13.374 8.718 13.374 8.718 13.374 8.718 13.374" />
-        <path d="M16,8.25a7.699,7.699,0,0,1,4.558,1.4958l4.06-3.7893A13.2152,13.2152,0,0,0,4.2849,9.8279l4.4328,3.5462A7.756,7.756,0,0,1,16,8.25Z" fill="#ea4435" />
-        <polygon fill="#2ab2db" points="8.718 18.626 8.718 18.626 8.718 18.626 8.718 18.626" />
-        <path d="M29.25,15v1L27,19.5H16.5V14H28.25A1,1,0,0,1,29.25,15Z" fill="#4285f4" />
-    </svg>
-);
 
 interface SignInModalProps {
     isOpen: boolean;
@@ -137,21 +114,21 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                         className="w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
                                         title="Sign in with GitLab"
                                     >
-                                        <GitLabIcon className="w-5 h-5" />
+                                        <GitLabBrandIcon className="w-5 h-5" />
                                     </button>
                                     <button
                                         onClick={() => handleOAuthLogin('discord')}
                                         className="w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
                                         title="Sign in with Discord"
                                     >
-                                        <DiscordIcon className="w-5 h-5" />
+                                        <DiscordBrandIcon className="w-5 h-5" />
                                     </button>
                                     <button
                                         onClick={() => handleOAuthLogin('google')}
                                         className="w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
                                         title="Sign in with Google"
                                     >
-                                        <GoogleIcon className="w-5 h-5" />
+                                        <GoogleBrandIcon className="w-5 h-5" />
                                     </button>
                                 </div>
                             </div>

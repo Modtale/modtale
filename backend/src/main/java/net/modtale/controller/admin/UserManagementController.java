@@ -11,6 +11,7 @@ import net.modtale.repository.admin.AdminLogRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.admin.UserManagementService;
 import net.modtale.service.communication.EmailService;
+import net.modtale.service.security.AccessControlService;
 import net.modtale.service.user.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,19 +32,10 @@ public class UserManagementController {
     @Autowired private UserRepository userRepository;
     @Autowired private AdminLogRepository adminLogRepository;
     @Autowired private EmailService emailService;
-
-    private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
-
-    private boolean isSuperAdmin(User user) {
-        return user != null && SUPER_ADMIN_ID.equals(user.getId());
-    }
-
-    private boolean isAdmin(User user) {
-        return (user != null && user.getRoles() != null && user.getRoles().contains("ADMIN")) || isSuperAdmin(user);
-    }
+    @Autowired private AccessControlService accessControlService;
 
     private boolean canManageUser(User currentUser, User targetUser) {
-        if (isSuperAdmin(currentUser)) return true;
+        if (accessControlService.isSuperAdmin(currentUser)) return true;
         if (targetUser != null && targetUser.getRoles() != null && targetUser.getRoles().contains("ADMIN")) {
             return false;
         }
@@ -65,7 +57,7 @@ public class UserManagementController {
     @GetMapping("/users/bans")
     public ResponseEntity<List<BannedEmailDTO>> getBannedEmails() {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(userManagementService.getBannedEmails().stream()
@@ -76,7 +68,7 @@ public class UserManagementController {
     @PostMapping("/users/bans")
     public ResponseEntity<?> banEmail(@RequestBody BanEmailRequest requestPayload) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         String email = requestPayload.getEmail();
@@ -99,7 +91,7 @@ public class UserManagementController {
     @DeleteMapping("/users/bans")
     public ResponseEntity<?> unbanEmail(@RequestParam String email) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         userManagementService.unbanEmail(email);
@@ -110,7 +102,7 @@ public class UserManagementController {
     @GetMapping("/users/{username}")
     public ResponseEntity<?> getUserDetails(@PathVariable String username) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         Optional<User> target = userRepository.findByUsernameIgnoreCase(username);
@@ -122,7 +114,7 @@ public class UserManagementController {
     @GetMapping("/users/{username}/raw")
     public ResponseEntity<?> getRawUser(@PathVariable String username) {
         User currentUser = getSafeUser();
-        if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
@@ -138,7 +130,7 @@ public class UserManagementController {
     @PutMapping("/users/{username}/raw")
     public ResponseEntity<?> updateRawUser(@PathVariable String username, @RequestBody User updatedData) {
         User currentUser = getSafeUser();
-        if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         User existing = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
@@ -166,7 +158,7 @@ public class UserManagementController {
             @RequestParam(required = false, defaultValue = "Administrative enforcement action.") String reason
     ) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
@@ -193,7 +185,7 @@ public class UserManagementController {
     @PostMapping("/users/{username}/tier")
     public ResponseEntity<?> setUserTier(@PathVariable String username, @RequestParam String tier) {
         User currentUser = getSafeUser();
-        if (!isSuperAdmin(currentUser)) {
+        if (!accessControlService.isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Access Denied", "message", "You do not have permission."));
         }
@@ -225,7 +217,7 @@ public class UserManagementController {
     @PostMapping("/users/{username}/role")
     public ResponseEntity<?> addUserRole(@PathVariable String username, @RequestParam String role) {
         User currentUser = getSafeUser();
-        if (!isSuperAdmin(currentUser)) {
+        if (!accessControlService.isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
 
@@ -244,7 +236,7 @@ public class UserManagementController {
     @DeleteMapping("/users/{username}/role")
     public ResponseEntity<?> removeUserRole(@PathVariable String username, @RequestParam String role) {
         User currentUser = getSafeUser();
-        if (!isSuperAdmin(currentUser)) {
+        if (!accessControlService.isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
 

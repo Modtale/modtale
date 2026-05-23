@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, Lock, X, AlertTriangle, FileJson } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { isSuperAdminUser } from '../utils/access';
 
 export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const [viewMode, setViewMode] = useState<'users' | 'bans'>('users');
@@ -49,7 +50,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const isSuperAdmin = currentAdmin?.id === '692620f7c2f3266e23ac0ded';
+    const isSuperAdmin = isSuperAdminUser(currentAdmin);
     const isTargetAdmin = foundUser?.roles?.includes('ADMIN');
     const canManageUser = isSuperAdmin || !isTargetAdmin;
 

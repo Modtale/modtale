@@ -9,6 +9,7 @@ import { ReportQueue } from '../components/ReportQueue';
 import { ProjectManagement } from '../components/ProjectManagement';
 import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
+import { isAdminUser, isSuperAdminUser } from '../utils/access';
 import type { Project } from '@/types';
 
 interface AdminPanelProps {
@@ -27,8 +28,8 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     const [reports, setReports] = useState<any[]>([]);
 
-    const isAdmin = currentUser?.roles?.includes('ADMIN');
-    const isSuperAdmin = currentUser?.id === '692620f7c2f3266e23ac0ded';
+    const isAdmin = isAdminUser(currentUser);
+    const isSuperAdmin = isSuperAdminUser(currentUser);
 
     useEffect(() => {
         if (isAdmin) {

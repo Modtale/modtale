@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { UserPlus, ChevronDown, Check, Shield, Trash2 } from 'lucide-react';
 import { theme } from '@/styles/theme';
+import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -27,7 +28,6 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
     const [isInviting, setIsInviting] = useState(false);
 
     const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
-    const [inviteRoleDropdownOpen, setInviteRoleDropdownOpen] = useState(false);
     const [memberRoleDropdownOpen, setMemberRoleDropdownOpen] = useState<string | null>(null);
 
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
@@ -130,8 +130,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            {(inviteRoleDropdownOpen || memberRoleDropdownOpen) && (
-                <div className="fixed inset-0 z-[90]" onClick={() => { setInviteRoleDropdownOpen(false); setMemberRoleDropdownOpen(null); }} />
+            {memberRoleDropdownOpen && (
+                <div className="fixed inset-0 z-[90]" onClick={() => { setMemberRoleDropdownOpen(null); }} />
             )}
 
             {error && <ErrorBanner message={error} />}
@@ -181,31 +181,20 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
                             <div className="w-full md:w-64 relative z-[95]">
                                 <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role</label>
-                                <button type="button" onClick={() => setInviteRoleDropdownOpen(!inviteRoleDropdownOpen)} className={`${theme.components.inputField} flex justify-between items-center cursor-pointer`}>
-                                    {inviteRoleId ? (
-                                        <div className="flex items-center gap-2 truncate">
-                                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: nonOwnerRoles.find(r => r.id === inviteRoleId)?.color}} />
-                                            <span className="truncate">{nonOwnerRoles.find(r => r.id === inviteRoleId)?.name}</span>
-                                        </div>
-                                    ) : <span className={theme.colors.textMuted}>Select Role...</span>}
-                                    <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted} flex-shrink-0 transition-transform ${inviteRoleDropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
-
-                                {inviteRoleDropdownOpen && (
-                                    <div className={`absolute top-full left-0 right-0 mt-2 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95`}>
-                                        <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
-                                            {nonOwnerRoles.map(role => (
-                                                <button key={role.id} type="button" onClick={() => { setInviteRoleId(role.id); setInviteRoleDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2.5 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
-                                                    <div className="flex items-center gap-2 truncate">
-                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: role.color}} />
-                                                        <span className={`font-bold text-sm ${theme.colors.textPrimary} truncate`}>{role.name}</span>
-                                                    </div>
-                                                    {inviteRoleId === role.id && <Check className="w-4 h-4 text-modtale-accent flex-shrink-0" />}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                <DropdownSelect
+                                    value={inviteRoleId}
+                                    onChange={setInviteRoleId}
+                                    placeholder={<span className={theme.colors.textMuted}>Select Role...</span>}
+                                    options={nonOwnerRoles.map(role => ({
+                                        value: role.id,
+                                        label: role.name,
+                                        leftAdornment: <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
+                                    }))}
+                                    containerClassName="relative"
+                                    buttonClassName={`${theme.components.inputField} w-full flex justify-between items-center cursor-pointer`}
+                                    menuClassName={`${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 left-0 right-0`}
+                                    optionClassName={`w-full flex items-center justify-between px-3 py-2.5 ${theme.colors.bgSurfaceHover} transition-colors text-left font-bold text-sm ${theme.colors.textPrimary}`}
+                                />
                             </div>
 
                             <button type="submit" disabled={!inviteUserId || !inviteRoleId || isInviting} className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg h-11">

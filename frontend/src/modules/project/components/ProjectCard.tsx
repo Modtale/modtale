@@ -1,10 +1,11 @@
 import React from 'react';
-import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe, ChevronRight } from 'lucide-react';
+import { Download, Calendar, Heart, Box, ChevronRight } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
 import { Link } from 'react-router-dom';
 import { SiteRoutes } from '@/utils/routes';
 import { prefetchProject } from '@/utils/prefetch';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { formatTimeAgo, getClassificationIcon, toTitleCase } from '@/utils/modHelpers';
 import type { Project } from '@/types';
 
 interface ProjectCardProps {
@@ -16,42 +17,6 @@ interface ProjectCardProps {
     priority?: boolean;
     viewStyle?: 'grid' | 'list' | 'compact';
 }
-
-const getClassificationIcon = (cls: string) => {
-    switch(cls) {
-        case 'PLUGIN': return <Code className="w-4 h-4" />;
-        case 'ART': return <Paintbrush className="w-4 h-4" />;
-        case 'DATA': return <Database className="w-4 h-4" />;
-        case 'SAVE': return <Globe className="w-4 h-4" />;
-        case 'MODPACK': return <Layers className="w-4 h-4" />;
-        default: return <Layout className="w-4 h-4" />;
-    }
-}
-
-const toTitleCase = (str: string) => {
-    if (!str) return '';
-    if (str === 'SAVE') return 'World';
-    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-};
-
-const formatTimeAgo = (dateString: string) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + "y ago";
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + "mo ago";
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + "d ago";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + "h ago";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + "m ago";
-    return "Just now";
-};
 
 export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid' }) => {
     const title = project.title || 'Untitled Project';
@@ -65,7 +30,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     const downloads = (project.downloadCount || 0).toLocaleString();
     const favorites = (project.favoriteCount || 0).toLocaleString();
 
-    const timeAgo = formatTimeAgo(project.updatedAt || '');
+    const timeAgo = project.updatedAt ? formatTimeAgo(project.updatedAt) : null;
     const childCount = (project.projectIds || project.childProjectIds || []).length;
     const displayClassification = toTitleCase(classification);
 

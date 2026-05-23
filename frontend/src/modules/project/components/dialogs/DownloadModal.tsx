@@ -1,57 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight } from 'lucide-react';
+import { DropdownSelect, type DropdownOption } from '@/components/ui/DropdownSelect';
 import { theme } from '@/styles/theme';
 import { formatTimeAgo, compareSemVer } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
-
-const CustomDropdown = ({ options, value, onChange, placeholder }: any) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false); };
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, []);
-
-    return (
-        <div className="relative" ref={ref}>
-            <button
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all duration-300 ${isOpen ? "ring-2 ring-modtale-accent border-transparent" : ""}`}
-            >
-                <span>{value ? value : placeholder}</span>
-                <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted} transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isOpen && (
-                <div className={`absolute top-[calc(100%+8px)] left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 overflow-hidden max-h-60 overflow-y-auto custom-scrollbar`}>
-                    {options.length > 0 ? (
-                        options.map((opt: string) => (
-                            <button
-                                key={opt}
-                                type="button"
-                                onClick={() => {
-                                    onChange(opt);
-                                    setIsOpen(false);
-                                }}
-                                className={`w-full text-left px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate ${value === opt ? "text-modtale-accent bg-blue-50/50 dark:bg-blue-500/10" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
-                            >
-                                {opt}
-                            </button>
-                        ))
-                    ) : (
-                        <div className={`p-4 text-center ${theme.colors.textMuted} text-sm`}>
-                            No versions found
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
 
 interface DownloadModalProps {
     show: boolean;
@@ -93,6 +46,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         if (showPreReleaseGameVersions) return all;
         return all.filter(version => !preReleaseGameVersionSet.has(version));
     }, [versionsByGame, showPreReleaseGameVersions, preReleaseGameVersionSet, orderedGameVersions]);
+
+    const gameVersionOptions = useMemo<DropdownOption[]>(
+        () => gameVersions.map((version) => ({ value: version, label: version })),
+        [gameVersions]
+    );
 
     useEffect(() => {
         if (show) {
@@ -176,11 +134,16 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 <div className={`p-6 overflow-visible relative flex-1 flex flex-col justify-center`}>
                     <div className="mb-6">
                         <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Game Version</label>
-                        <CustomDropdown
-                            options={gameVersions}
+                        <DropdownSelect
+                            options={gameVersionOptions}
                             value={selectedGameVer}
                             onChange={setSelectedGameVer}
                             placeholder="Select Game Version"
+                            emptyLabel="No versions found"
+                            showSelectedCheck={false}
+                            buttonClassName="w-full flex items-center justify-between gap-3 p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all duration-300"
+                            menuClassName="left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 overflow-hidden"
+                            optionClassName="w-full flex items-center justify-between text-left px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                         />
                     </div>
 

@@ -3,6 +3,7 @@ package net.modtale.controller.admin;
 import net.modtale.mapper.AdminMapper;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.AdminLogRepository;
+import net.modtale.service.security.AccessControlService;
 import net.modtale.service.user.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -21,12 +22,7 @@ public class AuditController {
 
     @Autowired private AccountService accountService;
     @Autowired private AdminLogRepository adminLogRepository;
-
-    private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
-
-    private boolean isSuperAdmin(User user) {
-        return user != null && SUPER_ADMIN_ID.equals(user.getId());
-    }
+    @Autowired private AccessControlService accessControlService;
 
     private User getSafeUser() {
         try {
@@ -45,7 +41,7 @@ public class AuditController {
             @RequestParam(required = false, defaultValue = "50") int size
     ) {
         User currentUser = getSafeUser();
-        if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
         return ResponseEntity.ok(adminLogRepository.findWithFilters(query, action, targetType, pageable)
