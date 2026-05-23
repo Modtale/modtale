@@ -36,9 +36,12 @@ public class StripeGatewayService {
         return stripeSecretKey != null && !stripeSecretKey.isBlank();
     }
 
-    public StripeResult createOrSimulateConnectAccount(String email, String country) {
-        if (!isEnabled()) {
+    public StripeResult createOrSimulateConnectAccount(String email, String country, boolean forceMock) {
+        if (forceMock) {
             return new StripeResult(true, "sim_acct_" + System.currentTimeMillis(), null, null, Map.of("simulated", true));
+        }
+        if (!isEnabled()) {
+            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
         }
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -49,10 +52,13 @@ public class StripeGatewayService {
         return postForm("/accounts", form);
     }
 
-    public StripeResult createOrSimulateOnboardingLink(String accountId, String returnPath) {
-        if (!isEnabled()) {
+    public StripeResult createOrSimulateOnboardingLink(String accountId, String returnPath, boolean forceMock) {
+        if (forceMock) {
             String url = normalizeFrontendUrl() + (returnPath.startsWith("/") ? returnPath : "/" + returnPath);
             return new StripeResult(true, "sim_link_" + System.currentTimeMillis(), url, null, Map.of("simulated", true));
+        }
+        if (!isEnabled()) {
+            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
         }
 
         String returnUrl = normalizeFrontendUrl() + (returnPath.startsWith("/") ? returnPath : "/" + returnPath);
@@ -69,8 +75,8 @@ public class StripeGatewayService {
         return new StripeResult(true, result.id(), (String) result.raw().get("url"), null, result.raw());
     }
 
-    public Map<String, Object> getAccountStatus(String accountId) {
-        if (!isEnabled()) {
+    public Map<String, Object> getAccountStatus(String accountId, boolean forceMock) {
+        if (forceMock) {
             return Map.of(
                     "details_submitted", true,
                     "charges_enabled", true,
@@ -78,6 +84,9 @@ public class StripeGatewayService {
                     "country", "US",
                     "simulated", true
             );
+        }
+        if (!isEnabled()) {
+            return Map.of("error", "Stripe secret key is not configured.");
         }
 
         try {
@@ -100,10 +109,14 @@ public class StripeGatewayService {
             boolean recurring,
             String successUrl,
             String cancelUrl,
-            String currency
+            String currency,
+            boolean forceMock
     ) {
-        if (!isEnabled()) {
+        if (forceMock) {
             return new StripeResult(true, "sim_cs_" + System.currentTimeMillis(), normalizeFrontendUrl() + "/dashboard/finance?donation=intent-" + intentId, null, Map.of("simulated", true));
+        }
+        if (!isEnabled()) {
+            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
         }
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -126,9 +139,12 @@ public class StripeGatewayService {
         return new StripeResult(true, result.id(), (String) result.raw().get("url"), null, result.raw());
     }
 
-    public Map<String, Object> getCheckoutSession(String sessionId) {
+    public Map<String, Object> getCheckoutSession(String sessionId, boolean forceMock) {
+        if (forceMock) {
+            return Map.of("id", sessionId, "status", "open", "payment_status", "unpaid", "simulated", true);
+        }
         if (!isEnabled()) {
-            return Map.of("id", sessionId, "status", "complete", "payment_status", "paid", "simulated", true);
+            return Map.of("error", "Stripe secret key is not configured.");
         }
 
         try {
@@ -144,14 +160,17 @@ public class StripeGatewayService {
         }
     }
 
-    public StripeResult createOrSimulateTransfer(String destinationAccountId, long amountCents, String currency, String description, Map<String, String> metadata) {
-        if (!isEnabled()) {
+    public StripeResult createOrSimulateTransfer(String destinationAccountId, long amountCents, String currency, String description, Map<String, String> metadata, boolean forceMock) {
+        if (forceMock) {
             return new StripeResult(true, "sim_tr_" + System.currentTimeMillis(), null, null, Map.of(
                     "simulated", true,
                     "createdAt", LocalDateTime.now().toString(),
                     "destination", destinationAccountId,
                     "amount", amountCents
             ));
+        }
+        if (!isEnabled()) {
+            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
         }
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();

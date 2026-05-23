@@ -189,10 +189,12 @@ public class FinanceController {
     public ResponseEntity<?> createDonationCheckout(
             @PathVariable String projectId,
             @RequestParam long amountCents,
-            @RequestParam(defaultValue = "false") boolean recurring
+            @RequestParam(defaultValue = "false") boolean recurring,
+            @RequestParam(defaultValue = "false") boolean guestCheckout
     ) {
         try {
-            return ResponseEntity.ok(financeService.createDonationCheckout(projectId, amountCents, recurring));
+            User donor = accountService.getCurrentUser();
+            return ResponseEntity.ok(financeService.createDonationCheckout(projectId, amountCents, recurring, donor, guestCheckout));
         } catch (IllegalStateException | IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
