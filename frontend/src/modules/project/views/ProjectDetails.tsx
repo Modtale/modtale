@@ -35,6 +35,8 @@ import { DownloadModal } from '../components/dialogs/DownloadModal';
 import { DependencyModal } from '../components/dialogs/DependencyModal';
 import { api } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
+import { financeClient } from '@/modules/finance/api/financeClient';
+import { DonationPromptModal } from '../components/dialogs/DonationPromptModal';
 import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface ProjectDetailViewProps {
@@ -73,7 +75,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; dependencies: any[] } | null>(null);
+    const [pendingFinalDownload, setPendingFinalDownload] = useState<{ versionNumber: string; selectedDeps: string[] } | null>(null);
+    const [donationConfig, setDonationConfig] = useState<any>(null);
+    const [showDonationPrompt, setShowDonationPrompt] = useState(false);
+    const [processingDonation, setProcessingDonation] = useState(false);
     const commentsRef = useRef<HTMLDivElement>(null);
+    const processedDonationIntentRef = useRef<string | null>(null);
 
     const isWikiRoute = location.pathname.includes('/wiki');
     const isGalleryRoute = /\/gallery\/?$/.test(location.pathname);
@@ -126,6 +133,53 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, []);
 
     useEffect(() => {
+        if (!project?.id) return;
+        financeClient.getDonationConfig(project.id)
+            .then((cfg) => setDonationConfig(cfg))
+            .catch(() => setDonationConfig(null));
+    }, [project?.id]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const intentId = params.get('donation_intent');
+        const donationStatus = params.get('donation_status');
+
+        if (!intentId || processedDonationIntentRef.current === intentId) return;
+        processedDonationIntentRef.current = intentId;
+
+        if (donationStatus === 'success') {
+            financeClient.confirmDonationIntent(intentId)
+                .then((result) => {
+                    if (result?.ok) {
+                        setStatusModal({ type: 'success', title: 'Donation Received', msg: 'Thanks for supporting this creator.' });
+                    } else {
+                        setStatusModal({ type: 'info', title: 'Donation Pending', msg: 'Payment is still processing. This can take a moment.' });
+                    }
+                })
+                .catch(() => setStatusModal({ type: 'warning', title: 'Donation Check Failed', msg: 'Could not verify donation status yet.' }))
+                .finally(() => {
+                    params.delete('donation_intent');
+                    params.delete('donation_status');
+                    navigate(
+                        { pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : '', hash: location.hash },
+                        { replace: true }
+                    );
+                });
+            return;
+        }
+
+        if (donationStatus === 'cancel') {
+            setStatusModal({ type: 'info', title: 'Donation Cancelled', msg: 'Download is still available even if you skip donating.' });
+            params.delete('donation_intent');
+            params.delete('donation_status');
+            navigate(
+                { pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : '', hash: location.hash },
+                { replace: true }
+            );
+        }
+    }, [location.search, location.pathname, location.hash, navigate]);
+
+    useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
             window.scrollTo(0, scrollPosRef.current);
         }
@@ -161,6 +215,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     useEffect(() => {
         if (!isGalleryRoute || galleryImages.length <= 1) return;
+        const escapeTarget = project ? SiteRoutes.project(project) : SiteRoutes.home();
 
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'ArrowLeft') {
@@ -171,13 +226,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 setGalleryIndex((prev) => (prev + 1) % galleryImages.length);
             } else if (event.key === 'Escape') {
                 event.preventDefault();
-                navigate(projectUrl);
+                navigate(escapeTarget);
             }
         };
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [isGalleryRoute, galleryImages.length, navigate, projectUrl]);
+    }, [isGalleryRoute, galleryImages.length, navigate, project]);
 
     useEffect(() => {
         if (project && id) {
@@ -259,6 +314,57 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     };
 
+    const shouldPromptDonation = Boolean(project?.donationsEnabled && (donationConfig?.donationsEnabled ?? true));
+
+    const queueOrStartDownload = async (versionNumber: string, selectedDeps: string[]) => {
+        if (shouldPromptDonation) {
+            setPendingFinalDownload({ versionNumber, selectedDeps });
+            setShowDonationPrompt(true);
+            setIsDepModalOpen(false);
+            setPendingDownload(null);
+            return;
+        }
+        await finishVersionDownload(versionNumber, selectedDeps);
+    };
+
+    const handleSkipDonation = () => {
+        const pending = pendingFinalDownload;
+        setShowDonationPrompt(false);
+        setPendingFinalDownload(null);
+        if (!pending) return;
+
+        finishVersionDownload(pending.versionNumber, pending.selectedDeps).catch(() => {
+            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
+        });
+    };
+
+    const handleDonateAndContinue = async (amountCents: number, recurring: boolean) => {
+        const pending = pendingFinalDownload;
+        if (!pending || !project?.id) return;
+
+        setProcessingDonation(true);
+        try {
+            const donation = await financeClient.createDonationCheckout(project.id, amountCents, recurring);
+            if (donation?.checkoutUrl) {
+                window.open(donation.checkoutUrl, '_blank', 'noopener,noreferrer');
+            }
+            if (donation?.simulated) {
+                setStatusModal({ type: 'success', title: 'Donation Recorded', msg: 'Thank you for supporting this creator.' });
+            } else {
+                setStatusModal({ type: 'info', title: 'Donation Opened', msg: 'Donation checkout opened in a new tab.' });
+            }
+        } catch {
+            setStatusModal({ type: 'warning', title: 'Donation Not Started', msg: 'Download will continue without a donation.' });
+        } finally {
+            setProcessingDonation(false);
+            setShowDonationPrompt(false);
+            setPendingFinalDownload(null);
+            finishVersionDownload(pending.versionNumber, pending.selectedDeps).catch(() => {
+                setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
+            });
+        }
+    };
+
     const handleDownloadClick = async (url: string, versionNumber: string, deps: any[], channel: string) => {
         try {
             if (!versionNumber) {
@@ -291,7 +397,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            await finishVersionDownload(versionNumber, []);
+            await queueOrStartDownload(versionNumber, []);
         } catch (e) {
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
         }
@@ -345,6 +451,21 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />
             <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />
             <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} />
+            <DonationPromptModal
+                show={showDonationPrompt}
+                projectTitle={project.title}
+                currency={(donationConfig?.currency || 'USD').toUpperCase()}
+                suggestedAmountCents={Math.max(100, Number(donationConfig?.suggestedDonationCents || project.suggestedDonationCents || 500))}
+                recurringDefault={Boolean(donationConfig?.donationRecurringDefault ?? project.donationRecurringDefault)}
+                platformCutPercent={Number(donationConfig?.donationPlatformCutPercent || 0)}
+                onClose={() => {
+                    setShowDonationPrompt(false);
+                    setPendingFinalDownload(null);
+                }}
+                onSkip={handleSkipDonation}
+                onDonate={handleDonateAndContinue}
+                isProcessing={processingDonation}
+            />
 
             <HistoryModal
                 show={isHistoryOpen}
@@ -373,12 +494,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         setPendingDownload(null);
                     }}
                     onDownloadBundle={(selectedDeps) => {
-                        finishVersionDownload(pendingDownload.versionNumber, selectedDeps).catch(() => {
+                        queueOrStartDownload(pendingDownload.versionNumber, selectedDeps).catch(() => {
                             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
                         });
                     }}
                     onDownloadProjectOnly={() => {
-                        finishVersionDownload(pendingDownload.versionNumber, []).catch(() => {
+                        queueOrStartDownload(pendingDownload.versionNumber, []).catch(() => {
                             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
                         });
                     }}

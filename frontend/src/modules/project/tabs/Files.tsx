@@ -3,7 +3,7 @@ import { UploadCloud, Edit2, Trash2 } from 'lucide-react';
 import { VersionFields } from '../components/VersionFields';
 import { Spinner } from '../../../components/ui/Spinner';
 import { theme } from '../../../styles/theme';
-import type { Project, ProjectVersion } from '../../../../types';
+import type { Project, ProjectVersion } from '@/types';
 import type { VersionFormData } from '../components/FormShared';
 
 interface FilesProps {
@@ -32,7 +32,7 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
                     </div>
                 </div>
             )}
-            {projectData?.versions?.map(v => (
+            {projectData?.versions?.map((v: ProjectVersion) => (
                 <div key={v.id} className={`${theme.colors.bgSurface} border ${theme.colors.border} rounded-xl p-4 flex justify-between items-center group`}>
                     <div>
                         <div className="flex items-center gap-3"><span className={`font-mono font-bold ${theme.colors.textPrimary} text-lg`}>{v.versionNumber}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${v.channel === 'RELEASE' ? 'text-green-500 border-green-500/30 bg-green-500/10' : 'text-orange-500 border-orange-500/30 bg-orange-500/10'}`}>{v.channel}</span></div>

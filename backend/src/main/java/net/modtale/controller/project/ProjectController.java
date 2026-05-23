@@ -147,6 +147,9 @@ public class ProjectController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
+            Project existingProject = projectService.getRawProjectById(id);
+            if (existingProject == null) return ResponseEntity.notFound().build();
+
             Project updated = new Project();
             updated.setTitle(requestPayload.getTitle());
             updated.setSlug(requestPayload.getSlug());
@@ -156,10 +159,14 @@ public class ProjectController {
             updated.setLinks(requestPayload.getLinks());
             updated.setRepositoryUrl(requestPayload.getRepositoryUrl());
             updated.setLicense(requestPayload.getLicense());
-            if (requestPayload.getAllowModpacks() != null) updated.setAllowModpacks(requestPayload.getAllowModpacks());
-            if (requestPayload.getAllowComments() != null) updated.setAllowComments(requestPayload.getAllowComments());
-            if (requestPayload.getHmWikiEnabled() != null) updated.setHmWikiEnabled(requestPayload.getHmWikiEnabled());
-            updated.setHmWikiSlug(requestPayload.getHmWikiSlug());
+            updated.setAllowModpacks(requestPayload.getAllowModpacks() != null ? requestPayload.getAllowModpacks() : existingProject.isAllowModpacks());
+            updated.setAllowComments(requestPayload.getAllowComments() != null ? requestPayload.getAllowComments() : existingProject.isAllowComments());
+            updated.setAdsEnabled(requestPayload.getAdsEnabled() != null ? requestPayload.getAdsEnabled() : existingProject.isAdsEnabled());
+            updated.setDonationsEnabled(requestPayload.getDonationsEnabled() != null ? requestPayload.getDonationsEnabled() : existingProject.isDonationsEnabled());
+            updated.setSuggestedDonationCents(requestPayload.getSuggestedDonationCents() != null ? requestPayload.getSuggestedDonationCents() : existingProject.getSuggestedDonationCents());
+            updated.setDonationRecurringDefault(requestPayload.getDonationRecurringDefault() != null ? requestPayload.getDonationRecurringDefault() : existingProject.isDonationRecurringDefault());
+            updated.setHmWikiEnabled(requestPayload.getHmWikiEnabled() != null ? requestPayload.getHmWikiEnabled() : existingProject.isHmWikiEnabled());
+            updated.setHmWikiSlug(requestPayload.getHmWikiSlug() != null ? requestPayload.getHmWikiSlug() : existingProject.getHmWikiSlug());
 
             if (updated.getDescription() != null && updated.getDescription().length() > 250) return ResponseEntity.badRequest().body("Short Summary cannot exceed 250 characters.");
             if (updated.getAbout() != null && updated.getAbout().length() > 50000) return ResponseEntity.badRequest().body("Full Description cannot exceed 50,000 characters.");
