@@ -103,24 +103,24 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                 <link rel="preload" as="image" href="/assets/logo.svg" />
                 <style>{`
                     @keyframes marquee-up {
-                        from { transform: translateY(0); }
-                        to { transform: translateY(calc(-50% - 0.75rem)); }
+                        from { transform: translateY(calc(50% + 0.75rem)); }
+                        to { transform: translateY(0); }
                     }
                     .animate-marquee-up {
                         animation: marquee-up var(--marquee-duration, 40s) linear infinite;
                         will-change: transform;
                     }
                     @keyframes marquee-left {
-                        from { transform: translateX(0); }
-                        to { transform: translateX(-50%); }
+                        from { transform: translateX(50%); }
+                        to { transform: translateX(0); }
                     }
                     .animate-marquee-left {
                         animation: marquee-left var(--marquee-duration, 35s) linear infinite;
                         will-change: transform;
                     }
                     @keyframes marquee-right {
-                        from { transform: translateX(-50%); }
-                        to { transform: translateX(0); }
+                        from { transform: translateX(-100%); }
+                        to { transform: translateX(-50%); }
                     }
                     .animate-marquee-right {
                         animation: marquee-right var(--marquee-duration, 35s) linear infinite;
