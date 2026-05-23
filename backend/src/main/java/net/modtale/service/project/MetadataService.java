@@ -90,6 +90,7 @@ public class MetadataService {
         String perm = isBanner ? "PROJECT_EDIT_BANNER" : "PROJECT_EDIT_ICON";
         if (project == null || !accessControlService.hasProjectPermission(project, user, perm)) throw new SecurityException("Permission denied.");
         lifecycleService.ensureEditable(project);
+        storageService.validateUploadSize(file);
 
         String currentUrl = isBanner ? project.getBannerUrl() : project.getImageUrl();
         if (currentUrl != null && !currentUrl.contains("default.png") && !currentUrl.contains("placeholder") && !currentUrl.contains("favicon")) {
@@ -110,6 +111,7 @@ public class MetadataService {
         Project project = projectService.getRawProjectById(id);
         if (project != null && accessControlService.hasProjectPermission(project, user, "PROJECT_GALLERY_ADD")) {
             lifecycleService.ensureEditable(project);
+            storageService.validateUploadSize(file);
             if (project.getGalleryImages().size() >= maxGalleryImages) throw new IllegalStateException("Maximum gallery images reached.");
 
             fileValidationService.validateGalleryImage(file);
