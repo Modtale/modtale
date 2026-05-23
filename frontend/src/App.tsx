@@ -17,6 +17,7 @@ import { Onboarding } from '@/modules/user/components/Onboarding';
 
 import { Home } from '@/modules/home/views/Home';
 import { Browse } from '@/modules/discovery/views/Browse';
+import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
 
 import { SSRProvider } from '@/context/SSRContext';
 import { ExternalLinkProvider } from '@/context/ExternalLinkContext';
@@ -36,7 +37,6 @@ const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((
 const ResetPassword = lazy(() => import('@/modules/auth/views/ResetPassword').then((module) => ({ default: module.ResetPassword })));
 const MfaVerify = lazy(() => import('@/modules/auth/views/MfaVerify').then((module) => ({ default: module.MfaVerify })));
 const CreateProject = lazy(() => import('@/modules/project/views/CreateProject').then((module) => ({ default: module.CreateProject })));
-const ProjectDetails = lazy(() => import('@/modules/project/views/ProjectDetails').then((module) => ({ default: module.ProjectDetails })));
 const ProjectEditorView = lazy(() => import('@/modules/project/views/ProjectEditor').then((module) => ({ default: module.ProjectEditorView })));
 const AdminPanel = lazy(() => import('@/modules/admin/views/AdminPanel').then((module) => ({ default: module.AdminPanel })));
 const ApiDocs = lazy(() => import('@/modules/core/views/ApiDocs').then((module) => ({ default: module.ApiDocs })));
@@ -288,7 +288,7 @@ const AppContent: React.FC = () => {
 
 export const App: React.FC<any> = ({ initialPath, ssrData }) => {
     return (
-        <SSRProvider data={ssrData || null}>
+        <SSRProvider data={ssrData || null} initialPath={initialPath || '/'}>
             <HelmetProvider>
                 <MobileProvider>
                     <ExternalLinkProvider>

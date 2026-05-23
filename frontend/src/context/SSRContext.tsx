@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useLocation } from 'react-router-dom';
 
 declare global {
     interface Window {
@@ -8,23 +9,29 @@ declare global {
 
 interface SSRContextType {
     initialData: any | null;
+    initialPath: string;
 }
 
-const SSRContext = createContext<SSRContextType>({ initialData: null });
+const SSRContext = createContext<SSRContextType>({ initialData: null, initialPath: '/' });
 
-export const SSRProvider: React.FC<{ data: any, children: React.ReactNode }> = ({ data, children }) => {
-    const initialData = useMemo(() => {
-        if (typeof window !== 'undefined' && window.INITIAL_DATA) {
-            return window.INITIAL_DATA;
-        }
-        return data;
-    }, [data]);
-
+export const SSRProvider: React.FC<{ data: any, initialPath?: string, children: React.ReactNode }> = ({ data, initialPath = '/', children }) => {
     return (
-        <SSRContext.Provider value={{ initialData }}>
+        <SSRContext.Provider value={{ initialData: data ?? null, initialPath }}>
             {children}
         </SSRContext.Provider>
     );
 };
 
-export const useSSRData = () => useContext(SSRContext);
+const normalizePath = (path: string) => (path || '/').replace(/\/$/, '') || '/';
+
+export const useSSRData = () => {
+    const { initialData, initialPath } = useContext(SSRContext);
+    const location = useLocation();
+
+    const isInitialRoute = normalizePath(location.pathname) === normalizePath(initialPath);
+
+    return {
+        initialData: isInitialRoute ? initialData : null,
+        isInitialRoute,
+    };
+};
