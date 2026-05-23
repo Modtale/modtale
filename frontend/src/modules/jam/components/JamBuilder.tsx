@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Edit3, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon, Link2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon, Link2 } from 'lucide-react';
 import { JamLayout } from '@/modules/jam/components/JamLayout';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -103,31 +104,52 @@ const TimeDropdown = ({ value, options, onChange }: { value: string | number, op
 const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, minDate?: string, onChange: (v: string) => void }> = ({ label, icon: Icon, value, minDate, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+    const [popupRect, setPopupRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
     const isPassed = value && new Date(value).getTime() <= Date.now();
 
-    const twentyFourHoursFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const effectiveMinDate = minDate ? new Date(Math.max(twentyFourHoursFromNow.getTime(), new Date(minDate).getTime())) : twentyFourHoursFromNow;
+    const todayStartMs = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
 
-    const initialDate = value ? new Date(value) : effectiveMinDate;
+    const initialDate = value ? new Date(value) : new Date(todayStartMs);
     const [tempDate, setTempDate] = useState<Date>(initialDate);
     const [viewDate, setViewDate] = useState<Date>(initialDate);
 
     useEffect(() => {
         if (isOpen) {
-            const start = value ? new Date(value) : effectiveMinDate;
+            const start = value ? new Date(value) : new Date(todayStartMs);
             setTempDate(start);
             setViewDate(start);
         }
-    }, [isOpen, value, effectiveMinDate]);
+    }, [isOpen, value, todayStartMs]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
+            const target = e.target as Node;
+            const clickedTrigger = containerRef.current?.contains(target);
+            const clickedPopup = popupRef.current?.contains(target);
+            if (!clickedTrigger && !clickedPopup) setIsOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const updatePopupRect = () => {
+            if (!buttonRef.current) return;
+            const rect = buttonRef.current.getBoundingClientRect();
+            setPopupRect({ top: rect.bottom + 8, left: rect.left, width: rect.width });
+        };
+        updatePopupRect();
+        window.addEventListener('resize', updatePopupRect);
+        window.addEventListener('scroll', updatePopupRect, true);
+        return () => {
+            window.removeEventListener('resize', updatePopupRect);
+            window.removeEventListener('scroll', updatePopupRect, true);
+        };
+    }, [isOpen]);
 
     const handleDateSelect = (d: Date) => {
         const newDate = new Date(tempDate);
@@ -166,8 +188,8 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
     };
 
     const handleApply = () => {
-        if (tempDate.getTime() < effectiveMinDate.getTime()) {
-            alert("Please select a valid time (At least 24 hours from now, and sequentially after previous phases).");
+        if (tempDate.getTime() < todayStartMs) {
+            alert("Please select a valid time (dates in the past are not allowed).");
             return;
         }
         onChange(tempDate.toISOString());
@@ -188,6 +210,7 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
     return (
         <div className={`relative w-full ${isOpen ? 'z-[100]' : 'z-10'}`} ref={containerRef}>
             <button
+                ref={buttonRef}
                 type="button"
                 onClick={() => !isPassed && setIsOpen(!isOpen)}
                 className={`w-full flex flex-col bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-[1.25rem] md:rounded-[1.5rem] px-5 py-3 md:py-3.5 shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden group transition-all text-left ${isPassed ? 'opacity-60 cursor-not-allowed grayscale' : 'hover:border-modtale-accent focus-within:ring-1 focus-within:ring-modtale-accent'}`}
@@ -204,9 +227,9 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
                 </span>
             </button>
 
-            {isOpen && !isPassed && (
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[300px] md:w-[320px] max-w-[90vw] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] z-[9999] p-4 animate-in fade-in zoom-in-95 duration-200 origin-top">
-                    <CalendarWidget viewDate={viewDate} setViewDate={setViewDate} selectedDate={tempDate} onSelect={handleDateSelect} minDate={effectiveMinDate} />
+            {isOpen && !isPassed && popupRect && createPortal(
+                <div ref={popupRef} className="w-[300px] md:w-[320px] max-w-[90vw] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] p-4 animate-in fade-in zoom-in-95 duration-200 origin-top" style={{ position: 'fixed', top: popupRect.top, left: popupRect.left + (popupRect.width / 2), transform: 'translateX(-50%)', zIndex: 10000 }}>
+                    <CalendarWidget viewDate={viewDate} setViewDate={setViewDate} selectedDate={tempDate} onSelect={handleDateSelect} minDate={new Date(todayStartMs)} />
 
                     <div className="mt-4 flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                         <div className="flex items-center gap-2 pl-1">
@@ -226,7 +249,8 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
                         <button type="button" onClick={() => setIsOpen(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Cancel</button>
                         <button type="button" onClick={handleApply} className="px-5 py-2 rounded-xl text-xs font-bold bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-md transition-all">Apply</button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
@@ -235,6 +259,8 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
 const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[], selected: string[], onChange: (val: string[]) => void, placeholder: string, direction?: 'up' | 'down' }> = ({ options, selected, onChange, placeholder, direction = 'down' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -244,11 +270,30 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const popupClass = direction === 'up' ? 'absolute bottom-full mb-2' : 'absolute top-full mt-2';
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const updateMenuRect = () => {
+            if (!buttonRef.current) return;
+            const rect = buttonRef.current.getBoundingClientRect();
+            const gap = 8;
+            const top = direction === 'up' ? rect.top - gap : rect.bottom + gap;
+            setMenuRect({ top, left: rect.left, width: rect.width });
+        };
+
+        updateMenuRect();
+        window.addEventListener('resize', updateMenuRect);
+        window.addEventListener('scroll', updateMenuRect, true);
+        return () => {
+            window.removeEventListener('resize', updateMenuRect);
+            window.removeEventListener('scroll', updateMenuRect, true);
+        };
+    }, [isOpen, direction]);
 
     return (
         <div className={`relative w-full ${isOpen ? 'z-[100]' : 'z-10'}`} ref={ref}>
             <button
+                ref={buttonRef}
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center text-sm transition-all"
@@ -256,8 +301,18 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
                 <span className="truncate">{selected.length > 0 ? `${selected.length} selected` : placeholder}</span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen && direction === 'down' ? 'rotate-180' : ''} ${!isOpen && direction === 'up' ? 'rotate-180' : ''}`} />
             </button>
-            {isOpen && (
-                <div className={`${popupClass} left-0 right-0 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] z-[9999] max-h-48 overflow-y-auto custom-scrollbar p-1`}>
+            {isOpen && menuRect && createPortal(
+                <div
+                    className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] max-h-48 overflow-y-auto custom-scrollbar p-1"
+                    style={{
+                        position: 'fixed',
+                        left: menuRect.left,
+                        top: direction === 'up' ? undefined : menuRect.top,
+                        bottom: direction === 'up' ? window.innerHeight - menuRect.top : undefined,
+                        width: menuRect.width,
+                        zIndex: 10000
+                    }}
+                >
                     {options.map((opt) => (
                         <button
                             key={opt.value}
@@ -272,7 +327,8 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
                             {selected.includes(opt.value) && <Check className="w-4 h-4 text-modtale-accent" />}
                         </button>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
@@ -283,6 +339,8 @@ const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedMeta, setSelectedMeta] = useState<any>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
     useEffect(() => {
         if (selectedId && !selectedMeta) {
@@ -301,6 +359,22 @@ const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange
         }, 300);
         return () => clearTimeout(timer);
     }, [search]);
+
+    useEffect(() => {
+        if (results.length === 0) return;
+        const updateMenuRect = () => {
+            if (!inputRef.current) return;
+            const rect = inputRef.current.getBoundingClientRect();
+            setMenuRect({ top: rect.bottom + 8, left: rect.left, width: rect.width });
+        };
+        updateMenuRect();
+        window.addEventListener('resize', updateMenuRect);
+        window.addEventListener('scroll', updateMenuRect, true);
+        return () => {
+            window.removeEventListener('resize', updateMenuRect);
+            window.removeEventListener('scroll', updateMenuRect, true);
+        };
+    }, [results.length]);
 
     const getIconUrl = (path?: string) => { if (!path) return '/assets/favicon.svg'; return path.startsWith('http') ? path : `${BACKEND_URL}${path}`; };
 
@@ -323,10 +397,13 @@ const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange
 
     return (
         <div className="relative">
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search for a project..." className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2.5 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent text-sm transition-all" />
+            <input ref={inputRef} type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search for a project..." className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2.5 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent text-sm transition-all" />
             {loading && <Loader2 className="absolute right-3 top-2.5 w-5 h-5 animate-spin text-modtale-accent" />}
-            {results.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar p-1">
+            {results.length > 0 && menuRect && createPortal(
+                <div
+                    className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar p-1"
+                    style={{ position: 'fixed', top: menuRect.top, left: menuRect.left, width: menuRect.width, zIndex: 10000 }}
+                >
                     {results.map(mod => (
                         <button key={mod.id} type="button" onClick={() => { onChange(mod.id); setSelectedMeta({ title: mod.title, author: mod.author, icon: mod.imageUrl }); setSearch(''); setResults([]); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors text-left group">
                             <img src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-800 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
@@ -336,7 +413,8 @@ const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange
                             </div>
                         </button>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
@@ -349,7 +427,6 @@ export const JamBuilder: React.FC<any> = ({
     const [isSaved, setIsSaved] = useState(false);
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
     const [rulesEditorMode, setRulesEditorMode] = useState<'generate' | 'write' | 'preview'>('generate');
-    const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [gameVersionOptions, setGameVersionOptions] = useState<{label: string, value: string}[]>([]);
 
     const [slugError, setSlugError] = useState<string | null>(null);
@@ -632,26 +709,15 @@ export const JamBuilder: React.FC<any> = ({
             onBannerUpload={(f, p) => { markDirty(); setMetaData((prev: any) => ({ ...prev, bannerUrl: p, bannerFile: f })); }}
             onIconUpload={(f, p) => { markDirty(); setMetaData((prev: any) => ({ ...prev, imageUrl: p, iconFile: f })); }}
             titleContent={
-                <div className="flex items-center gap-3 w-full group relative">
-                    <div className="relative flex items-center">
+                <div className="w-full">
+                    <div className="relative flex items-center w-full">
                         <input
                             value={metaData.title}
-                            onFocus={() => setIsEditingTitle(true)}
-                            onBlur={() => setIsEditingTitle(false)}
                             onChange={e => updateField('title', e.target.value)}
                             placeholder="Enter Jam Title"
-                            className="text-3xl md:text-5xl lg:text-6xl font-black bg-transparent border-none outline-none w-full placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-0 text-slate-900 dark:text-white drop-shadow-xl p-0 min-w-[50px]"
-                            style={{ width: `${Math.max(metaData.title?.length || 10, 1)}ch` }}
+                            className="text-4xl md:text-5xl font-black bg-transparent border-b border-transparent outline-none w-full hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-slate-900 dark:text-white"
                         />
-                        {!isEditingTitle && (
-                            <Edit3 className="w-6 h-6 md:w-8 md:h-8 text-slate-400 dark:text-white/50 shrink-0 ml-4 pointer-events-none" />
-                        )}
                     </div>
-                </div>
-            }
-            hostContent={
-                <div className="text-slate-600 dark:text-slate-300 font-bold flex items-center gap-2 bg-white/50 dark:bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 dark:border-white/10 shadow-sm w-fit text-sm">
-                    <span className="w-2.5 h-2.5 rounded-full bg-modtale-accent animate-pulse" /> {isPublished ? 'Live Event' : 'Editing Draft'}
                 </div>
             }
             actionContent={
@@ -660,10 +726,10 @@ export const JamBuilder: React.FC<any> = ({
                         type="button"
                         onClick={(e) => { e.preventDefault(); performSave(); }}
                         disabled={isLoading || !isDirty}
-                        className={`h-12 md:h-14 px-5 md:px-6 rounded-[1rem] md:rounded-[1.25rem] font-black text-sm transition-all flex items-center justify-center gap-2 backdrop-blur-xl border shadow-lg ${
+                        className={`h-10 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border shadow-lg ${
                             isSaved ? 'bg-green-500/20 border-green-500/30 text-green-700 dark:text-green-400' :
-                                !isDirty ? 'bg-white/40 dark:bg-slate-800/40 border-white/20 dark:border-white/5 text-slate-500 cursor-not-allowed shadow-none' :
-                                    'bg-white/80 dark:bg-slate-800/80 border-white/60 dark:border-white/20 text-slate-900 dark:text-white hover:border-modtale-accent hover:text-modtale-accent active:scale-95'
+                                !isDirty ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-500 cursor-not-allowed shadow-none' :
+                                    'bg-modtale-accent text-white hover:bg-modtale-accentHover border-modtale-accent shadow-modtale-accent/20'
                         }`}
                     >
                         {isLoading ? <Spinner className="w-4 h-4" fullScreen={false} /> : isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
@@ -696,7 +762,7 @@ export const JamBuilder: React.FC<any> = ({
                                 type="button"
                                 onClick={(e) => { e.preventDefault(); onPublish(); }}
                                 disabled={!isReadyToPublish || isLoading}
-                                className="h-12 md:h-14 px-6 md:px-8 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-[1rem] md:rounded-[1.25rem] font-black text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-modtale-accent/20 enabled:active:scale-95"
+                                className="h-10 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg enabled:active:scale-95"
                             >
                                 <span className="hidden sm:inline">Publish Jam</span>
                             </button>
@@ -705,8 +771,7 @@ export const JamBuilder: React.FC<any> = ({
                 </div>
             }
             tabsAndTimers={
-                <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 border-b-2 border-slate-200/50 dark:border-white/5 pb-3 xl:pb-0">
-                    <div className="flex items-center gap-6 md:gap-8 h-full w-full overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex items-center gap-1 overflow-x-auto">
                         {[
                             {id: 'details', icon: FileText, label: 'Overview'},
                             {id: 'schedule', icon: Calendar, label: 'Schedule'},
@@ -720,12 +785,11 @@ export const JamBuilder: React.FC<any> = ({
                                 key={t.id}
                                 type="button"
                                 onClick={() => setActiveTab(t.id as any)}
-                                className={`pb-3 text-sm font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-modtale-accent border-b-4 -mb-[2px]' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                                className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === t.id ? 'border-modtale-accent text-slate-900 dark:text-slate-300' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
                             >
                                 <t.icon className="w-4 h-4"/> {t.label}
                             </button>
                         ))}
-                    </div>
                 </div>
             }
             mainContent={
@@ -775,9 +839,9 @@ export const JamBuilder: React.FC<any> = ({
 
                             {rulesEditorMode === 'generate' && (
                                 <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 space-y-6 shadow-sm">
-                                    <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 p-4 rounded-xl flex items-start gap-3">
-                                        <Wand2 className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-                                        <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                                    <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 p-4 rounded-xl flex items-start gap-3">
+                                        <Wand2 className="w-5 h-5 text-modtale-accent mt-0.5 shrink-0" />
+                                        <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
                                             The rules generator automatically incorporates your active <strong>Restrictions</strong> and <strong>Settings</strong>. Use the toggles below to append community guidelines, then hit Generate to formulate the Markdown text!
                                         </p>
                                     </div>
@@ -954,7 +1018,7 @@ export const JamBuilder: React.FC<any> = ({
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center transition-all">
-                                    <div className="w-14 h-14 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                                    <div className="w-14 h-14 bg-modtale-accent/10 text-modtale-accent rounded-full flex items-center justify-center mb-4">
                                         <Play className="w-6 h-6 ml-1" />
                                     </div>
                                     <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Jam Starts</h4>
@@ -971,7 +1035,7 @@ export const JamBuilder: React.FC<any> = ({
                                 </div>
 
                                 <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center transition-all">
-                                    <div className="w-14 h-14 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mb-4">
+                                    <div className="w-14 h-14 bg-modtale-accent/10 text-modtale-accent rounded-full flex items-center justify-center mb-4">
                                         <LayoutGrid className="w-6 h-6" />
                                     </div>
                                     <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Submissions Close</h4>
@@ -988,7 +1052,7 @@ export const JamBuilder: React.FC<any> = ({
                                 </div>
 
                                 <div className="p-6 md:p-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2rem] border border-white/40 dark:border-white/10 shadow-sm flex flex-col items-center text-center transition-all">
-                                    <div className="w-14 h-14 bg-purple-500/10 text-purple-500 rounded-full flex items-center justify-center mb-4">
+                                    <div className="w-14 h-14 bg-modtale-accent/10 text-modtale-accent rounded-full flex items-center justify-center mb-4">
                                         <Trophy className="w-6 h-6" />
                                     </div>
                                     <h4 className="font-black text-xl mb-1 text-slate-900 dark:text-white">Voting Ends</h4>
@@ -1004,9 +1068,9 @@ export const JamBuilder: React.FC<any> = ({
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 p-4 rounded-xl flex items-start gap-3">
-                                <Clock className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-                                <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                            <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 p-4 rounded-xl flex items-start gap-3">
+                                <Clock className="w-5 h-5 text-modtale-accent mt-0.5 shrink-0" />
+                                <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
                                     Timezone configuration is automatic! All times are selected and displayed in your local timezone (<strong>{Intl.DateTimeFormat().resolvedOptions().timeZone}</strong>), but are securely stored as UTC on the backend so participants worldwide will see the correct local times for them.
                                 </p>
                             </div>
@@ -1024,7 +1088,7 @@ export const JamBuilder: React.FC<any> = ({
                                 <button
                                     type="button"
                                     onClick={() => updateField('categories', [...(metaData.categories || []), {name: '', description: '', maxScore: 5}])}
-                                    className="px-4 py-2 bg-modtale-accent/10 text-modtale-accent rounded-xl text-xs font-black flex items-center gap-1.5 hover:bg-modtale-accent hover:text-white transition-all"
+                                    className="h-10 px-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md shadow-modtale-accent/20"
                                 >
                                     <Plus className="w-3.5 h-3.5" /> Add Category
                                 </button>
@@ -1372,7 +1436,7 @@ export const JamBuilder: React.FC<any> = ({
                                         />
                                     </div>
 
-                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[15]">
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[100]">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Game Version Lock</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Select allowed game versions</span>
                                         <MultiSelectDropdown
@@ -1380,11 +1444,11 @@ export const JamBuilder: React.FC<any> = ({
                                             selected={metaData.restrictions?.allowedGameVersions || []}
                                             onChange={val => updateField('restrictions', {...metaData.restrictions, allowedGameVersions: val})}
                                             placeholder="Any Version"
-                                            direction="up"
+                                            direction="down"
                                         />
                                     </div>
 
-                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[10]">
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[100]">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Allowed Classifications</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Limit submissions to specific types</span>
                                         <MultiSelectDropdown
@@ -1392,11 +1456,11 @@ export const JamBuilder: React.FC<any> = ({
                                             selected={metaData.restrictions?.allowedClassifications || []}
                                             onChange={val => updateField('restrictions', {...metaData.restrictions, allowedClassifications: val})}
                                             placeholder="Any Type"
-                                            direction="up"
+                                            direction="down"
                                         />
                                     </div>
 
-                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[5]">
+                                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[100]">
                                         <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Allowed Specific Licenses</label>
                                         <span className="text-xs text-slate-500 font-medium block mb-2">Restrict submissions to explicit licenses</span>
                                         <MultiSelectDropdown
@@ -1404,7 +1468,7 @@ export const JamBuilder: React.FC<any> = ({
                                             selected={metaData.restrictions?.allowedLicenses || []}
                                             onChange={val => updateField('restrictions', {...metaData.restrictions, allowedLicenses: val})}
                                             placeholder="Any License"
-                                            direction="up"
+                                            direction="down"
                                         />
                                     </div>
                                 </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
@@ -46,7 +46,22 @@ import type { Classification } from '@/data/categories';
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
+    const previousPathname = useRef<string | null>(null);
     useEffect(() => {
+        const prev = previousPathname.current;
+        previousPathname.current = pathname;
+        if (!prev) return;
+
+        const jamTabPattern = /^\/jam\/[^/]+\/(overview|rules|entries)$/;
+        const prevJamTabMatch = prev.match(jamTabPattern);
+        const nextJamTabMatch = pathname.match(jamTabPattern);
+
+        if (prevJamTabMatch && nextJamTabMatch) {
+            const prevJamBase = prev.replace(/\/(overview|rules|entries)$/, '');
+            const nextJamBase = pathname.replace(/\/(overview|rules|entries)$/, '');
+            if (prevJamBase === nextJamBase) return;
+        }
+
         window.scrollTo(0, 0);
     }, [pathname]);
     return null;
