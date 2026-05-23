@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Upload, Plus, Image as ImageIcon, Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag } from 'lucide-react';
+import { ChevronLeft, Upload, Plus, Image as ImageIcon, Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag, LogIn } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { Spinner } from '@/components/ui/Spinner';
@@ -338,7 +338,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                             </a>
                                         ) : (
                                             <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
-                                                {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : "Sign in"}
+                                                {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : <><LogIn className="w-5 h-5" /> Sign in to follow</>}
                                             </button>
                                         )}
                                         <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
@@ -379,7 +379,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     </a>
                                 ) : (
                                     <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
-                                        {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : "Sign in to Follow"}
+                                        {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : <><LogIn className="w-4 h-4" /> Sign in to follow</>}
                                     </button>
                                 )}
                                 <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0 backdrop-blur-md" title="Copy ID">

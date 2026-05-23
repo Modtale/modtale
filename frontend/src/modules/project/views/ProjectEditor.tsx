@@ -133,7 +133,9 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         availableTabs.push({id: 'wiki', icon: BookOpen, label: 'Wiki Preview'});
     }
 
-    const previewProject: Project = { ...projectData, title: metaData.title, description: metaData.summary };
+    const previewTitle = metaData.title.trim() || projectData.title || '';
+    const previewSummary = metaData.summary.trim() || projectData.description || '';
+    const previewProject: Project = { ...projectData, title: previewTitle, description: previewSummary };
 
     const isCustomLicense = metaData.license && !LICENSES.some(l => l.id === metaData.license);
     const hasTitle = metaData.title && metaData.title.trim().length > 0;

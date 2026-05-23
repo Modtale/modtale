@@ -8,6 +8,7 @@ import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.auth.ReservedAccountGuardService;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -30,6 +31,7 @@ public class DataSeeder implements CommandLineRunner {
     private final MongoTemplate mongoTemplate;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ReservedAccountGuardService reservedAccountGuardService;
 
     @Value("${app.seeding.enabled:false}")
     private boolean seedingEnabled;
@@ -40,20 +42,30 @@ public class DataSeeder implements CommandLineRunner {
     private static final int PUBLISHED_PROJECT_LIMIT = 100;
     private static final int REPORT_LIMIT = 20;
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
+    private static final String ADMIN_ID = "692620f7c2f3266e23ac0dee";
 
-    public DataSeeder(MongoTemplate mongoTemplate, UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public DataSeeder(MongoTemplate mongoTemplate, UserRepository userRepository, PasswordEncoder passwordEncoder, ReservedAccountGuardService reservedAccountGuardService) {
         this.mongoTemplate = mongoTemplate;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.reservedAccountGuardService = reservedAccountGuardService;
     }
 
     @Override
     public void run(String... args) {
+        reservedAccountGuardService.purgeReservedAccountsIfProduction();
+
+        if (reservedAccountGuardService.isProductionDeployment()) {
+            logger.warn("Seeding skipped: production deployment detected.");
+            return;
+        }
+
         if (!seedingEnabled) {
             return;
         }
 
         ensureSuperAdmin();
+        ensureAdmin();
         ensureNormalUser();
 
         String currentDbName = mongoTemplate.getDb().getName();
@@ -175,7 +187,7 @@ public class DataSeeder implements CommandLineRunner {
         User user = new User();
         user.setId(SUPER_ADMIN_ID);
         user.setUsername("super_admin");
-        user.setEmail("admin@modtale.net");
+        user.setEmail("super_admin@modtale.net");
         user.setEmailVerified(true);
         user.setPassword(passwordEncoder.encode("password"));
         user.setRoles(List.of("USER", "ADMIN"));
@@ -183,6 +195,24 @@ public class DataSeeder implements CommandLineRunner {
         user.setTier(ApiKey.Tier.ENTERPRISE);
         userRepository.save(user);
         logger.info("Created Super Admin: super_admin / password (ID: {})", SUPER_ADMIN_ID);
+    }
+
+    private void ensureAdmin() {
+        if (userRepository.existsById(ADMIN_ID)) return;
+
+        userRepository.findByUsername("admin").ifPresent(userRepository::delete);
+
+        User user = new User();
+        user.setId(ADMIN_ID);
+        user.setUsername("admin");
+        user.setEmail("admin@modtale.net");
+        user.setEmailVerified(true);
+        user.setPassword(passwordEncoder.encode("password"));
+        user.setRoles(List.of("USER", "ADMIN"));
+        user.setBio("I am the Admin for this preview environment.");
+        user.setTier(ApiKey.Tier.ENTERPRISE);
+        userRepository.save(user);
+        logger.info("Created Admin: admin / password (ID: {})", ADMIN_ID);
     }
 
     private void ensureNormalUser() {
@@ -234,15 +264,23 @@ public class DataSeeder implements CommandLineRunner {
             String id = user.get("_id").toString();
             String username = user.getString("username");
 
-            if (id.equals(SUPER_ADMIN_ID) || "user".equals(username) || "super_admin".equals(username)) {
+            if (id.equals(SUPER_ADMIN_ID) || id.equals(ADMIN_ID) || "user".equals(username) || "super_admin".equals(username) || "admin".equals(username)) {
                 continue;
             }
 
             user.put("password", defaultPasswordHash);
             user.put("email", "scrubbed_" + id + "@modtale.local");
             user.put("emailVerified", true);
+            user.put("mfaEnabled", false);
+            user.put("mfaSecret", null);
+            user.put("verificationToken", null);
+            user.put("verificationTokenExpiry", null);
+            user.put("passwordResetToken", null);
+            user.put("passwordResetTokenExpiry", null);
             user.put("githubAccessToken", null);
             user.put("gitlabAccessToken", null);
+            user.put("gitlabRefreshToken", null);
+            user.put("gitlabTokenExpiresAt", null);
             safeToInsert.add(user);
         }
 
