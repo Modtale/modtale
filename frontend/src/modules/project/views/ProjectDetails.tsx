@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
@@ -297,14 +297,22 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     };
 
-    const versionsByGame = (project.versions || []).reduce((acc: any, v: any) => {
-        const key = v.gameVersions?.[0] || 'Any';
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(v);
-        return acc;
-    }, {});
+    const versionsByGame = useMemo(() => {
+        return (project.versions || []).reduce((acc: any, v: any) => {
+            const key = v.gameVersions?.[0] || 'Any';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(v);
+            return acc;
+        }, {});
+    }, [project.versions]);
 
-    const sortedHistory = [...(project.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    const sortedHistory = useMemo(() => {
+        return [...(project.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    }, [project.versions]);
+
+    const toggleExperimental = useCallback(() => {
+        setShowExperimental((prev) => !prev);
+    }, []);
 
     const meta = generateProjectMeta(project);
     const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);
@@ -351,7 +359,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 onClose={() => navigate(projectUrl)}
                 history={sortedHistory}
                 showExperimental={showExperimental}
-                onToggleExperimental={() => setShowExperimental(!showExperimental)}
+                onToggleExperimental={toggleExperimental}
                 onDownload={handleDownloadClick}
             />
             <DownloadModal
@@ -362,7 +370,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 orderedGameVersions={orderedGameVersions}
                 onDownload={handleDownloadClick}
                 showExperimental={showExperimental}
-                onToggleExperimental={() => setShowExperimental(!showExperimental)}
+                onToggleExperimental={toggleExperimental}
                 onViewHistory={() => navigate(projectUrl + '/changelog')}
             />
             {isDepModalOpen && pendingDownload && (
