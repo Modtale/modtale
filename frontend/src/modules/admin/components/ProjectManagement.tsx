@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson, Lock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { API_BASE_URL } from '@/utils/api';
+import { isSuperAdminUser } from '../utils/access';
 import type { Project, ScanIssue } from '@/types';
 
 export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }) {
@@ -33,7 +34,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
         adminClient.getCurrentAdmin().then(res => setCurrentAdmin(res)).catch(() => {});
     }, []);
 
-    const isSuperAdmin = currentAdmin?.id === '692620f7c2f3266e23ac0ded';
+    const isSuperAdmin = isSuperAdminUser(currentAdmin);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

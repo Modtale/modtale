@@ -20,7 +20,10 @@ public class AccessControlService {
     @Autowired private ProjectRepository projectRepository;
 
     public boolean isAdmin(User user) {
-        return user != null && user.getRoles() != null && user.getRoles().contains("ADMIN");
+        return user != null && (
+                isSuperAdmin(user) ||
+                        user.getRoles() != null && user.getRoles().contains("ADMIN")
+        );
     }
 
     public boolean isSuperAdmin(User user) {

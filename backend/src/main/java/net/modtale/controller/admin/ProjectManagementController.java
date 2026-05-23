@@ -16,6 +16,7 @@ import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.LifecycleService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
+import net.modtale.service.security.AccessControlService;
 import net.modtale.service.security.ScanService;
 import net.modtale.service.user.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,16 +43,7 @@ public class ProjectManagementController {
     @Autowired private ProjectRepository projectRepository;
     @Autowired private AdminLogRepository adminLogRepository;
     @Autowired private NotificationService notificationService;
-
-    private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
-
-    private boolean isSuperAdmin(User user) {
-        return user != null && SUPER_ADMIN_ID.equals(user.getId());
-    }
-
-    private boolean isAdmin(User user) {
-        return (user != null && user.getRoles() != null && user.getRoles().contains("ADMIN")) || isSuperAdmin(user);
-    }
+    @Autowired private AccessControlService accessControlService;
 
     private User getSafeUser() {
         try {
@@ -68,7 +60,7 @@ public class ProjectManagementController {
     @GetMapping("/verification/queue")
     public ResponseEntity<List<ProjectSummaryDTO>> getVerificationQueue() {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(searchService.getVerificationQueue().stream()
@@ -79,7 +71,7 @@ public class ProjectManagementController {
     @GetMapping("/projects/{id}/review-details")
     public ResponseEntity<?> getProjectReviewDetails(@PathVariable String id) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
@@ -104,7 +96,7 @@ public class ProjectManagementController {
     @GetMapping("/projects/{id}")
     public ResponseEntity<?> getProjectById(@PathVariable String id) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         Project project = projectService.getAdminProjectDetails(id);
         if (project == null) return ResponseEntity.notFound().build();
@@ -114,7 +106,7 @@ public class ProjectManagementController {
     @PutMapping("/projects/{id}/raw")
     public ResponseEntity<?> updateRawProject(@PathVariable String id, @RequestBody Project updatedProject) {
         User currentUser = getSafeUser();
-        if (!isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         Project existing = projectService.getRawProjectById(id);
         if (existing == null) return ResponseEntity.notFound().build();
@@ -129,7 +121,7 @@ public class ProjectManagementController {
     @PostMapping("/projects/{id}/publish")
     public ResponseEntity<?> publishProject(@PathVariable String id) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             lifecycleService.publishProject(id, currentUser);
             logAction(currentUser.getId(), "PUBLISH_PROJECT", id, "PROJECT", null);
@@ -142,7 +134,7 @@ public class ProjectManagementController {
     @PostMapping("/projects/{id}/versions/{versionId}/approve")
     public ResponseEntity<?> approveVersion(@PathVariable String id, @PathVariable String versionId) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             projectManagementService.approveVersion(id, versionId);
             logAction(currentUser.getId(), "APPROVE_VERSION", id, "VERSION", "VerID: " + versionId);
@@ -155,7 +147,7 @@ public class ProjectManagementController {
     @PostMapping("/projects/{id}/versions/{versionId}/reject")
     public ResponseEntity<?> rejectVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             projectManagementService.rejectVersion(id, versionId, requestPayload.getReason());
             logAction(currentUser.getId(), "REJECT_VERSION", id, "VERSION", "VerID: " + versionId + ", Reason: " + requestPayload.getReason());
@@ -168,7 +160,7 @@ public class ProjectManagementController {
     @PostMapping("/projects/{id}/reject")
     public ResponseEntity<?> rejectProject(@PathVariable String id, @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) {
+        if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         try {
@@ -186,7 +178,7 @@ public class ProjectManagementController {
             @RequestParam(required = false, defaultValue = "Administrative action.") String reason
     ) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             Project targetProject = projectService.getRawProjectById(id);
             if (targetProject == null) return ResponseEntity.notFound().build();
@@ -216,7 +208,7 @@ public class ProjectManagementController {
             @RequestParam(required = false, defaultValue = "Administrative action.") String reason
     ) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             Project targetProject = projectService.getRawProjectById(id);
             if (targetProject == null) return ResponseEntity.notFound().build();
@@ -243,7 +235,7 @@ public class ProjectManagementController {
     @PostMapping("/projects/{id}/restore")
     public ResponseEntity<?> restoreProject(@PathVariable String id, @RequestParam(defaultValue = "PUBLISHED") String status) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             projectManagementService.adminRestoreProject(id, status);
             logAction(currentUser.getId(), "RESTORE_PROJECT", id, "PROJECT", "To Status: " + status);
@@ -256,7 +248,7 @@ public class ProjectManagementController {
     @PostMapping("/projects/{id}/unlist")
     public ResponseEntity<?> unlistProject(@PathVariable String id, @RequestBody(required = false) RejectReasonRequest requestPayload) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             String reason = (requestPayload != null && requestPayload.getReason() != null && !requestPayload.getReason().isBlank())
                     ? requestPayload.getReason()
@@ -286,7 +278,7 @@ public class ProjectManagementController {
     @DeleteMapping("/projects/{id}/versions/{versionId}")
     public ResponseEntity<?> deleteProjectVersion(@PathVariable String id, @PathVariable String versionId) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             projectManagementService.adminDeleteVersion(id, versionId);
             logAction(currentUser.getId(), "DELETE_VERSION", id, "VERSION", "VerID: " + versionId);
@@ -301,7 +293,7 @@ public class ProjectManagementController {
     @GetMapping("/projects/search")
     public ResponseEntity<?> searchProjects(@RequestParam String query, @RequestParam(required = false, defaultValue = "false") boolean deleted) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         if (deleted) {
             return ResponseEntity.ok(searchService.searchDeletedProjects(query, PageRequest.of(0, 10)).getContent().stream()
@@ -317,7 +309,7 @@ public class ProjectManagementController {
     @PostMapping("/projects/{id}/versions/{versionId}/scan")
     public ResponseEntity<?> rescanVersion(@PathVariable String id, @PathVariable String versionId) {
         User currentUser = getSafeUser();
-        if (!isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             scanService.triggerRescan(id, versionId);
             logAction(currentUser.getId(), "RESCAN_VERSION", id, "VERSION", "VerID: " + versionId);

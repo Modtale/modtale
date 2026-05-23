@@ -1,4 +1,5 @@
 import React from 'react';
+import { Checkbox } from '@/components/ui/Checkbox';
 
 export interface PermissionDef {
     id: string;
@@ -163,8 +164,7 @@ export const PermissionSelector: React.FC<PermissionSelectorProps> = ({
                     <div className="p-2 space-y-0.5">
                         {group.permissions.map(perm => (
                             <label key={perm.id} className={`flex items-center gap-3 px-2.5 py-2 rounded-lg transition-colors group/label border border-transparent ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer hover:border-slate-100 dark:hover:border-white/5'}`}>
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={selectedPermissions.includes(perm.id)}
                                     onChange={() => togglePerm(perm.id)}
                                     disabled={disabled}
