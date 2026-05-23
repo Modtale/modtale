@@ -271,8 +271,16 @@ public class DataSeeder implements CommandLineRunner {
             user.put("password", defaultPasswordHash);
             user.put("email", "scrubbed_" + id + "@modtale.local");
             user.put("emailVerified", true);
+            user.put("mfaEnabled", false);
+            user.put("mfaSecret", null);
+            user.put("verificationToken", null);
+            user.put("verificationTokenExpiry", null);
+            user.put("passwordResetToken", null);
+            user.put("passwordResetTokenExpiry", null);
             user.put("githubAccessToken", null);
             user.put("gitlabAccessToken", null);
+            user.put("gitlabRefreshToken", null);
+            user.put("gitlabTokenExpiresAt", null);
             safeToInsert.add(user);
         }
 
