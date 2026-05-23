@@ -64,6 +64,15 @@ modtale/
 
 ---
 
+## Codebase Size (LoC)
+
+Auto-updating GitHub badges:
+
+* ![Lines of code](https://img.shields.io/tokei/lines/github/Modtale/modtale?style=flat-square&label=Total%20LoC)
+* ![Files](https://img.shields.io/tokei/files/github/Modtale/modtale?style=flat-square&label=Tracked%20Files)
+
+---
+
 ## Local Development Setup
 
 Ready to contribute? Follow these steps to get Modtale running on your local machine.
