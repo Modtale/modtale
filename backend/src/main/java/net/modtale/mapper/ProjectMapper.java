@@ -133,6 +133,11 @@ public class ProjectMapper {
         dto.setTypes(project.getTypes());
         dto.setAllowModpacks(project.isAllowModpacks());
         dto.setAllowComments(project.isAllowComments());
+        dto.setAdsEnabled(project.isAdsEnabled());
+        dto.setDonationsEnabled(project.isDonationsEnabled());
+        dto.setSuggestedDonationCents(project.getSuggestedDonationCents());
+        dto.setDonationRecurringDefault(project.isDonationRecurringDefault());
+        dto.setDonationPlatformCutBps(project.getDonationPlatformCutBps());
         dto.setHmWikiEnabled(project.isHmWikiEnabled());
         dto.setHmWikiSlug(project.getHmWikiSlug());
         dto.setStatus(project.getStatus());

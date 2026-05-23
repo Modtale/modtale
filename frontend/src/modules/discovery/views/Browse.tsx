@@ -17,6 +17,7 @@ import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
 import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
+import { BrowseAdPlacement } from '../components/BrowseAdPlacement';
 
 const getResolvedImageUrl = (url?: string) => {
     if (!url) return null;
@@ -80,6 +81,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
         }
         return null;
     }, [items]);
+
+    const adContextProjectId = items.length > 0 ? items[0].id : '';
 
     useEffect(() => {
         let lastScrollY = window.scrollY;
@@ -213,6 +216,12 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 })}
                             </div>
                         </div>
+                        {adContextProjectId && (
+                            <BrowseAdPlacement
+                                projectId={adContextProjectId}
+                                placement="TALL_BANNER"
+                            />
+                        )}
                     </div>
 
                     <div className="flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>

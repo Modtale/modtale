@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { VerificationQueue } from '../components/VerificationQueue';
@@ -9,6 +9,7 @@ import { ReportQueue } from '../components/ReportQueue';
 import { ProjectManagement } from '../components/ProjectManagement';
 import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
+import { FinanceAdmin } from '../components/FinanceAdmin';
 import type { Project } from '@/types';
 
 interface AdminPanelProps {
@@ -16,7 +17,7 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
-    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs'>('verification');
+    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'finance' | 'logs'>('verification');
     const [status, setStatus] = useState<any>(null);
 
     const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
@@ -28,7 +29,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [reports, setReports] = useState<any[]>([]);
 
     const isAdmin = currentUser?.roles?.includes('ADMIN');
-    const isSuperAdmin = currentUser?.id === '692620f7c2f3266e23ac0ded';
+    const isSuperAdmin = currentUser?.roles?.includes('SUPER_ADMIN') || currentUser?.id === '692620f7c2f3266e23ac0ded';
 
     useEffect(() => {
         if (isAdmin) {
@@ -94,7 +95,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         );
     }
 
-    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs', icon: any, label: string, badge?: number }) => (
+    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'finance' | 'logs', icon: any, label: string, badge?: number }) => (
         <button
             onClick={() => setActiveTab(tab)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${
@@ -159,6 +160,11 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                     icon={Activity}
                                     label="Platform Analytics"
                                 />
+                                <SidebarButton
+                                    tab="finance"
+                                    icon={Wallet}
+                                    label="Platform Finance"
+                                />
                                 {isSuperAdmin && (
                                     <>
                                         <SidebarButton
@@ -212,6 +218,12 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                         {activeTab === 'analytics' && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <PlatformAnalytics />
+                            </div>
+                        )}
+
+                        {activeTab === 'finance' && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <FinanceAdmin isSuperAdmin={isSuperAdmin} />
                             </div>
                         )}
 
