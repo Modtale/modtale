@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Upload, Plus, Image as ImageIcon, Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag, LogIn } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
@@ -52,7 +52,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
     const [uploadingBanner, setUploadingBanner] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
-    const [scrollY, setScrollY] = useState(0);
+    const bannerParallaxRef = useRef<HTMLDivElement>(null);
+    const bannerFadeRef = useRef<HTMLDivElement>(null);
 
     const [copied, setCopied] = useState(false);
     const [popupCopied, setPopupCopied] = useState<string | null>(null);
@@ -66,21 +67,54 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const avatarMargin = isEditing ? "md:-mt-12 ml-2" : "md:-mt-24 ml-2";
 
     useEffect(() => {
-        if (isEditing) return;
-        let ticking = false;
-        const handleScroll = () => {
-            if (!ticking) {
-                window.requestAnimationFrame(() => {
-                    setScrollY(Math.min(Math.max(0, window.scrollY), 1500));
-                    ticking = false;
-                });
-                ticking = true;
+        if (isEditing) {
+            if (bannerParallaxRef.current) {
+                bannerParallaxRef.current.style.transform = 'translateY(0px)';
+            }
+            if (bannerFadeRef.current) {
+                bannerFadeRef.current.style.height = 'var(--fade-base)';
+            }
+            return;
+        }
+        let rafId: number | null = null;
+        const applyParallax = () => {
+            const scrollY = Math.min(Math.max(0, window.scrollY), 1500);
+            const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
+            if (bannerParallaxRef.current) {
+                bannerParallaxRef.current.style.transform = `translateY(${parallaxOffset}px)`;
+            }
+            if (bannerFadeRef.current) {
+                bannerFadeRef.current.style.height = `calc(var(--fade-base) + ${parallaxOffset}px)`;
             }
         };
 
+        const handleScroll = () => {
+            if (rafId !== null) return;
+            rafId = window.requestAnimationFrame(() => {
+                applyParallax();
+                rafId = null;
+            });
+        };
+
+        const handleResize = () => {
+            if (rafId !== null) {
+                window.cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+            applyParallax();
+        };
+
         window.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll();
-        return () => window.removeEventListener('scroll', handleScroll);
+        window.addEventListener('resize', handleResize, { passive: true });
+        applyParallax();
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleResize);
+            if (rafId !== null) {
+                window.cancelAnimationFrame(rafId);
+            }
+        };
     }, [isEditing]);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
@@ -223,16 +257,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         );
     };
 
-    const parallaxOffset = isEditing ? 0 : 500 * (1 - Math.exp(-scrollY / 600));
-
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
             {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
             {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
 
             <div
+                ref={bannerParallaxRef}
                 className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${resolvedBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
-                style={{ transform: `translateY(${parallaxOffset}px)` }}
+                style={{ transform: 'translateY(0px)' }}
             >
                 <div className="absolute inset-0 z-0">
                     {resolvedBanner ? (
@@ -249,8 +282,9 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 </div>
 
                 <div
+                    ref={bannerFadeRef}
                     className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
-                    style={{ height: `calc(var(--fade-base) + ${parallaxOffset}px)` }}
+                    style={{ height: 'var(--fade-base)' }}
                 />
 
                 {isEditing && (
