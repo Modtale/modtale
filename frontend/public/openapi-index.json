@@ -1,0 +1,2365 @@
+{
+  "title": "Modtale API",
+  "version": "v1",
+  "server": "https://api.modtale.net",
+  "totalEndpoints": 100,
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/platform/stats",
+      "summary": "Get public platform aggregate stats",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/change-password",
+      "summary": "Change current account password",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/ChangePasswordRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/auth/credentials",
+      "summary": "Add/update local email+password credentials for current account",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/UpdateCredentialsRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/forgot-password",
+      "summary": "Initiate password reset",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/ForgotPasswordRequest"
+        ]
+      },
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/mfa/setup",
+      "summary": "Generate MFA setup secret + QR payload",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/mfa/validate-login",
+      "summary": "Complete MFA login with pre-auth token",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/MfaLoginRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "401"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/mfa/verify",
+      "summary": "Verify MFA setup code and enable MFA",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/VerifyMfaRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "summary": "Register account",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/RegisterRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/resend-verification",
+      "summary": "Resend verification email for current user",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/reset-password",
+      "summary": "Complete password reset",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/ResetPasswordRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/signin",
+      "summary": "Sign in with username/email + password",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/SignInRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "202",
+        "401"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify",
+      "summary": "Verify email using token",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "token",
+          "in": "query",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/creators/search",
+      "summary": "Search creators/orgs",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "query",
+          "in": "query",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/creators/{userId}/projects",
+      "summary": "List creator projects",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        },
+        {
+          "name": "size",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/download-bundle/{token}",
+      "summary": "Download dependency bundle via one-time token",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/download/{token}",
+      "summary": "Download project binary/modpack via one-time token",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/meta/classifications",
+      "summary": "List supported project classifications",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/meta/game-versions",
+      "summary": "List supported game versions",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/meta/game-versions/catalog",
+      "summary": "Get full game version catalog",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "summary": "List current user's notifications",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/notifications/clear-all",
+      "summary": "Delete all notifications",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/notifications/read-all",
+      "summary": "Mark all notifications as read",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/notifications/{id}",
+      "summary": "Delete notification",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/notifications/{id}/read",
+      "summary": "Mark notification as read",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/notifications/{id}/unread",
+      "summary": "Mark notification as unread",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/og/project/{identifier}",
+      "summary": "Generate dynamic Open Graph image for a project",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "identifier",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs",
+      "summary": "Create organization",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/CreateOrganizationRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{orgId}",
+      "summary": "Delete organization",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{orgId}",
+      "summary": "Update organization metadata",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/UpdateOrganizationRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/avatar",
+      "summary": "Upload organization avatar (1:1)",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/banner",
+      "summary": "Upload organization banner (3:1)",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{orgId}/connections/{provider}",
+      "summary": "Unlink org provider account",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "provider",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/connections/{provider}/toggle-visibility",
+      "summary": "Toggle visibility of linked org provider account",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "provider",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/invite/accept",
+      "summary": "Accept organization invite",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/invite/decline",
+      "summary": "Decline organization invite",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{orgId}/invites",
+      "summary": "List pending organization invites",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{orgId}/invites/{userId}",
+      "summary": "Cancel pending organization invite",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/link/prepare",
+      "summary": "Prepare session context for linking org provider account",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/members",
+      "summary": "Invite organization member",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/AddOrganizationMemberRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{orgId}/members/{userId}",
+      "summary": "Remove member (or self-leave)",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{orgId}/members/{userId}",
+      "summary": "Change member role",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/UpdateOrganizationMemberRoleRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orgs/{orgId}/repos/github",
+      "summary": "List organization GitHub repos",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/{orgId}/roles",
+      "summary": "Create organization role",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/OrganizationRoleRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/orgs/{orgId}/roles/{roleId}",
+      "summary": "Delete organization role",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "roleId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orgs/{orgId}/roles/{roleId}",
+      "summary": "Update organization role",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "roleId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/OrganizationRoleRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects",
+      "summary": "Search projects",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "search",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "tags",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Comma-separated tags."
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        },
+        {
+          "name": "size",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        },
+        {
+          "name": "sort",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "gameVersion",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "classification",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "minDownloads",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        },
+        {
+          "name": "minFavorites",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        },
+        {
+          "name": "category",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Ignored for API-key auth callers."
+        },
+        {
+          "name": "dateRange",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "author",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "creator",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects",
+      "summary": "Create project draft",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/CreateProjectRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/user/contributed",
+      "summary": "List projects where current user is a contributor",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        },
+        {
+          "name": "size",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/projects/{id}",
+      "summary": "Delete project (soft-delete strategy)",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{id}",
+      "summary": "Get project details",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "403",
+        "404"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/projects/{id}",
+      "summary": "Update project metadata",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/UpdateProjectRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{id}/analytics",
+      "summary": "Get project analytics snapshot",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "range",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/archive",
+      "summary": "Archive project",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/projects/{id}/banner",
+      "summary": "Upload project banner (3:1)",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/comments",
+      "summary": "Add project comment",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/CommentRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/projects/{id}/comments/{commentId}",
+      "summary": "Edit own comment",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "commentId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/CommentRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/comments/{commentId}/vote",
+      "summary": "Vote on comment",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "commentId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "upvote",
+          "in": "query",
+          "required": true,
+          "type": "boolean",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/favorite",
+      "summary": "Toggle project favorite status",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/projects/{id}/gallery",
+      "summary": "Remove gallery image",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "imageUrl"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/gallery",
+      "summary": "Add gallery image (16:9)",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/projects/{id}/icon",
+      "summary": "Upload project icon (1:1)",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{id}/meta",
+      "summary": "Get lightweight project metadata",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/publish",
+      "summary": "Publish project",
+      "description": "Admin-only for first publish; owners can republish archived/unlisted projects.",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/revert",
+      "summary": "Revert project to DRAFT",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/submit",
+      "summary": "Submit project for review",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/unlist",
+      "summary": "Unlist project",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/versions",
+      "summary": "Create project version",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "versionNumber",
+          "gameVersions",
+          "file",
+          "modIds",
+          "changelog",
+          "channel"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/projects/{id}/versions/dependency-suggestions",
+      "summary": "Inspect plugin manifest and suggest Modtale dependency matches",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/projects/{id}/versions/{versionId}",
+      "summary": "Delete version",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "versionId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/projects/{id}/versions/{versionId}",
+      "summary": "Update version metadata/dependencies",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "versionId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/UpdateVersionRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{id}/versions/{version}/dependencies",
+      "summary": "Get dependency list for a project version",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "version",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "404"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{id}/versions/{version}/download-bundle-url",
+      "summary": "Create one-time bundle token URL",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "version",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "deps",
+          "in": "query",
+          "required": false,
+          "type": "array",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/projects/{id}/versions/{version}/download-url",
+      "summary": "Create one-time download token URL",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "version",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/reports",
+      "summary": "Submit a moderation report",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "targetId",
+          "targetType",
+          "reason",
+          "description"
+        ]
+      },
+      "responses": [
+        "200",
+        "400",
+        "401"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/status",
+      "summary": "Get platform health and latency history",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "range",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tags",
+      "summary": "List canonical project tags",
+      "description": "",
+      "public": true,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/user/connections/{provider}",
+      "summary": "Unlink personal provider account",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "provider",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/user/connections/{provider}/toggle-visibility",
+      "summary": "Toggle visibility of linked personal provider account",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "provider",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/user/follow/{targetId}",
+      "summary": "Follow user",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "targetId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/user/me",
+      "summary": "Soft-delete current account",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/me",
+      "summary": "Get current authenticated user profile",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/orgs",
+      "summary": "List organizations current user belongs to",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/user/profile",
+      "summary": "Update own profile",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/UpdateProfileRequest"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/user/profile/avatar",
+      "summary": "Upload own avatar",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/user/profile/banner",
+      "summary": "Upload own banner",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "multipart/form-data"
+        ],
+        "schemaHints": [
+          "file"
+        ]
+      },
+      "responses": [
+        "200",
+        "400"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/profile/{userId}",
+      "summary": "Get public profile by user ID",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/repos",
+      "summary": "Alias for personal GitHub repo list",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/repos/github",
+      "summary": "List personal GitHub repos",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/repos/gitlab",
+      "summary": "List personal GitLab repos",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/user/settings/notifications",
+      "summary": "Update own notification preferences",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/NotificationPreferences"
+        ]
+      },
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/user/unfollow/{targetId}",
+      "summary": "Unfollow user",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "targetId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/batch",
+      "summary": "Fetch user summaries by ID list",
+      "description": "",
+      "public": false,
+      "params": [],
+      "requestBody": {
+        "required": true,
+        "contentTypes": [
+          "application/json"
+        ],
+        "schemaHints": [
+          "$ref #/components/schemas/UsersBatchRequest"
+        ]
+      },
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/lookup/{username}",
+      "summary": "Resolve username to user ID",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "username",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/search",
+      "summary": "Search users",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "query",
+          "in": "query",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{userId}/followers",
+      "summary": "Get followers of user",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{userId}/following",
+      "summary": "Get users followed by user",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{userId}/organizations",
+      "summary": "List organizations for user ID",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/version/{hash}",
+      "summary": "Resolve version metadata by SHA-256 hash",
+      "description": "",
+      "public": false,
+      "params": [
+        {
+          "name": "hash",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "401",
+        "404"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wiki/{slug}",
+      "summary": "Proxy wiki project metadata",
+      "description": "",
+      "public": true,
+      "params": [
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200",
+        "404"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wiki/{slug}/{pagePath}",
+      "summary": "Proxy wiki page payload",
+      "description": "pagePath may represent nested wiki paths.",
+      "public": true,
+      "params": [
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        },
+        {
+          "name": "pagePath",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": null
+        }
+      ],
+      "requestBody": null,
+      "responses": [
+        "200"
+      ]
+    }
+  ]
+}
