@@ -3,7 +3,7 @@ import { UploadCloud, Edit2, Trash2 } from 'lucide-react';
 import { VersionFields } from '../components/VersionFields';
 import { Spinner } from '../../../components/ui/Spinner';
 import { theme } from '../../../styles/theme';
-import type { Project, ProjectVersion } from '../../../../types';
+import type { Project, ProjectVersion } from '@/types';
 import type { VersionFormData } from '../components/FormShared';
 
 interface FilesProps {
