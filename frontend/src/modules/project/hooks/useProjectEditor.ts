@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { projectClient } from '@/modules/project/api/projectClient';
 import { api } from '@/utils/api';
+import { financeClient } from '@/modules/finance/api/financeClient';
 import type { Project, User } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
 
@@ -91,6 +92,13 @@ export const useProjectEditor = (
             };
 
             await api.put(`/projects/${projectData.id}`, payload);
+            await financeClient.updateProjectMonetization(projectData.id, {
+                adsEnabled: Boolean(projectData.adsEnabled),
+                donationsEnabled: Boolean(projectData.donationsEnabled),
+                suggestedDonationCents: Math.max(100, Math.round(Number(projectData.suggestedDonationCents || 500))),
+                donationRecurringDefault: Boolean(projectData.donationRecurringDefault),
+                donationPlatformCutBps: Math.max(0, Math.min(10000, Math.round(Number(projectData.donationPlatformCutBps || 0))))
+            });
             setIsDirty(false);
 
             setProjectData(prev => prev ? {
