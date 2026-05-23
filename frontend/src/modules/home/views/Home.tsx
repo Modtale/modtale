@@ -3,20 +3,14 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Search, Upload, ChevronRight, Github, Code } from 'lucide-react';
 import { api } from '@/utils/api';
-import type { Project, User } from '@/types';
+import type { Project } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
+import { useSSRData } from '@/context/SSRContext';
 
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { MarqueeColumn, MarqueeRow } from '../components/HeroMarquee';
 import { InlineDependencyUI, InlineDownloadUI, InlineNotificationUI } from '../components/FeaturePreviews';
 import { GLASS_CARD } from '../styles';
-
-const getInitialData = () => {
-    if (typeof window !== 'undefined' && (window as any).INITIAL_DATA) {
-        return (window as any).INITIAL_DATA;
-    }
-    return null;
-}
 
 const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHeight: string }) => {
     const [isVisible, setIsVisible] = useState(false);
@@ -45,13 +39,15 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
     );
 };
 
-export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
-    const ssrData = getInitialData();
+export const Home: React.FC = () => {
+    const { initialData: ssrData } = useSSRData();
 
     const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
     const [projects, setProjects] = useState<Project[]>(ssrData?.homeProjects || []);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const [readyForHeavyUI, setReadyForHeavyUI] = useState(false);
+
+    const formatMetric = (value?: number) => (value || 0).toLocaleString();
 
     useEffect(() => {
         const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -99,7 +95,6 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
             <Helmet>
                 <title>Modtale - The Hytale Community Repository</title>
                 <meta name="description" content="The community repository for Hytale. Discover, download, and share Hytale worlds, plugins, asset packs, worlds, and projectpacks." />
-                <link rel="preload" as="image" href="/assets/logo_light.svg" />
                 <link rel="preload" as="image" href="/assets/logo.svg" />
                 <style>{`
                     @keyframes marquee-up {
@@ -186,18 +181,18 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                     <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 2xl:gap-20 items-stretch">
 
                         <div className="home-hero-copy flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl justify-center mx-auto lg:mx-0">
-                            <img
-                                src="/assets/logo_light.svg"
-                                alt="Modtale Logo"
-                                className="h-14 sm:h-16 md:h-20 lg:h-24 mb-6 sm:mb-10 object-contain drop-shadow-[0_0_30px_rgba(59,130,246,0.2)] hidden dark:block"
-                                fetchPriority="high"
-                            />
-                            <img
-                                src="/assets/logo.svg"
-                                alt="Modtale Logo"
-                                className="h-14 sm:h-16 md:h-20 lg:h-24 mb-6 sm:mb-10 object-contain drop-shadow-sm block dark:hidden"
-                                fetchPriority="high"
-                            />
+                            <picture>
+                                <source srcSet="/assets/logo_light.svg" media="(prefers-color-scheme: dark)" />
+                                <img
+                                    src="/assets/logo.svg"
+                                    alt="Modtale Logo"
+                                    width={853}
+                                    height={128}
+                                    className="h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm"
+                                    fetchPriority="high"
+                                    decoding="async"
+                                />
+                            </picture>
 
                             <h1 className="text-4xl sm:text-5xl lg:text-6xl 2xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-4 sm:mb-6 2xl:mb-8">
                                 The Hytale <br className="hidden lg:block" />
@@ -230,21 +225,21 @@ export const Home: React.FC<{ user?: User | null }> = ({ user }) => {
                             <div className={`${GLASS_CARD} flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-4 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
                                 <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalProjects} /> : 0}
+                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalProjects} /> : formatMetric(stats.totalProjects)}
                                     </span>
                                     <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
                                 <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalDownloads} /> : 0}
+                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalDownloads} /> : formatMetric(stats.totalDownloads)}
                                     </span>
                                     <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
                                 <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalUsers} /> : 0}
+                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalUsers} /> : formatMetric(stats.totalUsers)}
                                     </span>
                                     <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
                                 </div>

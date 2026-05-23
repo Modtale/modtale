@@ -21,6 +21,25 @@ let jsonLd: any = undefined;
 let initialData: any = null;
 let ssrSuccessfullyCompleted = false;
 
+const DAY_IN_SECONDS = 60 * 60 * 24;
+
+const fetchJsonWithTimeout = async (resource: string, timeoutMs = 1500, init: RequestInit = {}) => {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(resource, {
+            ...init,
+            signal: controller.signal,
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
+};
+
 let canonicalOverride = `https://modtale.net${cleanPath === '' ? '/' : cleanPath}`;
 let pageNext = undefined;
 let pagePrev = undefined;
@@ -99,43 +118,23 @@ const isComplex =
     pageNum > 0 ||
     styleParam !== 'grid';
 
-function getSecondsUntilNextUpdate() {
-    const now = new Date();
-    const nextUpdate = new Date(now);
-    nextUpdate.setUTCHours(0, 35, 0, 0);
-
-    if (now > nextUpdate) {
-        nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
-    }
-
-    return Math.max(60, Math.floor((nextUpdate.getTime() - now.getTime()) / 1000));
-}
+const isBrowseRoute = !!classification && !isHome;
+const isStaticBrowseRequest = isBrowseRoute && !isComplex;
+const shouldHydrateAsIdle = isHome || isStaticBrowseRequest;
 
 if (classification) {
     if (!isComplex || isBot) {
         try {
             if (isHome) {
-                const [trendingRes, popularRes, gemsRes, relevanceRes, statsRes] = await Promise.allSettled([
-                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=trending`),
-                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=popular`),
-                    fetch(`${BACKEND_URL}/api/v1/projects?category=hidden_gems&size=20&sort=favorites`),
-                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=relevance`),
-                    fetch(`${BACKEND_URL}/api/v1/analytics/platform/stats`)
+                const [trending, popular, stats] = await Promise.all([
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=24&sort=trending`),
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=popular`),
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`)
                 ]);
-
-                const getJson = async (res: any) => res.status === 'fulfilled' && res.value.ok ? await res.value.json() : null;
-
-                const trending = await getJson(trendingRes);
-                const popular = await getJson(popularRes);
-                const gems = await getJson(gemsRes);
-                const relevance = await getJson(relevanceRes);
-                const stats = await getJson(statsRes);
 
                 const combined = [
                     ...(trending?.content || []),
                     ...(popular?.content || []),
-                    ...(gems?.content || []),
-                    ...(relevance?.content || [])
                 ];
 
                 const uniqueMap = new Map();
@@ -144,7 +143,7 @@ if (classification) {
                 const unique = Array.from(uniqueMap.values()).sort((a, b) => a.id.localeCompare(b.id));
 
                 initialData = {
-                    homeMods: unique || [],
+                    homeProjects: unique || [],
                     stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }
                 };
 
@@ -174,12 +173,11 @@ if (classification) {
                 const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
                 const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
 
-                const res = await fetch(endpoint, {
+                const data = await fetchJsonWithTimeout(endpoint, 2000, {
                     headers: { "Cache-Control": "public, s-maxage=300" }
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
+                if (data) {
                     initialData = { browseData: data };
 
                     if (data.totalPages > pageNum + 1) {
@@ -203,7 +201,7 @@ if (classification) {
             }
         } catch (e) {
             if (isHome) {
-                initialData = { homeMods: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
+                initialData = { homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
             } else {
                 initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
             }
@@ -212,10 +210,9 @@ if (classification) {
 }
 else if (isBot && identifier && isProjectRoute) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${identifier}`);
+        const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${identifier}`, 2500);
 
-        if (res.ok) {
-            const modData = await res.json();
+        if (modData) {
 
             const projectUrl = SiteRoutes.project(modData);
             if (cleanPath !== projectUrl.replace(/\/$/, "")) {
@@ -261,9 +258,10 @@ else if (isBot && identifier && isProjectRoute) {
     }
 }
 
-if (ssrSuccessfullyCompleted) {
-    const ttl = getSecondsUntilNextUpdate();
-    Astro.response.headers.set('Cache-Control', `public, max-age=60, s-maxage=${ttl}, stale-while-revalidate=86400`);
+if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
+    Astro.response.headers.set('Cache-Control', `public, max-age=300, s-maxage=${DAY_IN_SECONDS}, stale-while-revalidate=${DAY_IN_SECONDS}`);
+} else if (ssrSuccessfullyCompleted && isProjectRoute && isBot) {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=3600');
 } else {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
@@ -280,5 +278,9 @@ if (ssrSuccessfullyCompleted) {
         pageNext={pageNext}
         pagePrev={pagePrev}
 >
-    <App client:load initialPath={path} ssrData={initialData} />
+    {shouldHydrateAsIdle ? (
+        <App client:idle={{ timeout: 1500 }} initialPath={path} ssrData={initialData} />
+    ) : (
+        <App client:load initialPath={path} ssrData={initialData} />
+    )}
 </BaseLayout>

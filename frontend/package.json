@@ -14,6 +14,7 @@
     "@astrojs/node": "^8.2.0",
     "@astrojs/react": "^3.0.9",
     "@astrojs/tailwind": "^5.1.0",
+    "@fontsource-variable/inter": "^5.2.8",
     "@sentry/react": "^8.44.0",
     "@types/react-syntax-highlighter": "^15.5.13",
     "astro": "^4.3.5",

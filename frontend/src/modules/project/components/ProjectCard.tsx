@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe, ChevronRight } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
 import { Link } from 'react-router-dom';
@@ -54,12 +54,6 @@ const formatTimeAgo = (dateString: string) => {
 };
 
 export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid' }) => {
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
     const title = project.title || 'Untitled Project';
     const author = project.author || 'Unknown';
 
@@ -100,7 +94,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
                 <Link to={canonicalPath} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
-                    <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent object-cover" />
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent object-cover" />
                 </Link>
                 <div className="flex-1 min-w-0 relative z-20 pointer-events-none">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
@@ -135,7 +129,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
                 <Link to={canonicalPath} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
-                    <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
                 </Link>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center sm:justify-start relative z-20 pointer-events-none">
@@ -204,7 +198,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
             <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 pointer-events-none ${resolvedBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {resolvedBanner ? (
                     <OptimizedImage
-                        key={`banner-${isMounted}`}
                         src={resolvedBanner}
                         alt=""
                         priority={priority}
@@ -226,7 +219,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent z-20 pointer-events-none">
                 <Link to={canonicalPath} aria-label={`View ${title}`} className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto focus:outline-none">
                     <OptimizedImage
-                        key={`icon-${isMounted}`}
                         src={resolvedImage}
                         alt={title}
                         baseWidth={80}
