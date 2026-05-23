@@ -423,14 +423,14 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, license: e.target.value }); }}
                                                 placeholder="License Name"
                                                 disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
-                                                className={`w-full ${theme.colors.bgPrimary} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs`}
+                                                className={`w-full ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs`}
                                             />
                                             <input
                                                 value={metaData.links.LICENSE || ''}
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, links: { ...metaData.links, LICENSE: e.target.value } }); }}
                                                 placeholder="License URL"
                                                 disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
-                                                className={`w-full ${theme.colors.bgPrimary} border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : theme.colors.border}`}
+                                                className={`w-full ${theme.colors.bgSurfaceAlt} border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : theme.colors.border}`}
                                             />
                                             {!metaData.links.LICENSE && (
                                                 <p className="text-[10px] text-red-500 font-bold px-1">URL is required for custom licenses.</p>
