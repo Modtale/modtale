@@ -233,6 +233,8 @@ export const FinanceManager: React.FC = () => {
 
     const selectedContext = contexts.find(ctx => ctx.id === selectedOwnerId);
     const orgShareTotal = Object.values(orgShares).reduce((sum, n) => sum + Math.max(0, Math.round(Number(n || 0))), 0);
+    const ranges = ['30d', '90d', '1y'];
+    const activeRangeIndex = ranges.indexOf(range);
 
     return (
         <div className="space-y-6">
@@ -285,12 +287,18 @@ export const FinanceManager: React.FC = () => {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-white/5">
-                            {['30d', '90d', '1y'].map(option => (
+                        <div className="relative flex bg-white/60 dark:bg-black/20 p-1 rounded-xl shadow-inner border border-slate-200 dark:border-white/10 shrink-0 w-fit">
+                            <div
+                                className="absolute top-1 bottom-1 w-14 rounded-lg transition-transform duration-300 ease-out bg-modtale-accent shadow-sm shadow-modtale-accent/30 border border-transparent"
+                                style={{ transform: `translateX(${activeRangeIndex * 100}%)` }}
+                            />
+                            {ranges.map(option => (
                                 <button
                                     key={option}
                                     onClick={() => setRange(option)}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-bold ${range === option ? 'bg-modtale-accent text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+                                    className={`relative z-10 w-14 py-2 text-xs font-bold transition-colors duration-300 ${
+                                        range === option ? 'text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                                    }`}
                                 >
                                     {option}
                                 </button>
