@@ -156,7 +156,7 @@ public class ModjamService {
         return jam;
     }
 
-    private void enrichSubmissions(String jamId, List<ModjamSubmission> subs, Map<String, Mod> projectMap) {
+    private void enrichSubmissions(String jamId, List<ModjamSubmission> subs, Map<String, Project> projectMap) {
         if (subs == null || subs.isEmpty()) return;
 
         Map<String, Integer> userVoteCount = new HashMap<>();
@@ -199,8 +199,8 @@ public class ModjamService {
     private void enrichSubmissions(String jamId, List<ModjamSubmission> subs) {
         if (subs == null || subs.isEmpty()) return;
         List<String> projectIds = subs.stream().map(ModjamSubmission::getProjectId).toList();
-        Iterable<Mod> projectsIterable = projectRepository.findAllById(projectIds);
-        Map<String, Mod> projectMap = new HashMap<>();
+        Iterable<Project> projectsIterable = projectRepository.findAllById(projectIds);
+        Map<String, Project> projectMap = new HashMap<>();
         projectsIterable.forEach(p -> projectMap.put(p.getId(), p));
         enrichSubmissions(jamId, subs, projectMap);
     }
@@ -491,8 +491,8 @@ public class ModjamService {
         boolean isJamHiding = jam.isHideSubmissions() && List.of("DRAFT", "UPCOMING", "ACTIVE").contains(jam.getStatus());
 
         List<String> projectIds = allSubs.stream().map(ModjamSubmission::getProjectId).toList();
-        Iterable<Mod> projectsIterable = projectRepository.findAllById(projectIds);
-        Map<String, Mod> projectMap = new HashMap<>();
+        Iterable<Project> projectsIterable = projectRepository.findAllById(projectIds);
+        Map<String, Project> projectMap = new HashMap<>();
         projectsIterable.forEach(p -> projectMap.put(p.getId(), p));
 
         List<ModjamSubmission> visibleSubs = new ArrayList<>();
