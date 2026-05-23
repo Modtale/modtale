@@ -8,6 +8,7 @@ import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.auth.ReservedAccountGuardService;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -30,6 +31,7 @@ public class DataSeeder implements CommandLineRunner {
     private final MongoTemplate mongoTemplate;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ReservedAccountGuardService reservedAccountGuardService;
 
     @Value("${app.seeding.enabled:false}")
     private boolean seedingEnabled;
@@ -41,14 +43,22 @@ public class DataSeeder implements CommandLineRunner {
     private static final int REPORT_LIMIT = 20;
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
-    public DataSeeder(MongoTemplate mongoTemplate, UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public DataSeeder(MongoTemplate mongoTemplate, UserRepository userRepository, PasswordEncoder passwordEncoder, ReservedAccountGuardService reservedAccountGuardService) {
         this.mongoTemplate = mongoTemplate;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.reservedAccountGuardService = reservedAccountGuardService;
     }
 
     @Override
     public void run(String... args) {
+        reservedAccountGuardService.purgeReservedAccountsIfProduction();
+
+        if (reservedAccountGuardService.isProductionDeployment()) {
+            logger.warn("Seeding skipped: production deployment detected.");
+            return;
+        }
+
         if (!seedingEnabled) {
             return;
         }
