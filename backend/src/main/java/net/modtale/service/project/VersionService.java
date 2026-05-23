@@ -130,6 +130,7 @@ public class VersionService {
 
         ProjectClassification effectiveClassification = resolveClassificationForUpload(project, file);
         boolean isModpack = effectiveClassification == ProjectClassification.MODPACK;
+        storageService.validateUploadSize(file);
         if (!isModpack) fileValidationService.validateProjectFile(file, effectiveClassification.name());
 
         String filePath = null;
@@ -216,6 +217,7 @@ public class VersionService {
         Project project = projectService.getRawProjectById(id);
         if (project == null || !accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")) throw new SecurityException("Denied");
         if (project.getClassification() != ProjectClassification.PLUGIN) return new ManifestInspectionResult(null, List.of());
+        storageService.validateUploadSize(file);
 
         ManifestInspection manifest = fileValidationService.validateProjectFile(file, project.getClassification().name());
         if (manifest == null) return new ManifestInspectionResult(null, List.of());

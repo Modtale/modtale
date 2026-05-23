@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.Map;
 
@@ -30,5 +31,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleAllOtherExceptions(Exception ex) {
         logger.error("Unhandled Exception:", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An internal server error occurred."));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<?> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        logger.error("MaxUploadSizeExceededException:", ex);
+        return ResponseEntity.badRequest().body(Map.of("error", "File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB."));
     }
 }
