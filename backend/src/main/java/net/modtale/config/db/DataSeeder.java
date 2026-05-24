@@ -4,6 +4,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
@@ -118,6 +119,8 @@ public class DataSeeder implements CommandLineRunner {
                     logger.warn("No source project found with status: {}", status.name());
                 }
             }
+
+            ensureClassificationCoverage(sourceProjectsCol, compiledProjects);
 
             Set<String> selectedProjectIds = compiledProjects.stream()
                     .map(doc -> doc.get("_id"))
@@ -408,5 +411,42 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         return dependencyIds;
+    }
+
+    private void ensureClassificationCoverage(MongoCollection<Document> sourceProjectsCol, List<Document> compiledProjects) {
+        Set<String> existingProjectIds = compiledProjects.stream()
+                .map(doc -> doc.get("_id"))
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .collect(Collectors.toSet());
+
+        Set<String> includedClassifications = compiledProjects.stream()
+                .map(doc -> doc.getString("classification"))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        for (ProjectClassification classification : ProjectClassification.values()) {
+            if (includedClassifications.contains(classification.name())) {
+                continue;
+            }
+
+            Document projectForClassification = sourceProjectsCol.aggregate(Arrays.asList(
+                    Aggregates.match(Filters.eq("classification", classification.name())),
+                    Aggregates.sample(1)
+            )).first();
+
+            if (projectForClassification == null) {
+                logger.warn("No source project found with classification: {}", classification.name());
+                continue;
+            }
+
+            Object id = projectForClassification.get("_id");
+            String projectId = id != null ? id.toString() : null;
+            if (projectId != null && existingProjectIds.add(projectId)) {
+                compiledProjects.add(projectForClassification);
+                includedClassifications.add(classification.name());
+                logger.info("Guaranteed inclusion of project with classification: {}", classification.name());
+            }
+        }
     }
 }
