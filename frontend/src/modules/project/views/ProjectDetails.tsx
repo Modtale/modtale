@@ -76,6 +76,15 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; dependencies: any[] } | null>(null);
     const commentsRef = useRef<HTMLDivElement>(null);
 
+    const browseBackTarget = useMemo(() => {
+        if (typeof window === 'undefined') return SiteRoutes.browse();
+        const stored = window.sessionStorage.getItem('modtale.lastBrowseUrl');
+        if (!stored) return SiteRoutes.browse();
+
+        const isBrowsePath = /^\/(mods|plugins|modpacks|worlds|art|data)(\?|$)/.test(stored);
+        return isBrowsePath ? stored : SiteRoutes.browse();
+    }, []);
+
     const isWikiRoute = location.pathname.includes('/wiki');
     const isGalleryRoute = /\/gallery\/?$/.test(location.pathname);
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
@@ -410,7 +419,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <ProjectLayout
                 bannerUrl={project.bannerUrl}
                 iconUrl={project.imageUrl}
-                onBack={() => navigate(SiteRoutes.home())}
+                onBack={() => navigate(browseBackTarget)}
                 headerActions={
                     <HeaderActions
                         project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} canEdit={Boolean(canEdit)} projectUrl={projectUrl}

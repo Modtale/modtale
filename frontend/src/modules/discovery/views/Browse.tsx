@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import { Search, X, ChevronLeft, ChevronRight, CornerDownLeft, PackageSearch } from 'lucide-react';
 
 import { useMobile } from '@/context/MobileContext';
@@ -34,6 +34,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                                       likedProjectIds, onToggleFavorite, isLoggedIn, initialClassification
                                                   }) => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
@@ -56,6 +57,13 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const isScrolledRef = useRef(false);
     const cardsSectionRef = useRef<HTMLDivElement>(null);
     const [jumpPage, setJumpPage] = useState('');
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const query = searchParams.toString();
+        const currentBrowseUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+        window.sessionStorage.setItem('modtale.lastBrowseUrl', currentBrowseUrl);
+    }, [location.pathname, searchParams]);
 
     useEffect(() => {
         setIsMounted(true);
