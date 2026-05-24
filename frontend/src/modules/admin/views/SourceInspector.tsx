@@ -127,9 +127,6 @@ const FileTreeNode: React.FC<{
 };
 
 const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number }> = ({ content, filename, startLine, endLine }) => {
-    let ext = filename.split('.').pop()?.toLowerCase();
-    if (ext === 'class') ext = 'java';
-
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const scrollbarStyles = `
@@ -148,28 +145,6 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [content]);
 
     const lines = useMemo(() => safeContent.split('\n'), [safeContent]);
-
-    const highlightedCode = useMemo(() => {
-        if (!safeContent) return '';
-        const entityMap: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-        let src = safeContent.replace(/[&<>"']/g, (m) => entityMap[m] || m);
-        if (src.length > 50000) return src;
-
-        const tokens: string[] = [];
-        const saveToken = (text: string, type: string) => {
-            tokens.push(`<span class="${type}">${text}</span>`);
-            return `___TOKEN${tokens.length - 1}___`;
-        };
-
-        if (ext === 'java') {
-            src = src.replace(/(&quot;(\\.|[^&"\\])*&quot;)/g, (m) => saveToken(m, 'text-emerald-400'));
-            src = src.replace(/(\/\/.*)/g, (m) => saveToken(m, 'text-slate-500 italic'));
-            src = src.replace(/\b(public|private|protected|static|final|class|void|int|boolean|if|else|return|new)\b/g, (m) => saveToken(m, 'text-purple-400 font-bold'));
-        }
-
-        tokens.forEach((html, i) => { src = src.split(`___TOKEN${i}___`).join(html); });
-        return src;
-    }, [safeContent, ext]);
 
     useEffect(() => {
         if (startLine && scrollContainerRef.current && startLine > 1) {
@@ -196,7 +171,7 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
 
                 <div className="flex-1 min-w-0">
                     <pre className="text-slate-300 leading-5 p-4 pt-4 w-fit min-w-full">
-                         <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
+                         <code>{safeContent}</code>
                     </pre>
                 </div>
             </div>

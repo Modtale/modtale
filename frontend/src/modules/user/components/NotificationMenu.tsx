@@ -77,6 +77,15 @@ export function NotificationMenu() {
         return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     };
 
+    const customScrollbarStyles = `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 20px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.8); }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
+    `;
+
     return (
         <div className="relative" ref={menuRef}>
             <button
@@ -119,7 +128,7 @@ export function NotificationMenu() {
                                         key={n.id}
                                         className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 ${n.read ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}`}
                                     >
-=                                        <OptimizedImage
+                                        <OptimizedImage
                                             src={resolveUrl(n.iconUrl)}
                                             alt=""
                                             baseWidth={40}
@@ -170,14 +179,7 @@ export function NotificationMenu() {
                     </div>
                 </div>
             )}
-            <style dangerouslySetInnerHTML={{ __html: `
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 20px; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.8); }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
-            `}} />
+            <style>{customScrollbarStyles}</style>
         </div>
     );
 }

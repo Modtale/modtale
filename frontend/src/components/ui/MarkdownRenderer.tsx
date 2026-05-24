@@ -76,6 +76,8 @@ const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
 
 const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
     const [svg, setSvg] = useState<string>('');
+    const [renderError, setRenderError] = useState(false);
+    const containerRef = React.useRef<HTMLDivElement>(null);
 
     const id = useMemo(() => `mermaid-${Math.random().toString(36).substr(2, 9)}`, []);
 
@@ -96,11 +98,13 @@ const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
                 const { svg: renderedSvg } = await mermaid.render(id, chart);
                 if (isMounted) {
                     setSvg(renderedSvg);
+                    setRenderError(false);
                 }
             } catch (e) {
                 console.error('Mermaid rendering failed', e);
                 if (isMounted) {
-                    setSvg(`<div class="text-red-500 bg-red-50 p-4 rounded-lg border border-red-200 text-sm">Failed to render diagram</div>`);
+                    setSvg('');
+                    setRenderError(true);
                 }
             }
         };
@@ -112,14 +116,49 @@ const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
         };
     }, [chart, id]);
 
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        while (container.firstChild) {
+            container.removeChild(container.firstChild);
+        }
+
+        if (!svg || renderError) return;
+
+        try {
+            const parser = new DOMParser();
+            const parsed = parser.parseFromString(svg, 'image/svg+xml');
+            const parseError = parsed.querySelector('parsererror');
+            const parsedSvg = parsed.documentElement;
+
+            if (parseError || !parsedSvg || parsedSvg.tagName.toLowerCase() !== 'svg') {
+                setRenderError(true);
+                return;
+            }
+
+            container.appendChild(document.importNode(parsedSvg, true));
+        } catch (e) {
+            console.error('Mermaid SVG injection failed', e);
+            setRenderError(true);
+        }
+    }, [svg, renderError]);
+
     if (!svg) {
+        if (renderError) {
+            return (
+                <div className="my-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    Failed to render diagram
+                </div>
+            );
+        }
         return <div className="animate-pulse h-32 bg-slate-100 dark:bg-slate-800 rounded-xl my-4"></div>;
     }
 
     return (
         <div
+            ref={containerRef}
             className="my-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm overflow-x-auto flex justify-center mermaid-container"
-            dangerouslySetInnerHTML={{ __html: svg }}
         />
     );
 };

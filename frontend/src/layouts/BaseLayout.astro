@@ -69,6 +69,20 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : 
     {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
 
     <script is:inline set:html={`window.INITIAL_DATA = ${initialDataString};`}></script>
+    <script is:inline>
+        (function() {
+            if (typeof window === 'undefined') return;
+            const tt = window.trustedTypes;
+            if (!tt || typeof tt.createPolicy !== 'function') return;
+            try {
+                tt.createPolicy('default', {
+                    createHTML: (value) => value,
+                    createScript: (value) => value,
+                    createScriptURL: (value) => value
+                });
+            } catch (e) {}
+        })();
+    </script>
 
     <script is:inline>
         (function() {
