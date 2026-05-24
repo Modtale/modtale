@@ -233,18 +233,26 @@ export const Home: React.FC = () => {
                     <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 2xl:gap-20 items-stretch">
 
                         <div className="home-hero-copy flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl justify-center mx-auto lg:mx-0">
-                            <picture className="shrink-0">
-                                <source srcSet="/assets/logo_light.svg" media="(prefers-color-scheme: dark)" />
+                            <div className="shrink-0">
                                 <img
                                     src="/assets/logo.svg"
                                     alt="Modtale Logo"
                                     width={853}
                                     height={128}
-                                    className="h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0"
+                                    className="h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:hidden"
                                     fetchPriority="high"
                                     decoding="async"
                                 />
-                            </picture>
+                                <img
+                                    src="/assets/logo_light.svg"
+                                    alt="Modtale Logo"
+                                    width={853}
+                                    height={128}
+                                    className="hidden h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:block"
+                                    fetchPriority="high"
+                                    decoding="async"
+                                />
+                            </div>
 
                             <h1 className="text-4xl sm:text-5xl lg:text-6xl 2xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-4 sm:mb-6 2xl:mb-8">
                                 The Hytale <br className="hidden lg:block" />
