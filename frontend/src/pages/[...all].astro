@@ -120,7 +120,6 @@ const isComplex =
 
 const isBrowseRoute = !!classification && !isHome;
 const isStaticBrowseRequest = isBrowseRoute && !isComplex;
-const shouldHydrateAsIdle = isHome || isStaticBrowseRequest;
 
 if (classification) {
     if (!isComplex || isBot) {
@@ -278,9 +277,5 @@ if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
         pageNext={pageNext}
         pagePrev={pagePrev}
 >
-    {shouldHydrateAsIdle ? (
-        <App client:idle={{ timeout: 3500 }} initialPath={path} ssrData={initialData} />
-    ) : (
-        <App client:load initialPath={path} ssrData={initialData} />
-    )}
+    <App client:load initialPath={path} ssrData={initialData} />
 </BaseLayout>
