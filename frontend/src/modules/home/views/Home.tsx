@@ -176,15 +176,11 @@ export const Home: React.FC = () => {
                     }
                     @media (max-height: 900px) {
                         .home-hero {
-                            padding-top: 4vh !important;
+                            padding-top: clamp(3.75rem, 4vh, 5rem) !important;
                             padding-bottom: 4vh !important;
                         }
                         .home-hero-copy {
                             gap: 0.75rem !important;
-                        }
-                        .home-hero-copy img {
-                            margin-bottom: 1rem !important;
-                            height: 3.5rem !important;
                         }
                         .home-hero-copy h1 {
                             margin-bottom: 0.75rem !important;
@@ -199,12 +195,8 @@ export const Home: React.FC = () => {
                     }
                     @media (max-height: 760px) {
                         .home-hero {
-                            padding-top: 2vh !important;
+                            padding-top: clamp(3.5rem, 2vh, 4.5rem) !important;
                             padding-bottom: 2.5vh !important;
-                        }
-                        .home-hero-copy img {
-                            height: 3rem !important;
-                            margin-bottom: 0.75rem !important;
                         }
                         .home-hero-copy h1 {
                             font-size: clamp(1.85rem, 5.2vh, 2.7rem) !important;
@@ -218,11 +210,21 @@ export const Home: React.FC = () => {
                             margin-bottom: 0.75rem !important;
                         }
                     }
+                    @media (min-width: 1024px) {
+                        .home-hero {
+                            min-height: calc(100vh - 6rem) !important;
+                            padding-top: clamp(2.5rem, 3.5vh, 4rem) !important;
+                            padding-bottom: clamp(1.25rem, 2.5vh, 2.75rem) !important;
+                        }
+                        .home-hero-copy {
+                            gap: 0.5rem !important;
+                        }
+                    }
                 `}</style>
             </Helmet>
 
             <main className="relative z-10 contain-content">
-                <section className="home-hero relative w-full min-h-[100vh] lg:min-h-[92vh] 2xl:min-h-[90vh] flex flex-col items-center justify-center pt-[6vh] sm:pt-[7vh] lg:pt-[7vh] 2xl:pt-36 pb-[5vh] lg:pb-[6vh] border-b border-slate-200 dark:border-white/5 overflow-hidden">
+                <section className="home-hero relative w-full min-h-[100vh] lg:min-h-[92vh] 2xl:min-h-[90vh] flex flex-col items-center justify-center pt-16 sm:pt-[7vh] lg:pt-[7vh] 2xl:pt-36 pb-[5vh] lg:pb-[6vh] border-b border-slate-200 dark:border-white/5 overflow-hidden">
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none transform-gpu" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
@@ -231,14 +233,14 @@ export const Home: React.FC = () => {
                     <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 2xl:gap-20 items-stretch">
 
                         <div className="home-hero-copy flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl justify-center mx-auto lg:mx-0">
-                            <picture>
+                            <picture className="shrink-0">
                                 <source srcSet="/assets/logo_light.svg" media="(prefers-color-scheme: dark)" />
                                 <img
                                     src="/assets/logo.svg"
                                     alt="Modtale Logo"
                                     width={853}
                                     height={128}
-                                    className="h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm"
+                                    className="h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0"
                                     fetchPriority="high"
                                     decoding="async"
                                 />
@@ -297,7 +299,7 @@ export const Home: React.FC = () => {
                         </div>
 
                         {isDesktop ? (
-                            <div className="relative hidden lg:block w-full lg:min-h-[600px] 2xl:min-h-[750px]">
+                            <div className="relative hidden lg:block w-full lg:min-h-[520px] 2xl:min-h-[680px]">
                                 {validFeaturedProjects.length > 0 && (
                                     <aside
                                         className="absolute -inset-x-4 xl:-inset-x-8 inset-y-0 px-4 xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
