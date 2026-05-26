@@ -34,6 +34,27 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
         setCroppedAreaPixels(croppedAreaPixels);
     }, []);
 
+    const resolveSourceMimeType = useCallback(async (): Promise<string> => {
+        if (imageSrc.startsWith('data:image/')) {
+            const match = imageSrc.match(/^data:(image\/[a-zA-Z0-9.+-]+);/);
+            if (match?.[1]) return match[1];
+        }
+
+        if (imageSrc.startsWith('blob:')) {
+            return 'image/jpeg';
+        }
+
+        try {
+            const response = await fetch(imageSrc);
+            const blob = await response.blob();
+            if (blob.type) return blob.type;
+        } catch (e) {
+            console.warn('Could not determine original MIME type, falling back to JPEG');
+        }
+
+        return 'image/jpeg';
+    }, [imageSrc]);
+
     const handleSave = async () => {
         if (!croppedAreaPixels) return;
         setIsProcessing(true);
@@ -60,16 +81,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 croppedAreaPixels.height
             );
 
-            let mimeType = 'image/jpeg';
-            try {
-                const response = await fetch(imageSrc);
-                const blob = await response.blob();
-                if (blob.type) {
-                    mimeType = blob.type;
-                }
-            } catch (e) {
-                console.warn('Could not determine original MIME type, falling back to JPEG');
-            }
+            let mimeType = await resolveSourceMimeType();
 
             const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
             if (!supportedTypes.includes(mimeType)) {
