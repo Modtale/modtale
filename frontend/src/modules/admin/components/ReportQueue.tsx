@@ -75,7 +75,7 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
 
     return (
         <div className="grid gap-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/40 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/10 backdrop-blur-md">
                 <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-slate-400" />
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Filter Status:</span>
@@ -102,7 +102,7 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-modtale-accent mx-auto"></div>
                 </div>
             ) : reports.length === 0 ? (
-                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-sm">
+                <div className="text-center py-20 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                     <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <ShieldAlert className="w-10 h-10 text-green-500" />
                     </div>
@@ -111,7 +111,7 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
                 </div>
             ) : (
                 reports.map(report => (
-                    <div key={report.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-6 flex flex-col md:flex-row gap-6 relative overflow-hidden group">
+                    <div key={report.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-6 relative overflow-hidden group">
                         <div className={`absolute top-0 left-0 bottom-0 w-1 ${report.status === 'OPEN' ? 'bg-red-500' : report.status === 'RESOLVED' ? 'bg-green-500' : 'bg-slate-500'}`}></div>
 
                         <div className="flex-1 min-w-0">

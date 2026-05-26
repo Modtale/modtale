@@ -61,13 +61,13 @@ function CustomSelect({ value, onChange, options, placeholder }: any) {
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center text-slate-700 dark:text-slate-300"
+                className="w-full px-4 py-2 bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center text-slate-700 dark:text-slate-300"
             >
                 <span className="truncate">{selectedLabel}</span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
             {isOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg shadow-xl max-h-60 overflow-auto py-1">
+                <div className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl max-h-60 overflow-auto py-1">
                     <button
                         type="button"
                         onClick={() => { onChange(''); setIsOpen(false); }}
@@ -125,7 +125,7 @@ export function AuditLogs() {
 
     return (
         <div className="space-y-4">
-            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 mb-6 bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm">
+            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 mb-6 bg-white/40 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                 <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
@@ -133,7 +133,7 @@ export function AuditLogs() {
                         placeholder="Search IDs, Users, or Details..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent"
+                        className="w-full pl-9 pr-4 py-2 bg-white/60 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-modtale-accent"
                     />
                 </div>
                 <CustomSelect
@@ -148,15 +148,15 @@ export function AuditLogs() {
                     options={TARGET_OPTIONS}
                     placeholder="All Targets"
                 />
-                <button type="submit" className="px-6 py-2 bg-modtale-accent text-white rounded-lg text-sm font-bold hover:bg-modtale-accent/90 transition-colors">
+                <button type="submit" className="px-6 py-2 bg-modtale-accent text-white rounded-xl text-sm font-bold hover:bg-modtale-accent/90 transition-colors">
                     Search
                 </button>
             </form>
 
-            <div className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm overflow-hidden backdrop-blur-md">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
-                        <thead className="bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white font-semibold">
+                        <thead className="bg-white/60 dark:bg-black/20 text-slate-900 dark:text-white font-semibold">
                         <tr>
                             <th className="px-4 py-3 border-b border-slate-200 dark:border-white/5">Time</th>
                             <th className="px-4 py-3 border-b border-slate-200 dark:border-white/5">Admin</th>
@@ -204,11 +204,11 @@ export function AuditLogs() {
             </div>
 
             {totalPages > 1 && (
-                <div className="flex justify-between items-center px-4 py-3 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 rounded-xl">
+                <div className="flex justify-between items-center px-4 py-3 bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-md">
                     <button
                         disabled={page === 0}
                         onClick={() => setPage(p => Math.max(0, p - 1))}
-                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 rounded-xl transition-colors"
                     >
                         Previous
                     </button>
@@ -218,7 +218,7 @@ export function AuditLogs() {
                     <button
                         disabled={page >= totalPages - 1}
                         onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                        className="px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 rounded-xl transition-colors"
                     >
                         Next
                     </button>
