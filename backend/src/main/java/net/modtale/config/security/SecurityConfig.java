@@ -51,6 +51,8 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Configuration
 public class SecurityConfig {
@@ -105,6 +107,62 @@ public class SecurityConfig {
     private boolean isLocalhost() {
         String cleanUrl = getCleanFrontendUrl();
         return cleanUrl != null && (cleanUrl.contains("localhost") || cleanUrl.contains("127.0.0.1"));
+    }
+
+    private Set<String> getAllowedFrontendOriginPatterns() {
+        Set<String> origins = new LinkedHashSet<>();
+        origins.add("https://modtale.net");
+        origins.add("https://*.modtale.net");
+
+        String cleanUrl = getCleanFrontendUrl();
+        if (cleanUrl == null || cleanUrl.isBlank()) {
+            return origins;
+        }
+
+        origins.add(cleanUrl);
+        try {
+            URI uri = URI.create(cleanUrl);
+            String host = uri.getHost();
+            String scheme = uri.getScheme();
+            if (host == null || scheme == null) {
+                return origins;
+            }
+
+            if (!host.endsWith(".run.app") && !"localhost".equalsIgnoreCase(host) && !"127.0.0.1".equals(host)) {
+                if (host.startsWith("www.")) {
+                    origins.add(scheme + "://" + host.substring(4));
+                } else {
+                    origins.add(scheme + "://www." + host);
+                }
+            }
+
+            if (host.endsWith("modtale.net")) {
+                origins.add("https://modtale.net");
+                origins.add("https://www.modtale.net");
+                origins.add("https://*.modtale.net");
+            }
+        } catch (Exception ignored) {
+            // Keep at least the configured origin if parsing fails.
+        }
+
+        return origins;
+    }
+
+    private boolean isAllowedFrontendHost(String host) {
+        if (host == null || host.isBlank()) return false;
+        String normalized = host.toLowerCase();
+        for (String originPattern : getAllowedFrontendOriginPatterns()) {
+            try {
+                URI uri = URI.create(originPattern);
+                String allowedHost = uri.getHost();
+                if (allowedHost != null && normalized.equalsIgnoreCase(allowedHost)) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+                // Best-effort validation
+            }
+        }
+        return false;
     }
 
     @Bean
@@ -264,11 +322,17 @@ public class SecurityConfig {
                             HttpServletRequest request = context.getRequest();
                             String origin = request.getHeader("Origin");
                             String referer = request.getHeader("Referer");
-                            String cleanUrl = getCleanFrontendUrl();
-                            String validHost = cleanUrl != null ? URI.create(cleanUrl).getHost() : "localhost";
+                            String originHost = null;
+                            String refererHost = null;
+                            try {
+                                originHost = origin != null ? URI.create(origin).getHost() : null;
+                            } catch (Exception ignored) { }
+                            try {
+                                refererHost = referer != null ? URI.create(referer).getHost() : null;
+                            } catch (Exception ignored) { }
 
-                            boolean isValidOrigin = (origin != null && origin.contains(validHost));
-                            boolean isValidReferer = (referer != null && referer.contains(validHost));
+                            boolean isValidOrigin = isAllowedFrontendHost(originHost);
+                            boolean isValidReferer = isAllowedFrontendHost(refererHost);
 
                             if (isPreviewEnvironment() && (origin != null && origin.contains(".run.app"))) {
                                 return new AuthorizationDecision(true);
@@ -329,6 +393,7 @@ public class SecurityConfig {
         List<String> restrictedOrigins = new ArrayList<>();
 
         boolean isPreview = isPreviewEnvironment();
+        Set<String> frontendOrigins = getAllowedFrontendOriginPatterns();
         String cleanUrl = getCleanFrontendUrl();
 
         if (isPreview) {
@@ -337,9 +402,7 @@ public class SecurityConfig {
                 restrictedOrigins.add(cleanUrl);
             }
         } else {
-            if (cleanUrl != null && !cleanUrl.isBlank()) {
-                restrictedOrigins.add(cleanUrl);
-            }
+            restrictedOrigins.addAll(frontendOrigins);
         }
 
         restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
@@ -361,9 +424,7 @@ public class SecurityConfig {
         CorsConfiguration publicConfig = new CorsConfiguration();
         List<String> publicOrigins = new ArrayList<>();
         publicOrigins.add("*");
-        if (cleanUrl != null && !cleanUrl.isBlank()) {
-            publicOrigins.add(cleanUrl);
-        }
+        publicOrigins.addAll(frontendOrigins);
         if (isPreview) {
             publicOrigins.add("https://*.run.app");
         }
