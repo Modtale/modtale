@@ -32,6 +32,7 @@ import net.modtale.model.project.Project;
 public class GameVersionService {
     private static final Logger logger = LoggerFactory.getLogger(GameVersionService.class);
     private static final Pattern GAME_VERSION_PATTERN = Pattern.compile("^(\\d{4})\\.(\\d{2})\\.(\\d{2})-([a-zA-Z0-9]+)$");
+    private static final Pattern EXPLICIT_PRE_RELEASE_PATTERN = Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)-pre\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$");
     private static final Pattern SEMVER_PATTERN = Pattern.compile(
             "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
                     + "(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
@@ -84,15 +85,10 @@ public class GameVersionService {
 
                 Set<String> releaseSet = new HashSet<>(release);
                 Set<String> preReleaseSet = new HashSet<>(preRelease);
-                for (String indexedVersion : indexed) {
-                    if (!releaseSet.contains(indexedVersion) && !preReleaseSet.contains(indexedVersion)) {
-                        preRelease.add(indexedVersion);
-                    }
-                }
 
                 List<String> sortedRelease = sortDescDistinct(release);
                 List<String> sortedPreRelease = sortDescDistinct(preRelease);
-                List<String> sortedAll = sortDescDistinct(mergeLists(sortedRelease, sortedPreRelease));
+                List<String> sortedAll = sortDescDistinct(mergeLists(mergeLists(sortedRelease, sortedPreRelease), indexed));
 
                 List<GameVersionEntry> entries = new ArrayList<>(sortedAll.size());
                 for (String version : sortedAll) {
@@ -101,7 +97,7 @@ public class GameVersionService {
                     } else if (preReleaseSet.contains(version)) {
                         entries.add(new GameVersionEntry(version, true, preReleaseMetadataUrl));
                     } else {
-                        entries.add(new GameVersionEntry(version, true, "indexed"));
+                        entries.add(new GameVersionEntry(version, isExplicitPreRelease(version), "indexed"));
                     }
                 }
 
@@ -249,6 +245,10 @@ public class GameVersionService {
         merged.addAll(a);
         merged.addAll(b);
         return merged;
+    }
+
+    private static boolean isExplicitPreRelease(String version) {
+        return version != null && EXPLICIT_PRE_RELEASE_PATTERN.matcher(version.trim()).matches();
     }
 
     public record GameVersionEntry(String version, boolean preRelease, String sourceUrl) {}
