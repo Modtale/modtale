@@ -111,16 +111,36 @@ export const useProjectEditor = (
                 });
             }
 
-            const refreshed = await projectClient.getProject(projectData.id);
-            setProjectData(refreshed);
+            let refreshed: Project | null = null;
+            try {
+                refreshed = await projectClient.getProject(projectData.id);
+            } catch {
+            }
+
+            setProjectData(prev => {
+                if (refreshed && prev) return { ...prev, ...refreshed };
+                if (refreshed) return refreshed;
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    title: metaData.title,
+                    slug: metaData.slug,
+                    description: metaData.summary,
+                    about: metaData.description,
+                    tags: metaData.tags,
+                    links: metaData.links,
+                    repositoryUrl: metaData.repositoryUrl,
+                    license: metaData.license
+                };
+            });
             setIsDirty(false);
             setMetaData(prev => ({
                 ...prev,
                 iconFile: null,
-                iconPreview: refreshed.imageUrl || null
+                iconPreview: refreshed?.imageUrl || prev.iconPreview
             }));
             setBannerFile(null);
-            setBannerPreview(refreshed.bannerUrl || null);
+            setBannerPreview(prev => refreshed?.bannerUrl ?? prev);
 
             onShowStatus('success', 'Saved', 'Project details saved successfully.');
         } catch (e: any) {
