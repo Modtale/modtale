@@ -58,6 +58,7 @@ export const Analytics: React.FC = () => {
     const [itemMeta, setItemMeta] = useState<Record<string, any>>({});
     const [fourthChart, setFourthChart] = useState<any>(null);
     const [tableConfig, setTableConfig] = useState<{ headers: string[], rowRenderer: (id: string, stats: any) => React.ReactNode } | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
         const init = async () => {
@@ -95,6 +96,7 @@ export const Analytics: React.FC = () => {
             setViewsData({});
             setItems([]);
             setFourthChart(null);
+            setLoadError(null);
             setHasProjects(true);
 
             try {
@@ -111,7 +113,12 @@ export const Analytics: React.FC = () => {
                         setHasProjects(false); setLoading(false); return;
                     }
 
-                    const res = await api.get(`/user/analytics?range=${range}&userId=${selectedContext}`);
+                    const isOrgContext = selectedContext !== currentUser?.id;
+                    const selectedOrg = myOrgs.find(o => o.id === selectedContext);
+                    const analyticsPath = isOrgContext && selectedOrg?.username
+                        ? `/user/analytics?range=${range}&username=${encodeURIComponent(selectedOrg.username)}`
+                        : `/user/analytics?range=${range}`;
+                    const res = await api.get(analyticsPath);
                     const data = res.data;
 
                     setMeta({
@@ -206,10 +213,20 @@ export const Analytics: React.FC = () => {
 
                 setHiddenSeries(prev => { const next = { ...prev, 'overall': false }; return next; });
 
-            } catch (e) { console.error(e); } finally { setLoading(false); }
+            } catch (e) {
+                console.error(e);
+                setLoadError("Unable to load analytics right now.");
+                setSummary(null);
+                setSeriesData({});
+                setViewsData({});
+                setItems([]);
+                setItemMeta({});
+                setFourthChart(null);
+                setTableConfig(null);
+            } finally { setLoading(false); }
         };
         fetchData();
-    }, [id, range, selectedContext]);
+    }, [id, range, selectedContext, currentUser?.id, myOrgs]);
 
     const calculateOverall = (source: Record<string, any[]>) => {
         const firstKey = Object.keys(source)[0];
@@ -302,6 +319,12 @@ export const Analytics: React.FC = () => {
         </div>
     );
 
+    if (loadError) return (
+        <div className="mt-8 animate-in fade-in duration-500">
+            <EmptyState icon={BarChart2} title="Analytics Unavailable" message={loadError} />
+        </div>
+    );
+
     const overallDownloads = calculateOverall(seriesData);
     const overallViews = id ? (viewsData['overall'] || []).map((v: any) => ({ date: v.date, value: v.count })) : calculateOverall(viewsData);
 
@@ -332,7 +355,16 @@ export const Analytics: React.FC = () => {
                 hidden: !!hiddenGrowth[key] || true
             }))
         ],
-        fourthMetric: { ...fourthChart, data: fourthChart?.type === 'bar' ? fourthChart.data.map((d:any) => ({...d, color: d.id === 'overall' ? OVERALL_COLOR : COLORS[items.indexOf(d.id) % COLORS.length], hidden: !!hiddenSeries[d.id] })) : fourthChart?.data }
+        fourthMetric: fourthChart ? {
+            ...fourthChart,
+            data: fourthChart.type === 'bar'
+                ? (fourthChart.data || []).map((d: any) => ({
+                    ...d,
+                    color: d.id === 'overall' ? OVERALL_COLOR : COLORS[items.indexOf(d.id) % COLORS.length],
+                    hidden: !!hiddenSeries[d.id]
+                }))
+                : fourthChart.data
+        } : null
     };
 
     const ranges = ['7d', '30d', '90d'];
