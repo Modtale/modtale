@@ -1,159 +1,35 @@
 package net.modtale.controller.project;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import net.modtale.model.project.Project;
-import net.modtale.repository.project.ProjectRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.client.RestClientException;
 import jakarta.servlet.http.HttpServletRequest;
-
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import net.modtale.service.project.WikiService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/wiki")
 public class WikiProxyController {
 
-    private static final Logger logger = LoggerFactory.getLogger(WikiProxyController.class);
-    private static final Set<String> HOP_BY_HOP_OR_UNSAFE_HEADERS = Set.of(
-            "connection",
-            "keep-alive",
-            "proxy-authenticate",
-            "proxy-authorization",
-            "te",
-            "trailer",
-            "transfer-encoding",
-            "upgrade",
-            "host",
-            "content-length",
-            "content-encoding"
-    );
+    private final WikiService wikiService;
 
-    @Value("${app.hytalemodding.wiki-key:}") private String wikiApiKey;
-    @Value("${app.hytalemodding.wiki-url:https://wiki.hytalemodding.dev/api}") private String wikiApiUrl;
-
-    @Autowired
-    private ProjectRepository projectRepository;
-
-    private final Map<String, String> wikiSlugToIdCache = new ConcurrentHashMap<>();
-
-    private String resolveTargetWikiSlug(String requestedSlug) {
-        Optional<Project> optProject = projectRepository.findById(requestedSlug);
-        if (optProject.isEmpty()) {
-            optProject = projectRepository.findBySlug(requestedSlug.toLowerCase());
-        }
-
-        if (optProject.isPresent()) {
-            Project project = optProject.get();
-            if (project.isHmWikiEnabled() && project.getHmWikiSlug() != null && !project.getHmWikiSlug().isBlank()) {
-                return project.getHmWikiSlug();
-            }
-        }
-        return requestedSlug;
-    }
-
-    private String resolveWikiModId(String hmSlug, RestTemplate restTemplate, HttpHeaders headers) {
-        if (wikiSlugToIdCache.containsKey(hmSlug)) return wikiSlugToIdCache.get(hmSlug);
-        try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(wikiApiUrl + "/mods", HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
-            JsonNode root = response.getBody();
-            if (root != null) {
-                JsonNode list = root.isArray() ? root : (root.has("data") ? root.get("data") : null);
-                if (list != null && list.isArray()) {
-                    for (JsonNode node : list) {
-                        if (node.has("slug") && hmSlug.equalsIgnoreCase(node.get("slug").asText()) && node.has("id")) {
-                            wikiSlugToIdCache.put(hmSlug, node.get("id").asText());
-                            return node.get("id").asText();
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Wiki ID resolution failed for slug: " + hmSlug, e);
-        }
-        return null;
-    }
-
-    private ResponseEntity<String> cleanProxyResponse(ResponseEntity<String> response) {
-        HttpHeaders cleanHeaders = new HttpHeaders();
-        response.getHeaders().forEach((key, value) -> {
-            String header = key.toLowerCase();
-            if (!header.startsWith("access-control-") && !HOP_BY_HOP_OR_UNSAFE_HEADERS.contains(header)) {
-                cleanHeaders.addAll(key, value);
-            }
-        });
-        return ResponseEntity.status(response.getStatusCode()).headers(cleanHeaders).body(response.getBody());
+    public WikiProxyController(WikiService wikiService) {
+        this.wikiService = wikiService;
     }
 
     @GetMapping("/{slug}")
     public ResponseEntity<?> getWikiProject(@PathVariable String slug) {
-        RestTemplate restTemplate = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        if (wikiApiKey != null && !wikiApiKey.isEmpty()) headers.setBearerAuth(wikiApiKey);
-
-        String targetSlug = resolveTargetWikiSlug(slug);
-        String id = resolveWikiModId(targetSlug, restTemplate, headers);
-
-        if (id == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Wiki not found for: " + slug);
-
-        String targetUrl = wikiApiUrl + "/mods/" + id;
-        logger.info("Proxying wiki project request for local slug '{}' (HM ID: '{}') to: {}", slug, id, targetUrl);
-
-        try {
-            ResponseEntity<String> response = restTemplate.exchange(targetUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-            return cleanProxyResponse(response);
-        } catch (HttpStatusCodeException e) {
-            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
-        } catch (RestClientException e) {
-            logger.error("Wiki project proxy transport failure for slug '{}': {}", slug, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Wiki upstream is temporarily unavailable.");
-        } catch (Exception e) {
-            logger.error("Unexpected wiki project proxy error for slug '{}': {}", slug, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Failed to fetch wiki project data.");
-        }
+        return wikiService.getWikiProject(slug);
     }
 
     @GetMapping("/{slug}/**")
     public ResponseEntity<?> getWikiPage(@PathVariable String slug, HttpServletRequest request) {
-        RestTemplate restTemplate = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        if (wikiApiKey != null && !wikiApiKey.isEmpty()) headers.setBearerAuth(wikiApiKey);
-
-        String targetSlug = resolveTargetWikiSlug(slug);
-        String id = resolveWikiModId(targetSlug, restTemplate, headers);
-
-        if (id == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Wiki not found for: " + slug);
-
-        try {
-            String path = request.getRequestURI();
-            String searchStr = "/wiki/" + slug + "/";
-            int index = path.indexOf(searchStr);
-            if (index == -1) return ResponseEntity.badRequest().body("Invalid path");
-
-            String pagePath = path.substring(index + searchStr.length());
-            String targetUrl = wikiApiUrl + "/mods/" + id + "/" + pagePath;
-
-            logger.info("Proxying wiki page request for local slug '{}', page '{}' to: {}", slug, pagePath, targetUrl);
-
-            ResponseEntity<String> response = restTemplate.exchange(targetUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-            return cleanProxyResponse(response);
-        } catch (HttpStatusCodeException e) {
-            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
-        } catch (RestClientException e) {
-            logger.error("Wiki page proxy transport failure for slug '{}' page '{}': {}", slug, request.getRequestURI(), e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Wiki upstream is temporarily unavailable.");
-        } catch (Exception e) {
-            logger.error("Unexpected wiki page proxy error for slug '{}' page '{}': {}", slug, request.getRequestURI(), e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Failed to fetch wiki page data.");
-        }
+        String path = request.getRequestURI();
+        String searchStr = "/wiki/" + slug + "/";
+        int index = path.indexOf(searchStr);
+        if (index == -1) return ResponseEntity.badRequest().body("Invalid path");
+        String pagePath = path.substring(index + searchStr.length());
+        return wikiService.getWikiPage(slug, pagePath);
     }
 }

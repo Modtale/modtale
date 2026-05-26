@@ -25,7 +25,10 @@ public class CacheConfig {
                 "creatorAnalytics",
                 "projectAnalytics",
                 "sitemapData",
-                "analyticsDebounce"
+                "analyticsDebounce",
+                "wikiModId",
+                "wikiProjectPayload",
+                "wikiPagePayload"
         );
 
         cacheManager.setCaffeine(Caffeine.newBuilder()
