@@ -71,10 +71,10 @@ public class PlatformAnalyticsController {
     public ResponseEntity<PlatformAnalyticsSummary> getPlatformAnalytics(@RequestParam(defaultValue = "30d") String range) {
         User user = accountService.getCurrentUser();
 
-        boolean isSuper = user != null && SUPER_ADMIN_ID.equals(user.getId());
-        boolean isAdmin = user != null && user.getRoles() != null && user.getRoles().contains("ADMIN");
+        boolean isLegacySuperAdmin = user != null && SUPER_ADMIN_ID.equals(user.getId());
+        boolean hasSuperAdminRole = user != null && user.getRoles() != null && user.getRoles().contains("SUPER_ADMIN");
 
-        if (!isSuper && !isAdmin) {
+        if (!isLegacySuperAdmin && !hasSuperAdminRole) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 

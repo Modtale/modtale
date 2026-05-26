@@ -247,6 +247,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/users/batch"
                         ).permitAll()
+                        .requestMatchers("/api/v1/analytics/platform/full").access((authentication, context) -> {
+                            boolean isApiKeyUser = authentication.get().getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
+                            if (isApiKeyUser) return new AuthorizationDecision(false);
+
+                            boolean isSuperAdmin = authentication.get().getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+                            return new AuthorizationDecision(authentication.get().isAuthenticated() && isSuperAdmin);
+                        })
                         .requestMatchers("/api/v1/analytics/view/**").access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));

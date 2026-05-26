@@ -155,11 +155,13 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                     label="Reports"
                                     badge={reports.length}
                                 />
-                                <SidebarButton
-                                    tab="analytics"
-                                    icon={Activity}
-                                    label="Platform Analytics"
-                                />
+                                {isSuperAdmin && (
+                                    <SidebarButton
+                                        tab="analytics"
+                                        icon={Activity}
+                                        label="Platform Analytics"
+                                    />
+                                )}
                                 {isSuperAdmin && (
                                     <>
                                         <SidebarButton
@@ -211,7 +213,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                 </div>
                             )}
 
-                            {activeTab === 'analytics' && (
+                            {activeTab === 'analytics' && isSuperAdmin && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <PlatformAnalytics />
                                 </div>
