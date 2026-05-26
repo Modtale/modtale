@@ -8,7 +8,10 @@ export const useProjectEditor = (
     projectData: Project | null,
     currentUser: User | null,
     metaData: MetadataFormData,
+    bannerFile: File | null,
     setMetaData: React.Dispatch<React.SetStateAction<MetadataFormData>>,
+    setBannerFile: React.Dispatch<React.SetStateAction<File | null>>,
+    setBannerPreview: React.Dispatch<React.SetStateAction<string | null>>,
     setProjectData: React.Dispatch<React.SetStateAction<Project | null>>,
     onShowStatus: any
 ) => {
@@ -91,19 +94,33 @@ export const useProjectEditor = (
             };
 
             await api.put(`/projects/${projectData.id}`, payload);
-            setIsDirty(false);
 
-            setProjectData(prev => prev ? {
+            if (metaData.iconFile) {
+                const iconFormData = new FormData();
+                iconFormData.append('file', metaData.iconFile);
+                await api.put(`/projects/${projectData.id}/icon`, iconFormData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+
+            if (bannerFile) {
+                const bannerFormData = new FormData();
+                bannerFormData.append('file', bannerFile);
+                await api.put(`/projects/${projectData.id}/banner`, bannerFormData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            setIsDirty(false);
+            setMetaData(prev => ({
                 ...prev,
-                title: metaData.title,
-                slug: metaData.slug,
-                description: metaData.summary,
-                about: metaData.description,
-                tags: metaData.tags,
-                links: metaData.links,
-                repositoryUrl: metaData.repositoryUrl,
-                license: metaData.license
-            } : null);
+                iconFile: null,
+                iconPreview: refreshed.imageUrl || null
+            }));
+            setBannerFile(null);
+            setBannerPreview(refreshed.bannerUrl || null);
 
             onShowStatus('success', 'Saved', 'Project details saved successfully.');
         } catch (e: any) {
