@@ -210,7 +210,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
+        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-md">
             <div className="flex flex-col md:flex-row gap-4 mb-10 relative z-50 items-start">
                 <div className="relative flex-1 group w-full" ref={wrapperRef}>
                     <div className="relative">
@@ -236,7 +236,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                     </div>
 
                     {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
                             {searchResults.map(mod => (
                                 <button key={mod.id} onClick={() => selectProject(mod)} className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0">
                                     <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0"><img src={mod.imageUrl || 'https://modtale.net/assets/favicon.svg'} alt="" className="w-full h-full object-cover" /></div>
@@ -312,7 +312,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                     {showVersions && foundProject.versions && (
                         <div className="space-y-2 mb-8 animate-in fade-in slide-in-from-top-2">
                             {foundProject.versions.map(ver => (
-                                <div key={ver.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl">
+                                <div key={ver.id} className="flex items-center justify-between p-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-sm">
                                     <div className="flex items-center gap-4">
                                         <div className="p-2 bg-slate-100 dark:bg-white/5 rounded-lg"><Package className="w-4 h-4 text-slate-400" /></div>
                                         <div>
