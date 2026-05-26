@@ -86,10 +86,11 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             projectClient.inspectManifest(currentProjectId, nextFile)
                 .then((result) => {
                     const manifestGameVersion = result?.gameVersion?.trim();
+                    const canApplyManifestVersion = !!manifestGameVersion && availableGameVersions.includes(manifestGameVersion);
                     onChange({
                         ...data,
                         file: nextFile,
-                        gameVersions: manifestGameVersion ? [manifestGameVersion] : data.gameVersions
+                        gameVersions: canApplyManifestVersion ? [manifestGameVersion] : data.gameVersions
                     });
                     setManifestSuggestions(result?.suggestions || []);
                 })
@@ -99,7 +100,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                 })
                 .finally(() => setLoadingManifestSuggestions(false));
         }
-    }, [data, onChange, disabled, projectType, currentProjectId]);
+    }, [data, onChange, disabled, projectType, currentProjectId, availableGameVersions]);
 
     const onFileDropRejected = useCallback((rejections: FileRejection[]) => {
         const tooLarge = rejections.some(r => r.errors.some(e => e.code === 'file-too-large'));
