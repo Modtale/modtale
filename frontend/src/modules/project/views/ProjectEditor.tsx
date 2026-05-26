@@ -62,7 +62,17 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
         handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryDelete
-    } = useProjectEditor(projectData, currentUser, metaData, setMetaData, setProjectData, onShowStatus);
+    } = useProjectEditor(
+        projectData,
+        currentUser,
+        metaData,
+        bannerFile,
+        setMetaData,
+        setBannerFile,
+        setBannerPreview,
+        setProjectData,
+        onShowStatus
+    );
 
     const [wikiPreviewSlug, setWikiPreviewSlug] = useState<string | undefined>();
     const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(projectData?.hmWikiSlug, wikiPreviewSlug, activeTab === 'wiki' && projectData?.hmWikiEnabled === true);
