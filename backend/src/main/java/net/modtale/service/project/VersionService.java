@@ -29,8 +29,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class VersionService {
@@ -55,6 +58,7 @@ public class VersionService {
             ProjectClassification.DATA,
             ProjectClassification.ART
     );
+    private static final Pattern SEMVER_TOKEN_PATTERN = Pattern.compile("(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+[0-9A-Za-z.-]+)?");
 
     public ProjectVersion findVersion(Project pack, String versionNumber) {
         if ("latest".equalsIgnoreCase(versionNumber)) return pack.getVersions().isEmpty() ? null : pack.getVersions().get(0);
@@ -258,7 +262,120 @@ public class VersionService {
             }
         }
 
-        return new ManifestInspectionResult(manifest.getServerVersion(), suggestions);
+        return new ManifestInspectionResult(resolveManifestGameVersion(manifest.getServerVersion()), suggestions);
+    }
+
+    private String resolveManifestGameVersion(String serverVersionRaw) {
+        if (serverVersionRaw == null || serverVersionRaw.isBlank()) return null;
+
+        List<String> allowed = validationService.getAllowedGameVersions();
+        if (allowed == null || allowed.isEmpty()) return null;
+
+        String raw = serverVersionRaw.trim();
+        if (allowed.contains(raw)) return raw;
+
+        Matcher matcher = SEMVER_TOKEN_PATTERN.matcher(raw);
+        if (!matcher.find()) return null;
+
+        String token = matcher.group();
+        if (allowed.contains(token)) return token;
+
+        boolean greaterThan = raw.startsWith(">=");
+        boolean strictGreaterThan = raw.startsWith(">");
+        boolean lessThan = raw.startsWith("<=");
+        boolean strictLessThan = raw.startsWith("<");
+        boolean caret = raw.startsWith("^");
+
+        SemVer target = SemVer.parse(token);
+        if (target == null) return null;
+        SemVer caretUpperBound = caret ? target.caretUpperBound() : null;
+
+        String best = null;
+        SemVer bestParsed = null;
+        for (String candidate : allowed) {
+            SemVer parsed = SemVer.parse(candidate);
+            if (parsed == null) continue;
+
+            boolean matches;
+            int cmp = parsed.compareTo(target);
+            if (caret) matches = cmp >= 0 && parsed.compareTo(caretUpperBound) < 0;
+            else if (strictGreaterThan) matches = cmp > 0;
+            else if (greaterThan) matches = cmp >= 0;
+            else if (strictLessThan) matches = cmp < 0;
+            else if (lessThan) matches = cmp <= 0;
+            else matches = true;
+
+            if (!matches) continue;
+            if (best == null) {
+                best = candidate;
+                bestParsed = parsed;
+                continue;
+            }
+
+            boolean preferSmaller = strictGreaterThan || greaterThan || caret;
+            int bestCmp = parsed.compareTo(bestParsed);
+            if ((preferSmaller && bestCmp < 0) || (!preferSmaller && bestCmp > 0)) {
+                best = candidate;
+                bestParsed = parsed;
+            }
+        }
+
+        if (best != null) return best;
+
+        String targetPrefix = token.toLowerCase(Locale.ROOT);
+        return allowed.stream()
+                .filter(v -> v != null && v.toLowerCase(Locale.ROOT).startsWith(targetPrefix))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static final class SemVer implements Comparable<SemVer> {
+        private final int major;
+        private final int minor;
+        private final int patch;
+        private final String preRelease;
+
+        private SemVer(int major, int minor, int patch, String preRelease) {
+            this.major = major;
+            this.minor = minor;
+            this.patch = patch;
+            this.preRelease = preRelease;
+        }
+
+        static SemVer parse(String value) {
+            if (value == null) return null;
+            Matcher matcher = SEMVER_TOKEN_PATTERN.matcher(value.trim());
+            if (!matcher.matches()) return null;
+            try {
+                int major = Integer.parseInt(matcher.group(1));
+                int minor = Integer.parseInt(matcher.group(2));
+                int patch = Integer.parseInt(matcher.group(3));
+                return new SemVer(major, minor, patch, matcher.group(4));
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+
+        @Override
+        public int compareTo(SemVer other) {
+            int majorCmp = Integer.compare(this.major, other.major);
+            if (majorCmp != 0) return majorCmp;
+            int minorCmp = Integer.compare(this.minor, other.minor);
+            if (minorCmp != 0) return minorCmp;
+            int patchCmp = Integer.compare(this.patch, other.patch);
+            if (patchCmp != 0) return patchCmp;
+
+            if (this.preRelease == null && other.preRelease == null) return 0;
+            if (this.preRelease == null) return 1;
+            if (other.preRelease == null) return -1;
+            return this.preRelease.compareTo(other.preRelease);
+        }
+
+        SemVer caretUpperBound() {
+            if (major > 0) return new SemVer(major + 1, 0, 0, null);
+            if (minor > 0) return new SemVer(0, minor + 1, 0, null);
+            return new SemVer(0, 0, patch + 1, null);
+        }
     }
 
     private int scoreDependencyMatch(ManifestDependency dependency, Project candidate) {
