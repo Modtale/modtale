@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
-import type { ScanIssue, ProjectVersion } from '@/types';
+import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
 
 interface ReviewProps {
     reviewingProject: any;
@@ -70,7 +70,33 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
     const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
     const scanResult = pendingVersion?.scanResult;
-    const hasScanIssues = scanResult && scanResult.status !== 'CLEAN';
+    const scanIssues = scanResult?.issues || [];
+    const hasScanIssues = !!scanResult && scanResult.status !== 'CLEAN' && scanResult.status !== 'SCANNING' && scanIssues.length > 0;
+    const isScanning = scanResult?.status === 'SCANNING';
+
+    const orderedIssues = useMemo(() => {
+        const severityRank = (value?: string) => {
+            if (value === 'CRITICAL') return 4;
+            if (value === 'HIGH') return 3;
+            if (value === 'MEDIUM') return 2;
+            return 1;
+        };
+
+        return [...scanIssues].sort((a, b) => {
+            const cadenceDiff = Number((b.reviewCadence || '').toUpperCase() === 'ALWAYS')
+                - Number((a.reviewCadence || '').toUpperCase() === 'ALWAYS');
+            if (cadenceDiff !== 0) return cadenceDiff;
+            const suppressionDiff = Number(!!a.noiseSuppressed) - Number(!!b.noiseSuppressed);
+            if (suppressionDiff !== 0) return suppressionDiff;
+            const escalatedDiff = Number(!!b.escalated) - Number(!!a.escalated);
+            if (escalatedDiff !== 0) return escalatedDiff;
+            const newIssueDiff = Number(!b.knownIssue) - Number(!a.knownIssue);
+            if (newIssueDiff !== 0) return newIssueDiff;
+            const impactDiff = (b.scoreImpact || 0) - (a.scoreImpact || 0);
+            if (impactDiff !== 0) return impactDiff;
+            return severityRank(b.severity) - severityRank(a.severity);
+        });
+    }, [scanIssues]);
 
     useEffect(() => {
         if (!pendingVersion?.dependencies) return;
@@ -469,14 +495,54 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                         {currentStep === 2 && (
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
 
+                                {isScanning && (
+                                    <div className="p-5 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+                                            <div>
+                                                <h4 className="font-bold text-blue-600 dark:text-blue-400">Scanner Is Running</h4>
+                                                <p className="text-sm text-blue-700/80 dark:text-blue-300/70 font-medium">
+                                                    Warden is still processing this artifact. Refresh or run a manual rescan shortly.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {hasScanIssues && (
                                     <div className="rounded-2xl border border-red-200 dark:border-red-900/50 overflow-hidden">
                                         <div className="flex items-center justify-between p-5 bg-red-50 dark:bg-red-900/10">
                                             <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
                                                 <ShieldAlert className="w-6 h-6" />
                                                 <div>
-                                                    <h4 className="font-bold text-lg">Malware Checks Failed</h4>
-                                                    <p className="text-xs opacity-80 font-medium">Status: {scanResult.status} • Risk Score: {scanResult.riskScore}</p>
+                                                    <h4 className="font-bold text-lg">
+                                                        {scanResult?.verdict === 'BLOCK' ? 'High-Risk Findings Detected' : 'Manual Security Review Required'}
+                                                    </h4>
+                                                    <p className="text-xs opacity-80 font-medium">
+                                                        Status: {scanResult.status}
+                                                        {scanResult.verdict ? ` • Verdict: ${scanResult.verdict}` : ''}
+                                                        {scanResult.riskLevel ? ` • Risk: ${scanResult.riskLevel}` : ''}
+                                                        {` • Score: ${scanResult.riskScore}`}
+                                                        {scanResult.confidenceScore ? ` • Confidence: ${scanResult.confidenceScore}%` : ''}
+                                                    </p>
+                                                    <p className="text-xs opacity-80 font-medium">
+                                                        New: {scanResult.newIssueCount || 0} • Known: {scanResult.knownIssueCount || 0} • Escalated: {scanResult.escalatedIssueCount || 0}
+                                                    </p>
+                                                    <p className="text-xs opacity-80 font-medium">
+                                                        {scanResult.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
+                                                        {scanResult.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
+                                                        {scanResult.summary?.recoverableErrors ? ` • Recoverable Errors ${scanResult.summary.recoverableErrors}` : ''}
+                                                    </p>
+                                                    {(scanResult.summary?.oversizedEntriesSkipped || scanResult.summary?.nestedArchiveReadFailures) ? (
+                                                        <p className="text-xs opacity-80 font-medium">
+                                                            Oversized Skips: {scanResult.summary?.oversizedEntriesSkipped || 0} • Nested Archive Failures: {scanResult.summary?.nestedArchiveReadFailures || 0}
+                                                        </p>
+                                                    ) : null}
+                                                    {(scanResult.summary?.correlatedThreatClusters || scanResult.summary?.alwaysReviewIssues || scanResult.summary?.suppressedNoiseIssues) ? (
+                                                        <p className="text-xs opacity-80 font-medium">
+                                                            Correlated Clusters: {scanResult.summary?.correlatedThreatClusters || 0} • Always Review: {scanResult.summary?.alwaysReviewIssues || 0} • Suppressed Noise: {scanResult.summary?.suppressedNoiseIssues || 0}
+                                                        </p>
+                                                    ) : null}
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
@@ -497,9 +563,19 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             </div>
                                         </div>
 
+                                        {(scanResult.reviewerNotes || []).length > 0 && (
+                                            <div className="px-5 py-3 bg-red-100/60 dark:bg-red-950/20 border-t border-red-200 dark:border-red-900/40">
+                                                <ul className="text-xs text-red-800 dark:text-red-300/90 font-medium list-disc pl-5 space-y-1">
+                                                    {(scanResult.reviewerNotes || []).map((note: string, idx: number) => (
+                                                        <li key={idx}>{note}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
                                         {showScanDetails && (
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
-                                                {(scanResult.issues || []).map((issue: ScanIssue, idx: number) => (
+                                                {orderedIssues.map((issue: ScanIssue, idx: number) => (
                                                     <div key={idx} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                                                         <div className="flex-1 min-w-0 pr-4">
                                                             <div className="flex items-center gap-2 mb-1">
@@ -512,10 +588,28 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                                 <span className="text-slate-900 dark:text-slate-200 font-bold truncate">
                                                                     {issue.type}
                                                                 </span>
+                                                                {issue.escalated && (
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-red-600 text-white uppercase">Escalated</span>
+                                                                )}
+                                                                {(issue.reviewCadence || '').toUpperCase() === 'ALWAYS' && (
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200 uppercase">Always Review</span>
+                                                                )}
+                                                                {issue.noiseSuppressed && (
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Suppressed</span>
+                                                                )}
+                                                                {issue.knownIssue && !issue.escalated && (
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Known</span>
+                                                                )}
+                                                                {!issue.knownIssue && (
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 uppercase">New</span>
+                                                                )}
                                                             </div>
                                                             <div className="flex items-center gap-2 text-slate-500 font-mono text-xs truncate mb-1">
                                                                 <span className="truncate">{issue.filePath}</span>
                                                                 {issue.lineStart > 0 && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-600 dark:text-slate-300">:{issue.lineStart}</span>}
+                                                                {issue.reviewPriority && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded">{issue.reviewPriority}</span>}
+                                                                {issue.evidenceLevel && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded">{issue.evidenceLevel}</span>}
+                                                                {typeof issue.scoreImpact === 'number' && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded">Impact {issue.scoreImpact}</span>}
                                                             </div>
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
                                                         </div>
@@ -532,14 +626,18 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                     </div>
                                 )}
 
-                                {!hasScanIssues && (
+                                {!hasScanIssues && !isScanning && (
                                     <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                             <Check className="w-6 h-6 text-emerald-500" />
                                             <div>
                                                 <h4 className="font-bold text-emerald-500">Automated Checks Passed</h4>
                                                 <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
-                                                    Warden found no known malware signatures or suspicious patterns.
+                                                    Warden did not surface actionable security findings for this scan.
+                                                </p>
+                                                <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">
+                                                    {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
+                                                    {scanResult?.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
                                                 </p>
                                             </div>
                                         </div>
@@ -583,6 +681,51 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                         </div>
                                     </div>
                                 </div>
+
+                                {scanResult?.summary && (
+                                    <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                        <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Scanner Context</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">Files: {scanResult.summary.filesScanned || 0}</div>
+                                            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">Classes: {scanResult.summary.classFilesScanned || 0}</div>
+                                            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">Roots: {scanResult.summary.uniquePackageRoots || 0}</div>
+                                            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">Depth: {scanResult.summary.maxArchiveDepthReached || 0}</div>
+                                            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">Clusters: {scanResult.summary.correlatedThreatClusters || 0}</div>
+                                            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">Always Review: {scanResult.summary.alwaysReviewIssues || 0}</div>
+                                            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">Suppressed Noise: {scanResult.summary.suppressedNoiseIssues || 0}</div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(scanResult?.reviewTargets || []).length > 0 && (
+                                    <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
+                                        <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Priority Review Targets</label>
+                                        <div className="space-y-2">
+                                            {(scanResult.reviewTargets || []).slice(0, 8).map((target: ScanReviewTarget, idx: number) => (
+                                                <div key={idx} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10">
+                                                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                        <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                                                            {target.priority}
+                                                        </span>
+                                                        {target.alwaysReview && (
+                                                            <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200">
+                                                                Always Review
+                                                            </span>
+                                                        )}
+                                                        <span className="font-mono text-xs text-slate-600 dark:text-slate-300 truncate">{target.filePath}</span>
+                                                        <span className="text-[10px] font-bold text-slate-500">Impact {target.cumulativeImpact}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{target.reason}</p>
+                                                    {(target.tactics || []).length > 0 && (
+                                                        <p className="text-[10px] text-slate-500 mt-1 font-mono">
+                                                            {(target.tactics || []).join(' • ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
                                     <label className="text-xs font-bold text-slate-400 uppercase block mb-4 tracking-wider">Dependencies</label>

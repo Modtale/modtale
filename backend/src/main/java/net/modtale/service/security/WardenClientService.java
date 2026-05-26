@@ -13,6 +13,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class WardenClientService {
@@ -22,6 +23,12 @@ public class WardenClientService {
 
     @Value("${app.warden.enabled:true}")
     private boolean wardenEnabled;
+
+    @Value("${app.warden.max-attempts:3}")
+    private int maxAttempts;
+
+    @Value("${app.warden.request-timeout-seconds:75}")
+    private long requestTimeoutSeconds;
 
     public WardenClientService(
             @Value("${app.warden.url}") String wardenUrl,
@@ -34,40 +41,86 @@ public class WardenClientService {
 
     public ScanResult scanFile(byte[] fileBytes, String filename) {
         if (!wardenEnabled) {
-            logger.warn("Warden scanner is DISABLED. Returning MOCK 'CLEAN' result for file: {}", filename);
-            ScanResult mockResult = new ScanResult();
-            mockResult.setStatus(ScanStatus.CLEAN);
-            mockResult.setRiskScore(0);
-            mockResult.setIssues(new ArrayList<>());
-            mockResult.setScanTimestamp(System.currentTimeMillis());
-            return mockResult;
+            logger.error("Warden scanner is DISABLED. Falling back to manual-review degraded result for file: {}", filename);
+            return buildDegradedResult(filename, new IllegalStateException("Warden scanner disabled"));
         }
 
-        try {
-            MultipartBodyBuilder builder = new MultipartBodyBuilder();
-            builder.part("file", new ByteArrayResource(fileBytes) {
-                @Override
-                public String getFilename() {
-                    return filename;
+        Exception lastError = null;
+        int attempts = Math.max(1, maxAttempts);
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                MultipartBodyBuilder builder = new MultipartBodyBuilder();
+                builder.part("file", new ByteArrayResource(fileBytes) {
+                    @Override
+                    public String getFilename() {
+                        return filename;
+                    }
+                });
+
+                ScanResult response = webClient.post()
+                        .uri("/api/v1/scan")
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .body(BodyInserters.fromMultipartData(builder.build()))
+                        .retrieve()
+                        .bodyToMono(ScanResult.class)
+                        .timeout(Duration.ofSeconds(Math.max(15, requestTimeoutSeconds)))
+                        .block();
+
+                if (response != null) {
+                    return response;
                 }
-            });
-
-            return webClient.post()
-                    .uri("/api/v1/scan")
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(BodyInserters.fromMultipartData(builder.build()))
-                    .retrieve()
-                    .bodyToMono(ScanResult.class)
-                    .timeout(Duration.ofSeconds(60))
-                    .block();
-
-        } catch (Exception e) {
-            logger.error("Failed to communicate with Warden service: " + e.getMessage());
-            ScanResult errorResult = new ScanResult();
-            errorResult.setStatus(ScanStatus.FAILED);
-            errorResult.setRiskScore(-1);
-            errorResult.setIssues(new ArrayList<>());
-            return errorResult;
+                throw new IllegalStateException("Warden returned empty response body");
+            } catch (Exception e) {
+                lastError = e;
+                logger.warn("Warden scan attempt {} failed for {}: {}", attempt, filename, e.getMessage());
+                if (attempt < attempts) {
+                    backoff(attempt);
+                }
+            }
         }
+
+        logger.error("Warden unavailable after retries for {}: {}", filename, lastError == null ? "unknown" : lastError.getMessage());
+        return buildDegradedResult(filename, lastError);
+    }
+
+    private void backoff(int attempt) {
+        long delayMs = Math.min(3000L, 400L * attempt);
+        try {
+            Thread.sleep(delayMs);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private ScanResult buildDegradedResult(String filename, Exception exception) {
+        ScanResult degraded = new ScanResult();
+        degraded.setStatus(ScanStatus.SUSPICIOUS);
+        degraded.setVerdict("REVIEW");
+        degraded.setRiskLevel("HIGH");
+        degraded.setScanState(wardenEnabled ? "UPSTREAM_UNAVAILABLE" : "UPSTREAM_DISABLED");
+        degraded.setRiskScore(45);
+        degraded.setConfidenceScore(25);
+        degraded.setScanTimestamp(System.currentTimeMillis());
+        degraded.setIssues(new ArrayList<>());
+        degraded.setReviewerNotes(List.of(
+                "Warden service was unavailable during this scan.",
+                "Manual review required before publishing."
+        ));
+
+        if (exception != null) {
+            ScanResult.ScanIssue issue = new ScanResult.ScanIssue();
+            issue.setSeverity("MEDIUM");
+            issue.setType("WardenUnavailable");
+            issue.setCategory("System");
+            issue.setDescription("Scanner communication failed: " + exception.getMessage());
+            issue.setFilePath(filename == null ? "uploaded-artifact" : filename);
+            issue.setLineStart(-1);
+            issue.setLineEnd(-1);
+            issue.setScoreImpact(4);
+            issue.setConfidence(35);
+            issue.setReviewPriority("P1");
+            degraded.setIssues(List.of(issue));
+        }
+        return degraded;
     }
 }

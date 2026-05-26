@@ -2,6 +2,8 @@ package net.modtale.service.project;
 
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
+import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.repository.project.ProjectRepository;
@@ -128,8 +130,38 @@ public class SearchService {
         Set<Project> combined = new HashSet<>(pendingProjects);
         combined.addAll(pendingVersions);
 
-        List<Project> result = new ArrayList<>(combined);
+        List<Project> result = new ArrayList<>(combined.stream()
+                .filter(this::hasReviewReadyVersion)
+                .toList());
+
         result.sort(Comparator.comparing(a -> a.getUpdatedAt() == null ? "" : a.getUpdatedAt()));
         return result;
+    }
+
+    private boolean hasReviewReadyVersion(Project project) {
+        if (project == null || project.getVersions() == null || project.getVersions().isEmpty()) {
+            return false;
+        }
+
+        boolean hasPendingScanningVersion = project.getVersions().stream().anyMatch(version ->
+                version != null
+                        && version.getReviewStatus() == ProjectVersion.ReviewStatus.PENDING
+                        && version.getScanResult() != null
+                        && version.getScanResult().getStatus() == ScanStatus.SCANNING
+        );
+
+        if (hasPendingScanningVersion) {
+            return false;
+        }
+
+        return project.getVersions().stream().anyMatch(version -> {
+            if (version == null || version.getReviewStatus() != ProjectVersion.ReviewStatus.PENDING) {
+                return false;
+            }
+            if (version.getScanResult() == null) {
+                return true;
+            }
+            return version.getScanResult().getStatus() != ScanStatus.SCANNING;
+        });
     }
 }

@@ -38,6 +38,14 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         }
     }, [isAdmin]);
 
+    useEffect(() => {
+        if (!isAdmin) return;
+        const interval = setInterval(() => {
+            fetchQueue();
+        }, 30_000);
+        return () => clearInterval(interval);
+    }, [isAdmin]);
+
     const fetchQueue = async () => {
         setLoadingQueue(true);
         try {
