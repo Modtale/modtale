@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight } from 'lucide-react';
 import { DropdownSelect, type DropdownOption } from '@/components/ui/DropdownSelect';
@@ -25,6 +25,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     const [selectedGameVer, setSelectedGameVer] = useState<string>('');
     const [isListExpanded, setIsListExpanded] = useState(false);
     const [showPreReleaseGameVersions, setShowPreReleaseGameVersions] = useState(false);
+    const wasOpenRef = useRef(false);
     const preReleaseGameVersionSet = useMemo(() => new Set(preReleaseGameVersions), [preReleaseGameVersions]);
 
     const hasPreReleaseGameVersionEntries = useMemo(() => {
@@ -54,13 +55,27 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         [gameVersions]
     );
 
+    const preferredGameVersion = useMemo(() => gameVersions[0] || '', [gameVersions]);
+
     useEffect(() => {
-        if (show) {
-            if (gameVersions.length > 0 && (!selectedGameVer || !gameVersions.includes(selectedGameVer))) {
-                setSelectedGameVer(gameVersions[0]);
-            }
+        const isOpening = show && !wasOpenRef.current;
+        const effectivePreferredGameVersion = preferredGameVersion || gameVersions[0] || '';
+
+        if (isOpening && effectivePreferredGameVersion) {
+            setSelectedGameVer(effectivePreferredGameVersion);
+            setIsListExpanded(false);
+        } else if (show && effectivePreferredGameVersion && !gameVersions.includes(selectedGameVer)) {
+            setSelectedGameVer(effectivePreferredGameVersion);
         }
-    }, [show, gameVersions, selectedGameVer]);
+
+        wasOpenRef.current = show;
+    }, [show, gameVersions, selectedGameVer, preferredGameVersion]);
+
+    useEffect(() => {
+        if (!show || !preferredGameVersion) return;
+        setSelectedGameVer(preferredGameVersion);
+        setIsListExpanded(false);
+    }, [showPreReleaseGameVersions, showExperimental, show, preferredGameVersion]);
 
     useEffect(() => {
         if (forceShowPreReleaseGameVersions && !showPreReleaseGameVersions) {
