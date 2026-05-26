@@ -103,6 +103,17 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const galleryImages = project?.galleryImages || [];
     const projectUrl = project ? SiteRoutes.project(project) : '';
 
+    const isStableBuild = useCallback((version: any) => {
+        if (!version) return false;
+        const channel = (version.channel || 'RELEASE').toUpperCase();
+        if (channel === 'ALPHA' || channel === 'BETA') return false;
+        return !String(version.versionNumber || '').includes('-');
+    }, []);
+
+    const hasStableBuilds = useMemo(() => {
+        return (project?.versions || []).some((v: any) => isStableBuild(v));
+    }, [project?.versions, isStableBuild]);
+
     const openGalleryIndexFromHash = () => {
         const hashIndex = Number((location.hash || '').replace('#', ''));
         if (Number.isFinite(hashIndex) && hashIndex > 0) {
@@ -146,6 +157,24 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             isCancelled = true;
         };
     }, [isDownloadOpen, orderedGameVersions.length, preReleaseGameVersions.length]);
+
+    useEffect(() => {
+        if (!isDownloadOpen) return;
+        if (hasStableBuilds) {
+            setShowExperimental(false);
+        } else {
+            setShowExperimental(true);
+        }
+    }, [isDownloadOpen, hasStableBuilds]);
+
+    useEffect(() => {
+        if (!isHistoryOpen) return;
+        if (hasStableBuilds) {
+            setShowExperimental(false);
+        } else {
+            setShowExperimental(true);
+        }
+    }, [isHistoryOpen, hasStableBuilds]);
 
     useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
@@ -384,6 +413,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 showExperimental={showExperimental}
                 onToggleExperimental={toggleExperimental}
                 onDownload={handleDownloadClick}
+                hasStableVersions={hasStableBuilds}
             />
             <DownloadModal
                 show={isDownloadOpen}
