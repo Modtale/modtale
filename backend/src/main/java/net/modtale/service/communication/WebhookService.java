@@ -155,9 +155,23 @@ public class WebhookService {
 
                 String vNum = version != null ? version.getVersionNumber() : "Unknown";
                 ScanStatus sStatus = scanResult != null && scanResult.getStatus() != null ? scanResult.getStatus() : ScanStatus.FAILED;
+                String verdict = scanResult != null && scanResult.getVerdict() != null ? scanResult.getVerdict() : "UNKNOWN";
+                String scanState = scanResult != null && scanResult.getScanState() != null ? scanResult.getScanState() : "UNKNOWN";
+                int riskScore = scanResult != null ? scanResult.getRiskScore() : -1;
+                int attempt = scanResult != null ? scanResult.getScanAttempt() : 0;
+                int newIssues = scanResult != null ? scanResult.getNewIssueCount() : 0;
+                int escalatedIssues = scanResult != null ? scanResult.getEscalatedIssueCount() : 0;
 
                 embed.put("description", "**Author:** " + (authorName != null ? authorName : "Unknown") +
-                        "\n**Version:** " + vNum + "\n**Status:** " + sStatus + issues +
+                        "\n**Version:** " + vNum +
+                        "\n**Status:** " + sStatus +
+                        "\n**Verdict:** " + verdict +
+                        "\n**Scan State:** " + scanState +
+                        "\n**Attempt:** " + attempt +
+                        "\n**Risk Score:** " + riskScore +
+                        "\n**New Issues:** " + newIssues +
+                        "\n**Escalated Issues:** " + escalatedIssues +
+                        issues +
                         "\n\n*This file requires immediate manual review.*");
 
                 Map<String, Object> body = new HashMap<>();

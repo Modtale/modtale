@@ -12,6 +12,7 @@ import net.modtale.service.security.FileValidationService.ManifestInspection;
 import net.modtale.service.security.SanitizationService;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.security.ScanService;
+import net.modtale.service.security.SecurityIssueAnalysisService;
 import net.modtale.service.communication.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +50,7 @@ public class VersionService {
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private NotificationService notificationService;
     @Autowired private AccessControlService accessControlService;
+    @Autowired private SecurityIssueAnalysisService securityIssueAnalysisService;
 
     @Value("${app.limits.max-versions-per-day:5}") private int maxVersionsPerDay;
     @Value("${app.limits.max-versions-per-month:30}") private int maxVersionsPerMonth;
@@ -59,6 +61,7 @@ public class VersionService {
             ProjectClassification.ART
     );
     private static final Pattern SEMVER_TOKEN_PATTERN = Pattern.compile("(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+[0-9A-Za-z.-]+)?");
+    private static final Pattern RANGE_PART_PATTERN = Pattern.compile("(\\^|>=|<=|>|<|=)?\\s*((?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)");
 
     public ProjectVersion findVersion(Project pack, String versionNumber) {
         if ("latest".equalsIgnoreCase(versionNumber)) return pack.getVersions().isEmpty() ? null : pack.getVersions().get(0);
@@ -186,15 +189,16 @@ public class VersionService {
             project.setModIds(simpleIds);
         }
         if (file != null && !isModpack) {
-            ScanResult pending = new ScanResult(); pending.setStatus(ScanStatus.SCANNING);
-            ver.setScanResult(pending);
+            ver.setScanResult(scanService.createQueuedScanResult(1, "Initial scan queued."));
         }
 
         project.getVersions().add(0, ver);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
 
-        if (file != null && !isModpack) scanService.performBackgroundScan(project.getId(), ver.getId(), filePath, file.getOriginalFilename(), false);
+        if (file != null && !isModpack) {
+            scanService.enqueueBackgroundScan(project.getId(), ver.getId(), filePath, file.getOriginalFilename(), false, 1);
+        }
     }
 
     private ProjectClassification resolveClassificationForUpload(Project project, MultipartFile file) {
@@ -274,21 +278,8 @@ public class VersionService {
         String raw = serverVersionRaw.trim();
         if (allowed.contains(raw)) return raw;
 
-        Matcher matcher = SEMVER_TOKEN_PATTERN.matcher(raw);
-        if (!matcher.find()) return null;
-
-        String token = matcher.group();
-        if (allowed.contains(token)) return token;
-
-        boolean greaterThan = raw.startsWith(">=");
-        boolean strictGreaterThan = raw.startsWith(">");
-        boolean lessThan = raw.startsWith("<=");
-        boolean strictLessThan = raw.startsWith("<");
-        boolean caret = raw.startsWith("^");
-
-        SemVer target = SemVer.parse(token);
-        if (target == null) return null;
-        SemVer caretUpperBound = caret ? target.caretUpperBound() : null;
+        List<RangeConstraint> constraints = parseRangeConstraints(raw);
+        if (constraints.isEmpty()) return null;
 
         String best = null;
         SemVer bestParsed = null;
@@ -296,23 +287,21 @@ public class VersionService {
             SemVer parsed = SemVer.parse(candidate);
             if (parsed == null) continue;
 
-            boolean matches;
-            int cmp = parsed.compareTo(target);
-            if (caret) matches = cmp >= 0 && parsed.compareTo(caretUpperBound) < 0;
-            else if (strictGreaterThan) matches = cmp > 0;
-            else if (greaterThan) matches = cmp >= 0;
-            else if (strictLessThan) matches = cmp < 0;
-            else if (lessThan) matches = cmp <= 0;
-            else matches = true;
-
-            if (!matches) continue;
+            boolean matchesAll = true;
+            for (RangeConstraint constraint : constraints) {
+                if (!constraint.matches(parsed)) {
+                    matchesAll = false;
+                    break;
+                }
+            }
+            if (!matchesAll) continue;
             if (best == null) {
                 best = candidate;
                 bestParsed = parsed;
                 continue;
             }
 
-            boolean preferSmaller = strictGreaterThan || greaterThan || caret;
+            boolean preferSmaller = constraints.stream().noneMatch(RangeConstraint::hasUpperBound);
             int bestCmp = parsed.compareTo(bestParsed);
             if ((preferSmaller && bestCmp < 0) || (!preferSmaller && bestCmp > 0)) {
                 best = candidate;
@@ -322,11 +311,53 @@ public class VersionService {
 
         if (best != null) return best;
 
-        String targetPrefix = token.toLowerCase(Locale.ROOT);
+        String targetPrefix = constraints.get(0).target.toString().toLowerCase(Locale.ROOT);
         return allowed.stream()
                 .filter(v -> v != null && v.toLowerCase(Locale.ROOT).startsWith(targetPrefix))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private List<RangeConstraint> parseRangeConstraints(String raw) {
+        List<RangeConstraint> constraints = new ArrayList<>();
+        Matcher matcher = RANGE_PART_PATTERN.matcher(raw);
+        while (matcher.find()) {
+            String op = matcher.group(1);
+            String token = matcher.group(2);
+            SemVer target = SemVer.parse(token);
+            if (target == null) continue;
+            constraints.add(new RangeConstraint(op == null ? "=" : op.trim(), target));
+        }
+        return constraints;
+    }
+
+    private static final class RangeConstraint {
+        private final String operator;
+        private final SemVer target;
+        private final SemVer caretUpperBound;
+
+        private RangeConstraint(String operator, SemVer target) {
+            this.operator = operator == null || operator.isBlank() ? "=" : operator;
+            this.target = target;
+            this.caretUpperBound = "^".equals(this.operator) ? target.caretUpperBound() : null;
+        }
+
+        boolean hasUpperBound() {
+            return "<".equals(operator) || "<=".equals(operator) || "^".equals(operator);
+        }
+
+        boolean matches(SemVer candidate) {
+            int cmp = candidate.compareTo(target);
+            return switch (operator) {
+                case ">" -> cmp > 0;
+                case ">=" -> cmp >= 0;
+                case "<" -> cmp < 0;
+                case "<=" -> cmp <= 0;
+                case "^" -> cmp >= 0 && candidate.compareTo(caretUpperBound) < 0;
+                case "=" -> cmp == 0;
+                default -> cmp == 0;
+            };
+        }
     }
 
     private static final class SemVer implements Comparable<SemVer> {
@@ -375,6 +406,11 @@ public class VersionService {
             if (major > 0) return new SemVer(major + 1, 0, 0, null);
             if (minor > 0) return new SemVer(0, minor + 1, 0, null);
             return new SemVer(0, 0, patch + 1, null);
+        }
+
+        @Override
+        public String toString() {
+            return major + "." + minor + "." + patch + (preRelease != null ? "-" + preRelease : "");
         }
     }
 
@@ -475,6 +511,7 @@ public class VersionService {
                 if (v.getReviewStatus() == ProjectVersion.ReviewStatus.SCHEDULED && v.getScheduledPublishDate() != null && LocalDateTime.parse(v.getScheduledPublishDate()).isBefore(LocalDateTime.now())) {
                     v.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
                     v.setScheduledPublishDate(null);
+                    securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(v);
                     released.add(v.getVersionNumber());
                     updated = true;
                 }

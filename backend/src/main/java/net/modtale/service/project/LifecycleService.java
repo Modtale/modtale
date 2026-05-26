@@ -14,6 +14,7 @@ import net.modtale.service.security.SanitizationService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.communication.WebhookService;
 import net.modtale.service.security.AccessControlService;
+import net.modtale.service.security.SecurityIssueAnalysisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -40,6 +41,7 @@ public class LifecycleService {
     @Autowired private StorageService storageService;
     @Autowired private UserRepository userRepository;
     @Autowired private AccessControlService accessControlService;
+    @Autowired private SecurityIssueAnalysisService securityIssueAnalysisService;
 
     @Value("${app.limits.max-projects-per-user:50}")
     private int maxProjectsPerUser;
@@ -161,7 +163,13 @@ public class LifecycleService {
         project.setUpdatedAt(LocalDateTime.now().toString());
 
         if (project.getVersions() != null) project.getVersions().forEach(v -> {
-            if (v.getReviewStatus() == ProjectVersion.ReviewStatus.PENDING || v.getReviewStatus() == ProjectVersion.ReviewStatus.SCHEDULED) { v.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED); v.setScheduledPublishDate(null); }
+            if (v.getReviewStatus() == ProjectVersion.ReviewStatus.PENDING || v.getReviewStatus() == ProjectVersion.ReviewStatus.SCHEDULED) {
+                v.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+                v.setScheduledPublishDate(null);
+            }
+            if (v.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED) {
+                securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(v);
+            }
         });
 
         if (isNew) project.setCreatedAt(LocalDateTime.now().toString());

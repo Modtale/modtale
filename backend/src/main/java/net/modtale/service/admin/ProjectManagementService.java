@@ -10,6 +10,7 @@ import net.modtale.service.storage.StorageService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.LifecycleService;
+import net.modtale.service.security.SecurityIssueAnalysisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,11 +26,13 @@ public class ProjectManagementService {
     @Autowired private LifecycleService lifecycleService;
     @Autowired private NotificationService notificationService;
     @Autowired private StorageService storageService;
+    @Autowired private SecurityIssueAnalysisService securityIssueAnalysisService;
 
     public void approveVersion(String id, String versionId) {
         Project project = projectService.getRawProjectById(id);
         if (project == null) throw new IllegalArgumentException("Project not found");
         ProjectVersion ver = project.getVersions().stream().filter(v -> v.getId().equals(versionId)).findFirst().orElseThrow();
+        securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(ver);
         ver.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         ver.setRejectionReason(null);
         ver.setScheduledPublishDate(null);
