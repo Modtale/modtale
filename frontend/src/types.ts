@@ -69,6 +69,7 @@ export interface ManifestDependencySuggestion {
 
 export interface ManifestInspectionResult {
     gameVersion?: string;
+    modVersion?: string;
     suggestions: ManifestDependencySuggestion[];
 }
 

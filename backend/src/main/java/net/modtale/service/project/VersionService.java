@@ -224,11 +224,11 @@ public class VersionService {
     public ManifestInspectionResult inspectManifest(String id, MultipartFile file, User user) {
         Project project = projectService.getRawProjectById(id);
         if (project == null || !accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")) throw new SecurityException("Denied");
-        if (project.getClassification() != ProjectClassification.PLUGIN) return new ManifestInspectionResult(null, List.of());
+        if (project.getClassification() != ProjectClassification.PLUGIN) return new ManifestInspectionResult(null, null, List.of());
         storageService.validateUploadSize(file);
 
         ManifestInspection manifest = fileValidationService.validateProjectFile(file, project.getClassification().name());
-        if (manifest == null) return new ManifestInspectionResult(null, List.of());
+        if (manifest == null) return new ManifestInspectionResult(null, null, List.of());
 
         Query query = new Query(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED)
                 .and("deletedAt").is(null)
@@ -266,7 +266,11 @@ public class VersionService {
             }
         }
 
-        return new ManifestInspectionResult(resolveManifestGameVersion(manifest.getServerVersion()), suggestions);
+        return new ManifestInspectionResult(
+                resolveManifestGameVersion(manifest.getServerVersion()),
+                manifest.getVersion(),
+                suggestions
+        );
     }
 
     private String resolveManifestGameVersion(String serverVersionRaw) {
