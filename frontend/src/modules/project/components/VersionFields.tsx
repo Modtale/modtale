@@ -86,10 +86,12 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             projectClient.inspectManifest(currentProjectId, nextFile)
                 .then((result) => {
                     const manifestGameVersion = result?.gameVersion?.trim();
+                    const manifestModVersion = result?.modVersion?.trim();
                     const canApplyManifestVersion = !!manifestGameVersion && availableGameVersions.includes(manifestGameVersion);
                     onChange({
                         ...data,
                         file: nextFile,
+                        versionNumber: manifestModVersion || data.versionNumber,
                         gameVersions: canApplyManifestVersion ? [manifestGameVersion] : data.gameVersions
                     });
                     setManifestSuggestions(result?.suggestions || []);
