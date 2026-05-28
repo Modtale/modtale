@@ -210,6 +210,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 {BROWSE_VIEWS.map(v => {
                                     const s = new URLSearchParams(searchParams);
                                     if (v.id === 'all') s.delete('view'); else s.set('view', v.id);
+                                    if (v.defaultSort === 'relevance') s.delete('sort');
+                                    else s.set('sort', v.defaultSort);
                                     s.delete('page');
                                     const query = s.toString() ? `?${s.toString()}` : '?';
 
