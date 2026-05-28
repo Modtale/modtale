@@ -46,7 +46,7 @@ public class TeamService {
         meta.put("action", "TRANSFER_REQUEST");
 
         User author = userRepository.findById(project.getAuthorId()).orElse(null);
-        notificationService.sendActionableNotification(List.of(target.getId()), "Transfer Request", (author != null ? author.getUsername() : "Someone") + " wants to transfer '" + project.getTitle() + "' to you.", URI.create("/dashboard/projects"), project.getImageUrl(), NotificationType.TRANSFER_REQUEST, meta);
+        notificationService.sendNotifcation(List.of(target.getId()), "Transfer Request", (author != null ? author.getUsername() : "Someone") + " wants to transfer '" + project.getTitle() + "' to you.", URI.create("/dashboard/projects"), project.getImageUrl(), NotificationType.TRANSFER_REQUEST, meta);
     }
 
     public void resolveTransfer(String id, boolean accept, User responder) {
@@ -78,13 +78,13 @@ public class TeamService {
 
             projectRepository.save(project);
             projectService.evictProjectCache(project);
-            if(oldOwner != null) notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Accepted", project.getTitle() + " transferred to " + newOwner.getUsername(), URI.create("/projects/" + project.getId()), project.getImageUrl());
+            if(oldOwner != null) notificationService.sendNotifcation(List.of(oldOwner.getId()), "Transfer Accepted", project.getTitle() + " transferred to " + newOwner.getUsername(), URI.create("/projects/" + project.getId()), project.getImageUrl());
         } else {
             project.setPendingTransferTo(null);
             projectRepository.save(project);
             projectService.evictProjectCache(project);
             User oldOwner = userRepository.findById(project.getAuthorId()).orElse(null);
-            if(oldOwner != null) notificationService.sendNotification(List.of(oldOwner.getId()), "Transfer Declined", "Transfer declined for " + project.getTitle(), URI.create("/dashboard/projects"), project.getImageUrl());
+            if(oldOwner != null) notificationService.sendNotifcation(List.of(oldOwner.getId()), "Transfer Declined", "Transfer declined for " + project.getTitle(), URI.create("/dashboard/projects"), project.getImageUrl());
         }
     }
 
@@ -148,7 +148,7 @@ public class TeamService {
         projectService.evictProjectCache(project);
 
         Map<String, String> meta = new HashMap<>(); meta.put("projectId", project.getId()); meta.put("action", "CONTRIBUTOR_INVITE");
-        notificationService.sendActionableNotification(List.of(invitee.getId()), "Contributor Invite", "You have been invited to " + project.getTitle(), URI.create("/dashboard/projects"), project.getImageUrl(), NotificationType.CONTRIBUTOR_INVITE, meta);
+        notificationService.sendNotifcation(List.of(invitee.getId()), "Contributor Invite", "You have been invited to " + project.getTitle(), URI.create("/dashboard/projects"), project.getImageUrl(), NotificationType.CONTRIBUTOR_INVITE, meta);
     }
 
     public void cancelInvite(String id, String targetUserId, User requester) {
@@ -173,7 +173,7 @@ public class TeamService {
             projectRepository.save(project);
             projectService.evictProjectCache(project);
             apiKeyService.syncUserProjectPermissions(targetUserId, id, role.getPermissions());
-            notificationService.sendNotification(List.of(targetUserId), "Role Updated", "Role in " + project.getTitle() + " updated to " + role.getName(), URI.create(projectService.getProjectLink(project)), project.getImageUrl());
+            notificationService.sendNotifcation(List.of(targetUserId), "Role Updated", "Role in " + project.getTitle() + " updated to " + role.getName(), URI.create(projectService.getProjectLink(project)), project.getImageUrl());
         }
     }
 
@@ -202,7 +202,7 @@ public class TeamService {
                 projectService.evictProjectCache(project);
 
                 User owner = userRepository.findById(project.getAuthorId()).orElse(null);
-                if (owner != null) notificationService.sendNotification(List.of(owner.getId()), "Invite Accepted", user.getUsername() + " joined " + project.getTitle(), URI.create(projectService.getProjectLink(project)), user.getAvatarUrl());
+                if (owner != null) notificationService.sendNotifcation(List.of(owner.getId()), "Invite Accepted", user.getUsername() + " joined " + project.getTitle(), URI.create(projectService.getProjectLink(project)), user.getAvatarUrl());
             }
         }
     }

@@ -148,7 +148,7 @@ public class OrganizationService {
         userRepository.save(org);
 
         Map<String, String> metadata = new HashMap<>(); metadata.put("orgId", org.getId()); metadata.put("action", "ORG_INVITE");
-        notificationService.sendActionableNotification(List.of(target.getId()), "Organization Invite", "You have been invited to join " + org.getUsername() + " as " + role.getName() + ".", URI.create("/dashboard/orgs"), org.getAvatarUrl(), NotificationType.ORG_INVITE, metadata);
+        notificationService.sendNotifcation(List.of(target.getId()), "Organization Invite", "You have been invited to join " + org.getUsername() + " as " + role.getName() + ".", URI.create("/dashboard/orgs"), org.getAvatarUrl(), NotificationType.ORG_INVITE, metadata);
     }
 
     public void resolveOrgInvite(String orgId, boolean accept, User responder) {
@@ -164,7 +164,7 @@ public class OrganizationService {
 
             String msg = responder.getUsername() + " accepted the invitation to join " + org.getUsername();
             org.getOrganizationMembers().stream().filter(m -> accessControlService.hasOrgPermission(org, m.getUserId(), ApiKey.ApiPermission.ORG_MEMBER_READ) && !m.getUserId().equals(responder.getId()))
-                    .forEach(admin -> notificationService.sendNotification(List.of(admin.getUserId()), "Invite Accepted", msg, URI.create("/dashboard/orgs"), responder.getAvatarUrl()));
+                    .forEach(admin -> notificationService.sendNotifcation(List.of(admin.getUserId()), "Invite Accepted", msg, URI.create("/dashboard/orgs"), responder.getAvatarUrl()));
         } else {
             org.getPendingOrgInvites().remove(invite);
             userRepository.save(org);
@@ -210,7 +210,7 @@ public class OrganizationService {
             apiKeyService.syncUserOrgPermissions(targetUserId, orgId, newRole.getPermissions());
         }
 
-        notificationService.sendNotification(List.of(targetUserId), "Role Updated", "Your role in " + org.getUsername() + " has been updated to " + newRole.getName() + ".", URI.create("/dashboard/orgs"), org.getAvatarUrl());
+        notificationService.sendNotifcation(List.of(targetUserId), "Role Updated", "Your role in " + org.getUsername() + " has been updated to " + newRole.getName() + ".", URI.create("/dashboard/orgs"), org.getAvatarUrl());
     }
 
     public void removeOrganizationMember(String orgId, String targetUserId, User requester) {

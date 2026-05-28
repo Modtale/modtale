@@ -120,7 +120,7 @@ public class ReportService {
 
         String title = status == Report.ReportStatus.RESOLVED ? "Report Resolved" : "Report Dismissed";
 
-        notificationService.sendNotification(
+        notificationService.sendNotifcation(
                 List.of(report.getReporterId()),
                 title,
                 message,

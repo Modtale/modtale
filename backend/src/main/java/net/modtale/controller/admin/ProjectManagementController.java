@@ -185,11 +185,11 @@ public class ProjectManagementController {
 
             projectManagementService.adminDeleteProject(id);
 
-            notificationService.sendNotification(
+            notificationService.sendNotifcation(
                     List.of(targetProject.getAuthorId()),
                     "Project Deleted",
                     "Your project '" + targetProject.getTitle() + "' was deleted by an administrator. Reason: " + reason,
-                    URI.create("/"),
+                    URI.create("/dashboard"),
                     null
             );
 
@@ -215,11 +215,11 @@ public class ProjectManagementController {
 
             projectManagementService.adminHardDeleteProject(id);
 
-            notificationService.sendNotification(
+            notificationService.sendNotifcation(
                     List.of(targetProject.getAuthorId()),
                     "Project Permanently Deleted",
                     "Your project '" + targetProject.getTitle() + "' was permanently removed by an administrator. Reason: " + reason,
-                    URI.create("/"),
+                    URI.create("/dashboard"),
                     null
             );
 
@@ -258,7 +258,7 @@ public class ProjectManagementController {
 
             projectManagementService.adminUnlistProject(id);
 
-            notificationService.sendNotification(
+            notificationService.sendNotifcation(
                     List.of(targetProject.getAuthorId()),
                     "Project Unlisted",
                     "Your project '" + targetProject.getTitle() + "' was unlisted from the public directory by an administrator. Reason: " + reason,

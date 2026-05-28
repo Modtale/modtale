@@ -148,7 +148,7 @@ public class NotificationService {
     }
 
     @Async
-    public void sendActionableNotification(List<String> targetIds, String title, String message, URI link, String iconUrl, NotificationType type, Map<String, String> metadata) {
+    public void sendNotifcation(List<String> targetIds, String title, String message, URI link, String iconUrl, NotificationType type, Map<String, String> metadata) {
         if (targetIds.isEmpty()) return;
 
         List<Notification> toSave = new ArrayList<>();
@@ -175,8 +175,8 @@ public class NotificationService {
     }
 
     @Async
-    public void sendNotification(List<String> userIds, String title, String message, URI link, String iconUrl) {
-        sendActionableNotification(userIds, title, message, link, iconUrl, NotificationType.INFO, null);
+    public void sendNotifcation(List<String> userIds, String title, String message, URI link, String iconUrl) {
+        sendNotifcation(userIds, title, message, link, iconUrl, NotificationType.INFO, null);
     }
 
     public void notifyUpdates(Project project, String versionNumber) {
@@ -188,7 +188,7 @@ public class NotificationService {
                         .map(User::getId).toList();
 
                 if (!usersToNotify.isEmpty()) {
-                    sendNotification(usersToNotify, "Update: " + project.getTitle(), "Version " + versionNumber + " is now available.", URI.create(projectService.getProjectLink(project)), project.getImageUrl());
+                    sendNotifcation(usersToNotify, "Update: " + project.getTitle(), "Version " + versionNumber + " is now available.", URI.create(projectService.getProjectLink(project)), project.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send notifications", e); }
         });
@@ -205,7 +205,7 @@ public class NotificationService {
                         .map(User::getId).toList();
 
                 if (!usersToNotify.isEmpty()) {
-                    sendNotification(usersToNotify, "New Project from " + project.getAuthor(), project.getTitle() + " has been released.", URI.create(projectService.getProjectLink(project)), project.getImageUrl());
+                    sendNotifcation(usersToNotify, "New Project from " + project.getAuthor(), project.getTitle() + " has been released.", URI.create(projectService.getProjectLink(project)), project.getImageUrl());
                 }
             } catch (Exception e) { logger.error("Failed to send new project notifications", e); }
         });
@@ -218,7 +218,7 @@ public class NotificationService {
                 User author = userRepository.findById(dependent.getAuthorId()).orElse(null);
                 if (author != null && author.getNotificationPreferences().getDependencyUpdates() != User.NotificationLevel.OFF) {
                     String msg = updatedProject.getTitle() + " (used in " + dependent.getTitle() + ") has been updated to version " + version + ".";
-                    sendNotification(List.of(author.getId()), "Dependency Update", msg, URI.create(projectService.getProjectLink(updatedProject)), updatedProject.getImageUrl());
+                    sendNotifcation(List.of(author.getId()), "Dependency Update", msg, URI.create(projectService.getProjectLink(updatedProject)), updatedProject.getImageUrl());
                 }
             }
         });
