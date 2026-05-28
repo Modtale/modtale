@@ -5,7 +5,7 @@ import { api } from '@/utils/api';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { BarChart } from '@/components/ui/charts/BarChart';
-import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW } from '@/utils/analytics';
+import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
 import type { Project, User } from '@/types';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
@@ -327,10 +327,16 @@ export const Analytics: React.FC = () => {
 
     const overallDownloads = calculateOverall(seriesData);
     const overallViews = id ? (viewsData['overall'] || []).map((v: any) => ({ date: v.date, value: v.count })) : calculateOverall(viewsData);
+    const overallDownloadsAvg7 = calculateRollingAverage(overallDownloads, 7);
+    const overallDownloadsAvg30 = calculateRollingAverage(overallDownloads, 30);
+    const overallViewsAvg7 = calculateRollingAverage(overallViews, 7);
+    const overallViewsAvg30 = calculateRollingAverage(overallViews, 30);
 
     const chartDatasets = {
         downloads: [
             { id: 'overall', label: 'Overall', color: OVERALL_COLOR, data: sliceData(overallDownloads), hidden: !!hiddenSeries['overall'] },
+            { id: 'overallAvg7', label: 'Overall 7d Avg', color: '#14b8a6', data: sliceData(overallDownloadsAvg7), hidden: hiddenSeries['overallAvg7'] ?? true },
+            { id: 'overallAvg30', label: 'Overall 30d Avg', color: '#f97316', data: sliceData(overallDownloadsAvg30), hidden: hiddenSeries['overallAvg30'] ?? true },
             ...items.map((key, i) => ({
                 id: key, label: itemMeta[key]?.title || itemMeta[key]?.label || key, color: COLORS[i % COLORS.length],
                 data: sliceData(seriesData[key]?.map((d: any) => ({ date: d.date, value: d.count })) || []),
@@ -339,6 +345,8 @@ export const Analytics: React.FC = () => {
         ],
         views: [
             { id: 'overall', label: 'Total Views', color: '#3b82f6', data: sliceData(overallViews), hidden: !!hiddenSeries['overall'] },
+            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(overallViewsAvg7), hidden: hiddenSeries['viewsAvg7'] ?? true },
+            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(overallViewsAvg30), hidden: hiddenSeries['viewsAvg30'] ?? true },
             ...items.map((key, i) => ({
                 id: key,
                 label: itemMeta[key]?.title || itemMeta[key]?.label || key,

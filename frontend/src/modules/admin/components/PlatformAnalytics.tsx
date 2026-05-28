@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Eye, Download, TrendingUp, TrendingDown, PackagePlus, Server, UserPlus, Activity } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { LineChart } from '@/components/ui/charts/LineChart';
-import { sliceData, calculateWoW } from '@/utils/analytics';
+import { sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
@@ -87,6 +87,10 @@ export function PlatformAnalytics() {
     const downloadsData = formatData(data.downloadsChart);
     const apiDownloadsData = formatData(data.apiDownloadsChart);
     const viewsData = formatData(data.viewsChart);
+    const downloadsAvg7 = calculateRollingAverage(downloadsData, 7);
+    const downloadsAvg30 = calculateRollingAverage(downloadsData, 30);
+    const viewsAvg7 = calculateRollingAverage(viewsData, 7);
+    const viewsAvg30 = calculateRollingAverage(viewsData, 30);
     const newProjectsData = formatData(data.newProjectsChart);
     const newUsersData = formatData(data.newUsersChart);
     const newOrgsData = formatData(data.newOrgsChart);
@@ -94,10 +98,14 @@ export function PlatformAnalytics() {
     const chartDatasets = {
         downloads: [
             { id: 'downloads', label: 'Platform Downloads', color: '#3b82f6', data: sliceData(downloadsData), hidden: !!hiddenSeries['downloads'] },
-            { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: !!hiddenSeries['apiDownloads'] }
+            { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: !!hiddenSeries['apiDownloads'] },
+            { id: 'downloadsAvg7', label: 'Downloads 7d Avg', color: '#14b8a6', data: sliceData(downloadsAvg7), hidden: hiddenSeries['downloadsAvg7'] ?? true },
+            { id: 'downloadsAvg30', label: 'Downloads 30d Avg', color: '#a855f7', data: sliceData(downloadsAvg30), hidden: hiddenSeries['downloadsAvg30'] ?? true }
         ],
         views: [
-            { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: !!hiddenSeries['views'] }
+            { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: !!hiddenSeries['views'] },
+            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(viewsAvg7), hidden: hiddenSeries['viewsAvg7'] ?? true },
+            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(viewsAvg30), hidden: hiddenSeries['viewsAvg30'] ?? true }
         ],
         newProjects: [
             { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: !!hiddenSeries['newProjects'] },
