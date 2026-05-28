@@ -44,9 +44,15 @@ export const Home: React.FC = () => {
     const { initialData: ssrData } = useSSRData();
 
     const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+    const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
     const [projects, setProjects] = useState<Project[]>(ssrData?.homeProjects || []);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const [readyForHeavyUI, setReadyForHeavyUI] = useState(false);
+    const heroTextColumnRef = useRef<HTMLDivElement>(null);
+    const heroMarqueeDesktopRef = useRef<HTMLDivElement>(null);
+    const heroActionsRef = useRef<HTMLElement>(null);
+    const safeSamplesRef = useRef(0);
+    const lastLayoutSwitchAtRef = useRef(0);
 
     const formatMetric = (value?: number) => (value || 0).toLocaleString();
 
@@ -124,6 +130,92 @@ export const Home: React.FC = () => {
         };
     }, [ssrData?.homeProjects?.length, ssrData?.stats?.totalProjects]);
 
+    useEffect(() => {
+        const shouldUseMobileFallback = (currentDesktopLayout: boolean) => {
+            const viewportWidth = window.innerWidth;
+            if (viewportWidth < 1024) return true;
+
+            const actionsEl = heroActionsRef.current;
+            const textEl = heroTextColumnRef.current;
+            const marqueeEl = heroMarqueeDesktopRef.current;
+
+            let hasWrappedButtons = false;
+            if (actionsEl) {
+                const actionItems = Array.from(actionsEl.children) as HTMLElement[];
+                hasWrappedButtons = actionItems.some((item) => item.scrollHeight > item.clientHeight + 1)
+                    || (actionsEl.scrollWidth > actionsEl.clientWidth + 1)
+                    || (actionItems.length > 1 && actionItems.some((item) => item.offsetTop !== actionItems[0].offsetTop));
+            }
+
+            let hasHeroOverlap = false;
+            if (textEl && marqueeEl) {
+                const textRect = textEl.getBoundingClientRect();
+                const marqueeRect = marqueeEl.getBoundingClientRect();
+                const hasCollision = !(
+                    textRect.right <= marqueeRect.left
+                    || textRect.left >= marqueeRect.right
+                    || textRect.bottom <= marqueeRect.top
+                    || textRect.top >= marqueeRect.bottom
+                );
+                const horizontalGap = marqueeRect.left - textRect.right;
+                hasHeroOverlap = hasCollision || horizontalGap < 40;
+            } else if (!currentDesktopLayout) {
+                // When fallback is active, do not force a width gate.
+                // Let desktop return once wrap/overlap risk is no longer detected.
+                hasHeroOverlap = false;
+            }
+
+            return hasWrappedButtons || hasHeroOverlap;
+        };
+
+        const recomputeLayout = () => {
+            setUseDesktopHeroLayout((currentDesktopLayout) => {
+                const shouldFallback = shouldUseMobileFallback(currentDesktopLayout);
+                const now = Date.now();
+                const inCooldown = now - lastLayoutSwitchAtRef.current < 500;
+
+                if (currentDesktopLayout) {
+                    if (shouldFallback) {
+                        safeSamplesRef.current = 0;
+                        lastLayoutSwitchAtRef.current = now;
+                        return false;
+                    }
+                    return true;
+                }
+
+                if (shouldFallback || inCooldown) {
+                    safeSamplesRef.current = 0;
+                    return false;
+                }
+
+                // Require several consecutive safe samples to prevent layout ping-pong.
+                safeSamplesRef.current += 1;
+                const canReturnToDesktop = safeSamplesRef.current >= 4;
+                if (canReturnToDesktop) {
+                    safeSamplesRef.current = 0;
+                    lastLayoutSwitchAtRef.current = now;
+                }
+                return canReturnToDesktop;
+            });
+        };
+
+        recomputeLayout();
+        const rafId = window.requestAnimationFrame(recomputeLayout);
+
+        const observer = new ResizeObserver(() => recomputeLayout());
+        if (heroTextColumnRef.current) observer.observe(heroTextColumnRef.current);
+        if (heroMarqueeDesktopRef.current) observer.observe(heroMarqueeDesktopRef.current);
+        if (heroActionsRef.current) observer.observe(heroActionsRef.current);
+
+        window.addEventListener('resize', recomputeLayout, { passive: true });
+
+        return () => {
+            window.cancelAnimationFrame(rafId);
+            observer.disconnect();
+            window.removeEventListener('resize', recomputeLayout);
+        };
+    }, [projects.length, stats.totalDownloads, stats.totalProjects, stats.totalUsers, readyForHeavyUI]);
+
     const validFeaturedProjects = useMemo(() => {
         if (!readyForHeavyUI) return [];
         return projects.filter(p => Boolean(p.bannerUrl) && Boolean(p.imageUrl) && !p.imageUrl?.includes('favicon'));
@@ -136,6 +228,7 @@ export const Home: React.FC = () => {
 
     const col1Projects = useMemo(() => validFeaturedProjects.filter((_, i) => i % 2 === 0), [validFeaturedProjects]);
     const col2Projects = useMemo(() => validFeaturedProjects.filter((_, i) => i % 2 === 1), [validFeaturedProjects]);
+    const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
 
     return (
         <div
@@ -211,35 +304,106 @@ export const Home: React.FC = () => {
                         }
                     }
                     @media (min-width: 1024px) {
-                        .home-hero {
+                        .home-hero.home-hero-desktop {
                             min-height: calc(100vh - 6rem) !important;
                             padding-top: clamp(2.5rem, 3.5vh, 4rem) !important;
                             padding-bottom: clamp(1.25rem, 2.5vh, 2.75rem) !important;
                         }
-                        .home-hero-copy {
+                        .home-hero-copy.home-hero-copy-desktop {
                             gap: 0.5rem !important;
+                        }
+                    }
+                    @media (min-width: 1600px) and (max-height: 900px) {
+                        .home-hero.home-hero-desktop {
+                            min-height: calc(100vh - 6rem) !important;
+                            padding-top: clamp(2rem, 2.2vh, 2.75rem) !important;
+                            padding-bottom: clamp(1rem, 1.8vh, 1.75rem) !important;
+                        }
+                        .home-hero-desktop-grid {
+                            gap: 1.5rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop h1 {
+                            font-size: clamp(2.9rem, 6vh, 4.6rem) !important;
+                            line-height: 1.02 !important;
+                            margin-bottom: 0.75rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop .home-hero-logo {
+                            height: clamp(4.8rem, 9.2vh, 6.5rem) !important;
+                            margin-bottom: 1.4rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop p {
+                            font-size: 1.08rem !important;
+                            margin-bottom: 1rem !important;
+                            max-width: 38rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop nav {
+                            margin-bottom: 1rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop nav a {
+                            height: 3.15rem !important;
+                            font-size: 0.98rem !important;
+                            padding-left: 1.55rem !important;
+                            padding-right: 1.55rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop nav a svg {
+                            width: 1.05rem !important;
+                            height: 1.05rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop nav a svg + * {
+                            margin-left: 0.55rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop .home-hero-stats {
+                            padding: 0.9rem 1.25rem !important;
+                            gap: 1.2rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop .home-hero-stats .home-hero-stat-group {
+                            padding: 0.4rem 0.5rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop .home-hero-stats span {
+                            letter-spacing: inherit;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop .home-hero-stats .home-hero-stat-value {
+                            font-size: 2.15rem !important;
+                            line-height: 1 !important;
+                            padding: 0.38rem 0.5rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop .home-hero-stats .home-hero-stat-divider {
+                            height: 3rem !important;
+                        }
+                        .home-hero-copy.home-hero-copy-desktop .home-hero-stats .home-hero-stat-label {
+                            font-size: 0.69rem !important;
+                            margin-top: 0.5rem !important;
+                            letter-spacing: 0.12em !important;
+                            padding-left: 0.5rem !important;
+                            padding-right: 0.5rem !important;
+                        }
+                        .home-hero-desktop-marquee {
+                            min-height: 470px !important;
                         }
                     }
                 `}</style>
             </Helmet>
 
             <main className="relative z-10 contain-content">
-                <section className="home-hero relative w-full min-h-[100vh] lg:min-h-[92vh] 2xl:min-h-[90vh] flex flex-col items-center justify-center pt-16 sm:pt-[7vh] lg:pt-[7vh] 2xl:pt-36 pb-[5vh] lg:pb-[6vh] border-b border-slate-200 dark:border-white/5 overflow-hidden">
+                <section className={`home-hero ${isDesktopHeroLayout ? 'home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh]' : ''} relative w-full min-h-[100vh] flex flex-col items-center justify-center pt-16 sm:pt-[7vh] pb-[5vh] border-b border-slate-200 dark:border-white/5 overflow-hidden`}>
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none transform-gpu" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
 
-                    <div className="relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 2xl:gap-20 items-stretch">
+                    <div className={`relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 ${isDesktopHeroLayout ? 'home-hero-desktop-grid lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20' : ''} grid grid-cols-1 ${isDesktopHeroLayout ? '' : 'lg:grid-cols-1'} gap-8 sm:gap-12 items-stretch`}>
 
-                        <div className="home-hero-copy flex flex-col items-center lg:items-start text-center lg:text-left w-full max-w-2xl lg:max-w-xl 2xl:max-w-2xl justify-center mx-auto lg:mx-0">
+                        <div
+                            ref={heroTextColumnRef}
+                            className={`home-hero-copy ${isDesktopHeroLayout ? 'home-hero-copy-desktop' : ''} flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start text-center lg:text-left lg:mx-0 lg:max-w-xl' : 'text-center lg:text-center lg:mx-auto lg:max-w-2xl'} w-full max-w-2xl 2xl:max-w-2xl justify-center mx-auto`}
+                        >
                             <div className="shrink-0">
                                 <img
                                     src="/assets/logo.svg"
                                     alt="Modtale Logo"
                                     width={853}
                                     height={128}
-                                    className="h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:hidden"
+                                    className={`home-hero-logo h-14 sm:h-16 md:h-20 ${isDesktopHeroLayout ? 'lg:h-[6.75rem]' : ''} w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:hidden`}
                                     fetchPriority="high"
                                     decoding="async"
                                 />
@@ -248,68 +412,69 @@ export const Home: React.FC = () => {
                                     alt="Modtale Logo"
                                     width={853}
                                     height={128}
-                                    className="hidden h-14 sm:h-16 md:h-20 lg:h-24 w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:block"
+                                    className={`home-hero-logo hidden h-14 sm:h-16 md:h-20 ${isDesktopHeroLayout ? 'lg:h-[6.75rem]' : ''} w-auto mb-6 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:block`}
                                     fetchPriority="high"
                                     decoding="async"
                                 />
                             </div>
 
-                            <h1 className="text-4xl sm:text-5xl lg:text-6xl 2xl:text-[5.5rem] font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-4 sm:mb-6 2xl:mb-8">
-                                The Hytale <br className="hidden lg:block" />
+                            <h1 className={`text-4xl sm:text-5xl ${isDesktopHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-4 sm:mb-6`}>
+                                The Hytale<br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
-                                    Community Repository.
+                                    Community<br />Repository
                                 </span>
                             </h1>
 
-                            <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 max-w-2xl lg:max-w-lg 2xl:max-w-xl mb-8 sm:mb-10 2xl:mb-12 font-medium leading-relaxed">
+                            <p className={`text-base sm:text-lg ${isDesktopHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-8 sm:mb-10 font-medium leading-relaxed`}>
                                 Discover, download, and seamlessly share Hytale projects, worlds, plugins, asset packs, and projectpacks.
                             </p>
 
-                            <nav aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mb-8 sm:mb-10 2xl:mb-14">
+                            <nav ref={heroActionsRef} aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mb-8 sm:mb-10 2xl:mb-14">
                                 <Link
                                     to={SiteRoutes.browse()}
-                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto text-base sm:text-lg ring-1 ring-blue-500 transform-gpu"
+                                    className={`flex items-center justify-center px-6 ${isDesktopHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto ring-1 ring-blue-500 transform-gpu whitespace-nowrap`}
                                 >
                                     <Search className="w-5 h-5 mr-2 sm:mr-3" aria-hidden="true" />
                                     Discover Projects
                                 </Link>
                                 <Link
                                     to={SiteRoutes.upload()}
-                                    className="flex items-center justify-center px-6 sm:px-10 h-14 sm:h-16 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto text-base sm:text-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu"
+                                    className={`flex items-center justify-center px-6 ${isDesktopHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu whitespace-nowrap`}
                                 >
                                     <Upload className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                     Publish Work
                                 </Link>
                             </nav>
 
-                            <div className={`${GLASS_CARD} flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-4 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
-                                <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                            <div className={`${GLASS_CARD} home-hero-stats flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-4 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
+                                <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         {readyForHeavyUI ? <AnimatedCounter value={stats.totalProjects} /> : formatMetric(stats.totalProjects)}
                                     </span>
-                                    <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
+                                    <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
-                                <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
-                                <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
+                                <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         {readyForHeavyUI ? <AnimatedCounter value={stats.totalDownloads} /> : formatMetric(stats.totalDownloads)}
                                     </span>
-                                    <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
+                                    <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
-                                <div className="w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
-                                <div className="flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
+                                <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
                                         {readyForHeavyUI ? <AnimatedCounter value={stats.totalUsers} /> : formatMetric(stats.totalUsers)}
                                     </span>
-                                    <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
+                                    <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
                                 </div>
                             </div>
                         </div>
 
-                        {isDesktop ? (
-                            <div className="relative hidden lg:block w-full lg:min-h-[520px] 2xl:min-h-[680px]">
+                        {isDesktopHeroLayout ? (
+                            <div className="home-hero-desktop-marquee relative w-full lg:min-h-[520px] 2xl:min-h-[680px]">
                                 {validFeaturedProjects.length > 0 && (
                                     <aside
+                                        ref={heroMarqueeDesktopRef}
                                         className="absolute -inset-x-4 xl:-inset-x-8 inset-y-0 px-4 xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
                                         style={{
                                             maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
@@ -323,7 +488,7 @@ export const Home: React.FC = () => {
                                 )}
                             </div>
                         ) : (
-                            <div className="-mx-6 sm:-mx-12 md:-mx-16 flex flex-col gap-4 lg:hidden mt-8 sm:mt-12 mb-4 contain-content">
+                            <div className="-mx-6 sm:-mx-12 md:-mx-16 flex flex-col gap-4 mt-8 sm:mt-12 mb-4 contain-content">
                                 {validFeaturedProjects.length > 0 && (
                                     <>
                                         <MarqueeRow projects={col1Projects} duration="35s" />
