@@ -34,6 +34,24 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
     const isWorld = classification === 'SAVE';
     const folderName = isWorld ? 'Saves' : 'Mods';
 
+    const unzipInstructions = {
+        windows: (
+            <p className={theme.colors.textSecondary}>
+                Right-click the downloaded bundle and select <strong>Extract All</strong>.
+            </p>
+        ),
+        macos: (
+            <p className={theme.colors.textSecondary}>
+                Double-click the downloaded bundle, or right-click and choose <strong>Open With → Archive Utility</strong>.
+            </p>
+        ),
+        linux: (
+            <p className={theme.colors.textSecondary}>
+                In your file manager, use <strong>Extract Here</strong> or <strong>Extract To…</strong> (wording varies by desktop environment). If needed, use terminal: <code className={`px-1.5 py-0.5 rounded-md font-mono text-xs shadow-inner ${theme.colors.bgSurface} ${theme.colors.border} ${themeColors.text}`}>unzip your-file.zip</code>.
+            </p>
+        )
+    };
+
     const paths = {
         windows: `C:\\Program Files\\Hypixel Studios\\Hytale Launcher\\UserData\\${folderName}`,
         macos: `/Applications/Hytale Launcher.app/Contents/MacOS/UserData/${folderName}`,
@@ -138,7 +156,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                                     <div className={`w-8 h-8 rounded-full ${themeColors.bgAlpha} ${themeColors.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>2</div>
                                     <div className="w-full min-w-0 pt-1.5">
                                         <p className={`font-bold ${theme.colors.accent} mb-1 flex items-center gap-1.5`}><AlertCircle className="w-4 h-4"/> Important: Unzip the file!</p>
-                                        <p className={theme.colors.textSecondary}>Right-click the downloaded bundle and select <strong>Extract All</strong>.</p>
+                                        {unzipInstructions[os]}
                                     </div>
                                 </div>
                             )}
