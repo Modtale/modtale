@@ -191,7 +191,7 @@ public class FileValidationService {
         try {
             JsonNode root = objectMapper.readTree(is);
 
-            String[] requiredFields = {"Group", "Name", "Version", "Description", "ServerVersion", "Main"};
+            String[] requiredFields = {"Group", "Name", "Version", "ServerVersion", "Main"};
             for (String field : requiredFields) {
                 if (!root.has(field) || root.get(field).asText().isEmpty()) {
                     throw new IllegalArgumentException("Plugin manifest.json is missing required field: " + field);
