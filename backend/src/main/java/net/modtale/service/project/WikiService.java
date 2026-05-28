@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.HttpStatusCode;
 
 import java.util.Optional;
 
@@ -97,7 +98,7 @@ public class WikiService {
     }
 
     @Cacheable(value = "wikiSlugToId", key = "#hmSlug.toLowerCase()")
-    protected String resolveWikiModId(String hmSlug) {
+    public String resolveWikiModId(String hmSlug) {
         try {
             String body = fetchModsPayload();
             JsonNode root = objectMapper.readTree(body);
@@ -116,36 +117,18 @@ public class WikiService {
     }
 
     @Cacheable(value = "wikiModsPayload", key = "'mods-list'")
-    protected String fetchModsPayload() {
-        ResponseEntity<String> response = restTemplate.exchange(
-                wikiApiUrl + "/mods",
-                HttpMethod.GET,
-                new HttpEntity<>(buildHeaders()),
-                String.class
-        );
-        return response.getBody();
+    public String fetchModsPayload() {
+        return fetchWithAuthFallback(wikiApiUrl + "/mods");
     }
 
     @Cacheable(value = "wikiProjectPayload", key = "#id")
-    protected String fetchProjectPayload(String id) {
-        ResponseEntity<String> response = restTemplate.exchange(
-                wikiApiUrl + "/mods/" + id,
-                HttpMethod.GET,
-                new HttpEntity<>(buildHeaders()),
-                String.class
-        );
-        return response.getBody();
+    public String fetchProjectPayload(String id) {
+        return fetchWithAuthFallback(wikiApiUrl + "/mods/" + id);
     }
 
     @Cacheable(value = "wikiPagePayload", key = "#id + ':' + #pagePath")
-    protected String fetchPagePayload(String id, String pagePath) {
-        ResponseEntity<String> response = restTemplate.exchange(
-                wikiApiUrl + "/mods/" + id + "/" + pagePath,
-                HttpMethod.GET,
-                new HttpEntity<>(buildHeaders()),
-                String.class
-        );
-        return response.getBody();
+    public String fetchPagePayload(String id, String pagePath) {
+        return fetchWithAuthFallback(wikiApiUrl + "/mods/" + id + "/" + pagePath);
     }
 
     private HttpHeaders buildHeaders() {
@@ -161,5 +144,33 @@ public class WikiService {
         String normalized = pagePath.trim();
         while (normalized.startsWith("/")) normalized = normalized.substring(1);
         return normalized;
+    }
+
+    private String fetchWithAuthFallback(String url) {
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    new HttpEntity<>(buildHeaders()),
+                    String.class
+            );
+            return response.getBody();
+        } catch (HttpStatusCodeException e) {
+            HttpStatusCode code = e.getStatusCode();
+            boolean authConfigured = wikiApiKey != null && !wikiApiKey.isBlank();
+            boolean authRejected = code.value() == 401 || code.value() == 403;
+
+            if (authConfigured && authRejected) {
+                logger.warn("Wiki API rejected configured bearer token ({}). Retrying unauthenticated for URL: {}", code, url);
+                ResponseEntity<String> retry = restTemplate.exchange(
+                        url,
+                        HttpMethod.GET,
+                        new HttpEntity<>(new HttpHeaders()),
+                        String.class
+                );
+                return retry.getBody();
+            }
+            throw e;
+        }
     }
 }
