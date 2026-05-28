@@ -114,6 +114,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20 text-white'
             : 'bg-modtale-accent hover:bg-blue-500 shadow-blue-500/20 text-white';
 
+    const otherCompatibleVersions = (ver: any) => {
+        const versions = Array.isArray(ver?.gameVersions) ? ver.gameVersions : [];
+        return versions.filter((gv: string) => gv !== selectedGameVer);
+    };
+
     return (
         <div className={theme.components.modalOverlay} onClick={onClose}>
             <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
@@ -168,6 +173,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                     v{latestVer.versionNumber}
                                     {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
                                 </div>
+                                {otherCompatibleVersions(latestVer).length > 0 && (
+                                    <div className="text-[11px] font-semibold text-blue-50/95 z-10">
+                                        Also supports: {otherCompatibleVersions(latestVer).join(', ')}
+                                    </div>
+                                )}
                             </Link>
 
                             <div className="relative mb-6">
@@ -196,6 +206,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                         {ver.channel !== 'RELEASE' && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
                                                     </div>
                                                     <div className={`text-xs ${theme.colors.textMuted}`}>{formatTimeAgo(ver.releaseDate)}</div>
+                                                    {otherCompatibleVersions(ver).length > 0 && (
+                                                        <div className={`text-[11px] ${theme.colors.textSecondary}`}>
+                                                            Also supports: {otherCompatibleVersions(ver).join(', ')}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             <Link
