@@ -12,7 +12,7 @@ interface DownloadModalProps {
     versionsByGame: Record<string, any[]>;
     preReleaseGameVersions?: string[];
     orderedGameVersions?: string[];
-    onDownload: (url: string, number: string, deps: any[], channel: string) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
@@ -160,7 +160,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         <>
                             <Link
                                 to="#"
-                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies, latestVer.channel); }}
+                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, selectedGameVer, latestVer.dependencies, latestVer.channel); }}
                                 className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
                             >
                                 <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
@@ -200,7 +200,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                             </div>
                                             <Link
                                                 to="#"
-                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies, ver.channel); }}
+                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, selectedGameVer, ver.dependencies, ver.channel); }}
                                                 className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
                                             >
                                                 <Download className="w-4 h-4" />

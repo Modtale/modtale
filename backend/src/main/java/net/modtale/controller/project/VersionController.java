@@ -55,10 +55,11 @@ public class VersionController {
 
     @GetMapping("/projects/{id}/versions/{version}/dependencies")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_READ', authentication)")
-    public ResponseEntity<List<ProjectDependencyDTO>> getDependencies(@PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<List<ProjectDependencyDTO>> getDependencies(@PathVariable String id, @PathVariable String version,
+                                                                      @RequestParam(value = "gameVersion", required = false) String gameVersion) {
         Project project = projectService.getProjectById(id);
         if (project == null) return ResponseEntity.notFound().build();
-        ProjectVersion v = project.getVersions().stream().filter(ver -> ver.getVersionNumber().equalsIgnoreCase(version)).findFirst().orElse(null);
+        ProjectVersion v = versionService.findVersion(project, version, gameVersion);
         if (v == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok((v.getDependencies() != null ? v.getDependencies() : List.<ProjectDependency>of()).stream()
                 .map(ProjectMapper::toDependencyDTO)
@@ -125,12 +126,14 @@ public class VersionController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-url")
-    public ResponseEntity<?> getDownloadUrl(@PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<?> getDownloadUrl(@PathVariable String id, @PathVariable String version,
+                                            @RequestParam(value = "gameVersion", required = false) String gameVersion) {
         try {
             Project project = projectService.getProjectById(id);
             if (project == null) return ResponseEntity.notFound().build();
-            if (project.getVersions().stream().noneMatch(v -> v.getVersionNumber().equalsIgnoreCase(version))) return ResponseEntity.notFound().build();
-            String token = downloadTokenService.generateToken(id, version);
+            ProjectVersion target = versionService.findVersion(project, version, gameVersion);
+            if (target == null) return ResponseEntity.notFound().build();
+            String token = downloadTokenService.generateToken(id, version, gameVersion);
             return ResponseEntity.ok(Map.of("downloadUrl", "/download/" + token, "expiresIn", 300));
         } catch (Exception e) { return ResponseEntity.status(500).build(); }
     }
@@ -148,7 +151,7 @@ public class VersionController {
             boolean isApi = (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) || (request.getHeader("Referer") == null || !request.getHeader("Referer").startsWith(frontendUrl));
             String clientIp = request.getHeader("X-Forwarded-For") == null ? request.getRemoteAddr() : request.getHeader("X-Forwarded-For").split(",")[0];
 
-            ProjectVersion targetVersion = project.getVersions().stream().filter(v -> v.getVersionNumber().equalsIgnoreCase(dt.getVersion())).findFirst().orElse(null);
+            ProjectVersion targetVersion = versionService.findVersion(project, dt.getVersion(), dt.getGameVersion());
             if (targetVersion == null) return ResponseEntity.notFound().build();
 
             trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
@@ -190,12 +193,14 @@ public class VersionController {
     public ResponseEntity<?> getDownloadBundleUrl(
             @PathVariable String id,
             @PathVariable String version,
+            @RequestParam(value = "gameVersion", required = false) String gameVersion,
             @RequestParam(value = "deps", required = false) List<String> deps) {
         try {
             Project project = projectService.getProjectById(id);
             if (project == null) return ResponseEntity.notFound().build();
-            if (project.getVersions().stream().noneMatch(v -> v.getVersionNumber().equalsIgnoreCase(version))) return ResponseEntity.notFound().build();
-            String token = downloadTokenService.generateToken(id, version, deps);
+            ProjectVersion target = versionService.findVersion(project, version, gameVersion);
+            if (target == null) return ResponseEntity.notFound().build();
+            String token = downloadTokenService.generateToken(id, version, gameVersion, deps);
             return ResponseEntity.ok(Map.of(
                     "downloadUrl", "/download-bundle/" + token,
                     "expiresIn", 300
@@ -218,9 +223,7 @@ public class VersionController {
             boolean isApi = (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) || (request.getHeader("Referer") == null || !request.getHeader("Referer").startsWith(frontendUrl));
             String clientIp = request.getHeader("X-Forwarded-For") == null ? request.getRemoteAddr() : request.getHeader("X-Forwarded-For").split(",")[0];
 
-            ProjectVersion targetVersion = project.getVersions().stream()
-                    .filter(v -> v.getVersionNumber().equalsIgnoreCase(dt.getVersion()))
-                    .findFirst().orElse(null);
+            ProjectVersion targetVersion = versionService.findVersion(project, dt.getVersion(), dt.getGameVersion());
 
             if (targetVersion == null) return ResponseEntity.notFound().build();
 
