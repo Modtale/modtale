@@ -27,6 +27,8 @@ public class CacheConfig {
                 "sitemapData",
                 "analyticsDebounce",
                 "wikiModId",
+                "wikiSlugToId",
+                "wikiModsPayload",
                 "wikiProjectPayload",
                 "wikiPagePayload"
         );
