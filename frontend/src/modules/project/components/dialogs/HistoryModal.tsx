@@ -12,7 +12,7 @@ interface HistoryModalProps {
     history: any[];
     showExperimental: boolean;
     onToggleExperimental: () => void;
-    onDownload: (url: string, number: string, deps: any[], channel: string) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     hasExperimentalVersions?: boolean;
     hasStableVersions?: boolean;
 }
@@ -116,7 +116,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
     const handleDownloadClick = useCallback((e: React.MouseEvent, ver: any) => {
         e.preventDefault();
-        onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies, ver.channel);
+        const gameVersion = Array.isArray(ver.gameVersions) && ver.gameVersions.length > 0 ? ver.gameVersions[0] : '';
+        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     }, [onDownload]);
 
     if (!show) return null;

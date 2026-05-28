@@ -68,6 +68,37 @@ public class VersionService {
         return pack.getVersions().stream().filter(v -> v.getVersionNumber().equalsIgnoreCase(versionNumber)).findFirst().orElse(null);
     }
 
+    public ProjectVersion findVersion(Project project, String versionNumber, String gameVersion) {
+        if (project == null || project.getVersions() == null || project.getVersions().isEmpty()) return null;
+        if ("latest".equalsIgnoreCase(versionNumber)) return project.getVersions().get(0);
+        List<ProjectVersion> matches = project.getVersions().stream()
+                .filter(v -> v.getVersionNumber() != null && v.getVersionNumber().equalsIgnoreCase(versionNumber))
+                .toList();
+        if (matches.isEmpty()) return null;
+        if (gameVersion != null && !gameVersion.isBlank()) {
+            return matches.stream()
+                    .filter(v -> v.getGameVersions() != null && v.getGameVersions().stream().anyMatch(gv -> gameVersion.equalsIgnoreCase(gv)))
+                    .findFirst()
+                    .orElse(null);
+        }
+        return selectForLatestGameVersion(matches);
+    }
+
+    private ProjectVersion selectForLatestGameVersion(List<ProjectVersion> versions) {
+        List<String> allowed = validationService.getAllowedGameVersions();
+        if (allowed != null && !allowed.isEmpty()) {
+            for (String gv : allowed) {
+                Optional<ProjectVersion> match = versions.stream()
+                        .filter(v -> v.getGameVersions() != null && v.getGameVersions().stream().anyMatch(existing -> gv.equalsIgnoreCase(existing)))
+                        .findFirst();
+                if (match.isPresent()) return match.get();
+            }
+        }
+        return versions.stream()
+                .max(Comparator.comparing(ProjectVersion::getReleaseDate, Comparator.nullsLast(String::compareTo)))
+                .orElse(versions.get(0));
+    }
+
     public Optional<ProjectVersion> getVersionByHash(String hash) {
         Query query = new Query(Criteria.where("versions.hash").is(hash));
         query.fields().include("versions.$");
@@ -126,7 +157,12 @@ public class VersionService {
         if (project.getVersions().stream().filter(v -> v.getReleaseDate().startsWith(now.toString())).count() >= maxVersionsPerDay) throw new IllegalStateException("Daily limit.");
 
         validationService.validateVersionNumber(versionNumber);
-        if (project.getVersions().stream().anyMatch(v -> v.getVersionNumber().equalsIgnoreCase(versionNumber))) throw new IllegalArgumentException("Exists.");
+        boolean duplicateVersionWithOverlap = project.getVersions().stream().anyMatch(v ->
+                v.getVersionNumber() != null
+                        && v.getVersionNumber().equalsIgnoreCase(versionNumber)
+                        && gameVersionsOverlap(v.getGameVersions(), gameVersions)
+        );
+        if (duplicateVersionWithOverlap) throw new IllegalArgumentException("Exists for the same game/API target.");
 
         if (gameVersions != null) {
             List<String> allowed = validationService.getAllowedGameVersions();
@@ -199,6 +235,20 @@ public class VersionService {
         if (file != null && !isModpack) {
             scanService.enqueueBackgroundScan(project.getId(), ver.getId(), filePath, file.getOriginalFilename(), false, 1);
         }
+    }
+
+    private boolean gameVersionsOverlap(List<String> existingGameVersions, List<String> requestedGameVersions) {
+        if (existingGameVersions == null || existingGameVersions.isEmpty() || requestedGameVersions == null || requestedGameVersions.isEmpty()) {
+            return true;
+        }
+        for (String existing : existingGameVersions) {
+            for (String requested : requestedGameVersions) {
+                if (existing != null && requested != null && existing.equalsIgnoreCase(requested)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private ProjectClassification resolveClassificationForUpload(Project project, MultipartFile file) {

@@ -73,7 +73,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [orderedGameVersions, setOrderedGameVersions] = useState<string[]>([]);
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
-    const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; dependencies: any[] } | null>(null);
+    const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[] } | null>(null);
     const commentsRef = useRef<HTMLDivElement>(null);
 
     const browseBackTarget = useMemo(() => {
@@ -263,15 +263,19 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return '';
     };
 
-    const finishVersionDownload = async (versionNumber: string, selectedDeps: string[]) => {
+    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[]) => {
         if (!project) return;
         const currentProject = project;
         const isBundle = selectedDeps.length > 0;
         const depsQuery = isBundle ? `?deps=${selectedDeps.map(encodeURIComponent).join(',')}` : '';
+        const params = new URLSearchParams();
+        if (gameVersion) params.set('gameVersion', gameVersion);
+        const queryPrefix = isBundle ? '&' : '?';
+        const resolverQuery = params.toString() ? `${queryPrefix}${params.toString()}` : '';
 
         const endpoint = isBundle
-            ? `/projects/${currentProject.id}/versions/${versionNumber}/download-bundle-url${depsQuery}`
-            : `/projects/${currentProject.id}/versions/${versionNumber}/download-url`;
+            ? `/projects/${currentProject.id}/versions/${versionNumber}/download-bundle-url${depsQuery}${resolverQuery}`
+            : `/projects/${currentProject.id}/versions/${versionNumber}/download-url${params.toString() ? `?${params.toString()}` : ''}`;
 
         const res = await api.get(endpoint);
 
@@ -306,7 +310,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     };
 
-    const handleDownloadClick = async (url: string, versionNumber: string, deps: any[], channel: string) => {
+    const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
             if (!versionNumber) {
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
@@ -333,12 +337,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
             const selectableDeps = (deps || []).filter(dep => getDependencyId(dep));
             if (selectableDeps.length > 0) {
-                setPendingDownload({ versionNumber, dependencies: selectableDeps });
+                setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps });
                 setIsDepModalOpen(true);
                 return;
             }
 
-            await finishVersionDownload(versionNumber, []);
+            await finishVersionDownload(versionNumber, gameVersion, []);
         } catch (e) {
             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
         }
@@ -346,9 +350,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const versionsByGame = useMemo(() => {
         return (project?.versions || []).reduce((acc: any, v: any) => {
-            const key = v.gameVersions?.[0] || 'Any';
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(v);
+            const keys = Array.isArray(v.gameVersions) && v.gameVersions.length > 0 ? v.gameVersions : ['Any'];
+            keys.forEach((key: string) => {
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(v);
+            });
             return acc;
         }, {});
     }, [project?.versions]);
@@ -434,12 +440,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         setPendingDownload(null);
                     }}
                     onDownloadBundle={(selectedDeps) => {
-                        finishVersionDownload(pendingDownload.versionNumber, selectedDeps).catch(() => {
+                        finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, selectedDeps).catch(() => {
                             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
                         });
                     }}
                     onDownloadProjectOnly={() => {
-                        finishVersionDownload(pendingDownload.versionNumber, []).catch(() => {
+                        finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, []).catch(() => {
                             setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
                         });
                     }}
