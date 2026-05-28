@@ -57,7 +57,7 @@ public class SocialService {
         if (project.getAuthorId() != null && !project.getAuthorId().equals(userId)) {
             User author = userRepository.findById(project.getAuthorId()).orElse(null);
             if (author != null && author.getNotificationPreferences().getNewComments() != User.NotificationLevel.OFF) {
-                notificationService.sendNotification(List.of(author.getId()), "New Comment", user.getUsername() + " commented on " + project.getTitle(), URI.create(projectService.getProjectLink(project)), project.getImageUrl());
+                notificationService.sendNotifcation(List.of(author.getId()), "New Comment", user.getUsername() + " commented on " + project.getTitle(), URI.create(projectService.getProjectLink(project)), project.getImageUrl());
             }
         }
     }
@@ -108,7 +108,7 @@ public class SocialService {
             userRepository.save(target);
 
             if (target.getNotificationPreferences().getNewFollowers() != User.NotificationLevel.OFF) {
-                notificationService.sendNotification(
+                notificationService.sendNotifcation(
                         List.of(target.getId()),
                         "New Follower",
                         currentUser.getUsername() + " started following you.",

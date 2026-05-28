@@ -3,13 +3,15 @@ import { Bell, Trash2, Check, X as XIcon, RefreshCw, Circle } from 'lucide-react
 import { api, BACKEND_URL } from '@/utils/api';
 import { useNotifications, type Notification } from '@/context/NotificationsContext';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { SiteRoutes } from '@/utils/routes';
 
 export function NotificationMenu() {
     const [isOpen, setIsOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
 
     const {
         notifications, unreadCount, isIdle, refresh,
@@ -77,6 +79,21 @@ export function NotificationMenu() {
         return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
     };
 
+    const getNotificationLink = (link?: string) => {
+        if (!link || !link.trim()) return SiteRoutes.dashboardNotifications();
+        return link;
+    };
+
+    const handleNotificationClick = (n: Notification) => {
+        const destination = getNotificationLink(n.link);
+        if (/^https?:\/\//i.test(destination)) {
+            window.location.href = destination;
+            return;
+        }
+        navigate(destination);
+        setIsOpen(false);
+    };
+
     const customScrollbarStyles = `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -126,7 +143,16 @@ export function NotificationMenu() {
                                 {notifications.map(n => (
                                     <div
                                         key={n.id}
-                                        className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 ${n.read ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => handleNotificationClick(n)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleNotificationClick(n);
+                                            }
+                                        }}
+                                        className={`p-4 transition-colors group relative flex items-start gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-modtale-accent ${n.read ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}`}
                                     >
                                         <OptimizedImage
                                             src={resolveUrl(n.iconUrl)}

@@ -56,7 +56,7 @@ public class ProjectManagementService {
         if (project.getAuthorId() != null) {
             User author = userRepository.findById(project.getAuthorId()).orElse(null);
             if (author != null) {
-                notificationService.sendNotification(java.util.List.of(author.getId()), "Version Rejected", "Version " + ver.getVersionNumber() + " of " + project.getTitle() + " was rejected. Reason: " + reason, URI.create("/dashboard/projects"), project.getImageUrl());
+                notificationService.sendNotifcation(java.util.List.of(author.getId()), "Version Rejected", "Version " + ver.getVersionNumber() + " of " + project.getTitle() + " was rejected. Reason: " + reason, URI.create("/dashboard/projects"), project.getImageUrl());
             }
         }
     }
@@ -71,7 +71,7 @@ public class ProjectManagementService {
         if (project.getAuthorId() != null) {
             User author = userRepository.findById(project.getAuthorId()).orElse(null);
             if (author != null) {
-                notificationService.sendNotification(java.util.List.of(author.getId()), "Project Returned", "Submission '" + project.getTitle() + "' returned to drafts. Reason: " + (reason != null ? reason : "Quality Standards"), URI.create("/dashboard/projects"), project.getImageUrl());
+                notificationService.sendNotifcation(java.util.List.of(author.getId()), "Project Returned", "Submission '" + project.getTitle() + "' returned to drafts. Reason: " + (reason != null ? reason : "Quality Standards"), URI.create("/dashboard/projects"), project.getImageUrl());
             }
         }
     }
