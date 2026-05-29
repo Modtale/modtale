@@ -3,7 +3,8 @@ import { Download, List, X, ChevronDown, Check, Box, Link as LinkIcon, AlertCirc
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project } from '@/types';
-import { GLASS_CARD, GLASS_HEADER, GLASS_ITEM } from '../styles';
+import { theme } from '@/styles/theme';
+import { GLASS_CARD, GLASS_HEADER } from '../styles';
 
 export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project }) => {
     const [isMounted, setIsMounted] = useState(false);
@@ -16,16 +17,16 @@ export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project 
     const randomVersion = randomProject?.versions?.[0]?.versionNumber || '1.0.0';
 
     return (
-        <div className={`${GLASS_CARD} w-full flex flex-col min-h-[420px] transform transition-transform hover:scale-[1.02] duration-500`}>
-            <div className={`p-6 flex justify-between items-center ${GLASS_HEADER}`}>
-                <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2.5 text-lg">
-                    <LinkIcon className="w-5 h-5 text-emerald-500" aria-hidden="true" /> Dependencies
+        <div className={`${theme.components.modalContent} w-full flex flex-col min-h-[420px] transform transition-transform hover:scale-[1.02] duration-500`}>
+            <div className={theme.components.modalHeader}>
+                <h3 className={`font-black ${theme.colors.textPrimary} flex items-center gap-2.5 text-lg`}>
+                    <LinkIcon className={`w-5 h-5 ${theme.colors.accent}`} aria-hidden="true" /> Dependencies
                 </h3>
             </div>
-            <div className="p-6 space-y-4 overflow-hidden relative flex-1 flex flex-col">
-                <div className={`flex items-center justify-between p-4 rounded-2xl border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 border shadow-sm transition-all hover:bg-emerald-50 dark:hover:bg-emerald-500/20`}>
+            <div className={`${theme.components.modalBody} overflow-hidden relative flex-1 flex flex-col`}>
+                <div className="flex items-center justify-between p-4 rounded-2xl border border-blue-400/40 bg-blue-50/60 dark:bg-blue-500/10 shadow-sm transition-all hover:bg-blue-50 dark:hover:bg-blue-500/20">
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
+                        <div className="w-6 h-6 rounded-full bg-modtale-accent text-white flex items-center justify-center shrink-0 shadow-md">
                             <Check className="w-3.5 h-3.5" aria-hidden="true" />
                         </div>
                         <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
@@ -36,10 +37,10 @@ export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project 
                             <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v1.2.0</div>
                         </div>
                     </div>
-                    <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-500/30 shrink-0 ml-2">Required</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-500/30 shrink-0 ml-2">Required</span>
                 </div>
 
-                <div className={`flex items-center justify-between p-4 rounded-2xl border-rose-500/20 bg-rose-50/30 dark:bg-rose-500/5 border shadow-sm transition-all hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer`}>
+                <div className={`flex items-center justify-between p-4 rounded-2xl ${theme.colors.dangerBorder} ${theme.colors.dangerBg} border shadow-sm transition-all hover:border-red-500 cursor-pointer`}>
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                         <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 flex items-center justify-center shrink-0 shadow-sm" />
                         <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
@@ -50,11 +51,11 @@ export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project 
                             <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v2.1.0</div>
                         </div>
                     </div>
-                    <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 px-2 py-1 rounded-md border border-rose-200 dark:border-rose-500/30 shrink-0 ml-2">Required</span>
+                    <span className="text-[9px] sm:text-[10px] font-black uppercase bg-red-500 text-white px-2 py-1 rounded-md shadow-sm shrink-0 ml-2">Required</span>
                 </div>
 
                 {randomProject ? (
-                    <div className={`flex items-center justify-between p-4 rounded-2xl ${GLASS_ITEM}`}>
+                    <div className={`flex items-center justify-between p-4 rounded-2xl ${theme.colors.border} ${theme.colors.bgBase} border shadow-sm`}>
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                             <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 shrink-0" />
                             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/10 shrink-0">
@@ -73,15 +74,15 @@ export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project 
                                 <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v{randomVersion}</div>
                             </div>
                         </div>
-                        <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-md border border-slate-200 dark:border-white/10 shrink-0 ml-2">Optional</span>
+                        <span className={`text-[9px] sm:text-[10px] font-bold uppercase ${theme.colors.bgSurfaceAlt} ${theme.colors.textSecondary} px-2 py-1 rounded-md border ${theme.colors.border} shrink-0 ml-2`}>Optional</span>
                     </div>
                 ) : (
                     <div className="h-20 w-full animate-pulse bg-slate-100/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-white/5" />
                 )}
 
-                <div className="mt-auto flex items-start gap-3 text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/20 shadow-sm">
+                <div className={`mt-auto flex items-start gap-3 text-sm ${theme.colors.dangerText} ${theme.colors.dangerBg} p-4 rounded-2xl border ${theme.colors.dangerBorder} shadow-sm`}>
                     <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
-                    <p className="font-medium text-xs sm:text-sm">Some <span className="font-black">Required</span> dependencies are currently unselected.</p>
+                    <p className="font-medium text-xs sm:text-sm">Some <span className="font-black">Required</span> dependencies are currently unselected. The project may not function correctly without them.</p>
                 </div>
             </div>
         </div>
@@ -126,8 +127,8 @@ export const InlineDownloadUI = () => {
 
     if (view === 'changelog') {
         return (
-            <div className={`${GLASS_CARD} w-full overflow-hidden flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
-                <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
+            <div className={`${theme.components.modalContent} w-full overflow-hidden flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
+                <div className={`${theme.components.modalHeader} p-4 sm:p-5`}>
                     <div>
                         <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2"><List className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Changelog</h3>
                         <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowExperimental(!showExperimental)}>
@@ -137,13 +138,13 @@ export const InlineDownloadUI = () => {
                             <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
                         </div>
                     </div>
-                    <button onClick={() => setView('download')} aria-label="Close Changelog" className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors backdrop-blur-md"><X className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+                    <button onClick={() => setView('download')} aria-label="Close Changelog" className={`p-2 rounded-full ${theme.colors.bgSurfaceHover} ${theme.colors.textMuted} transition-colors`}><X className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                 </div>
 
-                <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 relative">
+                <div className={`${theme.components.modalBody} p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 relative`}>
                     {visibleVersions.length > 0 ? (
                         visibleVersions.map(ver => (
-                            <div key={ver.id} className={`${GLASS_ITEM} rounded-xl p-3 sm:p-4 hover:border-modtale-accent/40 transition-colors`}>
+                            <div key={ver.id} className={`rounded-xl p-3 sm:p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-colors`}>
                                 <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-4 mb-3 border-b border-slate-200 dark:border-white/10 pb-3 flex-col sm:flex-row">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
@@ -177,8 +178,8 @@ export const InlineDownloadUI = () => {
     }
 
     return (
-        <div className={`${GLASS_CARD} w-full overflow-hidden relative flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
-            <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 ${GLASS_HEADER}`}>
+            <div className={`${theme.components.modalContent} w-full overflow-hidden relative flex flex-col h-[380px] transform transition-transform hover:scale-[1.02] duration-500`}>
+            <div className={`${theme.components.modalHeader} p-4 sm:p-5`}>
                 <div>
                     <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                         <Download className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Download
@@ -197,7 +198,7 @@ export const InlineDownloadUI = () => {
                     <label className="block text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
                     <div className="relative">
                         <div
-                            className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer ${GLASS_ITEM} ${isDropdownOpen ? 'ring-2 ring-modtale-accent border-transparent' : ''}`}
+                            className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all ${isDropdownOpen ? 'ring-2 ring-modtale-accent border-transparent' : ''}`}
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         >
                             <span className="truncate pr-2">{selectedVersion}</span>
@@ -242,7 +243,7 @@ export const InlineDownloadUI = () => {
                 )}
             </div>
 
-            <div className="p-3 sm:p-4 bg-slate-100/50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-white/10 shrink-0 z-10 backdrop-blur-md">
+            <div className={`${theme.components.modalFooter} p-3 sm:p-4 shrink-0 z-10`}>
                 <button onClick={() => setView('changelog')} className="text-[10px] sm:text-[11px] text-slate-500 hover:text-modtale-accent font-bold uppercase tracking-wider flex items-center justify-start gap-1 w-full transition-colors">
                     View Full Changelog <ChevronDown className="w-3 h-3 -rotate-90" aria-hidden="true" />
                 </button>
