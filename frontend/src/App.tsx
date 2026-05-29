@@ -40,6 +40,7 @@ const CreateProject = lazy(() => import('@/modules/project/views/CreateProject')
 const ProjectEditorView = lazy(() => import('@/modules/project/views/ProjectEditor').then((module) => ({ default: module.ProjectEditorView })));
 const AdminPanel = lazy(() => import('@/modules/admin/views/AdminPanel').then((module) => ({ default: module.AdminPanel })));
 const ApiDocs = lazy(() => import('@/modules/core/views/ApiDocs').then((module) => ({ default: module.ApiDocs })));
+const SwaggerDocs = lazy(() => import('@/modules/core/views/SwaggerDocs').then((module) => ({ default: module.SwaggerDocs })));
 
 const RouteLoading = () => <div className="p-20 flex justify-center"><Spinner /></div>;
 
@@ -268,6 +269,7 @@ const AppContent: React.FC = () => {
                                 <Route path="/status" element={<Status />} />
 
                                 <Route path="/api-docs" element={<ApiDocs />} />
+                                <Route path="/api-docs/swagger" element={<SwaggerDocs />} />
 
                                 <Route path="/admin" element={
                                     loadingAuth ? <RouteLoading /> :

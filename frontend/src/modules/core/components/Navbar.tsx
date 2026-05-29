@@ -162,9 +162,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 </div>
 
                                 <Link
-                                    to={SiteRoutes.apiDocs()}
-                                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                        currentPage === 'api-docs'
+                                        to={SiteRoutes.apiDocs()}
+                                        className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                        currentPage.startsWith('api-docs')
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                     }`}
