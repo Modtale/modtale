@@ -34,24 +34,6 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
     const isWorld = classification === 'SAVE';
     const folderName = isWorld ? 'Saves' : 'Mods';
 
-    const unzipInstructions = {
-        windows: (
-            <p className={theme.colors.textSecondary}>
-                Right-click the downloaded bundle and select <strong>Extract All</strong>.
-            </p>
-        ),
-        macos: (
-            <p className={theme.colors.textSecondary}>
-                Double-click the downloaded bundle, or right-click and choose <strong>Open With → Archive Utility</strong>.
-            </p>
-        ),
-        linux: (
-            <p className={theme.colors.textSecondary}>
-                In your file manager, use <strong>Extract Here</strong> or <strong>Extract To…</strong> (wording varies by desktop environment). If needed, use terminal: <code className={`px-1.5 py-0.5 rounded-md font-mono text-xs shadow-inner ${theme.colors.bgSurface} ${theme.colors.border} ${themeColors.text}`}>unzip your-file.zip</code>.
-            </p>
-        )
-    };
-
     const paths = {
         windows: `C:\\Program Files\\Hypixel Studios\\Hytale Launcher\\UserData\\${folderName}`,
         macos: `/Applications/Hytale Launcher.app/Contents/MacOS/UserData/${folderName}`,
@@ -90,6 +72,24 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
         border: theme.colors.border,
         iconGlow: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400',
         checkHover: 'group-hover:border-blue-300 dark:group-hover:border-blue-500/40'
+    };
+
+    const unzipInstructions = {
+        windows: (
+            <p className={theme.colors.textSecondary}>
+                Right-click the downloaded bundle and select <strong>Extract All</strong>.
+            </p>
+        ),
+        macos: (
+            <p className={theme.colors.textSecondary}>
+                Double-click the downloaded bundle, or right-click and choose <strong>Open With → Archive Utility</strong>.
+            </p>
+        ),
+        linux: (
+            <p className={theme.colors.textSecondary}>
+                In your file manager, use <strong>Extract Here</strong> or <strong>Extract To…</strong> (wording varies by desktop environment). If needed, use terminal: <code className={`px-1.5 py-0.5 rounded-md font-mono text-xs shadow-inner ${theme.colors.bgSurface} ${theme.colors.border} ${themeColors.text}`}>unzip your-file.zip</code>.
+            </p>
+        )
     };
 
     return (
