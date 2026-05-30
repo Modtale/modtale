@@ -68,6 +68,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
     const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
+    const [lastDownloadedFileName, setLastDownloadedFileName] = useState('');
     const [showDownloadFx, setShowDownloadFx] = useState(false);
     const [preReleaseGameVersions, setPreReleaseGameVersions] = useState<string[]>([]);
     const [orderedGameVersions, setOrderedGameVersions] = useState<string[]>([]);
@@ -263,6 +264,31 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return '';
     };
 
+    const sanitizeDownloadName = (input: string) => input.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+    const extractFileNameFromUrl = (rawUrl?: string) => {
+        if (!rawUrl) return '';
+        const withoutQuery = rawUrl.split('?')[0];
+        const lastSegment = withoutQuery.substring(withoutQuery.lastIndexOf('/') + 1);
+        const decoded = decodeURIComponent(lastSegment);
+        return decoded.length > 37 && decoded.charAt(36) === '-' ? decoded.substring(37) : decoded;
+    };
+
+    const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean) => {
+        if (!projectData) return '';
+        if (isBundle) return `${sanitizeDownloadName(projectData.title)}-UNZIP-ME.zip`;
+        if (projectData.classification === 'MODPACK') return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
+
+        const matchedVersion = (projectData.versions || []).find((v: any) => {
+            if (v.versionNumber !== versionNumber) return false;
+            if (!gameVersion) return true;
+            const gameVersions = Array.isArray(v.gameVersions) ? v.gameVersions : [];
+            return gameVersions.includes(gameVersion);
+        });
+
+        return extractFileNameFromUrl(matchedVersion?.fileUrl);
+    };
+
     const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[]) => {
         if (!project) return;
         const currentProject = project;
@@ -285,6 +311,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 downloadUrl = baseUrl + downloadUrl;
             }
+            setLastDownloadedFileName(resolveDownloadedFileName(currentProject, versionNumber, gameVersion, isBundle));
 
             window.open(downloadUrl, '_blank');
             setShowDownloadFx(true);
@@ -315,6 +342,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             if (!versionNumber) {
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 const targetUrl = baseUrl + '/files/download/' + encodeURI(url);
+                setLastDownloadedFileName(extractFileNameFromUrl(url));
                 window.open(targetUrl, '_blank');
                 setShowDownloadFx(true);
                 if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
@@ -410,7 +438,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             {statusModal && <StatusModal {...statusModal} onClose={() => setStatusModal(null)} />}
             <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />
             <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />
-            <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} />
+            <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} />
 
             <HistoryModal
                 show={isHistoryOpen}

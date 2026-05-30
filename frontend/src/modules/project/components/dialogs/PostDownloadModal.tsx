@@ -10,14 +10,16 @@ interface PostDownloadModalProps {
     title: string;
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     isBundle?: boolean;
+    fileName?: string;
 }
 
 export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
-                                                                        isOpen, onClose, classification, title, channel = 'RELEASE', isBundle = false
+                                                                        isOpen, onClose, classification, title, channel = 'RELEASE', isBundle = false, fileName = ''
                                                                     }) => {
     useScrollLock(isOpen);
     const [os, setOs] = useState<'windows' | 'macos' | 'linux'>('windows');
     const [copied, setCopied] = useState(false);
+    const [copiedCmd, setCopiedCmd] = useState(false);
     const [dontShow, setDontShow] = useState(false);
 
     useEffect(() => {
@@ -39,6 +41,8 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
         macos: `/Applications/Hytale Launcher.app/Contents/MacOS/UserData/${folderName}`,
         linux: `~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/UserData/${folderName}`
     };
+    const effectiveFileName = fileName || `${title.replace(/[^a-zA-Z0-9.-]/g, '_')}-UNZIP-ME.zip`;
+    const linuxUnzipCommand = `unzip "${effectiveFileName}"`;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(paths[os]);
@@ -49,6 +53,11 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
     const handleClose = () => {
         if (dontShow) localStorage.setItem('hideInstallInstructions', 'true');
         onClose();
+    };
+    const handleCopyCommand = () => {
+        navigator.clipboard.writeText(linuxUnzipCommand);
+        setCopiedCmd(true);
+        setTimeout(() => setCopiedCmd(false), 2000);
     };
 
     const themeColors = channel === 'ALPHA' ? {
@@ -87,7 +96,13 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
         ),
         linux: (
             <p className={theme.colors.textSecondary}>
-                In your file manager, use <strong>Extract Here</strong> or <strong>Extract To…</strong> (wording varies by desktop environment). If needed, use terminal: <code className={`px-1.5 py-0.5 rounded-md font-mono text-xs shadow-inner ${theme.colors.bgSurface} ${theme.colors.border} ${themeColors.text}`}>unzip your-file.zip</code>.
+                In your file manager, use <strong>Extract Here</strong> or <strong>Extract To…</strong> (wording varies by desktop environment). If needed, use terminal:
+                <span className={`mt-2 flex items-center gap-2 border rounded-xl p-2 pl-3 ${theme.colors.bgSurface} ${theme.colors.border}`}>
+                    <code className={`flex-1 font-mono text-[11px] ${theme.colors.textSecondary} break-all select-all leading-relaxed`}>{linuxUnzipCommand}</code>
+                    <button type="button" onClick={handleCopyCommand} className={`p-2 rounded-lg border transition-colors shadow-sm shrink-0 ${theme.colors.bgBase} ${theme.colors.border} ${theme.colors.textMuted} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover}`} title="Copy Command">
+                        {copiedCmd ? <Check className={`w-4 h-4 ${theme.colors.successText}`} /> : <Copy className="w-4 h-4" />}
+                    </button>
+                </span>
             </p>
         )
     };
