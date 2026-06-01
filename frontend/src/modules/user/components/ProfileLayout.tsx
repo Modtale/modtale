@@ -50,6 +50,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                                             }) => {
     const [bannerToCrop, setBannerToCrop] = useState<string | null>(null);
     const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
+    const [bannerSourceFile, setBannerSourceFile] = useState<File | null>(null);
+    const [avatarSourceFile, setAvatarSourceFile] = useState<File | null>(null);
     const [uploadingBanner, setUploadingBanner] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
@@ -128,20 +130,27 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         }
         setUploadError(null);
         const url = URL.createObjectURL(file);
-        if (type === 'banner') setBannerToCrop(url);
-        else setAvatarToCrop(url);
+        if (type === 'banner') {
+            setBannerToCrop(url);
+            setBannerSourceFile(file);
+        } else {
+            setAvatarToCrop(url);
+            setAvatarSourceFile(file);
+        }
         e.target.value = '';
     };
 
     const handleCropComplete = async (file: File, type: 'banner' | 'avatar') => {
         if (type === 'banner') {
             setBannerToCrop(null);
+            setBannerSourceFile(null);
             if (onBannerUpload) {
                 setUploadingBanner(true);
                 await onBannerUpload(file).finally(() => setUploadingBanner(false));
             }
         } else {
             setAvatarToCrop(null);
+            setAvatarSourceFile(null);
             if (onAvatarUpload) {
                 setUploadingAvatar(true);
                 await onAvatarUpload(file).finally(() => setUploadingAvatar(false));
@@ -266,8 +275,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
-            {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
-            {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
+            {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} sourceFile={bannerSourceFile} onCancel={() => { setBannerToCrop(null); setBannerSourceFile(null); }} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
+            {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} sourceFile={avatarSourceFile} onCancel={() => { setAvatarToCrop(null); setAvatarSourceFile(null); }} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
             {uploadError && (
                 <StatusModal
                     type="error"

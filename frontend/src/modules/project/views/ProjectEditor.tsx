@@ -87,6 +87,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
     const [galleryCropImage, setGalleryCropImage] = useState<string | null>(null);
+    const [galleryCropFile, setGalleryCropFile] = useState<File | null>(null);
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isStatusChanging, setIsStatusChanging] = useState(false);
 
@@ -286,10 +287,12 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             {galleryCropImage && createPortal(
                 <ImageCropperModal
                     imageSrc={galleryCropImage}
+                    sourceFile={galleryCropFile}
                     aspect={16 / 9}
-                    onCancel={() => setGalleryCropImage(null)}
+                    onCancel={() => { setGalleryCropImage(null); setGalleryCropFile(null); }}
                     onCropComplete={(file) => {
                         setGalleryCropImage(null);
+                        setGalleryCropFile(null);
                         handleGalleryUpload(file);
                     }}
                 />,
@@ -513,6 +516,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             return;
                         }
                         setGalleryCropImage(URL.createObjectURL(f));
+                        setGalleryCropFile(f);
                     }}
                                 isLoading={isSaving}
                             />

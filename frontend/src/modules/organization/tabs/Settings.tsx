@@ -39,6 +39,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
 
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
+    const [tempImageFile, setTempImageFile] = useState<File | null>(null);
     const [cropType, setCropType] = useState<'avatar' | 'banner'>('avatar');
 
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -78,6 +79,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
                 return;
             }
             setTempImage(URL.createObjectURL(file));
+            setTempImageFile(file);
             setCropType(type);
             setCropperOpen(true);
             e.target.value = '';
@@ -93,6 +95,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
         } finally {
             setCropperOpen(false);
             setTempImage(null);
+            setTempImageFile(null);
         }
     };
 
@@ -175,7 +178,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             {cropperOpen && tempImage && createPortal(
-                <ImageCropperModal imageSrc={tempImage} aspect={cropType === 'banner' ? 3 : 1} onCancel={() => { setCropperOpen(false); setTempImage(null); }} onCropComplete={handleCropComplete} />,
+                <ImageCropperModal imageSrc={tempImage} sourceFile={tempImageFile} aspect={cropType === 'banner' ? 3 : 1} onCancel={() => { setCropperOpen(false); setTempImage(null); setTempImageFile(null); }} onCropComplete={handleCropComplete} />,
                 document.body
             )}
 

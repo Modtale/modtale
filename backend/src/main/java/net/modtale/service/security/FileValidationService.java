@@ -15,6 +15,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -42,6 +45,10 @@ public class FileValidationService {
     private static final String PLUGIN_MANIFEST_PATH = "manifest.json";
     private static final long MAX_IMAGE_FILE_SIZE = 10L * 1024 * 1024; // 10MB
     private static final List<String> MUTABLE_CLASSIFICATIONS = Arrays.asList("PLUGIN", "DATA", "ART");
+    private static final Pattern SVG_TAG_PATTERN = Pattern.compile("<svg\\b([^>]*)>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SVG_VIEWBOX_PATTERN = Pattern.compile("viewBox\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SVG_WIDTH_PATTERN = Pattern.compile("width\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SVG_HEIGHT_PATTERN = Pattern.compile("height\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -313,9 +320,15 @@ public class FileValidationService {
 
             boolean isRiff = Arrays.equals(Arrays.copyOfRange(header, 0, 4), RIFF_HEADER);
             boolean isWebP = isRiff && header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P';
+            boolean isSvg = isLikelySvg(file);
 
-            if (!isPng && !isJpeg && !isWebP) {
-                throw new IllegalArgumentException("Image must be a valid PNG, JPEG, or WebP file.");
+            if (!isPng && !isJpeg && !isWebP && !isSvg) {
+                throw new IllegalArgumentException("Image must be a valid PNG, JPEG, WebP, or SVG file.");
+            }
+
+            if (isSvg) {
+                validateSvgAspectRatio(file, targetRatio, type, ratioLabel);
+                return;
             }
 
             BufferedImage image = ImageIO.read(is);
@@ -331,6 +344,71 @@ public class FileValidationService {
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to validate image.", e);
+        }
+    }
+
+    private boolean isLikelySvg(MultipartFile file) throws IOException {
+        String contentType = file.getContentType();
+        if (contentType != null && contentType.toLowerCase(Locale.ROOT).contains("svg")) {
+            return true;
+        }
+
+        String name = file.getOriginalFilename();
+        if (name != null && name.toLowerCase(Locale.ROOT).endsWith(".svg")) {
+            return true;
+        }
+
+        String sample = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8).trim().toLowerCase(Locale.ROOT);
+        return sample.startsWith("<?xml") || sample.contains("<svg");
+    }
+
+    private void validateSvgAspectRatio(MultipartFile file, double targetRatio, String type, String ratioLabel) throws IOException {
+        String svgText = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        Matcher svgTagMatcher = SVG_TAG_PATTERN.matcher(svgText);
+        if (!svgTagMatcher.find()) {
+            throw new IllegalArgumentException("Invalid SVG file.");
+        }
+
+        String svgTag = svgTagMatcher.group(0);
+        Double width = null;
+        Double height = null;
+
+        Matcher viewBoxMatcher = SVG_VIEWBOX_PATTERN.matcher(svgTag);
+        if (viewBoxMatcher.find()) {
+            String[] parts = viewBoxMatcher.group(1).trim().split("[\\s,]+");
+            if (parts.length == 4) {
+                width = parseSvgNumber(parts[2]);
+                height = parseSvgNumber(parts[3]);
+            }
+        }
+
+        if (width == null || height == null || width <= 0 || height <= 0) {
+            Matcher widthMatcher = SVG_WIDTH_PATTERN.matcher(svgTag);
+            Matcher heightMatcher = SVG_HEIGHT_PATTERN.matcher(svgTag);
+            if (widthMatcher.find() && heightMatcher.find()) {
+                width = parseSvgNumber(widthMatcher.group(1));
+                height = parseSvgNumber(heightMatcher.group(1));
+            }
+        }
+
+        if (width == null || height == null || width <= 0 || height <= 0) {
+            throw new IllegalArgumentException(type + " SVG must define a valid viewBox or width/height.");
+        }
+
+        double actualRatio = width / height;
+        if (Math.abs(actualRatio - targetRatio) > 0.05) {
+            throw new IllegalArgumentException(String.format("%s image must have an aspect ratio of %s (Uploaded: %.2f).", type, ratioLabel, actualRatio));
+        }
+    }
+
+    private Double parseSvgNumber(String value) {
+        if (value == null) return null;
+        Matcher m = Pattern.compile("^\\s*([-+]?\\d*\\.?\\d+)").matcher(value);
+        if (!m.find()) return null;
+        try {
+            return Double.parseDouble(m.group(1));
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }
