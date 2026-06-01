@@ -144,6 +144,7 @@ public class ProjectController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
+            Project existing = projectService.getRawProjectById(id);
             Project updated = new Project();
             updated.setTitle(requestPayload.getTitle());
             updated.setSlug(requestPayload.getSlug());
@@ -154,9 +155,13 @@ public class ProjectController {
             updated.setRepositoryUrl(requestPayload.getRepositoryUrl());
             updated.setLicense(requestPayload.getLicense());
             if (requestPayload.getAllowModpacks() != null) updated.setAllowModpacks(requestPayload.getAllowModpacks());
+            else if (existing != null) updated.setAllowModpacks(existing.isAllowModpacks());
             if (requestPayload.getAllowComments() != null) updated.setAllowComments(requestPayload.getAllowComments());
+            else if (existing != null) updated.setAllowComments(existing.isAllowComments());
             if (requestPayload.getHmWikiEnabled() != null) updated.setHmWikiEnabled(requestPayload.getHmWikiEnabled());
-            updated.setHmWikiSlug(requestPayload.getHmWikiSlug());
+            else if (existing != null) updated.setHmWikiEnabled(existing.isHmWikiEnabled());
+            if (requestPayload.getHmWikiSlug() != null) updated.setHmWikiSlug(requestPayload.getHmWikiSlug());
+            else if (existing != null) updated.setHmWikiSlug(existing.getHmWikiSlug());
 
             if (updated.getDescription() != null && updated.getDescription().length() > 250) return ResponseEntity.badRequest().body("Short Summary cannot exceed 250 characters.");
             if (updated.getAbout() != null && updated.getAbout().length() > 50000) return ResponseEntity.badRequest().body("Full Description cannot exceed 50,000 characters.");
