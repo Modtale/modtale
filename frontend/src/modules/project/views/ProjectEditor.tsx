@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle } from 'lucide-react';
+import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle, Undo2, AlertTriangle } from 'lucide-react';
 
 import type { User, Project, ProjectVersion } from '@/types';
 import { theme } from '@/styles/theme';
@@ -133,6 +133,15 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             tags: prev.tags.includes(tag)
                 ? prev.tags.filter(t => t !== tag)
                 : [...prev.tags, tag]
+        }));
+    };
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (readOnly) return;
+        markDirty();
+        setSlugError(null);
+        setMetaData(prev => ({
+            ...prev,
+            slug: e.target.value
         }));
     };
 
