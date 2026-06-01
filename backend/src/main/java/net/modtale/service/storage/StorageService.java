@@ -46,6 +46,7 @@ public class StorageService {
         MIME_TYPES.put("jpeg", "image/jpeg");
         MIME_TYPES.put("webp", "image/webp");
         MIME_TYPES.put("gif", "image/gif");
+        MIME_TYPES.put("svg", "image/svg+xml");
         MIME_TYPES.put("zip", "application/zip");
         MIME_TYPES.put("jar", "application/java-archive");
     }
