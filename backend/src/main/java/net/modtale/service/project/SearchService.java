@@ -139,22 +139,30 @@ public class SearchService {
     }
 
     private boolean hasReviewReadyVersion(Project project) {
-        if (project == null || project.getVersions() == null || project.getVersions().isEmpty()) {
+        if (project == null) {
             return false;
         }
 
-        boolean hasPendingScanningVersion = project.getVersions().stream().anyMatch(version ->
+        List<ProjectVersion> versions = project.getVersions();
+        if (versions == null || versions.isEmpty()) {
+            return project.getStatus() == ProjectStatus.PENDING;
+        }
+
+        boolean hasScanningVersion = versions.stream().anyMatch(version ->
                 version != null
-                        && version.getReviewStatus() == ProjectVersion.ReviewStatus.PENDING
                         && version.getScanResult() != null
                         && version.getScanResult().getStatus() == ScanStatus.SCANNING
         );
 
-        if (hasPendingScanningVersion) {
+        if (hasScanningVersion) {
             return false;
         }
 
-        return project.getVersions().stream().anyMatch(version -> {
+        if (project.getStatus() == ProjectStatus.PENDING) {
+            return true;
+        }
+
+        return versions.stream().anyMatch(version -> {
             if (version == null || version.getReviewStatus() != ProjectVersion.ReviewStatus.PENDING) {
                 return false;
             }
