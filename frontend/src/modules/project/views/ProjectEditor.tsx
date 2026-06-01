@@ -291,6 +291,22 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         });
     };
 
+    const handleRevertToDraft = async () => {
+        if (!projectData?.id || isStatusChanging) return;
+        setIsStatusChanging(true);
+
+        try {
+            await api.post(`/projects/${projectData.id}/revert`);
+            setProjectData(prev => prev ? { ...prev, status: 'DRAFT' } : null);
+            onShowStatus('success', 'Reverted', 'Project returned to draft. Editing is now enabled.');
+        } catch (e: any) {
+            onShowStatus('error', 'Revert Failed', e.response?.data || 'Failed to revert project to draft.');
+        } finally {
+            setIsStatusChanging(false);
+            setStatusModal(null);
+        }
+    };
+
     return (
         <div className="relative">
             {galleryCropImage && createPortal(
@@ -402,6 +418,35 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             </div>
                         )}
                         <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} className={`text-lg ${theme.colors.textSecondary} font-medium bg-transparent border-b border-transparent outline-none w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Short summary..."/>
+                        {projectData.status === 'PENDING' && (
+                            <div className="mt-4 rounded-2xl border border-amber-300/70 dark:border-amber-400/30 bg-amber-50/90 dark:bg-amber-500/10 p-4">
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                        <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-300 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-bold text-amber-900 dark:text-amber-200">This project is pending review.</p>
+                                            <p className="text-xs font-medium text-amber-800/90 dark:text-amber-200/80 mt-1">Need to fix something before approval? Revert to draft to unlock editing and resubmit when ready.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={isStatusChanging}
+                                        onClick={() => setStatusModal({
+                                            type: 'warning',
+                                            title: 'Revert to Draft?',
+                                            message: 'This will move your pending submission back to draft so you can make edits.',
+                                            actionLabel: 'Revert to Draft',
+                                            secondaryLabel: 'Cancel',
+                                            onAction: handleRevertToDraft
+                                        })}
+                                        className="h-10 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <Undo2 className="w-4 h-4" />
+                                        Revert to Draft
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 }
                 tabs={
