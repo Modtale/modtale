@@ -126,5 +126,8 @@ export const projectClient = {
     },
     updateVersion: async (projectId: string, versionId: string, data: any) => {
         await api.put(`/projects/${projectId}/versions/${versionId}`, data);
+    },
+    deleteVersion: async (projectId: string, versionId: string) => {
+        await api.delete(`/projects/${projectId}/versions/${versionId}`);
     }
 };

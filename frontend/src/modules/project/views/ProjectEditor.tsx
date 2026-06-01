@@ -30,6 +30,7 @@ import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { ThemedInput } from '../components/FormShared';
+import { VersionFields } from '../components/VersionFields';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
 
 interface ProjectEditorViewProps {
@@ -260,6 +261,64 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
     };
 
+    const handleStartEditVersion = (version: ProjectVersion) => {
+        setEditingVersion(version);
+        setEditVersionData({
+            projectIds: (version.dependencies || []).map(dep => `${dep.projectId}:${dep.versionNumber}${dep.isOptional ? ':optional' : ''}`),
+            versionNumber: version.versionNumber || '',
+            gameVersions: version.gameVersions || (version.gameVersion ? [version.gameVersion] : []),
+            changelog: version.changelog || '',
+            file: null,
+            dependencies: [],
+            modIds: [],
+            channel: version.channel || 'RELEASE'
+        });
+    };
+
+    const handleSaveEditedVersion = async () => {
+        if (!projectData?.id || !editingVersion || !editVersionData) return;
+        if (!editVersionData.gameVersions || editVersionData.gameVersions.length === 0) {
+            onShowStatus('error', 'Update Failed', 'At least one game version is required.');
+            return;
+        }
+        setIsSavingVersion(true);
+        try {
+            await projectClient.updateVersion(projectData.id, editingVersion.id, {
+                modIds: editVersionData.projectIds || [],
+                gameVersions: editVersionData.gameVersions,
+                changelog: editVersionData.changelog || '',
+                channel: editVersionData.channel || 'RELEASE'
+            });
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            setEditingVersion(null);
+            setEditVersionData(null);
+            onShowStatus('success', 'Version Updated', 'Version metadata updated successfully.');
+        } catch (e: any) {
+            onShowStatus('error', 'Update Failed', e.response?.data || 'Failed to update version.');
+        } finally {
+            setIsSavingVersion(false);
+        }
+    };
+
+    const handleDeleteVersion = async (versionId: string) => {
+        if (!projectData?.id) return;
+        const target = projectData.versions?.find(v => v.id === versionId);
+        const confirmed = window.confirm(`Delete version ${target?.versionNumber || ''}? This cannot be undone.`);
+        if (!confirmed) return;
+        setIsSavingVersion(true);
+        try {
+            await projectClient.deleteVersion(projectData.id, versionId);
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            onShowStatus('success', 'Version Deleted', 'Version deleted successfully.');
+        } catch (e: any) {
+            onShowStatus('error', 'Delete Failed', e.response?.data || 'Failed to delete version.');
+        } finally {
+            setIsSavingVersion(false);
+        }
+    };
+
     const runStatusTransition = async (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
         if (!projectData?.id || isStatusChanging) return;
         setIsStatusChanging(true);
@@ -375,6 +434,37 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 className="flex items-center gap-2 px-8 py-3 rounded-lg font-bold text-white transition-transform active:scale-95 bg-blue-600 hover:bg-blue-700"
                             >
                                 Submit Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body)}
+            {editingVersion && editVersionData && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className={`bg-white dark:bg-modtale-card border ${theme.colors.border} rounded-xl w-full max-w-3xl shadow-2xl overflow-hidden relative z-[110] max-h-[90vh] overflow-y-auto`}>
+                        <button onClick={() => { if (!isSavingVersion) { setEditingVersion(null); setEditVersionData(null); } }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="p-6 border-b border-slate-200 dark:border-white/10">
+                            <h2 className={`text-2xl font-black ${theme.colors.textPrimary}`}>Edit Version</h2>
+                            <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{editingVersion.versionNumber}</p>
+                        </div>
+                        <div className="p-6">
+                            <VersionFields
+                                data={editVersionData}
+                                onChange={setEditVersionData}
+                                isModpack={isModpack}
+                                projectType={projectData.classification || 'PLUGIN'}
+                                hideFilePicker={true}
+                                currentProjectId={projectData.id}
+                            />
+                        </div>
+                        <div className="p-4 border-t border-slate-200 dark:border-white/10 flex justify-end gap-3">
+                            <button type="button" disabled={isSavingVersion} onClick={() => { setEditingVersion(null); setEditVersionData(null); }} className={`px-5 py-2.5 rounded-lg font-bold ${theme.colors.textSecondary} hover:bg-slate-100 dark:hover:bg-white/10 transition-colors`}>
+                                Cancel
+                            </button>
+                            <button type="button" disabled={isSavingVersion} onClick={handleSaveEditedVersion} className={theme.components.buttonPrimary}>
+                                {isSavingVersion ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : 'Save Version'}
                             </button>
                         </div>
                     </div>
@@ -603,7 +693,18 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <EditDetails metaData={metaData} setMetaData={setMetaData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} editorMode={editorMode} setEditorMode={setEditorMode} markDirty={markDirty} />
                         )}
                         {activeTab === 'files' && (
-                            <Files projectData={projectData} versionData={versionData} setVersionData={setVersionData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} classification={projectData.classification || 'PLUGIN'} handleUploadVersion={handleUploadVersion} handleEditVersion={() => {}} isLoading={isSavingVersion} />
+                            <Files
+                                projectData={projectData}
+                                versionData={versionData}
+                                setVersionData={setVersionData}
+                                readOnly={readOnly}
+                                hasProjectPermission={hasProjectPermission}
+                                classification={projectData.classification || 'PLUGIN'}
+                                handleUploadVersion={handleUploadVersion}
+                                handleEditVersion={handleStartEditVersion}
+                                handleDeleteVersion={handleDeleteVersion}
+                                isLoading={isSavingVersion}
+                            />
                         )}
                         {activeTab === 'gallery' && (
                 <Gallery
