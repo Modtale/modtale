@@ -61,6 +61,8 @@ public class OgImageController {
     private static final int STAT_VALUE_FONT_SIZE = 28;
     private static final int STAT_GAP = 60;
     private static final int LOGO_HEIGHT = 28;
+    private static final int SVG_FALLBACK_SIZE = 1024;
+    private static final int SVG_MAX_RENDER_SIZE = 2048;
 
     private static final String LOGO_SVG = """
         <svg
@@ -204,7 +206,9 @@ public class OgImageController {
             connection.connect();
 
             try (var is = connection.getInputStream()) {
-                BufferedImage img = ImageIO.read(is);
+                String contentType = connection.getContentType();
+                byte[] data = is.readAllBytes();
+                BufferedImage img = decodeFetchedImage(data, contentType, fetchUrl);
                 if (img != null) {
                     assetCache.put(url, img);
                 }
@@ -213,6 +217,62 @@ public class OgImageController {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private BufferedImage decodeFetchedImage(byte[] data, String contentType, String sourceUrl) {
+        if (data == null || data.length == 0) return null;
+
+        try {
+            BufferedImage raster = ImageIO.read(new ByteArrayInputStream(data));
+            if (raster != null) return raster;
+        } catch (Exception ignored) {}
+
+        if (!isSvgPayload(data, contentType, sourceUrl)) return null;
+
+        try {
+            SVGLoader loader = new SVGLoader();
+            SVGDocument document = loader.load(new ByteArrayInputStream(data));
+            if (document == null || document.size() == null) return null;
+
+            double sourceWidth = document.size().width;
+            double sourceHeight = document.size().height;
+            if (!Double.isFinite(sourceWidth) || sourceWidth <= 0) sourceWidth = SVG_FALLBACK_SIZE;
+            if (!Double.isFinite(sourceHeight) || sourceHeight <= 0) sourceHeight = SVG_FALLBACK_SIZE;
+
+            int width = resolveSvgDimension(sourceWidth, SVG_FALLBACK_SIZE);
+            int height = resolveSvgDimension(sourceHeight, SVG_FALLBACK_SIZE);
+
+            if (width > SVG_MAX_RENDER_SIZE || height > SVG_MAX_RENDER_SIZE) {
+                double scale = Math.min((double) SVG_MAX_RENDER_SIZE / width, (double) SVG_MAX_RENDER_SIZE / height);
+                width = Math.max(1, (int) Math.round(width * scale));
+                height = Math.max(1, (int) Math.round(height * scale));
+            }
+
+            BufferedImage svgImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D svgG = svgImage.createGraphics();
+            setupRenderingHints(svgG);
+            svgG.scale((double) width / sourceWidth, (double) height / sourceHeight);
+            document.render(null, svgG);
+            svgG.dispose();
+            return svgImage;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean isSvgPayload(byte[] data, String contentType, String sourceUrl) {
+        if (contentType != null && contentType.toLowerCase().contains("image/svg+xml")) return true;
+        if (sourceUrl != null && sourceUrl.toLowerCase().contains(".svg")) return true;
+
+        String prefix = new String(data, 0, Math.min(data.length, 256), StandardCharsets.UTF_8)
+                .trim()
+                .toLowerCase();
+        return prefix.startsWith("<svg") || prefix.startsWith("<?xml");
+    }
+
+    private int resolveSvgDimension(double value, int fallback) {
+        if (!Double.isFinite(value) || value <= 0) return fallback;
+        return Math.max(1, (int) Math.round(value));
     }
 
     private byte[] renderImage(Project project, BufferedImage banner, BufferedImage icon, String format, boolean isJpg) throws Exception {
