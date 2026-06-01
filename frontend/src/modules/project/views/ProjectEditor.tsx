@@ -664,7 +664,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 handleUnlist={() => confirmStatusTransition('UNLISTED')}
                                 handleArchive={() => confirmStatusTransition('ARCHIVED')}
                                 slugError={slugError}
-                                handleSlugChange={() => {}}
+                                handleSlugChange={handleSlugChange}
                                 getUrlPrefix={() => `https://modtale.net/${SiteRoutes.getProjectPrefix(projectData.classification)}/`}
                                 markDirty={markDirty}
                                 isLoading={isStatusChanging}
