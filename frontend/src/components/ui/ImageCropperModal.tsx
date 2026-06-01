@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/Spinner';
 
 interface ImageCropperModalProps {
     imageSrc: string;
+    sourceFile?: File | null;
     aspect: number;
     onCancel: () => void;
     onCropComplete: (file: File) => void;
@@ -27,6 +28,7 @@ const parseNumericLength = (value: string | null): number | null => {
 
 export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                                                                         imageSrc,
+                                                                        sourceFile,
                                                                         aspect,
                                                                         onCancel,
                                                                         onCropComplete
@@ -41,6 +43,13 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     }, []);
 
     const resolveSourceMimeType = useCallback(async (): Promise<string> => {
+        if (sourceFile?.type?.startsWith('image/')) {
+            return sourceFile.type;
+        }
+        if (sourceFile?.name?.toLowerCase().endsWith('.svg')) {
+            return 'image/svg+xml';
+        }
+
         if (imageSrc.startsWith('data:image/')) {
             const match = imageSrc.match(/^data:(image\/[a-zA-Z0-9.+-]+);/);
             if (match?.[1]) return match[1];
@@ -55,12 +64,11 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
         }
 
         return 'image/png';
-    }, [imageSrc]);
+    }, [imageSrc, sourceFile]);
 
     const buildCroppedSvgFile = useCallback(
         async (image: HTMLImageElement, cropPixels: { x: number; y: number; width: number; height: number }) => {
-            const response = await fetch(imageSrc);
-            const svgText = await response.text();
+            const svgText = sourceFile ? await sourceFile.text() : await (await fetch(imageSrc)).text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgText, 'image/svg+xml');
             const svg = doc.documentElement;
@@ -107,7 +115,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             const serialized = new XMLSerializer().serializeToString(doc);
             return new File([serialized], 'cropped-image.svg', { type: 'image/svg+xml' });
         },
-        [imageSrc]
+        [imageSrc, sourceFile]
     );
 
     const handleSave = async () => {

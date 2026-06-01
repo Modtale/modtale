@@ -82,6 +82,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                                                        }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
+    const [tempImageFile, setTempImageFile] = useState<File | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
     const [uploadError, setUploadError] = useState<string | null>(null);
     const bannerParallaxRef = useRef<HTMLDivElement>(null);
@@ -148,6 +149,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
         }
         setUploadError(null);
         setTempImage(URL.createObjectURL(file));
+        setTempImageFile(file);
         setCropType(type);
         setCropperOpen(true);
         e.target.value = '';
@@ -159,6 +161,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
         if (cropType === 'banner' && onBannerUpload) onBannerUpload(croppedFile, preview);
         setCropperOpen(false);
         setTempImage(null);
+        setTempImageFile(null);
     };
 
     const containerClasses = "max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28";
@@ -175,8 +178,9 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             {cropperOpen && tempImage && (
                 <ImageCropperModal
                     imageSrc={tempImage}
+                    sourceFile={tempImageFile}
                     aspect={cropType === 'banner' ? 3 : 1}
-                    onCancel={() => { setCropperOpen(false); setTempImage(null); }}
+                    onCancel={() => { setCropperOpen(false); setTempImage(null); setTempImageFile(null); }}
                     onCropComplete={handleCropComplete}
                 />
             )}
