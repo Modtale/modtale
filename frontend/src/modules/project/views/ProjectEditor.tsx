@@ -301,11 +301,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
     };
 
-    const handleDeleteVersion = async (versionId: string) => {
+    const runDeleteVersion = async (versionId: string) => {
         if (!projectData?.id) return;
-        const target = projectData.versions?.find(v => v.id === versionId);
-        const confirmed = window.confirm(`Delete version ${target?.versionNumber || ''}? This cannot be undone.`);
-        if (!confirmed) return;
         setIsSavingVersion(true);
         try {
             await projectClient.deleteVersion(projectData.id, versionId);
@@ -316,7 +313,20 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             onShowStatus('error', 'Delete Failed', e.response?.data || 'Failed to delete version.');
         } finally {
             setIsSavingVersion(false);
+            setStatusModal(null);
         }
+    };
+
+    const handleDeleteVersion = (versionId: string) => {
+        const target = projectData?.versions?.find(v => v.id === versionId);
+        setStatusModal({
+            type: 'warning',
+            title: 'Delete Version?',
+            message: `This will permanently delete version ${target?.versionNumber || ''}. This action cannot be undone.`,
+            actionLabel: 'Delete Version',
+            secondaryLabel: 'Cancel',
+            onAction: () => runDeleteVersion(versionId)
+        });
     };
 
     const runStatusTransition = async (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
