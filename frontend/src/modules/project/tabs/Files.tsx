@@ -20,9 +20,11 @@ interface FilesProps {
 }
 
 export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersionData, readOnly, hasProjectPermission, classification, handleUploadVersion, handleEditVersion, handleDeleteVersion, isLoading }) => {
+    const hasUploadedDraftVersion = projectData?.status === 'DRAFT' && (projectData.versions?.length || 0) > 0;
+
     return (
         <div className="space-y-8">
-            {!readOnly && hasProjectPermission('VERSION_CREATE') && (
+            {!readOnly && hasProjectPermission('VERSION_CREATE') && !hasUploadedDraftVersion && (
                 <div className={`${theme.colors.bgSurface} p-6 rounded-2xl border ${theme.colors.border}`}>
                     <VersionFields data={versionData} onChange={setVersionData} isModpack={classification === 'MODPACK'} projectType={typeof classification === 'string' ? classification : 'PLUGIN'} currentProjectId={projectData?.id} disabled={readOnly} />
                     <div className="mt-6 flex justify-end">
@@ -30,6 +32,13 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
                             {isLoading ? <Spinner className="w-5 h-5"/> : <UploadCloud className="w-5 h-5" />} Upload Version
                         </button>
                     </div>
+                </div>
+            )}
+            {hasUploadedDraftVersion && (
+                <div className={`${theme.colors.bgSurface} p-4 rounded-xl border ${theme.colors.border}`}>
+                    <p className={`text-sm font-medium ${theme.colors.textSecondary}`}>
+                        This draft already has one uploaded version. Upload is hidden because drafts can only have one version at a time.
+                    </p>
                 </div>
             )}
             {projectData?.versions?.map(v => (
