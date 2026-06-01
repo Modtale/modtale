@@ -67,7 +67,7 @@ export const Settings: React.FC<SettingsProps> = ({
                         <div><h3 className={`text-sm font-bold ${theme.colors.textPrimary} flex items-center gap-2`}><Link2 className={`w-4 h-4 ${theme.colors.textMuted}`} /> Project Slug</h3></div>
                         <div className={`flex items-center w-full ${theme.colors.bgBase} border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : theme.colors.border}`}>
                             <div className={`px-4 py-2 ${theme.colors.bgSurface} border-r ${theme.colors.border} ${theme.colors.textMuted} text-sm font-mono whitespace-nowrap select-none`}>{getUrlPrefix()}</div>
-                            <input disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono ${theme.colors.textPrimary} focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} />
+                            <input id="project-custom-slug-input" disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')} value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono ${theme.colors.textPrimary} focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} />
                         </div>
                         {slugError && <p className="text-[10px] text-red-500 font-bold">{slugError}</p>}
                     </div>

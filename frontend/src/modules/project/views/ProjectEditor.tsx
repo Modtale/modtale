@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle, Undo2, AlertTriangle } from 'lucide-react';
+import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle, Undo2, AlertTriangle, Info } from 'lucide-react';
 
 import type { User, Project, ProjectVersion } from '@/types';
 import { theme } from '@/styles/theme';
@@ -143,6 +143,21 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             ...prev,
             slug: e.target.value
         }));
+    };
+    const handleSubmitClick = () => {
+        if (!metaData.slug?.trim()) {
+            setShowSlugPrompt(true);
+            return;
+        }
+        handleSubmit();
+    };
+    const handleSetCustomSlug = () => {
+        setShowSlugPrompt(false);
+        setActiveTab('settings');
+        window.setTimeout(() => {
+            const slugInput = document.getElementById('project-custom-slug-input') as HTMLInputElement | null;
+            slugInput?.focus();
+        }, 0);
     };
 
     const availableTabs = [
@@ -333,6 +348,38 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                     onClose={() => !isStatusChanging && setStatusModal(null)}
                 />,
                 document.body)}
+            {showSlugPrompt && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className={`bg-white dark:bg-modtale-card border ${theme.colors.border} rounded-xl w-full max-w-md shadow-2xl overflow-hidden relative z-[110]`}>
+                        <button onClick={() => setShowSlugPrompt(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="p-6 text-center bg-blue-500/10">
+                            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-blue-500 text-white">
+                                <Info className="w-8 h-8" />
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Choose a Custom Slug?</h2>
+                            <p className="text-slate-600 dark:text-slate-300">Your project can use a cleaner URL if you set a custom slug before submitting. You can still submit without one.</p>
+                        </div>
+                        <div className="p-4 flex justify-center gap-3">
+                            <button
+                                type="button"
+                                onClick={handleSetCustomSlug}
+                                className="px-6 py-3 rounded-lg font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                            >
+                                Set Custom Slug
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setShowSlugPrompt(false); handleSubmit(); }}
+                                className="flex items-center gap-2 px-8 py-3 rounded-lg font-bold text-white transition-transform active:scale-95 bg-blue-600 hover:bg-blue-700"
+                            >
+                                Submit Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body)}
 
             <ProjectLayout
                 isEditing={true}
@@ -370,7 +417,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                     <div className="absolute top-full right-8 -mt-[3px] border-[8px] border-transparent border-t-white dark:border-t-slate-900" />
                                 </div>
 
-                                <button onClick={handleSubmit} disabled={isSaving || !isPublishable} className={`h-10 px-6 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isPublishable ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 shadow-none cursor-not-allowed'}`}>
+                                <button onClick={handleSubmitClick} disabled={isSaving || !isPublishable} className={`h-10 px-6 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isPublishable ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 shadow-none cursor-not-allowed'}`}>
                                     {isSaving ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : <Send className="w-4 h-4" />}
                                     Submit
                                 </button>
