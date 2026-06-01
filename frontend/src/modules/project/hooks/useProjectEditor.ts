@@ -90,7 +90,11 @@ export const useProjectEditor = (
                 tags: metaData.tags,
                 links: metaData.links,
                 repositoryUrl: metaData.repositoryUrl,
-                license: metaData.license
+                license: metaData.license,
+                allowModpacks: projectData.allowModpacks,
+                allowComments: projectData.allowComments,
+                hmWikiEnabled: projectData.hmWikiEnabled,
+                hmWikiSlug: projectData.hmWikiSlug
             };
 
             await api.put(`/projects/${projectData.id}`, payload);
