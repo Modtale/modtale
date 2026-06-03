@@ -68,8 +68,7 @@ public class AccessControlService {
         User org = userRepository.findByUsernameIgnoreCase(ownerName).orElse(null);
         if (org == null || org.getAccountType() != User.AccountType.ORGANIZATION) return false;
 
-        return org.getOrganizationMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(user.getId()) && "ADMIN".equalsIgnoreCase(m.getRole()));
+        return hasOrgProjectManagementAccess(org, user.getId());
     }
 
     public boolean hasProjectPerm(String projectId, String permStr, Authentication authentication) {
@@ -94,8 +93,7 @@ public class AccessControlService {
     public boolean hasOrgPermission(User org, String userId, ApiKey.ApiPermission perm) {
         if (org == null || org.getAccountType() != User.AccountType.ORGANIZATION) return false;
 
-        User.OrganizationMember member = org.getOrganizationMembers().stream()
-                .filter(m -> m.getUserId().equals(userId)).findFirst().orElse(null);
+        User.OrganizationMember member = getOrgMember(org, userId);
         if (member == null) return false;
 
         if (member.getRoleId() != null) {
@@ -123,7 +121,7 @@ public class AccessControlService {
         User authorUser = accountService.getPublicProfile(project.getAuthorId());
         if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
             if (hasOrgPermission(authorUser, user.getId(), perm)) return true;
-            if (authorUser.getOrganizationMembers().stream().anyMatch(m -> m.getUserId().equals(user.getId()) && "ADMIN".equalsIgnoreCase(m.getRole()))) return true;
+            if (hasOrgProjectManagementAccess(authorUser, user.getId())) return true;
         }
 
         if (project.getTeamMembers() != null) {
@@ -152,9 +150,40 @@ public class AccessControlService {
 
         User authorUser = accountService.getPublicProfile(project.getAuthorId());
         if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
-            return authorUser.getOrganizationMembers().stream()
-                    .anyMatch(m -> m.getUserId().equals(user.getId()) && "ADMIN".equalsIgnoreCase(m.getRole()));
+            return hasOrgProjectManagementAccess(authorUser, user.getId());
         }
         return false;
+    }
+
+    private User.OrganizationMember getOrgMember(User org, String userId) {
+        if (org == null || org.getOrganizationMembers() == null || userId == null) return null;
+        return org.getOrganizationMembers().stream()
+                .filter(m -> userId.equals(m.getUserId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private User.OrganizationRole getOrgRole(User org, User.OrganizationMember member) {
+        if (org == null || member == null || member.getRoleId() == null || org.getOrganizationRoles() == null) return null;
+        return org.getOrganizationRoles().stream()
+                .filter(r -> member.getRoleId().equals(r.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean hasOrgProjectManagementAccess(User org, String userId) {
+        User.OrganizationMember member = getOrgMember(org, userId);
+        if (member == null) return false;
+
+        User.OrganizationRole role = getOrgRole(org, member);
+        if (role != null) {
+            if (role.isOwner()) return true;
+            return role.getPermissions() != null && (
+                    role.getPermissions().contains(ApiKey.ApiPermission.PROJECT_EDIT_METADATA) ||
+                            role.getPermissions().contains(ApiKey.ApiPermission.PROJECT_CREATE)
+            );
+        }
+
+        return "ADMIN".equalsIgnoreCase(member.getRole());
     }
 }
