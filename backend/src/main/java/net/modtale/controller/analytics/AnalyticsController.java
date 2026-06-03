@@ -63,7 +63,7 @@ public class AnalyticsController {
             if (target == null) return ResponseEntity.notFound().build();
 
             if (target.getAccountType() == User.AccountType.ORGANIZATION) {
-                if (target.getOrganizationMembers().stream().noneMatch(m -> m.getUserId().equals(currentUser.getId()) && "ADMIN".equals(m.getRole()))) {
+                if (!accessControlService.hasOrgPerm(target.getId(), "PROJECT_EDIT_METADATA", null)) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Permission denied.");
                 }
             } else return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
