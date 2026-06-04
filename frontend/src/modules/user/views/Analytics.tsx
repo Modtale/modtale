@@ -61,6 +61,14 @@ export const Analytics: React.FC = () => {
     const [tableConfig, setTableConfig] = useState<{ headers: string[], rowRenderer: (id: string, stats: any) => React.ReactNode } | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
 
+    const normalizePointSeries = (value: any): any[] => Array.isArray(value) ? value : [];
+    const normalizeSeriesMap = (value: any): Record<string, any[]> => {
+        if (!value || typeof value !== 'object') return {};
+        return Object.fromEntries(
+            Object.entries(value).map(([key, series]) => [key, normalizePointSeries(series)])
+        );
+    };
+
     useEffect(() => {
         const init = async () => {
             try {
@@ -121,21 +129,24 @@ export const Analytics: React.FC = () => {
                         : `/user/analytics?range=${range}`;
                     const res = await api.get(analyticsPath);
                     const data = res.data;
+                    const projectMeta = data?.projectMeta || {};
+                    const projectDownloads = normalizeSeriesMap(data?.projectDownloads);
+                    const projectViews = normalizeSeriesMap(data?.projectViews);
 
                     setMeta({
                         title: '',
                         subtitle: "Overall Performance & Reach"
                     });
 
-                    setItems(Object.keys(data.projectMeta || {}).sort((a, b) => data.projectMeta[b].totalDownloads - data.projectMeta[a].totalDownloads));
-                    setSeriesData(data.projectDownloads);
-                    setViewsData(data.projectViews);
-                    setItemMeta(data.projectMeta);
+                    setItems(Object.keys(projectMeta).sort((a, b) => (projectMeta[b]?.totalDownloads || 0) - (projectMeta[a]?.totalDownloads || 0)));
+                    setSeriesData(projectDownloads);
+                    setViewsData(projectViews);
+                    setItemMeta(projectMeta);
 
-                    const conversionData = Object.keys(data.projectMeta).map(pid => {
-                        const dl = (data.projectDownloads[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
-                        const vw = (data.projectViews[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
-                        return { id: pid, label: data.projectMeta[pid].title, value: vw > 0 ? (dl / vw) * 100 : 0 };
+                    const conversionData = Object.keys(projectMeta).map(pid => {
+                        const dl = (projectDownloads[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
+                        const vw = (projectViews[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
+                        return { id: pid, label: projectMeta[pid]?.title || pid, value: vw > 0 ? (dl / vw) * 100 : 0 };
                     }).sort((a, b) => b.value - a.value);
 
                     setFourthChart({ title: "Conversion Rate (%)", icon: <PieChart className="w-5 h-5 text-orange-500" />, type: 'bar', data: conversionData, formatter: (v: number) => `${v.toFixed(1)}%` });
@@ -144,17 +155,17 @@ export const Analytics: React.FC = () => {
                         downloads: { value: data.periodDownloads, total: data.totalDownloads, trend: ((data.periodDownloads - data.previousPeriodDownloads) / (data.previousPeriodDownloads || 1)) * 100 },
                         views: { value: data.periodViews, total: data.totalViews, trend: ((data.periodViews - data.previousPeriodViews) / (data.previousPeriodViews || 1)) * 100 },
                         conversion: data.periodViews > 0 ? (data.periodDownloads / data.periodViews) * 100 : 0,
-                        contentCount: { value: Object.keys(data.projectMeta).length, label: "Projects" }
+                        contentCount: { value: Object.keys(projectMeta).length, label: "Projects" }
                     });
 
                     setTableConfig({
                         headers: ["Project Name", "Period Downloads", "Total Downloads", "Rating", "Action"],
                         rowRenderer: (pid, sum) => (
                             <>
-                                <td className="p-4 pl-6 font-bold text-slate-900 dark:text-white">{data.projectMeta[pid].title}</td>
+                                <td className="p-4 pl-6 font-bold text-slate-900 dark:text-white">{projectMeta[pid]?.title || pid}</td>
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">+{sum.toLocaleString()}</td>
-                                <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{data.projectMeta[pid].totalDownloads.toLocaleString()}</td>
-                                <td className="p-4"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 font-bold text-xs"><Star className="w-3 h-3 fill-current" /> {data.projectMeta[pid].currentRating}</span></td>
+                                <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{(projectMeta[pid]?.totalDownloads || 0).toLocaleString()}</td>
+                                <td className="p-4"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 font-bold text-xs"><Star className="w-3 h-3 fill-current" /> {projectMeta[pid]?.currentRating ?? 'N/A'}</span></td>
                                 <td className="p-4 text-right pr-6"><button onClick={() => navigate(`/dashboard/analytics/project/${pid}`)} className="text-slate-500 hover:text-modtale-accent font-bold text-xs border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl hover:border-modtale-accent transition-all bg-white/50 dark:bg-white/5 shadow-sm">Details</button></td>
                             </>
                         )
@@ -165,15 +176,18 @@ export const Analytics: React.FC = () => {
                         api.get(`/projects/${id}/analytics?range=${range}`),
                         api.get(`/projects/${id}`)
                     ]).then(r => [r[0].data, r[1].data as Project]);
+                    const versionDownloads = normalizeSeriesMap(analytics?.versionDownloads);
+                    const views = normalizePointSeries(analytics?.views);
+                    const ratingHistory = normalizePointSeries(analytics?.ratingHistory);
 
                     setMeta({ title: info.title, subtitle: "Project Performance & Reach" });
 
                     const vMap = new Map(info.versions.map((v: { id: any; }) => [v.id, v]));
-                    setSeriesData(analytics.versionDownloads);
-                    setViewsData({ 'overall': analytics.views });
-                    setItems(Object.keys(analytics.versionDownloads).sort((a, b) => {
-                        const sumA = analytics.versionDownloads[a].reduce((ac: number, x: any) => ac + x.count, 0);
-                        const sumB = analytics.versionDownloads[b].reduce((ac: number, x: any) => ac + x.count, 0);
+                    setSeriesData(versionDownloads);
+                    setViewsData({ 'overall': views });
+                    setItems(Object.keys(versionDownloads).sort((a, b) => {
+                        const sumA = versionDownloads[a].reduce((ac: number, x: any) => ac + x.count, 0);
+                        const sumB = versionDownloads[b].reduce((ac: number, x: any) => ac + x.count, 0);
                         return sumB - sumA;
                     }));
 
@@ -186,7 +200,11 @@ export const Analytics: React.FC = () => {
                     });
                     setItemMeta(vMeta);
 
-                    setFourthChart({ title: "Rating History", icon: <Star className="w-5 h-5 text-yellow-500" />, type: 'line', data: [{ id: 'avg_rating', label: 'Rating', color: '#f59e0b', data: analytics.ratingHistory }] });
+                    setFourthChart(
+                        ratingHistory.length > 0
+                            ? { title: "Rating History", icon: <Star className="w-5 h-5 text-yellow-500" />, type: 'line', data: [{ id: 'avg_rating', label: 'Rating', color: '#f59e0b', data: ratingHistory }] }
+                            : null
+                    );
 
                     setSummary({
                         downloads: { value: analytics.totalDownloads, total: info.downloadCount, trend: 0 },

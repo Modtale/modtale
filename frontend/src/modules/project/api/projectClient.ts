@@ -11,7 +11,7 @@ export const projectClient = {
         return res.data;
     },
     trackView: async (id: string) => {
-        await api.post(`/analytics/view/${id}`);
+        await api.post(`/views/project/${id}`);
     },
     getUserProfile: async (id: string) => {
         const res = await api.get<User>(`/user/profile/${id}`);
