@@ -315,7 +315,7 @@ public class SecurityConfig {
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
                             return new AuthorizationDecision(authentication.get().isAuthenticated() && isSuperAdmin);
                         })
-                        .requestMatchers("/api/v1/analytics/view/**").access((authentication, context) -> {
+                        .requestMatchers("/api/v1/analytics/view/**", "/api/v1/views/project/**").access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
                             if (isApiKeyUser) return new AuthorizationDecision(false);
@@ -417,6 +417,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/user/analytics", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
+        source.registerCorsConfiguration("/api/v1/views/project/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);

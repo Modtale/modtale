@@ -56,7 +56,7 @@ public class AnalyticsController {
         User currentUser = accountService.getCurrentUser();
         if (currentUser == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-        String resolvedTargetUsername = currentUser.getUsername();
+        String resolvedTargetId = currentUser.getId();
 
         if (username != null && !username.isEmpty() && !username.equalsIgnoreCase(currentUser.getUsername())) {
             User target = mongoTemplate.findOne(new Query(Criteria.where("username").regex("^" + Pattern.quote(username) + "$", "i")), User.class);
@@ -67,10 +67,10 @@ public class AnalyticsController {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Permission denied.");
                 }
             } else return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-            resolvedTargetUsername = target.getUsername();
+            resolvedTargetId = target.getId();
         }
 
-        CreatorAnalytics data = queryService.getCreatorDashboard(resolvedTargetUsername, range, include);
+        CreatorAnalytics data = queryService.getCreatorDashboard(resolvedTargetId, range, include);
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate()).body(data);
     }
 
@@ -88,7 +88,7 @@ public class AnalyticsController {
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate()).body(data);
     }
 
-    @PostMapping("/analytics/view/{id}")
+    @PostMapping({"/analytics/view/{id}", "/views/project/{id}"})
     public ResponseEntity<Void> trackView(@PathVariable String id, HttpServletRequest request) {
         Project project = projectService.getProjectById(id);
         if (project != null) {
