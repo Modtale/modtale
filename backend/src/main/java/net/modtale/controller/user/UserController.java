@@ -2,6 +2,7 @@ package net.modtale.controller.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.mapper.UserMapper;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
@@ -102,7 +103,8 @@ public class UserController {
             SecurityContextHolder.clearContext();
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete account.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ErrorMessageUtils.describe(e, "Failed to delete account."));
         }
     }
 
@@ -162,7 +164,7 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to upload avatar");
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload avatar."));
         }
     }
 
@@ -180,7 +182,7 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to upload banner");
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload banner."));
         }
     }
 

@@ -53,3 +53,33 @@ api.interceptors.request.use(
     },
     error => Promise.reject(error)
 );
+
+export const extractApiErrorMessage = (error: unknown, fallback: string): string => {
+    if (typeof error === 'string' && error.trim()) {
+        return error;
+    }
+
+    if (error instanceof Error && error.message.trim()) {
+        const data = (error as any).response?.data;
+
+        if (typeof data === 'string' && data.trim()) {
+            return data;
+        }
+
+        if (data && typeof data === 'object') {
+            const errorMessage = 'error' in data && typeof data.error === 'string' ? data.error : null;
+            if (errorMessage?.trim()) {
+                return errorMessage;
+            }
+
+            const message = 'message' in data && typeof data.message === 'string' ? data.message : null;
+            if (message?.trim()) {
+                return message;
+            }
+        }
+
+        return error.message;
+    }
+
+    return fallback;
+};

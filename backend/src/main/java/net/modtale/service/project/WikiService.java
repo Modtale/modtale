@@ -2,6 +2,7 @@ package net.modtale.service.project;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.project.Project;
 import net.modtale.repository.project.ProjectRepository;
 import org.slf4j.Logger;
@@ -56,7 +57,7 @@ public class WikiService {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Wiki upstream is temporarily unavailable.");
         } catch (Exception e) {
             logger.error("Unexpected wiki project fetch error for slug '{}': {}", slug, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Failed to fetch wiki project data.");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ErrorMessageUtils.describe(e, "Failed to fetch wiki project data."));
         }
     }
 
@@ -78,7 +79,7 @@ public class WikiService {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Wiki upstream is temporarily unavailable.");
         } catch (Exception e) {
             logger.error("Unexpected wiki page fetch error for slug '{}' page '{}': {}", slug, pagePath, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Failed to fetch wiki page data.");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ErrorMessageUtils.describe(e, "Failed to fetch wiki page data."));
         }
     }
 

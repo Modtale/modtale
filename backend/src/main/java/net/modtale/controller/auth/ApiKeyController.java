@@ -1,5 +1,6 @@
 package net.modtale.controller.auth;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.AuthMapper;
 import net.modtale.model.dto.auth.ApiKeyDTO;
 import net.modtale.model.dto.request.auth.CreateApiKeyRequest;
@@ -46,7 +47,7 @@ public class ApiKeyController {
 
         String name = payload.getName();
         if (name == null || name.isBlank()) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(Map.of("error", "API key name is required."));
         }
 
         try {
@@ -54,8 +55,11 @@ public class ApiKeyController {
             return ResponseEntity.ok(Map.of("key", rawKey));
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
+        } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", ErrorMessageUtils.describe(e, "Failed to create API key.")));
         }
     }
 

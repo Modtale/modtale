@@ -72,7 +72,7 @@ public class FileValidationService {
         try {
             return validateZipContents(file, effectiveClassification);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to inspect archive contents.", e);
+            throw new IllegalArgumentException("Archive contents could not be inspected. Ensure the upload is a valid, readable ZIP or JAR file.", e);
         }
     }
 
@@ -104,7 +104,7 @@ public class FileValidationService {
                 throw new IllegalArgumentException("Invalid file format header.");
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to read file header.", e);
+            throw new IllegalArgumentException("File header could not be read. The upload may be truncated or corrupted.", e);
         }
     }
 
@@ -343,7 +343,7 @@ public class FileValidationService {
                 throw new IllegalArgumentException(String.format("%s image must have an aspect ratio of %s (Uploaded: %.2f).", type, ratioLabel, actualRatio));
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to validate image.", e);
+            throw new IllegalArgumentException(type + " image could not be read. Ensure the file is a valid PNG, JPEG, WebP, or SVG and is not corrupted.", e);
         }
     }
 

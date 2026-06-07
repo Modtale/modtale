@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.UserMapper;
 import net.modtale.model.dto.request.organization.AddOrganizationMemberRequest;
 import net.modtale.model.dto.request.organization.CreateOrganizationRequest;
@@ -246,7 +247,7 @@ public class OrganizationController {
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to delete organization");
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to delete organization."));
         }
     }
 
@@ -266,7 +267,7 @@ public class OrganizationController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to upload avatar");
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload avatar."));
         }
     }
 
@@ -286,7 +287,7 @@ public class OrganizationController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to upload banner");
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload banner."));
         }
     }
 
@@ -299,7 +300,7 @@ public class OrganizationController {
             organizationService.resolveOrgInvite(orgId, true, user);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to accept organization invite."));
         }
     }
 
@@ -312,7 +313,7 @@ public class OrganizationController {
             organizationService.resolveOrgInvite(orgId, false, user);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to decline organization invite."));
         }
     }
 
@@ -325,7 +326,7 @@ public class OrganizationController {
             organizationService.voidOrgInvite(orgId, userId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to cancel organization invite."));
         }
     }
 }
