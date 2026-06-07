@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, Loader2, Smartphone } from 'lucide-react';
+import { SiteRoutes } from '@/utils/routes';
 import { authClient } from '../api/authClient';
 
 export function MfaVerify() {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
+    const redirectTo = SiteRoutes.internalRedirect(
+        searchParams.get('redirect'),
+        SiteRoutes.dashboardProfile()
+    );
     const navigate = useNavigate();
 
     const [code, setCode] = useState('');
@@ -14,7 +19,7 @@ export function MfaVerify() {
 
     useEffect(() => {
         if (!token) {
-            navigate('/');
+            navigate(SiteRoutes.home());
         }
     }, [token, navigate]);
 
@@ -28,7 +33,7 @@ export function MfaVerify() {
                 pre_auth_token: token,
                 code: code
             });
-            window.location.href = '/dashboard/profile';
+            window.location.href = redirectTo;
         } catch (err: any) {
             setError(err.response?.data?.error || "Invalid code. Please try again.");
             setLoading(false);

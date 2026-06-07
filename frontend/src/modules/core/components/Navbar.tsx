@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { NotificationMenu } from '@/modules/user/components/NotificationMenu';
 import { FollowingModal } from '@/modules/user/components/FollowingModal';
 import { SignInModal } from '@/modules/auth/components/SignInModal.tsx';
@@ -23,6 +23,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                   user, onLogout, currentPage, isDarkMode, toggleDarkMode
                                               }) => {
     const { isMobile } = useMobile();
+    const location = useLocation();
+    const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isFollowingOpen, setIsFollowingOpen] = useState(false);
@@ -61,14 +63,42 @@ export const Navbar: React.FC<NavbarProps> = ({
         }
     }, [isMobile]);
 
+    useEffect(() => {
+        const isLoginRoute = location.pathname === '/login';
+        const redirectTo = SiteRoutes.internalRedirect(
+            new URLSearchParams(location.search).get('redirect'),
+            SiteRoutes.dashboardProfile()
+        );
+
+        if (user && isLoginRoute) {
+            navigate(redirectTo || SiteRoutes.dashboardProfile(), { replace: true });
+            return;
+        }
+
+        if (!user) {
+            setIsSignInOpen(isLoginRoute);
+        }
+    }, [location.pathname, location.search, navigate, user]);
+
     const browsePages = ['mods', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const isBrowseActive = browsePages.includes(currentPage);
 
     const widthClass = "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
+    const handleSignInClose = () => {
+        setIsSignInOpen(false);
+
+        if (location.pathname !== '/login') return;
+
+        const redirectTo = SiteRoutes.internalRedirect(
+            new URLSearchParams(location.search).get('redirect'),
+            SiteRoutes.home()
+        );
+        navigate(redirectTo || SiteRoutes.home(), { replace: true });
+    };
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
-            <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
+            <SignInModal isOpen={isSignInOpen} onClose={handleSignInClose} />
 
             {isFollowingOpen && user && (
                 <FollowingModal userId={user.id} onClose={() => setIsFollowingOpen(false)} />

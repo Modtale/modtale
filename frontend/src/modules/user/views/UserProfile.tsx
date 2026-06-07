@@ -165,7 +165,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }, [profileUser, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
 
     const handleToggleFollow = async () => {
-        if (!currentUser) { navigate(SiteRoutes.login()); return; }
+        if (!currentUser) {
+            const returnTo = `${location.pathname}${location.search}${location.hash}`;
+            navigate(SiteRoutes.login(returnTo));
+            return;
+        }
         if (!profileUser) return;
         const previousState = actualIsFollowing;
         setIsFollowingOptimistic(!previousState);

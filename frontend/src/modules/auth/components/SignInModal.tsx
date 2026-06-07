@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Github, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import { DiscordBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BACKEND_URL } from '@/utils/api';
 import { useToast } from '@/components/ui/Toast';
+import { SiteRoutes } from '@/utils/routes';
 import { authClient } from '../api/authClient';
 
 interface SignInModalProps {
@@ -15,6 +16,7 @@ interface SignInModalProps {
 export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     const { showToast } = useToast();
     const navigate = useNavigate();
+    const location = useLocation();
     const [mounted, setMounted] = useState(false);
     const [mode, setMode] = useState<'signin' | 'register' | 'forgot-password'>('signin');
     const [email, setEmail] = useState('');
@@ -29,6 +31,11 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     }, [isOpen]);
 
     if (!isOpen || !mounted) return null;
+
+    const redirectTo = SiteRoutes.internalRedirect(
+        new URLSearchParams(location.search).get('redirect'),
+        SiteRoutes.dashboardProfile()
+    );
 
     const handleOAuthLogin = (provider: string) => {
         window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
@@ -60,12 +67,16 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
             });
 
             if (res.data.mfa_required) {
-                onClose();
-                navigate(`/mfa?token=${res.data.pre_auth_token}`);
+                if (location.pathname !== '/login') {
+                    onClose();
+                }
+                const searchParams = new URLSearchParams({ token: res.data.pre_auth_token });
+                if (redirectTo) searchParams.set('redirect', redirectTo);
+                navigate(`${SiteRoutes.mfa()}?${searchParams.toString()}`);
                 return;
             }
 
-            window.location.href = '/dashboard/profile';
+            window.location.href = redirectTo;
         } catch (err: any) {
             console.error(err);
             if (err.response?.status === 401) {
