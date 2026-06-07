@@ -22,10 +22,17 @@ const isLocalHostname = (hostname: string) => {
     return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 };
 
+const isDevModtaleHostname = (hostname: string) => hostname === 'dev.modtale.net';
+
 export const onRequest: MiddlewareHandler = async ({ url }, next) => {
     const response = await next();
     const contentType = response.headers.get('content-type') || '';
     const isLocal = isLocalHostname(url.hostname);
+    const isDevModtale = isDevModtaleHostname(url.hostname);
+
+    if (isDevModtale) {
+        response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+    }
 
     if (contentType.includes('text/html') && !isLocal) {
         response.headers.set('Content-Security-Policy', SECURITY_CSP);
