@@ -312,12 +312,12 @@ public class AuthenticationService {
             throw new IllegalArgumentException("Account suspended.");
         }
 
-        Optional<User> linkedUser = userRepository.findByConnectedAccountsProviderId(providerId);
+        Optional<User> linkedUser = userRepository.findByConnectedAccountsProviderAndProviderId(provider, providerId);
         if (linkedUser.isPresent()) {
             user = linkedUser.get();
             reservedAccountGuardService.rejectReservedUserInProduction(user);
         } else if (email != null && !email.isEmpty()) {
-            Optional<User> emailUser = userRepository.findByEmail(email);
+            Optional<User> emailUser = userRepository.findByEmailIgnoreCase(email);
             if (emailUser.isPresent()) {
                 user = emailUser.get();
                 reservedAccountGuardService.rejectReservedUserInProduction(user);
@@ -400,7 +400,7 @@ public class AuthenticationService {
         String profileUrl = extractProfileUrl(providerStr, oauthUser, username, providerId);
         boolean isVisible = provider != OAuthProvider.GOOGLE;
 
-        Optional<User> conflict = userRepository.findByConnectedAccountsProviderId(providerId);
+        Optional<User> conflict = userRepository.findByConnectedAccountsProviderAndProviderId(provider, providerId);
         if (conflict.isPresent() && !conflict.get().getId().equals(currentUser.getId())) {
             throw new IllegalArgumentException("This account is already linked to another user.");
         }
@@ -433,7 +433,7 @@ public class AuthenticationService {
         String profileUrl = extractProfileUrl(providerStr, oauthUser, username, providerId);
         boolean isVisible = true;
 
-        Optional<User> conflict = userRepository.findByConnectedAccountsProviderId(providerId);
+        Optional<User> conflict = userRepository.findByConnectedAccountsProviderAndProviderId(provider, providerId);
         if (conflict.isPresent() && !conflict.get().getId().equals(orgId)) {
             throw new IllegalArgumentException("This account is already linked to another user or organization.");
         }
