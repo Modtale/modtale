@@ -216,6 +216,7 @@ const AppContent: React.FC = () => {
                         <Suspense fallback={<RouteLoading />}>
                             <Routes>
                                 <Route path="/" element={<Home />} />
+                                <Route path="/login" element={<Home />} />
 
                                 <Route path="/mods" element={renderBrowse()} />
                                 <Route path="/projects" element={<Navigate to={SiteRoutes.browse()} replace />} />

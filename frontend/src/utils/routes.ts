@@ -4,6 +4,19 @@ export class SiteRoutes {
     static admin() { return '/admin'; }
     static apiDocs() { return '/api-docs'; }
     static swaggerDocs() { return '/api-docs/swagger'; }
+    static login(redirectTo?: string) {
+        const params = new URLSearchParams();
+        if (redirectTo) params.set('redirect', redirectTo);
+        const query = params.toString();
+        return `/login${query ? `?${query}` : ''}`;
+    }
+
+    static internalRedirect(redirectTo: string | null | undefined, fallback: string = '/'): string {
+        if (!redirectTo) return fallback;
+        if (!redirectTo.startsWith('/')) return fallback;
+        if (redirectTo.startsWith('//')) return fallback;
+        return redirectTo;
+    }
 
     static browse(classification?: string) {
         if (classification === 'PLUGIN') return '/plugins';
@@ -39,8 +52,6 @@ export class SiteRoutes {
     static dashboardAnalytics() { return '/dashboard/analytics'; }
     static dashboardNotifications() { return '/dashboard/notifications'; }
     static dashboardDeveloper() { return '/dashboard/developer'; }
-
-    static login() { return '/login'; }
     static verify() { return '/verify'; }
     static resetPassword() { return '/reset-password'; }
     static mfa() { return '/mfa'; }
