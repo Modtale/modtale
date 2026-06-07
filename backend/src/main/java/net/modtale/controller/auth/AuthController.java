@@ -16,6 +16,8 @@ import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.TwoFactorService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,6 +27,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -79,6 +82,23 @@ public class AuthController {
         if (email == null || email.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
         authenticationService.initiatePasswordReset(email);
         return ResponseEntity.ok(Map.of("message", "If an account exists for that email, a password reset link has been sent."));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
+        SecurityContextHolder.clearContext();
+        securityContextRepository.saveContext(SecurityContextHolder.createEmptyContext(), request, response);
+
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+
+        expireCookie(response, "SESSION");
+        expireCookie(response, "JSESSIONID");
+        expireCookie(response, "XSRF-TOKEN");
+
+        return ResponseEntity.ok(Map.of("status", "success"));
     }
 
     @PostMapping("/reset-password")
@@ -211,6 +231,14 @@ public class AuthController {
         SecurityContextHolder.setContext(context);
 
         securityContextRepository.saveContext(context, request, response);
+    }
+
+    private void expireCookie(HttpServletResponse response, String name) {
+        ResponseCookie expiredCookie = ResponseCookie.from(name, "")
+                .path("/")
+                .maxAge(Duration.ZERO)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
     }
 
 }

@@ -279,6 +279,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/verify",
                                 "/api/v1/auth/signin",
+                                "/api/v1/auth/logout",
                                 "/api/v1/auth/mfa/validate-login",
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password"
