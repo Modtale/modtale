@@ -8,6 +8,7 @@ import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
 import { SecuritySettings } from '../tabs/SecuritySettings';
 import { ConnectionsSettings } from '../tabs/ConnectionsSettings';
 import { SiteRoutes } from '@/utils/routes';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
 
 interface ManageProfileProps {
@@ -63,7 +64,7 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
             setTimeout(() => setSaved(false), 2000);
             onUpdate();
         } catch (e: any) {
-            setError(e.response?.data || "Failed to save profile.");
+            setError(extractApiErrorMessage(e, "Failed to save profile."));
         } finally {
             setSaving(false);
         }
@@ -73,8 +74,8 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
         try {
             await userClient.uploadBanner(file);
             onUpdate();
-        } catch (e) {
-            setError("Failed to upload banner.");
+        } catch (e: unknown) {
+            setError(extractApiErrorMessage(e, "Failed to upload banner."));
             throw e;
         }
     };
@@ -83,8 +84,8 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
         try {
             await userClient.uploadAvatar(file);
             onUpdate();
-        } catch (e) {
-            setError("Failed to upload avatar.");
+        } catch (e: unknown) {
+            setError(extractApiErrorMessage(e, "Failed to upload avatar."));
             throw e;
         }
     };

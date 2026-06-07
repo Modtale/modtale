@@ -16,7 +16,7 @@ import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { BlueskyBrandIcon, GitHubBrandIcon, GitLabBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
-import { BACKEND_URL } from '@/utils/api';
+import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
@@ -64,7 +64,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
             onUpdateOrg(updatedOrg);
             showStatus('success', 'Profile Updated', 'Organization settings saved successfully.');
         } catch (err: any) {
-            showStatus('error', 'Update Failed', err.response?.data || "Failed to update profile.");
+            showStatus('error', 'Update Failed', extractApiErrorMessage(err, "Failed to update profile."));
         } finally {
             setSaving(false);
         }
@@ -91,7 +91,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
             const url = await organizationClient.uploadImage(org.id, cropType, croppedFile);
             onUpdateOrg({ ...org, [cropType === 'avatar' ? 'avatarUrl' : 'bannerUrl']: url });
         } catch (err: any) {
-            showStatus('error', 'Upload Failed', err.response?.data || `Failed to upload ${cropType}.`);
+            showStatus('error', 'Upload Failed', extractApiErrorMessage(err, `Failed to upload ${cropType}.`));
         } finally {
             setCropperOpen(false);
             setTempImage(null);
@@ -105,7 +105,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
             onDeleteOrg();
             setDeleteModalOpen(false);
         } catch (err: any) {
-            showStatus('error', 'Delete Failed', err.response?.data || "Failed to delete organization.");
+            showStatus('error', 'Delete Failed', extractApiErrorMessage(err, "Failed to delete organization."));
         }
     };
 
@@ -117,7 +117,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
             onUpdateOrg({ ...org, connectedAccounts: updatedAccounts });
             setShowUnlinkModal(null);
         } catch (err: any) {
-            showStatus('error', 'Unlink Failed', err.response?.data || "Failed to unlink account.");
+            showStatus('error', 'Unlink Failed', extractApiErrorMessage(err, "Failed to unlink account."));
             setShowUnlinkModal(null);
         }
     };
@@ -130,7 +130,7 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
             );
             onUpdateOrg({ ...org, connectedAccounts: updatedAccounts });
         } catch (err: any) {
-            showStatus('error', 'Update Failed', err.response?.data || "Failed to toggle visibility.");
+            showStatus('error', 'Update Failed', extractApiErrorMessage(err, "Failed to toggle visibility."));
         }
     };
 

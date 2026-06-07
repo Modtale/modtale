@@ -1,5 +1,6 @@
 package net.modtale.controller.project;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
@@ -135,7 +136,9 @@ public class ProjectController {
             project.setIsOwner(true);
             return ResponseEntity.ok(ProjectMapper.toDTO(project, false));
         }
-        catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to create project draft.")); }
     }
 
     @PutMapping("/projects/{id}")
@@ -178,6 +181,8 @@ public class ProjectController {
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { lifecycleService.softDeleteProject(id, user); return ResponseEntity.ok().build(); }
         catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to delete project.")); }
     }
 
     @PostMapping("/projects/{id}/submit")
@@ -187,7 +192,8 @@ public class ProjectController {
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { lifecycleService.submitProject(id, user); return ResponseEntity.ok().build(); }
         catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to submit project.")); }
     }
 
     @PostMapping("/projects/{id}/revert")
@@ -196,7 +202,9 @@ public class ProjectController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { lifecycleService.updateProjectStatus(id, ProjectStatus.DRAFT, user, "PROJECT_STATUS_REVERT"); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to revert project to draft.")); }
     }
 
     @PostMapping("/projects/{id}/archive")
@@ -205,7 +213,9 @@ public class ProjectController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { lifecycleService.updateProjectStatus(id, ProjectStatus.ARCHIVED, user, "PROJECT_STATUS_ARCHIVE"); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to archive project.")); }
     }
 
     @PostMapping("/projects/{id}/unlist")
@@ -214,7 +224,9 @@ public class ProjectController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { lifecycleService.updateProjectStatus(id, ProjectStatus.UNLISTED, user, "PROJECT_STATUS_UNLIST"); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to unlist project.")); }
     }
 
     @PostMapping("/projects/{id}/publish")
@@ -224,5 +236,7 @@ public class ProjectController {
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { lifecycleService.publishProject(id, user); return ResponseEntity.ok().build(); }
         catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to publish project.")); }
     }
 }

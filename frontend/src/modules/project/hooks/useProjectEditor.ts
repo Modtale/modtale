@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { projectClient } from '@/modules/project/api/projectClient';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
 
@@ -152,7 +152,7 @@ export const useProjectEditor = (
             if (typeof errData === 'string' && errData.toLowerCase().includes('slug')) {
                 setSlugError(errData);
             }
-            onShowStatus('error', 'Save Failed', errData || 'Failed to save project.');
+            onShowStatus('error', 'Save Failed', extractApiErrorMessage(e, 'Failed to save project.'));
         } finally {
             setIsSaving(false);
         }
@@ -167,7 +167,7 @@ export const useProjectEditor = (
             setProjectData(prev => prev ? { ...prev, status: 'PENDING' as any } : null);
             onShowStatus('success', 'Submitted', 'Project submitted for review successfully.');
         } catch (e: any) {
-            onShowStatus('error', 'Submit Failed', e.response?.data || 'Failed to submit project.');
+            onShowStatus('error', 'Submit Failed', extractApiErrorMessage(e, 'Failed to submit project.'));
         } finally {
             setIsSaving(false);
         }
@@ -184,7 +184,7 @@ export const useProjectEditor = (
             setProjectData(res.data);
             onShowStatus('success', 'Uploaded', 'Image added to gallery.');
         } catch (e: any) {
-            onShowStatus('error', 'Upload Failed', e.response?.data || 'Failed to upload image.');
+            onShowStatus('error', 'Upload Failed', extractApiErrorMessage(e, 'Failed to upload image.'));
         }
     };
 
@@ -198,10 +198,7 @@ export const useProjectEditor = (
             setProjectData(res.data);
             onShowStatus('success', 'Deleted', 'Image removed from gallery.');
         } catch (e: any) {
-            const errorMsg = (e.response?.data && typeof e.response.data === 'object')
-                ? (e.response.data.message || "Failed to delete image.")
-                : (e.response?.data || e.message || 'Failed to delete image.');
-            onShowStatus('error', 'Delete Failed', errorMsg);
+            onShowStatus('error', 'Delete Failed', extractApiErrorMessage(e, 'Failed to delete image.'));
         }
     };
 

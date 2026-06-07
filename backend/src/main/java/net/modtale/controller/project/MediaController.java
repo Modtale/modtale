@@ -1,5 +1,6 @@
 package net.modtale.controller.project;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
 import net.modtale.model.user.User;
 import net.modtale.service.project.MetadataService;
@@ -24,7 +25,9 @@ public class MediaController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { metadataService.updateProjectImage(id, file, user, false); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to update project icon.")); }
     }
 
     @PutMapping("/{id}/banner")
@@ -33,7 +36,9 @@ public class MediaController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { metadataService.updateProjectImage(id, file, user, true); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to update project banner.")); }
     }
 
     @PostMapping("/{id}/gallery")
@@ -42,7 +47,9 @@ public class MediaController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { metadataService.addGalleryImage(id, file, user); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to upload gallery image.")); }
     }
 
 

@@ -19,7 +19,7 @@ import { Team } from '../tabs/Team';
 import { Settings as SettingsTab } from '../tabs/Settings';
 import { WikiPreview } from '../tabs/WikiPreview';
 import { projectClient } from '../api/projectClient';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -255,7 +255,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             });
             onShowStatus('success', 'Uploaded', 'Version uploaded successfully.');
         } catch (e: any) {
-            onShowStatus('error', 'Upload Failed', e.response?.data || 'Failed to upload version.');
+            onShowStatus('error', 'Upload Failed', extractApiErrorMessage(e, 'Failed to upload version.'));
         } finally {
             setIsSavingVersion(false);
         }

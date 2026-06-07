@@ -1,5 +1,6 @@
 package net.modtale.controller.project;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ManifestInspectionResult;
 import net.modtale.model.dto.project.ProjectDependencyDTO;
@@ -82,8 +83,9 @@ public class VersionController {
             if (projectIds != null && projectIds.size() == 1 && projectIds.get(0).contains(",")) projectIds = Arrays.stream(projectIds.get(0).split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
             versionService.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, ProjectVersion.Channel.valueOf(channel.toUpperCase()), user);
             return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); }
+        } catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to add version.")); }
     }
 
     @PostMapping("/projects/{id}/versions/dependency-suggestions")
@@ -94,9 +96,9 @@ public class VersionController {
         try {
             ManifestInspectionResult result = versionService.inspectManifest(id, file, user);
             return ResponseEntity.ok(result);
-        } catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        } catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
         catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to inspect version manifest.")); }
     }
 
     @PutMapping("/projects/{id}/versions/{versionId}")
@@ -113,7 +115,9 @@ public class VersionController {
 
             versionService.updateVersion(id, versionId, projectIds, gameVersions, requestPayload.getChangelog(), channel, user);
             return ResponseEntity.ok().build();
-        } catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        } catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to update version.")); }
     }
 
     @DeleteMapping("/projects/{id}/versions/{versionId}")
@@ -123,6 +127,8 @@ public class VersionController {
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try { versionService.deleteVersion(id, versionId, user); return ResponseEntity.ok().build(); }
         catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to delete version.")); }
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-url")
@@ -135,11 +141,11 @@ public class VersionController {
             if (target == null) return ResponseEntity.notFound().build();
             String token = downloadTokenService.generateToken(id, version, gameVersion);
             return ResponseEntity.ok(Map.of("downloadUrl", "/download/" + token, "expiresIn", 300));
-        } catch (Exception e) { return ResponseEntity.status(500).build(); }
+        } catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to generate download URL.")); }
     }
 
     @GetMapping("/download/{token}")
-    public ResponseEntity<Resource> downloadWithToken(@PathVariable String token, HttpServletRequest request) {
+    public ResponseEntity<?> downloadWithToken(@PathVariable String token, HttpServletRequest request) {
         try {
             DownloadTokenService.DownloadToken dt = downloadTokenService.validateAndConsume(token);
             if (dt == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -185,7 +191,8 @@ public class VersionController {
 
         } catch (Exception e) {
             logger.error("Error processing download", e);
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ErrorMessageUtils.describe(e, "Failed to download file."));
         }
     }
 
@@ -206,12 +213,12 @@ public class VersionController {
                     "expiresIn", 300
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to generate bundle download URL."));
         }
     }
 
     @GetMapping("/download-bundle/{token}")
-    public ResponseEntity<Resource> downloadBundleWithToken(@PathVariable String token, HttpServletRequest request) {
+    public ResponseEntity<?> downloadBundleWithToken(@PathVariable String token, HttpServletRequest request) {
         try {
             DownloadTokenService.DownloadToken dt = downloadTokenService.validateAndConsume(token);
             if (dt == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -249,7 +256,8 @@ public class VersionController {
 
         } catch (Exception e) {
             logger.error("Error processing bundle download", e);
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ErrorMessageUtils.describe(e, "Failed to download bundle."));
         }
     }
 
