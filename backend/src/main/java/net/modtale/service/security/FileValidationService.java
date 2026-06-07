@@ -309,29 +309,28 @@ public class FileValidationService {
             throw new IllegalArgumentException(type + " image size must not exceed 10MB.");
         }
 
-        try (InputStream is = file.getInputStream()) {
-            byte[] header = new byte[12];
-            is.mark(13);
-            if (is.read(header) < 12) throw new IllegalArgumentException("Invalid image file.");
-            is.reset();
+        try {
+            byte[] bytes = file.getBytes();
+            if (bytes.length < 12) throw new IllegalArgumentException("Invalid image file.");
+            byte[] header = Arrays.copyOf(bytes, 12);
 
             boolean isPng = Arrays.equals(Arrays.copyOfRange(header, 0, 4), PNG_HEADER);
             boolean isJpeg = header[0] == JPEG_HEADER[0] && header[1] == JPEG_HEADER[1] && header[2] == JPEG_HEADER[2];
 
             boolean isRiff = Arrays.equals(Arrays.copyOfRange(header, 0, 4), RIFF_HEADER);
             boolean isWebP = isRiff && header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P';
-            boolean isSvg = isLikelySvg(file);
+            boolean isSvg = isLikelySvg(file, bytes);
 
             if (!isPng && !isJpeg && !isWebP && !isSvg) {
                 throw new IllegalArgumentException("Image must be a valid PNG, JPEG, WebP, or SVG file.");
             }
 
             if (isSvg) {
-                validateSvgAspectRatio(file, targetRatio, type, ratioLabel);
+                validateSvgAspectRatio(bytes, type, ratioLabel, targetRatio);
                 return;
             }
 
-            BufferedImage image = ImageIO.read(is);
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
             if (image == null) throw new IllegalArgumentException("Could not decode image data.");
 
             if (image.getWidth() > 3840 || image.getHeight() > 2160) {
@@ -347,7 +346,7 @@ public class FileValidationService {
         }
     }
 
-    private boolean isLikelySvg(MultipartFile file) throws IOException {
+    private boolean isLikelySvg(MultipartFile file, byte[] bytes) {
         String contentType = file.getContentType();
         if (contentType != null && contentType.toLowerCase(Locale.ROOT).contains("svg")) {
             return true;
@@ -358,12 +357,12 @@ public class FileValidationService {
             return true;
         }
 
-        String sample = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8).trim().toLowerCase(Locale.ROOT);
+        String sample = new String(bytes, java.nio.charset.StandardCharsets.UTF_8).trim().toLowerCase(Locale.ROOT);
         return sample.startsWith("<?xml") || sample.contains("<svg");
     }
 
-    private void validateSvgAspectRatio(MultipartFile file, double targetRatio, String type, String ratioLabel) throws IOException {
-        String svgText = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    private void validateSvgAspectRatio(byte[] bytes, String type, String ratioLabel, double targetRatio) {
+        String svgText = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
         Matcher svgTagMatcher = SVG_TAG_PATTERN.matcher(svgText);
         if (!svgTagMatcher.find()) {
             throw new IllegalArgumentException("Invalid SVG file.");
