@@ -232,6 +232,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     const [results, setResults] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedModForVersion, setSelectedModForVersion] = useState<Project | null>(null);
+    const [loadingProjectVersions, setLoadingProjectVersions] = useState(false);
     const [showIncompatible, setShowIncompatible] = useState(false);
     const [showAlphaBeta, setShowAlphaBeta] = useState(false);
     const [isOptional, setIsOptional] = useState(false);
@@ -259,7 +260,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     useEffect(() => {
         if (selectedModForVersion) {
-            const compatible = selectedModForVersion.versions.filter(v => !targetGameVersion || v.gameVersions?.includes(targetGameVersion));
+            const compatible = (selectedModForVersion.versions || []).filter(v => !targetGameVersion || v.gameVersions?.includes(targetGameVersion));
             const hasRelease = compatible.some(v => !v.channel || v.channel === 'RELEASE');
             const hasAny = compatible.length > 0;
             setShowAlphaBeta(hasAny && !hasRelease);
@@ -291,6 +292,19 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
         setIsOptional(false);
         setSearch('');
         setResults([]);
+    };
+
+    const openVersionPicker = async (mod: Project) => {
+        if (disabled) return;
+        setLoadingProjectVersions(true);
+        try {
+            const fullProject = mod.versions ? mod : await projectClient.getProject(mod.id);
+            setSelectedModForVersion({ ...fullProject, versions: fullProject.versions || [] });
+        } catch (e) {
+            setSelectedModForVersion({ ...mod, versions: mod.versions || [] });
+        } finally {
+            setLoadingProjectVersions(false);
+        }
     };
 
     const removeDep = (index: number) => {
@@ -365,7 +379,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                         </div>
 
                         <div className="p-3 sm:p-4 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
-                            {filteredVersions.length > 0 ? filteredVersions.map(v => {
+                            {loadingProjectVersions ? (
+                                <div className={`p-4 text-center text-xs ${theme.colors.textMuted} flex items-center justify-center gap-2`}>
+                                    <Loader2 className="w-4 h-4 animate-spin" /> Loading versions...
+                                </div>
+                            ) : filteredVersions.length > 0 ? filteredVersions.map(v => {
                                 const isCompatible = !targetGameVersion || v.gameVersions?.includes(targetGameVersion);
                                 return (
                                     <button key={v.id} onClick={() => confirmVersion(v.versionNumber)} className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-all duration-300 shadow-sm border ${!isCompatible ? "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50"}`}>
@@ -424,7 +442,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
             {results.length > 0 && !disabled && (
                 <div className={`max-h-56 overflow-y-auto custom-scrollbar ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-lg divide-y ${theme.colors.borderFaint}`}>
                     {results.map(mod => (
-                        <button key={mod.id} onClick={(e) => { e.preventDefault(); setSelectedModForVersion(mod); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
+                        <button key={mod.id} onClick={(e) => { e.preventDefault(); void openVersionPicker(mod); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
                             <div className="flex items-center gap-3">
                                 <img src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded-md bg-slate-200 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
                                 <div>
