@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
-import { api, BACKEND_URL } from '@/utils/api';
+import { api } from '@/utils/api';
 
 import { Navbar } from '@/modules/core/components/Navbar';
 import { Footer } from '@/modules/core/components/Footer';
@@ -128,9 +128,14 @@ const AppContent: React.FC = () => {
     }, []);
 
     const handleLogout = async () => {
-        try { await api.post(`${BACKEND_URL}/logout`); } catch (e) {}
-        setUser(null);
-        navigate(SiteRoutes.home());
+        try {
+            await api.post('/auth/logout');
+            setUser(null);
+            setShowOnboarding(false);
+            navigate(SiteRoutes.home());
+        } catch (e) {
+            onShowStatus('error', 'Sign Out Failed', 'We could not end your session right now. Please try again.');
+        }
     };
 
     const handleNavigate = (page: string) => { navigate(page === 'home' ? SiteRoutes.home() : `/${page}`); };
