@@ -31,15 +31,26 @@ public class SocialService {
     @Autowired private MongoTemplate mongoTemplate;
 
     public void toggleFavorite(String projectId, String userId) {
+        Project project = projectService.getRawProjectById(projectId);
+        if (project == null) return;
+
         User user = userRepository.findById(userId).orElse(null);
         if (user != null) {
             List<String> likes = user.getLikedModIds();
             if (likes == null) { likes = new ArrayList<>(); user.setLikedModIds(likes); }
 
-            if (likes.contains(projectId)) { likes.remove(projectId); }
-            else likes.add(projectId);
+            String canonicalProjectId = project.getId();
+            if (likes.contains(canonicalProjectId)) {
+                likes.remove(canonicalProjectId);
+                project.setFavoriteCount(Math.max(0, project.getFavoriteCount() - 1));
+            } else {
+                likes.add(canonicalProjectId);
+                project.setFavoriteCount(project.getFavoriteCount() + 1);
+            }
 
             userRepository.save(user);
+            projectRepository.save(project);
+            projectService.evictProjectCache(project);
         }
     }
 

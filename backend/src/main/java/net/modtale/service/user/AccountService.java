@@ -75,6 +75,7 @@ public class AccountService {
     }
 
     public User getPublicProfile(String userId) {
+        if (userId == null || userId.isBlank()) return null;
         User user = userRepository.findById(userId).orElse(null);
         if (user != null && user.isDeleted()) return null;
         if (user != null) {
