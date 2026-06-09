@@ -83,7 +83,15 @@ public class QueryService {
         LocalDate comparisonEnd = start.minusDays(1);
         LocalDate chartStart = start.minusDays(CHART_BUFFER_DAYS);
 
-        List<ProjectMonthlyStats> allStats = getStatsInMemory(userId, comparisonStart, end, false, true);
+        List<Project> ownedProjects = projectRepository.findByAuthorIdList(userId);
+        List<String> ownedProjectIds = ownedProjects.stream()
+                .map(Project::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        List<ProjectMonthlyStats> allStats = ownedProjectIds.isEmpty()
+                ? List.of()
+                : getStatsForProjectsInMemory(ownedProjectIds, comparisonStart, end, true);
         StatsAccumulator curr = new StatsAccumulator(), prev = new StatsAccumulator();
 
         for (ProjectMonthlyStats stat : allStats) {
@@ -91,14 +99,14 @@ public class QueryService {
             accumulate(stat, comparisonStart, comparisonEnd, prev);
         }
 
-        StatsSummary allTime = getAllTimeTotals(userId, false);
+        StatsSummary allTime = ownedProjectIds.isEmpty() ? new StatsSummary() : getAllTimeTotalsForProjects(ownedProjectIds);
         CreatorAnalytics analytics = new CreatorAnalytics();
         analytics.setTotalDownloads(allTime.downloads); analytics.setTotalViews(allTime.views);
         analytics.setPeriodDownloads(curr.dls); analytics.setPreviousPeriodDownloads(prev.dls);
         analytics.setPeriodViews(curr.views); analytics.setPreviousPeriodViews(prev.views);
 
         Map<String, ProjectMeta> metaMap = new HashMap<>(); Map<String, List<AnalyticsDataPoint>> pDls = new HashMap<>(); Map<String, List<AnalyticsDataPoint>> pViews = new HashMap<>();
-        projectRepository.findMetaByAuthorId(userId).forEach(p -> {
+        ownedProjects.forEach(p -> {
             metaMap.put(p.getId(), new ProjectMeta(p.getId(), p.getTitle(), p.getDownloadCount()));
             List<ProjectMonthlyStats> modStats = allStats.stream().filter(s -> s.getProjectId().equals(p.getId())).toList();
             pDls.put(p.getId(), buildTimeSeries(modStats, chartStart, end, true));
@@ -140,6 +148,15 @@ public class QueryService {
     private List<ProjectMonthlyStats> getStatsInMemory(String id, LocalDate start, LocalDate end, boolean isProject, boolean excludeVersions) {
         Query query = Query.query(Criteria.where(isProject ? "projectId" : "authorId").is(id).orOperator(
                 Criteria.where("year").gt(start.getYear()), Criteria.where("year").is(start.getYear()).and("month").gte(start.getMonthValue())
+        ));
+        if (excludeVersions) query.fields().exclude("versionDownloads");
+        return mongoTemplate.find(query, ProjectMonthlyStats.class);
+    }
+
+    private List<ProjectMonthlyStats> getStatsForProjectsInMemory(List<String> projectIds, LocalDate start, LocalDate end, boolean excludeVersions) {
+        Query query = Query.query(Criteria.where("projectId").in(projectIds).orOperator(
+                Criteria.where("year").gt(start.getYear()),
+                Criteria.where("year").is(start.getYear()).and("month").gte(start.getMonthValue())
         ));
         if (excludeVersions) query.fields().exclude("versionDownloads");
         return mongoTemplate.find(query, ProjectMonthlyStats.class);
@@ -223,6 +240,22 @@ public class QueryService {
 
     private StatsSummary getAllTimeTotals(String id, boolean isProject) {
         StatsSummary s = mongoTemplate.aggregate(Aggregation.newAggregation(Aggregation.match(Criteria.where(isProject ? "projectId" : "authorId").is(id)), Aggregation.group().sum("totalDownloads").as("downloads").sum("totalViews").as("views").sum("apiDownloads").as("apiDownloads").sum("frontendDownloads").as("frontendDownloads")), ProjectMonthlyStats.class, StatsSummary.class).getUniqueMappedResult();
+        return s != null ? s : new StatsSummary();
+    }
+
+    private StatsSummary getAllTimeTotalsForProjects(List<String> projectIds) {
+        StatsSummary s = mongoTemplate.aggregate(
+                Aggregation.newAggregation(
+                        Aggregation.match(Criteria.where("projectId").in(projectIds)),
+                        Aggregation.group()
+                                .sum("totalDownloads").as("downloads")
+                                .sum("totalViews").as("views")
+                                .sum("apiDownloads").as("apiDownloads")
+                                .sum("frontendDownloads").as("frontendDownloads")
+                ),
+                ProjectMonthlyStats.class,
+                StatsSummary.class
+        ).getUniqueMappedResult();
         return s != null ? s : new StatsSummary();
     }
 

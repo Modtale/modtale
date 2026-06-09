@@ -92,7 +92,7 @@ public class AnalyticsController {
     public ResponseEntity<Void> trackView(@PathVariable String id, HttpServletRequest request) {
         Project project = projectService.getProjectById(id);
         if (project != null) {
-            trackingService.logView(project.getId(), project.getAuthor(), getClientIp(request));
+            trackingService.logView(project.getId(), project.getAuthorId(), getClientIp(request));
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.notFound().build();

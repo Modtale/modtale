@@ -160,7 +160,7 @@ public class VersionController {
             ProjectVersion targetVersion = versionService.findVersion(project, dt.getVersion(), dt.getGameVersion());
             if (targetVersion == null) return ResponseEntity.notFound().build();
 
-            trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
+            trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthorId(), isApi, clientIp);
 
             User user = accountService.getCurrentUser();
 
@@ -234,7 +234,7 @@ public class VersionController {
 
             if (targetVersion == null) return ResponseEntity.notFound().build();
 
-            trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
+            trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthorId(), isApi, clientIp);
 
             List<String> selectedDeps = dt.getSelectedDependencies();
             if (targetVersion.getDependencies() != null) {
