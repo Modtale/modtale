@@ -8,6 +8,7 @@ import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.security.SanitizationService;
+import net.modtale.util.MongoIdUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,7 +87,7 @@ public class AccountService {
 
     public List<User> getPublicProfilesByIds(List<String> userIds) {
         if (userIds == null || userIds.isEmpty()) return new ArrayList<>();
-        Query query = new Query(Criteria.where("_id").in(userIds).and("deletedAt").is(null));
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(userIds)).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "accountType", "badges", "id", "roles", "tier");
         List<User> users = mongoTemplate.find(query, User.class);
         users.forEach(this::maybeHealOAuthAvatar);
