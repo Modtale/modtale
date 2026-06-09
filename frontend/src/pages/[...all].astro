@@ -70,7 +70,7 @@ const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
 const identifier = all ? all.split('/').pop() : '';
 
-const isProjectRoute = cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
+const isProjectRoute = cleanPath.startsWith('/project/') || cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
 
 let image = (isProjectRoute && identifier)
     ? `${BACKEND_URL}/api/v1/og/project/${identifier}.png`
@@ -125,21 +125,12 @@ if (classification) {
     if (!isComplex || isBot) {
         try {
             if (isHome) {
-                const [trending, popular, stats] = await Promise.all([
+                const [trending, stats] = await Promise.all([
                     fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=24&sort=trending`),
-                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=popular`),
                     fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`)
                 ]);
 
-                const combined = [
-                    ...(trending?.content || []),
-                    ...(popular?.content || []),
-                ];
-
-                const uniqueMap = new Map();
-                combined.forEach(m => uniqueMap.set(m.id, m));
-
-                const unique = Array.from(uniqueMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+                const unique = trending?.content || [];
 
                 initialData = {
                     homeProjects: unique || [],
@@ -260,6 +251,8 @@ if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
 } else {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
+
+const projectBootstrapUrl = !initialData && isProjectRoute && identifier ? `${BACKEND_URL}/api/v1/projects/${identifier}` : undefined;
 ---
 
 <BaseLayout
@@ -272,6 +265,7 @@ if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
         canonicalOverride={canonicalOverride}
         pageNext={pageNext}
         pagePrev={pagePrev}
+        projectBootstrapUrl={projectBootstrapUrl}
 >
     <App client:load initialPath={path} ssrData={initialData} />
 </BaseLayout>

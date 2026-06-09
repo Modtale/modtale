@@ -513,8 +513,16 @@ export const Home: React.FC = () => {
                                     Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
                                 </Link>
                             </div>
-                            <div className="flex-1 w-full relative mt-4 lg:mt-0">
-                                <div className="absolute -inset-10 bg-gradient-to-tr from-blue-400/20 to-transparent dark:from-blue-500/20 blur-3xl rounded-full z-0 pointer-events-none transform-gpu" />
+                            <div className="flex-1 w-full relative mt-4 lg:mt-0 overflow-visible">
+                                <div
+                                    className="absolute inset-0 z-0 pointer-events-none transform-gpu"
+                                    aria-hidden="true"
+                                    style={{
+                                        background: 'radial-gradient(110% 90% at 22% 35%, rgba(59, 130, 246, 0.18), transparent 58%), radial-gradient(95% 85% at 78% 72%, rgba(125, 211, 252, 0.14), transparent 62%)',
+                                        filter: 'blur(56px)',
+                                        transform: 'translate3d(0, 0, 0) scale(1.22)'
+                                    }}
+                                />
                                 <div className="relative z-10 w-full max-w-lg mx-auto lg:ml-auto">
                                     <InlineDownloadUI />
                                 </div>
@@ -531,8 +539,16 @@ export const Home: React.FC = () => {
                                     Forget hunting down core libraries or confusing projectpacks. Modtale allows you to seamlessly download all required projects in one swift action.
                                 </p>
                             </div>
-                            <div className="flex-1 w-full relative mt-4 lg:mt-0">
-                                <div className="absolute -inset-10 bg-gradient-to-tl from-emerald-400/20 to-transparent dark:from-emerald-500/20 blur-3xl rounded-full z-0 pointer-events-none transform-gpu" />
+                            <div className="flex-1 w-full relative mt-4 lg:mt-0 overflow-visible">
+                                <div
+                                    className="absolute inset-0 z-0 pointer-events-none transform-gpu"
+                                    aria-hidden="true"
+                                    style={{
+                                        background: 'radial-gradient(115% 92% at 76% 34%, rgba(16, 185, 129, 0.18), transparent 56%), radial-gradient(90% 82% at 24% 76%, rgba(52, 211, 153, 0.13), transparent 60%)',
+                                        filter: 'blur(58px)',
+                                        transform: 'translate3d(0, 0, 0) scale(1.24)'
+                                    }}
+                                />
                                 <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
                                     <InlineDependencyUI randomProject={randomDisplayProject} />
                                 </div>
@@ -549,8 +565,16 @@ export const Home: React.FC = () => {
                                     Modtale keeps the Hytale community connected. Receive real-time alerts when tracked projects drop new updates, or when developers reply directly to your feedback.
                                 </p>
                             </div>
-                            <div className="flex-1 w-full relative mt-4 lg:mt-0">
-                                <div className="absolute -inset-10 bg-gradient-to-tl from-amber-400/20 to-transparent dark:from-amber-500/20 blur-3xl rounded-full z-0 pointer-events-none transform-gpu" />
+                            <div className="flex-1 w-full relative mt-4 lg:mt-0 overflow-visible">
+                                <div
+                                    className="absolute inset-0 z-0 pointer-events-none transform-gpu"
+                                    aria-hidden="true"
+                                    style={{
+                                        background: 'radial-gradient(112% 90% at 26% 30%, rgba(251, 191, 36, 0.18), transparent 56%), radial-gradient(92% 80% at 74% 74%, rgba(245, 158, 11, 0.12), transparent 60%)',
+                                        filter: 'blur(56px)',
+                                        transform: 'translate3d(0, 0, 0) scale(1.22)'
+                                    }}
+                                />
                                 <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
                                     <InlineNotificationUI />
                                 </div>

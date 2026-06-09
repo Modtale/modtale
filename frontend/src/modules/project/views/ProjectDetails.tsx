@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
@@ -20,23 +20,25 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
-import { Wiki } from '../tabs/Wiki';
-import { useHMWiki, WikiSidebar } from '../components/HMWiki';
+import { useHMWiki } from '../hooks/useHMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
 import { Spinner } from '@/components/ui/Spinner';
 import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { ShareModal } from '../components/dialogs/ShareModal';
-import { ReportModal } from '../components/dialogs/ReportModal';
-import { PostDownloadModal } from '../components/dialogs/PostDownloadModal';
-import { HistoryModal } from '../components/dialogs/HistoryModal';
-import { DownloadModal } from '../components/dialogs/DownloadModal';
-import { DependencyModal } from '../components/dialogs/DependencyModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import '../styles/downloadFx.css';
+
+const ShareModal = lazy(() => import('../components/dialogs/ShareModal').then((module) => ({ default: module.ShareModal })));
+const ReportModal = lazy(() => import('../components/dialogs/ReportModal').then((module) => ({ default: module.ReportModal })));
+const PostDownloadModal = lazy(() => import('../components/dialogs/PostDownloadModal').then((module) => ({ default: module.PostDownloadModal })));
+const HistoryModal = lazy(() => import('../components/dialogs/HistoryModal').then((module) => ({ default: module.HistoryModal })));
+const DownloadModal = lazy(() => import('../components/dialogs/DownloadModal').then((module) => ({ default: module.DownloadModal })));
+const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal').then((module) => ({ default: module.DependencyModal })));
+const Wiki = lazy(() => import('../tabs/Wiki').then((module) => ({ default: module.Wiki })));
+const WikiSidebar = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiSidebar })));
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -46,6 +48,12 @@ interface ProjectDetailViewProps {
     downloadedSessionIds: Set<string>;
     onRefresh: () => Promise<void>;
 }
+
+type DownloadChannel = 'RELEASE' | 'BETA' | 'ALPHA';
+
+const normalizeDownloadChannel = (channel?: string): DownloadChannel => (
+    channel === 'BETA' || channel === 'ALPHA' ? channel : 'RELEASE'
+);
 
 export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                                                                      currentUser, isLiked, onToggleFavorite, onDownload, downloadedSessionIds, onRefresh
@@ -69,12 +77,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
     const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
     const [lastDownloadedFileName, setLastDownloadedFileName] = useState('');
+    const [lastDownloadChannel, setLastDownloadChannel] = useState<DownloadChannel>('RELEASE');
     const [showDownloadFx, setShowDownloadFx] = useState(false);
     const [preReleaseGameVersions, setPreReleaseGameVersions] = useState<string[]>([]);
     const [orderedGameVersions, setOrderedGameVersions] = useState<string[]>([]);
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
-    const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[] } | null>(null);
+    const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[]; channel: DownloadChannel } | null>(null);
     const commentsRef = useRef<HTMLDivElement>(null);
 
     const browseBackTarget = useMemo(() => {
@@ -296,7 +305,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return extractFileNameFromUrl(matchedVersion?.fileUrl);
     };
 
-    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[]) => {
+    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE') => {
         if (!project) return;
         const currentProject = project;
         const isBundle = selectedDeps.length > 0;
@@ -335,6 +344,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             setIsDepModalOpen(false);
             setPendingDownload(null);
             setLastDownloadWasBundle(isBundle || currentProject.classification === 'MODPACK');
+            setLastDownloadChannel(channel);
 
             if (localStorage.getItem('hideInstallInstructions') !== 'true') {
                 setShowPostDownloadModal(true);
@@ -349,10 +359,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
+            const downloadChannel = normalizeDownloadChannel(channel);
+
             if (!versionNumber) {
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 const targetUrl = baseUrl + '/files/download/' + encodeURI(url);
                 setLastDownloadedFileName(extractFileNameFromUrl(url));
+                setLastDownloadChannel(downloadChannel);
                 window.open(targetUrl, '_blank');
                 setShowDownloadFx(true);
                 if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
@@ -375,12 +388,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
             const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !dep?.isEmbedded);
             if (selectableDeps.length > 0) {
-                setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps });
+                setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps, channel: downloadChannel });
                 setIsDepModalOpen(true);
                 return;
             }
 
-            await finishVersionDownload(versionNumber, gameVersion, []);
+            await finishVersionDownload(versionNumber, gameVersion, [], downloadChannel);
         } catch (e: unknown) {
             showDownloadError(e, 'We could not prepare this download.');
         }
@@ -451,49 +464,55 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             </Helmet>
 
             {statusModal && <StatusModal {...statusModal} onClose={() => setStatusModal(null)} />}
-            <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />
-            <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />
-            <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} />
+            <Suspense fallback={null}>
+                {isShareOpen && <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />}
+                {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
+                {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} />}
 
-            <HistoryModal
-                show={isHistoryOpen}
-                onClose={() => navigate(projectUrl)}
-                history={sortedHistory}
-                showExperimental={showExperimental}
-                onToggleExperimental={toggleExperimental}
-                onDownload={handleDownloadClick}
-                hasStableVersions={hasStableBuilds}
-            />
-            <DownloadModal
-                show={isDownloadOpen}
-                onClose={() => navigate(projectUrl)}
-                versionsByGame={versionsByGame}
-                preReleaseGameVersions={preReleaseGameVersions}
-                orderedGameVersions={orderedGameVersions}
-                onDownload={handleDownloadClick}
-                showExperimental={showExperimental}
-                onToggleExperimental={toggleExperimental}
-                onViewHistory={() => navigate(projectUrl + '/changelog')}
-            />
-            {isDepModalOpen && pendingDownload && (
-                <DependencyModal
-                    dependencies={pendingDownload.dependencies}
-                    onClose={() => {
-                        setIsDepModalOpen(false);
-                        setPendingDownload(null);
-                    }}
-                    onDownloadBundle={(selectedDeps) => {
-                        finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, selectedDeps).catch(() => {
-                            showDownloadError(new Error('The dependency bundle link could not be generated.'), 'We could not prepare that bundle download.');
-                        });
-                    }}
-                    onDownloadProjectOnly={() => {
-                        finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, []).catch(() => {
-                            showDownloadError(new Error('The project-only download link could not be generated.'), 'We could not prepare that download.');
-                        });
-                    }}
-                />
-            )}
+                {isHistoryOpen && (
+                    <HistoryModal
+                        show={isHistoryOpen}
+                        onClose={() => navigate(projectUrl)}
+                        history={sortedHistory}
+                        showExperimental={showExperimental}
+                        onToggleExperimental={toggleExperimental}
+                        onDownload={handleDownloadClick}
+                        hasStableVersions={hasStableBuilds}
+                    />
+                )}
+                {isDownloadOpen && (
+                    <DownloadModal
+                        show={isDownloadOpen}
+                        onClose={() => navigate(projectUrl)}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={preReleaseGameVersions}
+                        orderedGameVersions={orderedGameVersions}
+                        onDownload={handleDownloadClick}
+                        showExperimental={showExperimental}
+                        onToggleExperimental={toggleExperimental}
+                        onViewHistory={() => navigate(projectUrl + '/changelog')}
+                    />
+                )}
+                {isDepModalOpen && pendingDownload && (
+                    <DependencyModal
+                        dependencies={pendingDownload.dependencies}
+                        onClose={() => {
+                            setIsDepModalOpen(false);
+                            setPendingDownload(null);
+                        }}
+                        onDownloadBundle={(selectedDeps) => {
+                            finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, selectedDeps, pendingDownload.channel).catch(() => {
+                                showDownloadError(new Error('The dependency bundle link could not be generated.'), 'We could not prepare that bundle download.');
+                            });
+                        }}
+                        onDownloadProjectOnly={() => {
+                            finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, [], pendingDownload.channel).catch(() => {
+                                showDownloadError(new Error('The project-only download link could not be generated.'), 'We could not prepare that download.');
+                            });
+                        }}
+                    />
+                )}
+            </Suspense>
 
             <ProjectLayout
                 bannerUrl={project.bannerUrl}
@@ -510,7 +529,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 sidebarContent={
                     isWikiRoute ? (
                         <>
-                            <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} />
+                            <Suspense fallback={null}>
+                                <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} />
+                            </Suspense>
                             <div className="mt-4">
                                 <Link to={projectUrl} className={`block text-sm font-bold ${theme.colors.accent} hover:underline flex items-center gap-2`}>
                                     <ChevronLeft className="w-4 h-4" /> Back to Project
@@ -523,7 +544,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 }
                 mainContent={
                     isWikiRoute ? (
-                        <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
+                        <Suspense fallback={<div className="flex justify-center p-12"><Spinner /></div>}>
+                            <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
+                        </Suspense>
                     ) : (
                         <ViewDetails project={project} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} />
                     )

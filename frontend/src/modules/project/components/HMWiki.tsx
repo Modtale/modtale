@@ -1,48 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
-import { projectClient } from '../api/projectClient';
 import { Spinner } from '@/components/ui/Spinner';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { SidebarSection } from '@/modules/project/components/ProjectLayout';
 import { theme } from '@/styles/theme';
-
-export const useHMWiki = (hmWikiSlug?: string, pageSlug?: string, enabled: boolean = false) => {
-    const [modData, setModData] = useState<any>(null);
-    const [content, setContent] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        if (!enabled || !hmWikiSlug) return;
-        let isMounted = true;
-        setError(false);
-        projectClient.getWikiData(hmWikiSlug)
-            .then(data => { if (isMounted) setModData(data); })
-            .catch(() => { if (isMounted) setError(true); });
-        return () => { isMounted = false; };
-    }, [hmWikiSlug, enabled]);
-
-    useEffect(() => {
-        if (!enabled || !hmWikiSlug || !modData) return;
-        let isMounted = true;
-        setLoading(true);
-        const targetSlug = pageSlug || modData.index?.slug || (modData.pages?.length > 0 ? modData.pages[0].slug : null);
-
-        if (targetSlug) {
-            projectClient.getWikiPage(hmWikiSlug, targetSlug)
-                .then(data => { if (isMounted) setContent(data); })
-                .catch(() => { if (isMounted) setContent(null); })
-                .finally(() => { if (isMounted) setLoading(false); });
-        } else {
-            setContent(null);
-            setLoading(false);
-        }
-        return () => { isMounted = false; };
-    }, [hmWikiSlug, pageSlug, enabled, modData]);
-
-    return { data: modData ? { mod: modData, content } : null, loading: loading || (enabled && !modData && !error), error };
-};
+export { useHMWiki } from '../hooks/useHMWiki';
 
 const WikiNode: React.FC<{
     node: any;
@@ -70,7 +33,7 @@ const WikiNode: React.FC<{
                 </button>
                 {isOpen && (
                     <ul className={`space-y-1 mt-1 ml-3 pl-3 border-l ${theme.colors.border}`}>
-                        {node.children.map((child: any, idx: number) => (
+                        {node.children.map((child: any) => (
                             <WikiNode key={child.id} node={child} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={depth + 1} isFirst={false} />
                         ))}
                     </ul>

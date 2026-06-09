@@ -213,6 +213,21 @@ class ProjectControllerTest {
         assertEquals("project-1", dto.getId());
         assertTrue(dto.isCanEdit());
         assertEquals(false, dto.isOwner());
+        assertEquals("no-cache", response.getHeaders().getCacheControl());
+    }
+
+    @Test
+    void getProjectCachesAnonymousPublishedProjectDetails() {
+        Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
+
+        when(projectService.getProjectById("project-1")).thenReturn(project);
+        when(accountService.getCurrentUser()).thenReturn(null);
+
+        var response = controller.getProject("project-1");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
+        assertTrue(response.getHeaders().getCacheControl().contains("public"));
     }
 
     @Test
@@ -264,7 +279,8 @@ class ProjectControllerTest {
         var response = controller.updateProject("project-1", request);
 
         assertEquals(400, response.getStatusCode().value());
-        assertEquals("Short Summary cannot exceed 250 characters.", response.getBody());
+        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+        assertEquals("The short summary cannot exceed 250 characters.", body.get("message"));
         verifyNoInteractions(metadataService);
     }
 

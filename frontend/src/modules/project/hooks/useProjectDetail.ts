@@ -3,6 +3,24 @@ import { projectClient } from '../api/projectClient';
 import { SiteRoutes } from '@/utils/routes';
 import type { Project, User } from '@/types';
 
+const consumeProjectBootstrap = async (realId: string) => {
+    if (typeof window === 'undefined' || !window.__MODTALE_PROJECT_BOOTSTRAP) return null;
+
+    const bootstrap = window.__MODTALE_PROJECT_BOOTSTRAP;
+    window.__MODTALE_PROJECT_BOOTSTRAP = undefined;
+
+    try {
+        const data = await bootstrap;
+        if (data && SiteRoutes.extractId(data.id) === realId) {
+            return data as Project;
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+};
+
 export const useProjectDetail = (rawId: string | undefined, initialData: Project | null, currentUser: User | null) => {
     const realId = rawId ? SiteRoutes.extractId(rawId) : '';
 
@@ -43,10 +61,20 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
         }
 
         let isMounted = true;
-        projectClient.getProject(realId)
-            .then(data => { if (isMounted) setProject(data); })
-            .catch(() => { if (isMounted) setIsNotFound(true); })
-            .finally(() => { if (isMounted) setLoading(false); });
+
+        const loadProject = async () => {
+            try {
+                const bootstrapped = await consumeProjectBootstrap(realId);
+                const data = bootstrapped || await projectClient.getProject(realId);
+                if (isMounted) setProject(data);
+            } catch {
+                if (isMounted) setIsNotFound(true);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        loadProject();
 
         return () => { isMounted = false; };
     }, [realId, project?.id]);

@@ -16,8 +16,8 @@ describe('error tracking utils', () => {
         vi.clearAllMocks();
     });
 
-    it('initializes sentry with tracing, replay, and the current mode', () => {
-        initErrorTracking();
+    it('initializes sentry with tracing, replay, and the current mode', async () => {
+        await initErrorTracking();
 
         expect(sentryMocks.browserTracingIntegration).toHaveBeenCalledTimes(1);
         expect(sentryMocks.replayIntegration).toHaveBeenCalledTimes(1);
@@ -34,11 +34,11 @@ describe('error tracking utils', () => {
         });
     });
 
-    it('logs and captures errors with optional context', () => {
+    it('logs and captures errors with optional context', async () => {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const error = new Error('boom');
 
-        captureError(error, { route: '/dashboard' });
+        await captureError(error, { route: '/dashboard' });
 
         expect(consoleError).toHaveBeenCalledWith('Caught Error:', error);
         expect(sentryMocks.captureException).toHaveBeenCalledWith(error, {
