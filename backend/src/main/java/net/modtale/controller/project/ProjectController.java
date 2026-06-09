@@ -86,7 +86,14 @@ public class ProjectController {
             project.setIsOwner(accessControlService.isOwner(project, user));
         }
 
-        return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user != null ? user.getId() : null));
+        boolean isPublicProject = project.getStatus() == ProjectStatus.PUBLISHED || project.getStatus() == ProjectStatus.ARCHIVED;
+        CacheControl cacheControl = user == null && isPublicProject
+                ? CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic()
+                : CacheControl.noCache();
+
+        return ResponseEntity.ok()
+                .cacheControl(cacheControl)
+                .body(ProjectMapper.toDTO(project, false, user != null ? user.getId() : null));
     }
 
     @GetMapping("/projects/{id}/meta")

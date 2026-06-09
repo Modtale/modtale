@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { discoveryClient } from '../api/discoveryClient';
 import { captureError } from '@/utils/errorTracking';
-import { compareSemVer } from '@/utils/modHelpers';
 import type { Project } from '@/types';
 import type { Classification } from '@/data/categories';
 
@@ -114,7 +113,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
             setTotalItems(nextTotalItems);
         } catch (err: any) {
             if (err.name !== 'Canceled') {
-                captureError(err);
+                void captureError(err);
                 setItems([]);
                 setTotalPages(0);
                 setTotalItems(0);

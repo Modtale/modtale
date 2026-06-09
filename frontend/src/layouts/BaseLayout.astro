@@ -14,6 +14,7 @@ interface Props {
     canonicalOverride?: string;
     pageNext?: string;
     pagePrev?: string;
+    projectBootstrapUrl?: string;
 }
 
 const {
@@ -26,13 +27,15 @@ const {
     initialData,
     canonicalOverride,
     pageNext,
-    pagePrev
+    pagePrev,
+    projectBootstrapUrl
 } = Astro.props;
 
 const canonicalUrl = canonicalOverride || new URL(Astro.url.pathname, "https://modtale.net").toString();
 
 const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
+const projectBootstrapUrlString = projectBootstrapUrl ? JSON.stringify(projectBootstrapUrl).replace(/</g, '\\u003c') : null;
 ---
 
 <!DOCTYPE html>
@@ -94,6 +97,23 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : 
             } catch (e) {}
         })();
     </script>
+    {projectBootstrapUrlString && (
+        <script is:inline set:html={`
+            (function() {
+                var url = ${projectBootstrapUrlString};
+                if (!url || typeof window === 'undefined' || window.__MODTALE_PROJECT_BOOTSTRAP) return;
+                window.__MODTALE_PROJECT_BOOTSTRAP_URL = url;
+                window.__MODTALE_PROJECT_BOOTSTRAP = fetch(url, {
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' }
+                }).then(function(response) {
+                    return response.ok ? response.json() : null;
+                }).catch(function() {
+                    return null;
+                });
+            })();
+        `} />
+    )}
 </head>
 <body>
 <slot />

@@ -65,8 +65,10 @@ if (ssrSuccessfullyCompleted) {
 } else {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
+
+const projectBootstrapUrl = !modData && slug ? `${BACKEND_URL}/api/v1/projects/${slug}` : undefined;
 ---
 
-<BaseLayout title={title} description={""} image={image} jsonLd={jsonLd} initialData={modData}>
+<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={modData} projectBootstrapUrl={projectBootstrapUrl}>
     <App client:load initialPath={path} ssrData={modData} />
 </BaseLayout>

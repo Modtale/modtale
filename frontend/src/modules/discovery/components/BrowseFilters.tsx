@@ -124,6 +124,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     const [allGameVersions, setAllGameVersions] = useState<string[]>([]);
     const [preReleaseVersionSet, setPreReleaseVersionSet] = useState<Set<string>>(new Set());
     const [showPreReleases, setShowPreReleases] = useState(false);
+    const hasLoadedGameVersionsRef = useRef(false);
 
     useEffect(() => {
         if (isMobile && isFilterOpen) document.body.style.overflow = 'hidden';
@@ -145,6 +146,11 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     }, [isFilterOpen, onToggleFilterMenu, isMobile]);
 
     useEffect(() => {
+        if (hasLoadedGameVersionsRef.current) return;
+        if (!isFilterOpen && selectedVersion === 'Any') return;
+
+        hasLoadedGameVersionsRef.current = true;
+
         projectClient.getMetaGameVersionCatalog().then((catalog) => {
             const ordered = catalog?.orderedVersions || catalog?.allVersions || [];
             const pre = new Set<string>();
@@ -169,7 +175,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                 setPreReleaseVersionSet(new Set());
             }
         });
-    }, []);
+    }, [isFilterOpen, selectedVersion]);
 
     useEffect(() => {
         if (selectedVersion !== 'Any' && preReleaseVersionSet.has(selectedVersion)) {

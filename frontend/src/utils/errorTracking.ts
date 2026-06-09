@@ -1,6 +1,14 @@
-import * as Sentry from '@sentry/react';
+type SentryModule = typeof import('@sentry/react');
 
-export const initErrorTracking = () => {
+let sentryPromise: Promise<SentryModule> | null = null;
+
+const loadSentry = () => {
+    sentryPromise ??= import('@sentry/react');
+    return sentryPromise;
+};
+
+export const initErrorTracking = async () => {
+    const Sentry = await loadSentry();
     Sentry.init({
         dsn: "https://c26ba856731fbe1677a3057b019b7d13@o4510421984346112.ingest.us.sentry.io/4510421986770944", // TODO: Replace with your actual Sentry DSN
         integrations: [
@@ -17,9 +25,14 @@ export const initErrorTracking = () => {
     });
 };
 
-export const captureError = (error: unknown, context?: Record<string, any>) => {
+export const captureError = async (error: unknown, context?: Record<string, any>) => {
     console.error("Caught Error:", error);
-    Sentry.captureException(error, {
-        extra: context
-    });
+    try {
+        const Sentry = await loadSentry();
+        Sentry.captureException(error, {
+            extra: context
+        });
+    } catch (captureErr) {
+        console.error("Failed to report error:", captureErr);
+    }
 };

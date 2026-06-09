@@ -5,7 +5,7 @@ import App from './App';
 import { ErrorBoundary } from './components/ui/error/ErrorBoundary.tsx';
 import { initErrorTracking } from './utils/errorTracking';
 
-initErrorTracking();
+void initErrorTracking();
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 

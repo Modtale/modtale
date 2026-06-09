@@ -1,210 +1,136 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { darcula } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import { Check, Copy } from 'lucide-react';
-import mermaid from 'mermaid';
+import React, { Suspense, lazy, useMemo } from 'react';
 
-const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
-    const [copied, setCopied] = useState(false);
-    const match = /language-(\w+)/.exec(className || '');
-    const isBlock = !inline && (match || String(children).includes('\n'));
+const MarkdownRichRenderer = lazy(() => import('./MarkdownRichRenderer').then((module) => ({ default: module.MarkdownRichRenderer })));
 
-    if (isBlock) {
-        const lang = match ? match[1] : 'text';
-        const content = String(children).replace(/\n$/, '');
+const richMarkdownPatterns = [
+    /^```/m,
+    /^~~~/m,
+    /^\s{4,}\S/m,
+    /^\s*>/m,
+    /^\s*\d+\.\s+/m,
+    /^\s*[-*]\s+\[[ xX]\]\s+/m,
+    /^\s*[-*_]{3,}\s*$/m,
+    /!\[[^\]]*]\([^)]+\)/,
+    /^\|.+\|\s*$/m,
+    /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/m,
+    /<\/?[a-z][\s\S]*>/i,
+    /~~[^~]+~~/,
+    /\[[^\]]+]:\s+\S+/,
+];
 
-        if (lang === 'mermaid') {
-            return <MermaidChart chart={content} />;
+const requiresRichMarkdown = (content: string) => (
+    richMarkdownPatterns.some((pattern) => pattern.test(content))
+);
+
+const renderInline = (text: string, keyPrefix: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g).filter(Boolean);
+
+    return parts.map((part, index) => {
+        const key = `${keyPrefix}-${index}`;
+
+        if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+            return <strong key={key}>{part.slice(2, -2)}</strong>;
         }
 
-        const handleCopy = () => {
-            navigator.clipboard.writeText(content);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        };
-
-        return (
-            <div className="relative w-full my-4 rounded-xl overflow-hidden bg-slate-900 ring-1 ring-slate-300 dark:ring-white/10 shadow-lg [&+&]:-mt-[17px] [&+&]:rounded-t-none [&+&]:!border-t-0 z-10 group">
-                <div className="px-4 py-1.5 bg-slate-800 border-b border-slate-950 text-xs font-sans text-slate-400 select-none flex items-center justify-between">
-                    <span>{lang}</span>
-                    <button
-                        onClick={handleCopy}
-                        className="group/copy flex items-center justify-end px-2 py-1 -mr-2 rounded-md hover:bg-white/10 transition-colors text-slate-400 hover:text-white focus:outline-none"
-                        title="Copy code"
-                    >
-                        {copied ? <Check className="w-3.5 h-3.5 text-green-500 shrink-0" /> : <Copy className="w-3.5 h-3.5 shrink-0" />}
-                        <div className={`overflow-hidden transition-all duration-300 ease-in-out flex items-center ${copied ? 'max-w-[50px] ml-1.5 opacity-100' : 'max-w-0 opacity-0 group-hover/copy:max-w-[40px] group-hover/copy:ml-1.5 group-hover/copy:opacity-100'}`}>
-                             <span className={`text-[10px] font-bold whitespace-nowrap ${copied ? 'text-green-500' : ''}`}>
-                                 {copied ? 'Copied!' : 'Copy'}
-                             </span>
-                        </div>
-                    </button>
-                </div>
-                <SyntaxHighlighter
-                    {...props}
-                    style={darcula}
-                    language={lang}
-                    PreTag="div"
-                    className="!bg-transparent !m-0 !p-4 text-[13px] leading-relaxed"
-                    customStyle={{
-                        margin: 0,
-                        padding: match ? '1rem' : '1.25rem',
-                        background: 'transparent',
-                        fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace',
-                    }}
-                >
-                    {content}
-                </SyntaxHighlighter>
-            </div>
-        );
-    }
-
-    return (
-        <code
-            className={`${className || ''} !before:hidden !after:hidden bg-slate-200/70 dark:bg-slate-800 px-1.5 py-0.5 rounded-md text-[0.85em] font-mono text-slate-800 dark:text-slate-300 border border-slate-300/50 dark:border-slate-700/50 break-words`}
-            style={{ fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace' }}
-            {...props}
-        >
-            {children}
-        </code>
-    );
-};
-
-const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
-    const [svg, setSvg] = useState<string>('');
-    const [renderError, setRenderError] = useState(false);
-    const containerRef = React.useRef<HTMLDivElement>(null);
-
-    const id = useMemo(() => `mermaid-${Math.random().toString(36).substr(2, 9)}`, []);
-
-    useEffect(() => {
-        const isDark = document.documentElement.classList.contains('dark');
-
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: isDark ? 'dark' : 'default',
-            securityLevel: 'loose',
-            fontFamily: 'inherit'
-        });
-
-        let isMounted = true;
-
-        const renderChart = async () => {
-            try {
-                const { svg: renderedSvg } = await mermaid.render(id, chart);
-                if (isMounted) {
-                    setSvg(renderedSvg);
-                    setRenderError(false);
-                }
-            } catch (e) {
-                console.error('Mermaid rendering failed', e);
-                if (isMounted) {
-                    setSvg('');
-                    setRenderError(true);
-                }
-            }
-        };
-
-        renderChart();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [chart, id]);
-
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        while (container.firstChild) {
-            container.removeChild(container.firstChild);
+        if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+            return <em key={key}>{part.slice(1, -1)}</em>;
         }
 
-        if (!svg || renderError) return;
-
-        try {
-            const parser = new DOMParser();
-            const parsed = parser.parseFromString(svg, 'image/svg+xml');
-            const parseError = parsed.querySelector('parsererror');
-            const parsedSvg = parsed.documentElement;
-
-            if (parseError || !parsedSvg || parsedSvg.tagName.toLowerCase() !== 'svg') {
-                setRenderError(true);
-                return;
-            }
-
-            container.appendChild(document.importNode(parsedSvg, true));
-        } catch (e) {
-            console.error('Mermaid SVG injection failed', e);
-            setRenderError(true);
-        }
-    }, [svg, renderError]);
-
-    if (!svg) {
-        if (renderError) {
+        if (part.startsWith('`') && part.endsWith('`')) {
             return (
-                <div className="my-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    Failed to render diagram
-                </div>
+                <code
+                    key={key}
+                    className="!before:hidden !after:hidden bg-slate-200/70 dark:bg-slate-800 px-1.5 py-0.5 rounded-md text-[0.85em] font-mono text-slate-800 dark:text-slate-300 border border-slate-300/50 dark:border-slate-700/50 break-words"
+                >
+                    {part.slice(1, -1)}
+                </code>
             );
         }
-        return <div className="animate-pulse h-32 bg-slate-100 dark:bg-slate-800 rounded-xl my-4"></div>;
-    }
 
-    return (
-        <div
-            ref={containerRef}
-            className="my-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm overflow-x-auto flex justify-center mermaid-container"
-        />
-    );
+        const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (linkMatch) {
+            return (
+                <a key={key} href={linkMatch[2]} target="_blank" rel="noopener noreferrer">
+                    {linkMatch[1]}
+                </a>
+            );
+        }
+
+        return part;
+    });
 };
 
-const markdownComponents = {
-    code: CodeBlock,
-    pre({ node, children, ...props }: any) {
-        return <>{children}</>;
-    },
-    p({ node, children, ...props }: any) {
-        return <p className="my-3 leading-relaxed break-words text-base" {...props}>{children}</p>;
-    },
-    li({ node, children, ...props }: any) {
-        return <li className="my-1.5 [&>p]:my-0 break-words text-base" {...props}>{children}</li>;
-    },
-    ul({ node, children, ...props }: any) {
-        return <ul className="list-disc pl-6 my-3 space-y-1.5" {...props}>{children}</ul>;
-    },
-    ol({ node, children, ...props }: any) {
-        return <ol className="list-decimal pl-6 my-3 space-y-1.5" {...props}>{children}</ol>;
-    },
-    img({ node, ...props }: any) {
-        return <img className="inline-block align-middle max-w-full h-auto my-0" {...props} />;
-    },
+const MarkdownFallback: React.FC<{ content: string }> = ({ content }) => {
+    const blocks = useMemo(() => {
+        const lines = (content || '').replace(/\r\n/g, '\n').split('\n');
+        const nextBlocks: React.ReactNode[] = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i].trim();
+            if (!line) {
+                i += 1;
+                continue;
+            }
+
+            const heading = line.match(/^(#{1,3})\s+(.+)$/);
+            if (heading) {
+                const level = heading[1].length;
+                const text = renderInline(heading[2], `heading-${i}`);
+                if (level === 1) nextBlocks.push(<h1 key={`h-${i}`} className="text-4xl font-black mb-6">{text}</h1>);
+                else if (level === 2) nextBlocks.push(<h2 key={`h-${i}`} className="text-2xl font-black mt-8 mb-4">{text}</h2>);
+                else nextBlocks.push(<h3 key={`h-${i}`} className="text-xl font-black mt-6 mb-3">{text}</h3>);
+                i += 1;
+                continue;
+            }
+
+            if (/^[-*]\s+/.test(line)) {
+                const items: string[] = [];
+                while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
+                    items.push(lines[i].trim().replace(/^[-*]\s+/, ''));
+                    i += 1;
+                }
+                nextBlocks.push(
+                    <ul key={`ul-${i}`} className="list-disc pl-6 my-3 space-y-1.5">
+                        {items.map((item, index) => (
+                            <li key={`${item}-${index}`} className="my-1.5 break-words text-base">
+                                {renderInline(item, `li-${i}-${index}`)}
+                            </li>
+                        ))}
+                    </ul>
+                );
+                continue;
+            }
+
+            const paragraph: string[] = [line];
+            i += 1;
+            while (i < lines.length && lines[i].trim() && !/^(#{1,3})\s+/.test(lines[i].trim()) && !/^[-*]\s+/.test(lines[i].trim())) {
+                paragraph.push(lines[i].trim());
+                i += 1;
+            }
+
+            const text = paragraph.join(' ');
+            nextBlocks.push(
+                <p key={`p-${i}`} className="my-3 leading-relaxed break-words text-base">
+                    {renderInline(text, `p-${i}`)}
+                </p>
+            );
+        }
+
+        return nextBlocks.length > 0 ? nextBlocks : [<p key="empty" className="my-3 leading-relaxed break-words text-base">No description.</p>];
+    }, [content]);
+
+    return <>{blocks}</>;
 };
 
 export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+    if (!requiresRichMarkdown(content || '')) {
+        return <MarkdownFallback content={content} />;
+    }
+
     return (
-        <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[
-                rehypeRaw,
-                [
-                    rehypeSanitize,
-                    {
-                        ...defaultSchema,
-                        attributes: {
-                            ...defaultSchema.attributes,
-                            code: ['className']
-                        }
-                    }
-                ]
-            ]}
-            components={markdownComponents}
-        >
-            {content}
-        </ReactMarkdown>
+        <Suspense fallback={<MarkdownFallback content={content} />}>
+            <MarkdownRichRenderer content={content} />
+        </Suspense>
     );
 };

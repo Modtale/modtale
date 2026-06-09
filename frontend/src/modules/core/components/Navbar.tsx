@@ -1,13 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useRef, useEffect } from 'react';
 import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { NotificationMenu } from '@/modules/user/components/NotificationMenu';
-import { FollowingModal } from '@/modules/user/components/FollowingModal';
-import { SignInModal } from '@/modules/auth/components/SignInModal.tsx';
 import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
 import { SiteRoutes } from '@/utils/routes';
 import type { User } from "@/types.ts";
+
+const NotificationMenu = lazy(() => import('@/modules/user/components/NotificationMenu').then((module) => ({ default: module.NotificationMenu })));
+const FollowingModal = lazy(() => import('@/modules/user/components/FollowingModal').then((module) => ({ default: module.FollowingModal })));
+const SignInModal = lazy(() => import('@/modules/auth/components/SignInModal.tsx').then((module) => ({ default: module.SignInModal })));
 
 interface NavbarProps {
     user: User | null;
@@ -98,11 +99,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
-            <SignInModal isOpen={isSignInOpen} onClose={handleSignInClose} />
+            <Suspense fallback={null}>
+                {isSignInOpen && <SignInModal isOpen={isSignInOpen} onClose={handleSignInClose} />}
 
-            {isFollowingOpen && user && (
-                <FollowingModal userId={user.id} onClose={() => setIsFollowingOpen(false)} />
-            )}
+                {isFollowingOpen && user && (
+                    <FollowingModal userId={user.id} onClose={() => setIsFollowingOpen(false)} />
+                )}
+            </Suspense>
 
             <div className="flex justify-center w-full h-full">
                 <div className={`${widthClass} w-full h-full transition-[padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]`}>
@@ -231,7 +234,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                                 <div className="h-5 w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
 
-                                {user && <NotificationMenu />}
+                                {user && (
+                                    <Suspense fallback={null}>
+                                        <NotificationMenu />
+                                    </Suspense>
+                                )}
 
                                 <AnimatedThemeToggler
                                     onToggle={toggleDarkMode}
@@ -297,7 +304,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                             </div>
                         ) : (
                             <div className="flex items-center justify-end flex-1 gap-2">
-                                {user && <NotificationMenu />}
+                                {user && (
+                                    <Suspense fallback={null}>
+                                        <NotificationMenu />
+                                    </Suspense>
+                                )}
                                 <button
                                     id="mobile-menu-btn"
                                     type="button"

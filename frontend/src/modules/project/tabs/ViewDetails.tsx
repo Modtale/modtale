@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
-import { CommentSection } from '../components/CommentSection';
 import type { Project, User } from '@/types';
+
+const CommentSection = lazy(() => import('../components/CommentSection').then((module) => ({ default: module.CommentSection })));
 
 interface ViewDetailsProps {
     project: Project;
@@ -19,22 +20,24 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, currentUser, 
             <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
                 <MarkdownRenderer content={project.about || "*No description.*"} />
             </div>
-            <CommentSection
-                projectId={project.id}
-                comments={project.comments || []}
-                currentUser={currentUser}
-                isCreator={canEdit}
-                commentsDisabled={project.allowComments === false}
-                onCommentsUpdated={(c) => { setProject(prev => prev ? { ...prev, comments: c } : null); if (onRefresh) onRefresh(); }}
-                onError={(msg) => setStatusModal({ type: 'error', title: 'Comment Action Failed', message: msg })}
-                onSuccess={(msg) => setStatusModal({ type: 'success', title: 'Action Complete', message: msg })}
-                innerRef={commentsRef}
-                onReport={() => setStatusModal({
-                    type: 'info',
-                    title: 'Comment Reporting Not Ready',
-                    message: 'Comment-specific reporting is not wired up in this view yet. For now, please report the project and mention the comment details in your report notes.'
-                })}
-            />
+            <Suspense fallback={<div ref={commentsRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5" />}>
+                <CommentSection
+                    projectId={project.id}
+                    comments={project.comments || []}
+                    currentUser={currentUser}
+                    isCreator={canEdit}
+                    commentsDisabled={project.allowComments === false}
+                    onCommentsUpdated={(c) => { setProject(prev => prev ? { ...prev, comments: c } : null); if (onRefresh) onRefresh(); }}
+                    onError={(msg) => setStatusModal({ type: 'error', title: 'Comment Action Failed', message: msg })}
+                    onSuccess={(msg) => setStatusModal({ type: 'success', title: 'Action Complete', message: msg })}
+                    innerRef={commentsRef}
+                    onReport={() => setStatusModal({
+                        type: 'info',
+                        title: 'Comment Reporting Not Ready',
+                        message: 'Comment-specific reporting is not wired up in this view yet. For now, please report the project and mention the comment details in your report notes.'
+                    })}
+                />
+            </Suspense>
         </>
     );
 };

@@ -1,4 +1,4 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { useProjectDetail } from '@/modules/project/hooks/useProjectDetail';
@@ -80,10 +80,51 @@ describe('useProjectDetail', () => {
     });
 
     afterEach(async () => {
+        window.__MODTALE_PROJECT_BOOTSTRAP = undefined;
+        window.__MODTALE_PROJECT_BOOTSTRAP_URL = undefined;
         await act(async () => {
             root.unmount();
         });
         container.remove();
+    });
+
+    it('uses bootstrapped project data and skips the duplicate detail fetch', async () => {
+        const projectId = '123e4567-e89b-12d3-a456-426614174000';
+        const project = {
+            id: projectId,
+            authorId: 'author-1',
+            author: 'Ada',
+            versions: []
+        } as any satisfies Project;
+
+        window.__MODTALE_PROJECT_BOOTSTRAP = Promise.resolve(project);
+        mockedProjectClient.getUserProfile.mockResolvedValue({
+            id: 'author-1',
+            username: 'Ada',
+            avatarUrl: '',
+            likedProjectIds: [],
+            accountType: 'USER'
+        } as User);
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    rawId={`sky-tools~${projectId}`}
+                    initialData={null}
+                    currentUser={null}
+                    onRender={snapshot => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getProject).not.toHaveBeenCalled();
+        expect(mockedProjectClient.trackView).toHaveBeenCalledWith(projectId);
+        expect(latestSnapshot.project?.id).toBe(projectId);
+        expect(latestSnapshot.loading).toBe(false);
+        expect(window.__MODTALE_PROJECT_BOOTSTRAP).toBeUndefined();
     });
 
     it('loads related author, contributor, dependency, and analytics data from the fetched project', async () => {

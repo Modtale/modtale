@@ -9,12 +9,8 @@ import { Footer } from '@/modules/core/components/Footer';
 import { SEOHead } from '@/modules/core/components/SEOHead';
 
 import { Spinner } from '@/components/ui/Spinner';
-import { StatusModal } from '@/components/ui/StatusModal';
 import { ErrorBoundary } from '@/components/ui/error/ErrorBoundary';
 import NotFound from '@/components/ui/error/NotFound';
-
-import { Onboarding } from '@/modules/user/components/Onboarding';
-
 
 import { SSRProvider } from '@/context/SSRContext';
 import { ExternalLinkProvider } from '@/context/ExternalLinkContext';
@@ -25,6 +21,8 @@ import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import type { Classification } from '@/data/categories';
 
+const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((module) => ({ default: module.StatusModal })));
+const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
 const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
@@ -177,34 +175,36 @@ const AppContent: React.FC = () => {
             <div className={`min-h-screen bg-white dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
                 <ScrollToTop /> <SEOHead />
 
-                {globalError && (
-                    <StatusModal
-                        type="error"
-                        title="Login Failed"
-                        message={globalError}
-                        onClose={() => setGlobalError(null)}
-                    />
-                )}
+                <Suspense fallback={null}>
+                    {globalError && (
+                        <StatusModal
+                            type="error"
+                            title="Login Failed"
+                            message={globalError}
+                            onClose={() => setGlobalError(null)}
+                        />
+                    )}
 
-                {statusModal && (
-                    <StatusModal
-                        type={statusModal.type}
-                        title={statusModal.title}
-                        message={statusModal.msg}
-                        onClose={() => setStatusModal(null)}
-                    />
-                )}
+                    {statusModal && (
+                        <StatusModal
+                            type={statusModal.type}
+                            title={statusModal.title}
+                            message={statusModal.msg}
+                            onClose={() => setStatusModal(null)}
+                        />
+                    )}
 
-                {user && (
-                    <Onboarding
-                        isOpen={showOnboarding}
-                        onClose={() => setShowOnboarding(false)}
-                        currentUsername={user.username}
-                        currentAvatar={user.avatarUrl}
-                        suggestedUsername={(user as any).suggested_username}
-                        suggestedAvatar={(user as any).suggested_avatar}
-                    />
-                )}
+                    {user && showOnboarding && (
+                        <Onboarding
+                            isOpen={showOnboarding}
+                            onClose={() => setShowOnboarding(false)}
+                            currentUsername={user.username}
+                            currentAvatar={user.avatarUrl}
+                            suggestedUsername={(user as any).suggested_username}
+                            suggestedAvatar={(user as any).suggested_avatar}
+                        />
+                    )}
+                </Suspense>
 
                 <Navbar
                     user={user}
