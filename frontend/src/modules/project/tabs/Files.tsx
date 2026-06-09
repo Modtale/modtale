@@ -37,7 +37,7 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
             {hasUploadedDraftVersion && (
                 <div className={`${theme.colors.bgSurface} p-4 rounded-xl border ${theme.colors.border}`}>
                     <p className={`text-sm font-medium ${theme.colors.textSecondary}`}>
-                        This draft already has one uploaded version. Upload is hidden because drafts can only have one version at a time.
+                        This draft already has one uploaded version. New version uploads are hidden until the project leaves draft status.
                     </p>
                 </div>
             )}
