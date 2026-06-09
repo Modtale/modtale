@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, AlertCircle, Building2, User as UserIcon, ChevronDown, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, User as UserIcon, ChevronDown, Check } from 'lucide-react';
 
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import { PROJECT_TYPES, type Classification } from '@/data/categories';
 import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
@@ -22,7 +22,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [statusModal, setStatusModal] = useState<{type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string} | null>(null);
     const [showSignInModal, setShowSignInModal] = useState(false);
 
@@ -55,7 +54,13 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                     return adminRole && o.organizationMembers?.some(m => m.userId === currentUser.id && m.roleId === adminRole.id);
                 });
                 setMyOrgs(adminOrgs);
-            }).catch(console.error);
+            }).catch((error: unknown) => {
+                setStatusModal({
+                    type: 'error',
+                    title: 'Owner List Unavailable',
+                    msg: extractApiErrorMessage(error, 'We could not load your eligible organization owners.')
+                });
+            });
         }
 
         const handleClickOutside = (event: MouseEvent) => {
@@ -113,12 +118,21 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
         }
 
         if (!title.trim() || !summary.trim() || !classification) {
-            setError("Please fill in all fields."); return;
+            setStatusModal({
+                type: 'error',
+                title: 'Missing Project Details',
+                msg: 'Please choose a project type, add a title, and write a short summary before continuing.'
+            });
+            return;
         }
 
         const effectiveOwner = owner || currentUser?.id;
         if (!effectiveOwner) {
-            setError("Unable to determine project owner. Please refresh and try again.");
+            setStatusModal({
+                type: 'error',
+                title: 'Project Owner Missing',
+                msg: 'We could not determine which account should own this draft. Refresh the page and try again.'
+            });
             return;
         }
 
@@ -138,9 +152,13 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
             navigate(SiteRoutes.projectEdit(res.data));
 
-        } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to create draft.");
-            setError(errorMsg);
+        } catch (e: unknown) {
+            setStatusModal({
+                type: 'error',
+                title: 'Draft Creation Failed',
+                msg: extractApiErrorMessage(e, 'We could not create this project draft.')
+            });
+        } finally {
             setIsLoading(false);
         }
     };
@@ -244,8 +262,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                 <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Let's give it a name.</h1>
                                 <p className="text-slate-500 dark:text-slate-400 font-bold mt-10 uppercase tracking-widest text-xs">You can always change this later.</p>
                             </div>
-
-                            {error && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl flex items-center gap-2 text-sm font-bold animate-in shake duration-300"><AlertCircle className="w-5 h-5"/> {error}</div>}
 
                             <div className="space-y-6 bg-white/60 dark:bg-slate-900/60 backdrop-blur-3xl p-8 md:p-12 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl shadow-modtale-accent/5 animate-in fade-in zoom-in-95 duration-500">
                                 {myOrgs.length > 0 && (

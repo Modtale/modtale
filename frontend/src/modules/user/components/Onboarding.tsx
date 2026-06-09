@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Camera, Check, Sparkles } from 'lucide-react';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
+import { StatusModal } from '@/components/ui/StatusModal';
 
 interface OnboardingProps {
     isOpen: boolean;
@@ -22,14 +23,14 @@ export function Onboarding({
     const [username, setUsername] = useState(currentUsername);
     const [avatar, setAvatar] = useState(currentAvatar);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
+        setStatusModal(null);
 
         try {
             if (username !== currentUsername) {
@@ -41,14 +42,25 @@ export function Onboarding({
             }
 
             window.location.reload();
-        } catch (err: any) {
-            setError(err.response?.data || "Failed to update profile.");
+        } catch (err: unknown) {
+            setStatusModal({
+                title: 'Profile Setup Failed',
+                msg: extractApiErrorMessage(err, 'We could not finish setting up your profile.')
+            });
             setLoading(false);
         }
     };
 
     return (
         <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            {statusModal && (
+                <StatusModal
+                    type="error"
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                />
+            )}
             <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl w-full max-w-md p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-modtale-accent/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
@@ -106,8 +118,6 @@ export function Onboarding({
                                 </button>
                             )}
                         </div>
-
-                        {error && <div className="text-red-500 text-sm font-bold text-center">{error}</div>}
 
                         <button
                             type="submit"

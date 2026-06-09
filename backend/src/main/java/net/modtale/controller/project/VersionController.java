@@ -59,9 +59,9 @@ public class VersionController {
     public ResponseEntity<List<ProjectDependencyDTO>> getDependencies(@PathVariable String id, @PathVariable String version,
                                                                       @RequestParam(value = "gameVersion", required = false) String gameVersion) {
         Project project = projectService.getProjectById(id);
-        if (project == null) return ResponseEntity.notFound().build();
+        if (project == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         ProjectVersion v = versionService.findVersion(project, version, gameVersion);
-        if (v == null) return ResponseEntity.notFound().build();
+        if (v == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         return ResponseEntity.ok((v.getDependencies() != null ? v.getDependencies() : List.<ProjectDependency>of()).stream()
                 .map(ProjectMapper::toDependencyDTO)
                 .collect(Collectors.toList()));
@@ -78,34 +78,34 @@ public class VersionController {
             @RequestParam(value = "channel", required = false, defaultValue = "RELEASE") String channel
     ) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before uploading a project version.");
         try {
             if (projectIds != null && projectIds.size() == 1 && projectIds.get(0).contains(",")) projectIds = Arrays.stream(projectIds.get(0).split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
             versionService.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, ProjectVersion.Channel.valueOf(channel.toUpperCase()), user);
             return ResponseEntity.ok().build();
-        } catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to add version.")); }
+        } catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to add a version to this project."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not add that project version."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to add version."); }
     }
 
     @PostMapping("/projects/{id}/versions/dependency-suggestions")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_CREATE', authentication)")
     public ResponseEntity<?> suggestManifestDependencies(@PathVariable String id, @RequestParam("file") MultipartFile file) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before inspecting version dependencies.");
         try {
             ManifestInspectionResult result = versionService.inspectManifest(id, file, user);
             return ResponseEntity.ok(result);
-        } catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to inspect version manifest.")); }
+        } catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not inspect that version manifest."); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to inspect versions for this project."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to inspect version manifest."); }
     }
 
     @PutMapping("/projects/{id}/versions/{versionId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_EDIT', authentication)")
     public ResponseEntity<?> updateVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody UpdateVersionRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating a project version.");
         try {
             List<String> projectIds = requestPayload.getModIds();
             List<String> gameVersions = requestPayload.getGameVersions();
@@ -115,20 +115,20 @@ public class VersionController {
 
             versionService.updateVersion(id, versionId, projectIds, gameVersions, requestPayload.getChangelog(), channel, user);
             return ResponseEntity.ok().build();
-        } catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to update version.")); }
+        } catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to update this version."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not update that project version."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to update version."); }
     }
 
     @DeleteMapping("/projects/{id}/versions/{versionId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_DELETE', authentication)")
     public ResponseEntity<?> deleteVersion(@PathVariable String id, @PathVariable String versionId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before deleting a project version.");
         try { versionService.deleteVersion(id, versionId, user); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to delete version.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to delete this version."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not delete that project version."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to delete version."); }
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-url")
@@ -136,29 +136,29 @@ public class VersionController {
                                             @RequestParam(value = "gameVersion", required = false) String gameVersion) {
         try {
             Project project = projectService.getProjectById(id);
-            if (project == null) return ResponseEntity.notFound().build();
+            if (project == null) return ErrorMessageUtils.notFound("We couldn't find that project, so no download link could be generated.");
             ProjectVersion target = versionService.findVersion(project, version, gameVersion);
-            if (target == null) return ResponseEntity.notFound().build();
+            if (target == null) return ErrorMessageUtils.notFound("We couldn't find the requested version for that project.");
             String token = downloadTokenService.generateToken(id, version, gameVersion);
             return ResponseEntity.ok(Map.of("downloadUrl", "/download/" + token, "expiresIn", 300));
-        } catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to generate download URL.")); }
+        } catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to generate download URL."); }
     }
 
     @GetMapping("/download/{token}")
     public ResponseEntity<?> downloadWithToken(@PathVariable String token, HttpServletRequest request) {
         try {
             DownloadTokenService.DownloadToken dt = downloadTokenService.validateAndConsume(token);
-            if (dt == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            if (dt == null) return ErrorMessageUtils.forbidden("This download link is invalid, expired, or has already been used.");
 
             Project project = projectService.getRawProjectById(dt.getProjectId());
-            if (project == null) return ResponseEntity.notFound().build();
+            if (project == null) return ErrorMessageUtils.notFound("We couldn't find the project for this download link.");
 
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             boolean isApi = (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) || (request.getHeader("Referer") == null || !request.getHeader("Referer").startsWith(frontendUrl));
             String clientIp = request.getHeader("X-Forwarded-For") == null ? request.getRemoteAddr() : request.getHeader("X-Forwarded-For").split(",")[0];
 
             ProjectVersion targetVersion = versionService.findVersion(project, dt.getVersion(), dt.getGameVersion());
-            if (targetVersion == null) return ResponseEntity.notFound().build();
+            if (targetVersion == null) return ErrorMessageUtils.notFound("We couldn't find the version requested by this download link.");
 
             trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
 
@@ -191,8 +191,7 @@ public class VersionController {
 
         } catch (Exception e) {
             logger.error("Error processing download", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ErrorMessageUtils.describe(e, "Failed to download file."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to download file.");
         }
     }
 
@@ -204,16 +203,16 @@ public class VersionController {
             @RequestParam(value = "deps", required = false) List<String> deps) {
         try {
             Project project = projectService.getProjectById(id);
-            if (project == null) return ResponseEntity.notFound().build();
+            if (project == null) return ErrorMessageUtils.notFound("We couldn't find that project, so no bundle download link could be generated.");
             ProjectVersion target = versionService.findVersion(project, version, gameVersion);
-            if (target == null) return ResponseEntity.notFound().build();
+            if (target == null) return ErrorMessageUtils.notFound("We couldn't find the requested version for that bundle download.");
             String token = downloadTokenService.generateToken(id, version, gameVersion, deps);
             return ResponseEntity.ok(Map.of(
                     "downloadUrl", "/download-bundle/" + token,
                     "expiresIn", 300
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to generate bundle download URL."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to generate bundle download URL.");
         }
     }
 
@@ -221,10 +220,10 @@ public class VersionController {
     public ResponseEntity<?> downloadBundleWithToken(@PathVariable String token, HttpServletRequest request) {
         try {
             DownloadTokenService.DownloadToken dt = downloadTokenService.validateAndConsume(token);
-            if (dt == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            if (dt == null) return ErrorMessageUtils.forbidden("This bundle download link is invalid, expired, or has already been used.");
 
             Project project = projectService.getRawProjectById(dt.getProjectId());
-            if (project == null) return ResponseEntity.notFound().build();
+            if (project == null) return ErrorMessageUtils.notFound("We couldn't find the project for this bundle download link.");
 
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             boolean isApi = (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) || (request.getHeader("Referer") == null || !request.getHeader("Referer").startsWith(frontendUrl));
@@ -232,7 +231,7 @@ public class VersionController {
 
             ProjectVersion targetVersion = versionService.findVersion(project, dt.getVersion(), dt.getGameVersion());
 
-            if (targetVersion == null) return ResponseEntity.notFound().build();
+            if (targetVersion == null) return ErrorMessageUtils.notFound("We couldn't find the version requested by this bundle download link.");
 
             trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
 
@@ -257,8 +256,7 @@ public class VersionController {
 
         } catch (Exception e) {
             logger.error("Error processing bundle download", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ErrorMessageUtils.describe(e, "Failed to download bundle."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to download bundle.");
         }
     }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Flag, ExternalLink, Check, X, ShieldAlert, MessageSquare, User as UserIcon, Filter } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { Report } from '@/types';
 
 interface ReportQueueProps {
@@ -14,6 +15,7 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
     const [responses, setResponses] = useState<Record<string, string>>({});
     const [statusFilter, setStatusFilter] = useState<'OPEN' | 'RESOLVED' | 'DISMISSED'>('OPEN');
     const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (statusFilter === 'OPEN') {
@@ -28,8 +30,9 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
         try {
             const data = await adminClient.getReportQueue(statusFilter);
             setReports(data);
+            setErrorMessage(null);
         } catch (e) {
-            console.error(e);
+            setErrorMessage(extractApiErrorMessage(e, 'We could not load reports for this filter.'));
         } finally {
             setLoading(false);
         }
@@ -52,8 +55,9 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
             } else {
                 fetchFilteredReports();
             }
+            setErrorMessage(null);
         } catch (e) {
-            console.error(e);
+            setErrorMessage(extractApiErrorMessage(e, 'We could not update this report.'));
         } finally {
             setProcessing(null);
         }
@@ -75,6 +79,11 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
 
     return (
         <div className="grid gap-4">
+            {errorMessage && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                    {errorMessage}
+                </div>
+            )}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/40 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/10 backdrop-blur-md">
                 <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-slate-400" />

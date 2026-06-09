@@ -2,6 +2,7 @@ package net.modtale.controller.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.UserResponseMapper;
 import net.modtale.model.dto.user.GitRepositoryDTO;
 import net.modtale.model.user.GitRepository;
@@ -43,29 +44,33 @@ public class ConnectionController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> toggleVisibility(@PathVariable String provider) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
-        accountService.toggleConnectionVisibility(user.getId(), provider);
-        return ResponseEntity.ok().build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before changing connection visibility.");
+        try {
+            accountService.toggleConnectionVisibility(user.getId(), provider);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ErrorMessageUtils.badRequest(e, "We could not update that connection visibility.");
+        }
     }
 
     @DeleteMapping("/user/connections/{provider}")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> unlinkAccount(@PathVariable String provider) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before unlinking a connected account.");
         try {
             accountService.unlinkAccount(user.getId(), provider);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not unlink that connected account.");
         }
     }
 
     @GetMapping("/user/repos/github")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepositoryDTO>> getGithubRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<?> getGithubRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before loading GitHub repositories.");
 
         String accessToken = user.getGithubAccessToken();
 
@@ -79,7 +84,7 @@ public class ConnectionController {
         }
 
         if (accessToken == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(List.of());
+            return ErrorMessageUtils.unauthorized("No GitHub connection is available for this account. Link GitHub first, then try again.");
         }
 
         try {
@@ -91,15 +96,15 @@ public class ConnectionController {
             try {
                 authorizedClientRepository.removeAuthorizedClient("github", authentication, request, response);
             } catch (Exception ignored) {}
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return ErrorMessageUtils.unauthorized("Your GitHub connection is no longer valid. Reconnect GitHub and then try loading repositories again.");
         }
     }
 
     @GetMapping("/user/repos/gitlab")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepositoryDTO>> getGitlabRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<?> getGitlabRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before loading GitLab repositories.");
 
         String accessToken = user.getGitlabAccessToken();
 
@@ -113,7 +118,7 @@ public class ConnectionController {
         }
 
         if (accessToken == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(List.of());
+            return ErrorMessageUtils.unauthorized("No GitLab connection is available for this account. Link GitLab first, then try again.");
         }
 
         try {
@@ -172,15 +177,15 @@ public class ConnectionController {
             try {
                 authorizedClientRepository.removeAuthorizedClient("gitlab", authentication, request, response);
             } catch (Exception ignored) {}
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return ErrorMessageUtils.unauthorized("Your GitLab connection is no longer valid. Reconnect GitLab and then try loading repositories again.");
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ErrorMessageUtils.internalServerError(e, "Failed to load GitLab repositories.");
         }
     }
 
     @GetMapping("/user/repos")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepositoryDTO>> getMyRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<?> getMyRepos(Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
         return getGithubRepos(authentication, request, response);
     }
 
@@ -188,13 +193,13 @@ public class ConnectionController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> prepareOrgLink(@PathVariable String orgId, HttpServletRequest request) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before linking an account to an organization.");
 
         List<User> userOrgs = organizationService.getUserOrganizations(user.getId());
         User org = userOrgs.stream().filter(o -> o.getId().equals(orgId)).findFirst().orElse(null);
 
         if (org == null || !accessControlService.hasOrgPermission(org, user.getId(), net.modtale.model.user.ApiKey.ApiPermission.ORG_CONNECTION_MANAGE)) {
-            return ResponseEntity.status(403).body("Insufficient permissions.");
+            return ErrorMessageUtils.forbidden("You do not have permission to manage connected accounts for this organization.");
         }
 
         request.getSession().setAttribute("pending_org_link_id", orgId);
@@ -205,14 +210,14 @@ public class ConnectionController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> toggleOrgConnectionVisibility(@PathVariable String orgId, @PathVariable String provider) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before changing organization connection visibility.");
         try {
             organizationService.toggleOrgConnectionVisibility(orgId, provider, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to manage connections for this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not update that organization connection visibility.");
         }
     }
 
@@ -220,37 +225,37 @@ public class ConnectionController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
     public ResponseEntity<?> unlinkOrgAccount(@PathVariable String orgId, @PathVariable String provider) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before unlinking an organization account.");
         try {
             organizationService.unlinkOrgAccount(orgId, provider, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to unlink accounts from this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not unlink that organization account.");
         }
     }
 
     @GetMapping("/orgs/{orgId}/repos/github")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_CONNECTION_MANAGE', authentication)")
-    public ResponseEntity<List<GitRepositoryDTO>> getOrgGithubRepos(@PathVariable String orgId) {
+    public ResponseEntity<?> getOrgGithubRepos(@PathVariable String orgId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before loading organization repositories.");
 
         List<User> userOrgs = organizationService.getUserOrganizations(user.getId());
         User org = userOrgs.stream().filter(o -> o.getId().equals(orgId)).findFirst().orElse(null);
 
-        if (org == null) return ResponseEntity.status(403).build();
+        if (org == null) return ErrorMessageUtils.forbidden("You do not have access to this organization.");
 
         String accessToken = org.getGithubAccessToken();
-        if (accessToken == null) return ResponseEntity.status(404).body(List.of());
+        if (accessToken == null) return ErrorMessageUtils.notFound("This organization does not currently have a valid GitHub connection.");
 
         try {
             return ResponseEntity.ok(githubService.getUserRepos(accessToken).stream()
                     .map(UserResponseMapper::toGitRepositoryDTO)
                     .toList());
         } catch (HttpClientErrorException.Unauthorized e) {
-            return ResponseEntity.status(401).build();
+            return ErrorMessageUtils.unauthorized("This organization's GitHub connection is no longer valid. Reconnect GitHub and then try again.");
         }
     }
 }

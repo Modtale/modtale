@@ -43,9 +43,8 @@ export const useProjectEditor = (
         setLoadingRepos(true);
         projectClient.getGitRepos(provider)
             .then(data => setRepos(data || []))
-            .catch(e => {
-                const errorMsg = typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Failed to fetch repositories.';
-                onShowStatus('error', 'Repository Error', errorMsg);
+            .catch((e: unknown) => {
+                onShowStatus('error', 'Repository Error', extractApiErrorMessage(e, 'We could not load repositories for that connected account.'));
             })
             .finally(() => setLoadingRepos(false));
     }, [provider, hasGithub, hasGitlab, manualRepo, onShowStatus]);
@@ -62,8 +61,8 @@ export const useProjectEditor = (
                 return { ...prev, teamMembers: members };
             });
             onShowStatus('success', 'Updated', 'Member role updated.');
-        } catch (err: any) {
-            onShowStatus('error', 'Update Failed', err.response?.data || "Failed to update role.");
+        } catch (err: unknown) {
+            onShowStatus('error', 'Update Failed', extractApiErrorMessage(err, 'We could not update that team role.'));
         }
     };
 
@@ -72,8 +71,8 @@ export const useProjectEditor = (
         try {
             await projectClient.cancelInvite(projectData.id, userId);
             setProjectData(prev => prev ? ({ ...prev, teamInvites: (prev.teamInvites || []).filter(m => m.userId !== userId) }) : null);
-        } catch (e: any) {
-            onShowStatus('error', 'Error', e.response?.data || "Could not cancel invite.");
+        } catch (e: unknown) {
+            onShowStatus('error', 'Invite Cancel Failed', extractApiErrorMessage(e, 'We could not cancel that project invite.'));
         }
     };
 
@@ -147,12 +146,12 @@ export const useProjectEditor = (
             setBannerPreview(prev => refreshed?.bannerUrl ?? prev);
 
             onShowStatus('success', 'Saved', 'Project details saved successfully.');
-        } catch (e: any) {
-            const errData = e.response?.data;
-            if (typeof errData === 'string' && errData.toLowerCase().includes('slug')) {
-                setSlugError(errData);
+        } catch (e: unknown) {
+            const errorMessage = extractApiErrorMessage(e, 'We could not save this project.');
+            if (errorMessage.toLowerCase().includes('slug')) {
+                setSlugError(errorMessage.replace(/^we could not save this project\.\s*/i, ''));
             }
-            onShowStatus('error', 'Save Failed', extractApiErrorMessage(e, 'Failed to save project.'));
+            onShowStatus('error', 'Save Failed', errorMessage);
         } finally {
             setIsSaving(false);
         }

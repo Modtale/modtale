@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, ChevronDown } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { extractApiErrorMessage } from '@/utils/api';
 
 interface AdminLog {
     id: string;
@@ -99,6 +100,7 @@ export function AuditLogs() {
     const [targetTypeFilter, setTargetTypeFilter] = useState('');
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const fetchLogs = async () => {
         setLoading(true);
@@ -106,8 +108,9 @@ export function AuditLogs() {
             const data = await adminClient.getLogs({ query, action: actionFilter, targetType: targetTypeFilter, page, size: 50 });
             setLogs(data.content || []);
             setTotalPages(data.totalPages || 1);
+            setErrorMessage(null);
         } catch (e) {
-            console.error('Failed to fetch logs', e);
+            setErrorMessage(extractApiErrorMessage(e, 'We could not load the audit logs.'));
         } finally {
             setLoading(false);
         }
@@ -125,6 +128,11 @@ export function AuditLogs() {
 
     return (
         <div className="space-y-4">
+            {errorMessage && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                    {errorMessage}
+                </div>
+            )}
             <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 mb-6 bg-white/40 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                 <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

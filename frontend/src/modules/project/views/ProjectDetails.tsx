@@ -33,7 +33,7 @@ import { PostDownloadModal } from '../components/dialogs/PostDownloadModal';
 import { HistoryModal } from '../components/dialogs/HistoryModal';
 import { DownloadModal } from '../components/dialogs/DownloadModal';
 import { DependencyModal } from '../components/dialogs/DependencyModal';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import '../styles/downloadFx.css';
@@ -58,7 +58,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser);
 
-    const [statusModal, setStatusModal] = useState<any>(null);
+    const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
 
@@ -263,6 +263,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
         return '';
     };
+    const showDownloadError = useCallback((error: unknown, fallback: string) => {
+        setStatusModal({
+            type: 'error',
+            title: 'Download Unavailable',
+            message: extractApiErrorMessage(error, fallback)
+        });
+    }, []);
 
     const sanitizeDownloadName = (input: string) => input.replace(/[^a-zA-Z0-9.-]/g, '_');
 
@@ -334,7 +341,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             }
 
             if (location.pathname.endsWith('/download')) navigate(SiteRoutes.project(currentProject), { replace: true });
+            return;
         }
+
+        throw new Error('The server did not return a usable download link for this file.');
     };
 
     const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
@@ -371,8 +381,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             }
 
             await finishVersionDownload(versionNumber, gameVersion, []);
-        } catch (e) {
-            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
+        } catch (e: unknown) {
+            showDownloadError(e, 'We could not prepare this download.');
         }
     };
 
@@ -474,12 +484,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     }}
                     onDownloadBundle={(selectedDeps) => {
                         finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, selectedDeps).catch(() => {
-                            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
+                            showDownloadError(new Error('The dependency bundle link could not be generated.'), 'We could not prepare that bundle download.');
                         });
                     }}
                     onDownloadProjectOnly={() => {
                         finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, []).catch(() => {
-                            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
+                            showDownloadError(new Error('The project-only download link could not be generated.'), 'We could not prepare that download.');
                         });
                     }}
                 />

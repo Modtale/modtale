@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, Loader2, Smartphone } from 'lucide-react';
 import { SiteRoutes } from '@/utils/routes';
 import { authClient } from '../api/authClient';
+import { StatusModal } from '@/components/ui/StatusModal';
+import { extractApiErrorMessage } from '@/utils/api';
 
 export function MfaVerify() {
     const [searchParams] = useSearchParams();
@@ -15,7 +17,7 @@ export function MfaVerify() {
 
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
 
     useEffect(() => {
         if (!token) {
@@ -26,7 +28,7 @@ export function MfaVerify() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        setError(null);
+        setStatusModal(null);
 
         try {
             await authClient.validateMfaLogin({
@@ -34,14 +36,25 @@ export function MfaVerify() {
                 code: code
             });
             window.location.href = redirectTo;
-        } catch (err: any) {
-            setError(err.response?.data?.error || "Invalid code. Please try again.");
+        } catch (err: unknown) {
+            setStatusModal({
+                title: 'Verification Failed',
+                msg: extractApiErrorMessage(err, 'We could not verify that two-factor authentication code.')
+            });
             setLoading(false);
         }
     };
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col pb-20">
+            {statusModal && (
+                <StatusModal
+                    type="error"
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                />
+            )}
             <div className="flex-1 flex items-center justify-center p-4 relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-modtale-accent/5 to-transparent pointer-events-none" />
                 <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl relative z-10">
@@ -56,12 +69,6 @@ export function MfaVerify() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {error && (
-                            <div className="p-3 text-sm font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 rounded-xl text-center">
-                                {error}
-                            </div>
-                        )}
-
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block text-center tracking-widest">Authentication Code</label>
                             <div className="relative">

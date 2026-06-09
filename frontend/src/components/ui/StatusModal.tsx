@@ -103,7 +103,7 @@ const Confetti: React.FC = () => {
 interface StatusModalProps {
     type: 'success' | 'error' | 'warning' | 'info';
     title: string;
-    message: string;
+    message: React.ReactNode;
     onClose: () => void;
     actionLabel?: string;
     onAction?: () => void;
@@ -140,7 +140,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             {type === 'success' && <Confetti />}
-            <div className={`bg-white dark:bg-modtale-card border ${borderClass} rounded-xl w-full max-w-md shadow-2xl overflow-hidden relative z-[110]`}>
+            <div className={`bg-white dark:bg-modtale-card border ${borderClass} rounded-xl w-full max-w-lg shadow-2xl overflow-hidden relative z-[110]`}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
                     <X className="w-5 h-5" />
                 </button>
@@ -149,7 +149,15 @@ export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, 
                         {icon}
                     </div>
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{title}</h2>
-                    <p className="text-slate-600 dark:text-slate-300">{message}</p>
+                    {typeof message === 'string' ? (
+                        <p className="text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed text-left max-w-md mx-auto">
+                            {message}
+                        </p>
+                    ) : (
+                        <div className="text-slate-600 dark:text-slate-300 leading-relaxed text-left max-w-md mx-auto">
+                            {message}
+                        </div>
+                    )}
                 </div>
                 <div className="p-4 flex justify-center gap-3">
                     {(type === 'warning' || type === 'info') && (

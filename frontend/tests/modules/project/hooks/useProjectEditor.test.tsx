@@ -43,6 +43,14 @@ type HookSnapshot = ReturnType<typeof useProjectEditor> & {
     bannerPreview: string | null;
 };
 
+type RenderHookOptions = {
+    currentUser?: any;
+    projectData?: any;
+    metaData?: MetadataFormData;
+    bannerFile?: File | null;
+    bannerPreview?: string | null;
+};
+
 const Probe = ({
     initialProjectData,
     currentUser,
@@ -159,7 +167,7 @@ describe('useProjectEditor', () => {
         } satisfies MetadataFormData,
         bannerFile = null as File | null,
         bannerPreview = '/old-banner.png'
-    } = {}) => {
+    }: RenderHookOptions = {}) => {
         await act(async () => {
             root.render(
                 <Probe

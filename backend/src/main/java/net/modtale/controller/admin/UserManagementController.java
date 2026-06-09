@@ -1,5 +1,6 @@
 package net.modtale.controller.admin;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.AdminMapper;
 import net.modtale.mapper.UserMapper;
 import net.modtale.model.admin.AdminLog;
@@ -55,10 +56,10 @@ public class UserManagementController {
     }
 
     @GetMapping("/users/bans")
-    public ResponseEntity<List<BannedEmailDTO>> getBannedEmails() {
+    public ResponseEntity<?> getBannedEmails() {
         User currentUser = getSafeUser();
         if (!accessControlService.isAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ErrorMessageUtils.forbidden("You do not have permission to view banned email addresses.");
         }
         return ResponseEntity.ok(userManagementService.getBannedEmails().stream()
                 .map(AdminMapper::toBannedEmailDTO)
@@ -69,14 +70,14 @@ public class UserManagementController {
     public ResponseEntity<?> banEmail(@RequestBody BanEmailRequest requestPayload) {
         User currentUser = getSafeUser();
         if (!accessControlService.isAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ErrorMessageUtils.forbidden("You do not have permission to ban email addresses.");
         }
         String email = requestPayload.getEmail();
         String reason = requestPayload.getReason();
 
         Optional<User> targetByEmail = userRepository.findByEmail(email);
         if (targetByEmail.isPresent() && !canManageUser(currentUser, targetByEmail.get())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot ban the email of an administrator.");
+            return ErrorMessageUtils.forbidden("Cannot ban the email of an administrator.");
         }
 
         try {
@@ -84,7 +85,7 @@ public class UserManagementController {
             logAction(currentUser.getId(), "BAN_EMAIL", email, "EMAIL", "Reason: " + reason);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not ban that email address.");
         }
     }
 
@@ -92,7 +93,7 @@ public class UserManagementController {
     public ResponseEntity<?> unbanEmail(@RequestParam String email) {
         User currentUser = getSafeUser();
         if (!accessControlService.isAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ErrorMessageUtils.forbidden("You do not have permission to unban email addresses.");
         }
         userManagementService.unbanEmail(email);
         logAction(currentUser.getId(), "UNBAN_EMAIL", email, "EMAIL", null);
@@ -103,10 +104,10 @@ public class UserManagementController {
     public ResponseEntity<?> getUserDetails(@PathVariable String userId) {
         User currentUser = getSafeUser();
         if (!accessControlService.isAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ErrorMessageUtils.forbidden("You do not have permission to view this user in the admin console.");
         }
         Optional<User> target = userRepository.findById(userId);
-        if (target.isEmpty()) return ResponseEntity.notFound().build();
+        if (target.isEmpty()) return ErrorMessageUtils.notFound("User not found.");
 
         return ResponseEntity.ok(UserMapper.toDTO(target.get(), true));
     }
@@ -114,10 +115,10 @@ public class UserManagementController {
     @GetMapping("/users/{userId}/raw")
     public ResponseEntity<?> getRawUser(@PathVariable String userId) {
         User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isSuperAdmin(currentUser)) return ErrorMessageUtils.forbidden("Only Super Admin can view raw user data.");
 
         User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ResponseEntity.notFound().build();
+        if (target == null) return ErrorMessageUtils.notFound("User not found.");
 
         target.setGithubAccessToken(null);
         target.setGitlabAccessToken(null);
@@ -130,10 +131,10 @@ public class UserManagementController {
     @PutMapping("/users/{userId}/raw")
     public ResponseEntity<?> updateRawUser(@PathVariable String userId, @RequestBody User updatedData) {
         User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isSuperAdmin(currentUser)) return ErrorMessageUtils.forbidden("Only Super Admin can edit raw user data.");
 
         User existing = userRepository.findById(userId).orElse(null);
-        if (existing == null) return ResponseEntity.notFound().build();
+        if (existing == null) return ErrorMessageUtils.notFound("User not found.");
 
         updatedData.setId(existing.getId());
         updatedData.setPassword(existing.getPassword());
@@ -159,13 +160,13 @@ public class UserManagementController {
     ) {
         User currentUser = getSafeUser();
         if (!accessControlService.isAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ErrorMessageUtils.forbidden("You do not have permission to delete users.");
         }
         User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ResponseEntity.notFound().build();
+        if (target == null) return ErrorMessageUtils.notFound("User not found.");
 
         if (!canManageUser(currentUser, target)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can delete other admins.");
+            return ErrorMessageUtils.forbidden("Only Super Admin can delete other admins.");
         }
 
         try {
@@ -178,7 +179,7 @@ public class UserManagementController {
             logAction(currentUser.getId(), "DELETE_USER", target.getId(), "USER", "Username: " + target.getUsername() + ", Reason: " + reason);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not delete this user.");
         }
     }
 
@@ -186,13 +187,11 @@ public class UserManagementController {
     public ResponseEntity<?> setUserTier(@PathVariable String userId, @RequestParam String tier) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Access Denied", "message", "You do not have permission."));
+            return ErrorMessageUtils.forbidden("Only Super Admin can manage user tiers.");
         }
 
         User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", "Not Found", "message", "User not found."));
+        if (target == null) return ErrorMessageUtils.notFound("User not found.");
 
         try {
             ApiKey.Tier tierEnum;
@@ -210,7 +209,7 @@ public class UserManagementController {
                     "message", "User " + target.getUsername() + " updated to tier " + tierEnum.name()
             ));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid Tier", "message", "Tier must be USER or ENTERPRISE"));
+            return ErrorMessageUtils.badRequest("Tier must be USER or ENTERPRISE.");
         }
     }
 
@@ -218,11 +217,11 @@ public class UserManagementController {
     public ResponseEntity<?> addUserRole(@PathVariable String userId, @RequestParam String role) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
+            return ErrorMessageUtils.forbidden("Only Super Admin can manage roles.");
         }
 
         User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ResponseEntity.notFound().build();
+        if (target == null) return ErrorMessageUtils.notFound("User not found.");
 
         if (target.getRoles() == null) target.setRoles(new ArrayList<>());
         if (!target.getRoles().contains(role)) {
@@ -237,11 +236,11 @@ public class UserManagementController {
     public ResponseEntity<?> removeUserRole(@PathVariable String userId, @RequestParam String role) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
+            return ErrorMessageUtils.forbidden("Only Super Admin can manage roles.");
         }
 
         User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ResponseEntity.notFound().build();
+        if (target == null) return ErrorMessageUtils.notFound("User not found.");
 
         if (target.getRoles() != null) {
             target.getRoles().remove(role);

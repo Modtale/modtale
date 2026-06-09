@@ -3,6 +3,7 @@ package net.modtale.controller.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.dto.request.auth.ChangePasswordRequest;
 import net.modtale.model.dto.request.auth.ForgotPasswordRequest;
 import net.modtale.model.dto.request.auth.MfaLoginRequest;
@@ -50,7 +51,7 @@ public class AuthController {
             );
             return ResponseEntity.ok(Map.of("message", "User registered successfully", "username", user.getUsername()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ErrorMessageUtils.badRequest(e, "We could not create that account.");
         }
     }
 
@@ -60,26 +61,26 @@ public class AuthController {
             authenticationService.verifyEmail(token);
             return ResponseEntity.ok(Map.of("message", "Email verified successfully"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ErrorMessageUtils.badRequest(e, "We could not verify that email address.");
         }
     }
 
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerification() {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before requesting another verification email.");
         try {
             authenticationService.resendVerificationEmail(user);
             return ResponseEntity.ok(Map.of("message", "Verification email sent"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ErrorMessageUtils.badRequest(e, "We could not send another verification email.");
         }
     }
 
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest requestPayload) {
         String email = requestPayload.getEmail();
-        if (email == null || email.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
+        if (email == null || email.isEmpty()) return ErrorMessageUtils.badRequest("An email address is required before we can send a password reset link.");
         authenticationService.initiatePasswordReset(email);
         return ResponseEntity.ok(Map.of("message", "If an account exists for that email, a password reset link has been sent."));
     }
@@ -107,14 +108,14 @@ public class AuthController {
             authenticationService.completePasswordReset(request.getToken(), request.getPassword());
             return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now login."));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ErrorMessageUtils.badRequest(e, "We could not reset that password.");
         }
     }
 
     @PutMapping("/credentials")
     public ResponseEntity<?> updateCredentials(@RequestBody UpdateCredentialsRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating your email or password.");
 
         String email = requestPayload.getEmail();
         String password = requestPayload.getPassword();
@@ -123,14 +124,14 @@ public class AuthController {
             authenticationService.addCredentials(user.getId(), email, password);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not update those login credentials.");
         }
     }
 
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before changing your password.");
 
         String currentPassword = requestPayload.getCurrentPassword();
         String newPassword = requestPayload.getNewPassword();
@@ -139,15 +140,15 @@ public class AuthController {
             authenticationService.changePassword(user.getId(), currentPassword, newPassword);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not change that password.");
         }
     }
 
     @GetMapping("/mfa/setup")
     public ResponseEntity<?> setupMfa() {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
-        if (user.isMfaEnabled()) return ResponseEntity.badRequest().body(Map.of("error", "MFA is already enabled."));
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before setting up two-factor authentication.");
+        if (user.isMfaEnabled()) return ErrorMessageUtils.badRequest("Two-factor authentication is already enabled for this account.");
 
         String secret = twoFactorService.generateNewSecret();
         authenticationService.setTempMfaSecret(user.getId(), secret);
@@ -159,11 +160,11 @@ public class AuthController {
     @PostMapping("/mfa/verify")
     public ResponseEntity<?> verifyMfaSetup(@RequestBody VerifyMfaRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before verifying two-factor authentication setup.");
 
         String code = requestPayload.getCode();
         if (code == null || code.length() != 6) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid code format"));
+            return ErrorMessageUtils.badRequest("Two-factor authentication codes must be exactly 6 digits.");
         }
 
         String secret = user.getMfaSecret();
@@ -172,7 +173,7 @@ public class AuthController {
             authenticationService.enableMfa(user.getId());
             return ResponseEntity.ok(Map.of("message", "MFA enabled successfully"));
         } else {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid verification code. 2FA not enabled."));
+            return ErrorMessageUtils.badRequest("That verification code was not accepted, so two-factor authentication was not enabled.");
         }
     }
 
@@ -192,7 +193,7 @@ public class AuthController {
                 return ResponseEntity.ok(Map.of("status", "success"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
+            return ErrorMessageUtils.unauthorized("We couldn't sign you in with that username and password. Double-check both fields and try again.");
         }
     }
 
@@ -203,7 +204,7 @@ public class AuthController {
 
         User user = authenticationService.validatePreAuthToken(preAuthToken);
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Session expired or invalid. Please login again."));
+            return ErrorMessageUtils.unauthorized("Your two-factor login session has expired or is no longer valid. Please sign in again.");
         }
 
         if (user.isMfaEnabled()) {
@@ -211,11 +212,11 @@ public class AuthController {
                 createSession(user, request, response);
                 return ResponseEntity.ok(Map.of("status", "success"));
             } else {
-                return ResponseEntity.badRequest().body(Map.of("error", "Invalid 2FA code"));
+                return ErrorMessageUtils.badRequest("That two-factor authentication code was not accepted. Check the current code in your authenticator app and try again.");
             }
         }
 
-        return ResponseEntity.badRequest().build();
+        return ErrorMessageUtils.badRequest("Two-factor authentication is not enabled for this account.");
     }
 
     private void createSession(User user, HttpServletRequest request, HttpServletResponse response) {

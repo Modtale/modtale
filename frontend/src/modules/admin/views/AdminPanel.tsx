@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { extractApiErrorMessage } from '@/utils/api';
 import { VerificationQueue } from '../components/VerificationQueue';
 import { UserManagement } from '../components/UserManagement.tsx';
 import { Review } from './Review';
@@ -22,11 +23,13 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
     const [loadingQueue, setLoadingQueue] = useState(false);
+    const [queueError, setQueueError] = useState<string | null>(null);
 
     const [reviewingProject, setReviewingProject] = useState<any>(null);
     const [loadingReview, setLoadingReview] = useState(false);
 
     const [reports, setReports] = useState<any[]>([]);
+    const [reportsError, setReportsError] = useState<string | null>(null);
 
     const isAdmin = isAdminUser(currentUser);
     const isSuperAdmin = isSuperAdminUser(currentUser);
@@ -51,8 +54,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         try {
             const data = await adminClient.getVerificationQueue();
             setPendingProjects(data);
+            setQueueError(null);
         } catch (e) {
-            console.error(e);
+            setQueueError(extractApiErrorMessage(e, 'We could not load the verification queue.'));
         } finally {
             setLoadingQueue(false);
         }
@@ -62,8 +66,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         try {
             const data = await adminClient.getReportQueue('OPEN');
             setReports(data);
+            setReportsError(null);
         } catch (e) {
-            console.error(e);
+            setReportsError(extractApiErrorMessage(e, 'We could not load the report queue.'));
         }
     };
 
@@ -73,7 +78,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             const data = await adminClient.getReviewDetails(id);
             setReviewingProject(data);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Could not load project details' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not load this project's review details.") });
         } finally {
             setLoadingReview(false);
         }
@@ -201,6 +206,11 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Verification Queue</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
                                     </div>
+                                    {queueError && (
+                                        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                            {queueError}
+                                        </div>
+                                    )}
                                     <VerificationQueue
                                         pendingProjects={pendingProjects}
                                         loadingQueue={loadingQueue}
@@ -217,6 +227,11 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Report Queue</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Handle content violations and user reports.</p>
                                     </div>
+                                    {reportsError && (
+                                        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                            {reportsError}
+                                        </div>
+                                    )}
                                     <ReportQueue reports={reports} onRefresh={fetchReports} />
                                 </div>
                             )}

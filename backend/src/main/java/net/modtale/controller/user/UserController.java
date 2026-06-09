@@ -75,7 +75,7 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<UserDTO> getCurrentUser() {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(UserMapper.toDTO(user, true));
     }
 
@@ -83,7 +83,7 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_DELETE', authentication)")
     public ResponseEntity<?> deleteAccount(HttpServletRequest request) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before deleting your account.");
 
         try {
             accountService.deleteUser(user.getId());
@@ -94,8 +94,7 @@ public class UserController {
             SecurityContextHolder.clearContext();
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ErrorMessageUtils.describe(e, "Failed to delete account."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to delete account.");
         }
     }
 
@@ -110,13 +109,13 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BASIC', authentication)")
     public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequest requestPayload, HttpServletRequest request) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating your profile.");
 
         String bio = requestPayload.getBio();
         String username = requestPayload.getUsername();
 
         if (bio != null && bio.length() > 300) {
-            return ResponseEntity.badRequest().body("Bio cannot exceed 300 characters.");
+            return ErrorMessageUtils.badRequest("Your bio cannot exceed 300 characters.");
         }
 
         try {
@@ -137,7 +136,7 @@ public class UserController {
 
             return ResponseEntity.ok(UserMapper.toDTO(updated, true));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not update that profile.");
         }
     }
 
@@ -145,7 +144,7 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_AVATAR', authentication)")
     public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before uploading an avatar.");
         try {
             validationService.validateIcon(file);
             String path = storageService.upload(file, "avatars/" + user.getUsername());
@@ -153,9 +152,9 @@ public class UserController {
             accountService.updateUserAvatar(user.getId(), url);
             return ResponseEntity.ok(url);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not upload that avatar.");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload avatar."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to upload avatar.");
         }
     }
 
@@ -163,7 +162,7 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BANNER', authentication)")
     public ResponseEntity<?> uploadBanner(@RequestParam("file") MultipartFile file) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before uploading a banner.");
         try {
             validationService.validateBanner(file);
             String path = storageService.upload(file, "banners/" + user.getUsername());
@@ -171,9 +170,9 @@ public class UserController {
             accountService.updateUserBanner(user.getId(), url);
             return ResponseEntity.ok(url);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not upload that banner.");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload banner."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to upload banner.");
         }
     }
 
@@ -181,7 +180,7 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_NOTIFICATION_MANAGE', authentication)")
     public ResponseEntity<?> updateNotificationSettings(@RequestBody User.NotificationPreferences prefs) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating notification settings.");
         accountService.updateNotificationPreferences(user.getId(), prefs);
         return ResponseEntity.ok().build();
     }
@@ -190,12 +189,12 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_FOLLOW', authentication)")
     public ResponseEntity<?> followUser(@PathVariable String targetId) {
         User currentUser = accountService.getCurrentUser();
-        if (currentUser == null) return ResponseEntity.status(401).build();
+        if (currentUser == null) return ErrorMessageUtils.unauthorized("You need to sign in before following a user.");
         try {
             socialService.followUser(currentUser.getId(), targetId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            return ErrorMessageUtils.notFound("We couldn't find the user you were trying to follow.");
         }
     }
 
@@ -203,12 +202,12 @@ public class UserController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_UNFOLLOW', authentication)")
     public ResponseEntity<?> unfollowUser(@PathVariable String targetId) {
         User currentUser = accountService.getCurrentUser();
-        if (currentUser == null) return ResponseEntity.status(401).build();
+        if (currentUser == null) return ErrorMessageUtils.unauthorized("You need to sign in before unfollowing a user.");
         try {
             socialService.unfollowUser(currentUser.getId(), targetId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            return ErrorMessageUtils.notFound("We couldn't find the user you were trying to unfollow.");
         }
     }
 

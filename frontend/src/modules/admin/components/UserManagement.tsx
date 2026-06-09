@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, Lock, X, AlertTriangle, FileJson } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { extractApiErrorMessage } from '@/utils/api';
 import { isSuperAdminUser } from '../utils/access';
 
 export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
@@ -59,7 +60,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         try {
             setBannedEmails(await adminClient.getBannedEmails());
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch banned emails' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not load banned email addresses.') });
         } finally {
             setLoading(false);
         }
@@ -76,7 +77,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setBanReasonInput('');
             fetchBannedEmails();
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to ban email.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not ban this email address.') });
         } finally {
             setLoading(false);
         }
@@ -95,7 +96,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setBanUserReason('');
             setBanConfirmInput('');
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Ban Failed', msg: e.response?.data || 'Could not ban user completely.' });
+            setStatus({ type: 'error', title: 'Ban Failed', msg: extractApiErrorMessage(e, "We could not ban this user's email address.") });
         } finally {
             setLoading(false);
         }
@@ -108,7 +109,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setStatus({ type: 'success', title: 'Unbanned', msg: 'Email unbanned successfully.' });
             fetchBannedEmails();
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to unban email.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not unban this email address.') });
         } finally {
             setLoading(false);
         }
@@ -148,7 +149,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             const data = await adminClient.getUserProfile(userId);
             setFoundUser(data);
         } catch (e) {
-            setStatus({ type: 'error', title: 'User Not Found', msg: 'Could not load the selected user.' });
+            setStatus({ type: 'error', title: 'User Lookup Failed', msg: extractApiErrorMessage(e, 'We could not load the selected user.') });
         } finally {
             setLoading(false);
         }
@@ -176,7 +177,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setUsername(exactMatch.username);
             await fetchUserProfile(exactMatch.id);
         } catch (e) {
-            setStatus({ type: 'error', title: 'User Not Found', msg: `Could not find "${username}"` });
+            setStatus({ type: 'error', title: 'Search Failed', msg: extractApiErrorMessage(e, 'We could not search for that user.') });
         } finally {
             setLoading(false);
         }
@@ -190,7 +191,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setStatus({ type: 'success', title: 'Tier Updated', msg: `Successfully changed ${foundUser.username} to ${newTier}.` });
             setFoundUser({ ...foundUser, tier: newTier });
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Update Failed', msg: e.response?.data?.message || 'Server error occurred.' });
+            setStatus({ type: 'error', title: 'Update Failed', msg: extractApiErrorMessage(e, "We could not update this user's tier.") });
         } finally {
             setLoading(false);
         }
@@ -215,7 +216,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                 setStatus({ type: 'success', title: 'Role Updated', msg: `Admin role granted to ${foundUser.username}.` });
             }
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Update Failed', msg: e.response?.data || 'Server error occurred.' });
+            setStatus({ type: 'error', title: 'Update Failed', msg: extractApiErrorMessage(e, "We could not update this user's roles.") });
         } finally {
             setLoading(false);
         }
@@ -233,7 +234,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setDeleteConfirmUsername('');
             setDeleteUserReason('');
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Delete Failed', msg: e.response?.data || 'Could not delete user.' });
+            setStatus({ type: 'error', title: 'Delete Failed', msg: extractApiErrorMessage(e, 'We could not delete this user.') });
         } finally {
             setLoading(false);
         }
@@ -247,7 +248,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setJsonError(null);
             setShowRawModal(true);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch raw user data.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not load the raw user data.') });
         } finally {
             setLoading(false);
         }
@@ -282,7 +283,13 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setShowRawModal(false);
             fetchUserProfile(foundUser.id);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : (e.response?.data || 'Server error saving raw data.') });
+            setStatus({
+                type: 'error',
+                title: 'Error',
+                msg: e instanceof SyntaxError
+                    ? 'Invalid JSON format.'
+                    : extractApiErrorMessage(e, 'We could not save the raw user data.')
+            });
         } finally {
             setLoading(false);
         }

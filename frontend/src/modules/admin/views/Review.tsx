@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw } from 'lucide-react';
-import { API_BASE_URL, BACKEND_URL } from '@/utils/api';
+import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
@@ -134,7 +134,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 initialLineEnd: lineEnd
             });
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to inspect JAR structure.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not inspect this version's file structure.") });
         } finally {
             setLoadingInspector(false);
         }
@@ -168,7 +168,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             }
             onApprove();
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to approve.' });
+            setStatus({
+                type: 'error',
+                title: 'Error',
+                msg: extractApiErrorMessage(e, isNewProject ? 'We could not publish this project.' : 'We could not approve this version.')
+            });
         }
     };
 
@@ -181,7 +185,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             }
             onReject(reason);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to reject.' });
+            setStatus({
+                type: 'error',
+                title: 'Error',
+                msg: extractApiErrorMessage(e, isNewProject ? 'We could not reject this project.' : 'We could not reject this version.')
+            });
         }
     };
 
@@ -192,7 +200,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             await adminClient.scanVersion(mod.id, pendingVersion.id);
             setStatus({ type: 'success', title: 'Scan Initiated', msg: 'The malware scanner has been queued for this version.' });
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Scan Failed', msg: e.response?.data || 'Could not start rescan.' });
+            setStatus({ type: 'error', title: 'Scan Failed', msg: extractApiErrorMessage(e, 'We could not start a rescan for this version.') });
         } finally {
             setRescanning(false);
         }

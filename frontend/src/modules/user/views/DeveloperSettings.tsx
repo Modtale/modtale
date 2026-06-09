@@ -13,7 +13,7 @@ import {
     Key,
     Shield
 } from 'lucide-react';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Spinner } from '@/components/ui/Spinner';
 import type { User, Project } from '@/types';
@@ -114,7 +114,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
         });
 
         if (!hasAnyPerms) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Please select at least one permission across any profile, organization, or project.' });
+            setStatus({ type: 'error', title: 'No Permissions Selected', msg: 'Select at least one permission for your personal account, an organization, or a project before creating an API key.' });
             return;
         }
 
@@ -132,10 +132,8 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
         } catch (e: any) {
             if (e.response?.status === 403 && e.response?.data?.error === "Email verification required.") {
                 setStatus({ type: 'error', title: 'Verification Required', msg: "You must verify your email address to generate API keys." });
-            } else if (e.response?.data?.error) {
-                setStatus({ type: 'error', title: 'Permission Error', msg: e.response.data.error });
             } else {
-                setStatus({ type: 'error', title: 'Error', msg: 'Failed to create key.' });
+                setStatus({ type: 'error', title: 'API Key Creation Failed', msg: extractApiErrorMessage(e, 'We could not create this API key.') });
             }
         } finally { setIsCreating(false); }
     };
@@ -144,7 +142,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
         setStatus({
             type: 'warning',
             title: 'Revoke API Key?',
-            message: 'Are you sure? This will break any integrations using this key.',
+            msg: 'Revoking this key will immediately break any scripts, apps, or integrations that still rely on it.',
             actionLabel: 'Revoke Key',
             secondaryLabel: 'Cancel',
             onAction: () => executeRevoke(id)
@@ -156,8 +154,8 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
             await api.delete(`/user/api-keys/${id}`);
             fetchKeys();
             setStatus(null);
-        } catch(e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to revoke key.' });
+        } catch (e: unknown) {
+            setStatus({ type: 'error', title: 'API Key Revoke Failed', msg: extractApiErrorMessage(e, 'We could not revoke that API key.') });
         }
     };
 

@@ -4,7 +4,7 @@ import { Save, Check, ExternalLink, XCircle, Edit3 } from 'lucide-react';
 import { userClient } from '../api/userClient';
 import { ProfileLayout } from '@/modules/user/components/ProfileLayout.tsx';
 import { Spinner } from '@/components/ui/Spinner';
-import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
+import { StatusModal } from '@/components/ui/StatusModal';
 import { SecuritySettings } from '../tabs/SecuritySettings';
 import { ConnectionsSettings } from '../tabs/ConnectionsSettings';
 import { SiteRoutes } from '@/utils/routes';
@@ -25,13 +25,16 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
 
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
     const [isEditingUsername, setIsEditingUsername] = useState(false);
 
     useEffect(() => {
         const oauthError = searchParams.get('oauth_error');
         if (oauthError) {
-            setError(decodeURIComponent(oauthError).replace(/\+/g, ' '));
+            setStatusModal({
+                title: 'Account Connection Failed',
+                msg: decodeURIComponent(oauthError).replace(/\+/g, ' ')
+            });
             setSearchParams({});
         }
     }, [searchParams, setSearchParams]);
@@ -55,7 +58,7 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
 
     const handleSave = async () => {
         setSaving(true);
-        setError(null);
+        setStatusModal(null);
         try {
             await userClient.updateProfile({ bio, username: username !== user.username ? username : undefined });
             setSaved(true);
@@ -63,8 +66,11 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
             setIsEditingUsername(false);
             setTimeout(() => setSaved(false), 2000);
             onUpdate();
-        } catch (e: any) {
-            setError(extractApiErrorMessage(e, "Failed to save profile."));
+        } catch (e: unknown) {
+            setStatusModal({
+                title: 'Profile Save Failed',
+                msg: extractApiErrorMessage(e, 'We could not save your profile changes.')
+            });
         } finally {
             setSaving(false);
         }
@@ -75,7 +81,10 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
             await userClient.uploadBanner(file);
             onUpdate();
         } catch (e: unknown) {
-            setError(extractApiErrorMessage(e, "Failed to upload banner."));
+            setStatusModal({
+                title: 'Banner Upload Failed',
+                msg: extractApiErrorMessage(e, 'We could not upload your banner.')
+            });
             throw e;
         }
     };
@@ -85,7 +94,10 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
             await userClient.uploadAvatar(file);
             onUpdate();
         } catch (e: unknown) {
-            setError(extractApiErrorMessage(e, "Failed to upload avatar."));
+            setStatusModal({
+                title: 'Avatar Upload Failed',
+                msg: extractApiErrorMessage(e, 'We could not upload your avatar.')
+            });
             throw e;
         }
     };
@@ -150,7 +162,14 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
 
     return (
         <div className="relative">
-            {error && <ErrorBanner message={error} />}
+            {statusModal && (
+                <StatusModal
+                    type="error"
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                />
+            )}
             <ProfileLayout
                 user={user}
                 isEditing={true}

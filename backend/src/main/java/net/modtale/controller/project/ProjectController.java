@@ -71,11 +71,13 @@ public class ProjectController {
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<?> getProject(@PathVariable String id) {
         Project project = projectService.getProjectById(id);
-        if (project == null) return ResponseEntity.notFound().build();
+        if (project == null) return ErrorMessageUtils.notFound("We couldn't find a project with that ID.");
 
         if (project.getStatus() == ProjectStatus.DRAFT || project.getStatus() == ProjectStatus.PENDING) {
             User user = accountService.getCurrentUser();
-            if (!accessControlService.isAdmin(user) && (user == null || !accessControlService.hasProjectPermission(project, user, "PROJECT_READ"))) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            if (!accessControlService.isAdmin(user) && (user == null || !accessControlService.hasProjectPermission(project, user, "PROJECT_READ"))) {
+                return ErrorMessageUtils.forbidden("This draft or pending project is only visible to collaborators and administrators.");
+            }
         }
 
         User user = accountService.getCurrentUser();
@@ -91,7 +93,7 @@ public class ProjectController {
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<ProjectMetaDTO> getProjectMeta(@PathVariable String id) {
         Project project = projectService.getProjectById(id);
-        if (project == null) return ResponseEntity.notFound().build();
+        if (project == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         return ResponseEntity.ok(ProjectMapper.toMetaDTO(project));
     }
 
@@ -121,7 +123,7 @@ public class ProjectController {
     @PreAuthorize("@apiSecurity.hasCreateProjectPerm(#requestPayload.owner, authentication)")
     public ResponseEntity<?> createProject(@ModelAttribute CreateProjectRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before creating a project draft.");
         try {
             ProjectClassification classificationEnum = ProjectClassification.valueOf(requestPayload.getClassification().toUpperCase());
             Project project = lifecycleService.createDraft(
@@ -136,16 +138,16 @@ public class ProjectController {
             project.setIsOwner(true);
             return ResponseEntity.ok(ProjectMapper.toDTO(project, false));
         }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to create project draft.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to create a draft for that owner."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not create that project draft."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to create project draft."); }
     }
 
     @PutMapping("/projects/{id}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_EDIT_METADATA', authentication)")
     public ResponseEntity<?> updateProject(@PathVariable String id, @RequestBody UpdateProjectRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before editing project metadata.");
         try {
             Project existing = projectService.getRawProjectById(id);
             Project updated = new Project();
@@ -166,77 +168,78 @@ public class ProjectController {
             if (requestPayload.getHmWikiSlug() != null) updated.setHmWikiSlug(requestPayload.getHmWikiSlug());
             else if (existing != null) updated.setHmWikiSlug(existing.getHmWikiSlug());
 
-            if (updated.getDescription() != null && updated.getDescription().length() > 250) return ResponseEntity.badRequest().body("Short Summary cannot exceed 250 characters.");
-            if (updated.getAbout() != null && updated.getAbout().length() > 50000) return ResponseEntity.badRequest().body("Full Description cannot exceed 50,000 characters.");
+            if (updated.getDescription() != null && updated.getDescription().length() > 250) return ErrorMessageUtils.badRequest("The short summary cannot exceed 250 characters.");
+            if (updated.getAbout() != null && updated.getAbout().length() > 50000) return ErrorMessageUtils.badRequest("The full description cannot exceed 50,000 characters.");
             metadataService.updateMetadata(id, updated, user);
             return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
+        } catch (IllegalArgumentException e) { return ErrorMessageUtils.badRequest(e, "We could not update that project."); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to edit this project."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to update project."); }
     }
 
     @DeleteMapping("/projects/{id}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_DELETE', authentication)")
     public ResponseEntity<?> deleteProject(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before deleting a project.");
         try { lifecycleService.softDeleteProject(id, user); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to delete project.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to delete this project."); }
+        catch (IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not delete that project."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to delete project."); }
     }
 
     @PostMapping("/projects/{id}/submit")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_STATUS_SUBMIT', authentication)")
     public ResponseEntity<?> submitProject(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before submitting a project for review.");
         try { lifecycleService.submitProject(id, user); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to submit project.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to submit this project."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not submit that project for review."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to submit project."); }
     }
 
     @PostMapping("/projects/{id}/revert")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_STATUS_REVERT', authentication)")
     public ResponseEntity<?> revertProject(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before reverting a project to draft.");
         try { lifecycleService.updateProjectStatus(id, ProjectStatus.DRAFT, user, "PROJECT_STATUS_REVERT"); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to revert project to draft.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to revert this project."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not revert that project to draft."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to revert project to draft."); }
     }
 
     @PostMapping("/projects/{id}/archive")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_STATUS_ARCHIVE', authentication)")
     public ResponseEntity<?> archiveProject(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before archiving a project.");
         try { lifecycleService.updateProjectStatus(id, ProjectStatus.ARCHIVED, user, "PROJECT_STATUS_ARCHIVE"); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to archive project.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to archive this project."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not archive that project."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to archive project."); }
     }
 
     @PostMapping("/projects/{id}/unlist")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_STATUS_UNLIST', authentication)")
     public ResponseEntity<?> unlistProject(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before unlisting a project.");
         try { lifecycleService.updateProjectStatus(id, ProjectStatus.UNLISTED, user, "PROJECT_STATUS_UNLIST"); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to unlist project.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to unlist this project."); }
+        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not unlist that project."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to unlist project."); }
     }
 
     @PostMapping("/projects/{id}/publish")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_STATUS_PUBLISH', authentication)")
     public ResponseEntity<?> publishProject(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before publishing a project.");
         try { lifecycleService.publishProject(id, user); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage()); }
-        catch (IllegalStateException e) { return ResponseEntity.badRequest().body(e.getMessage()); }
-        catch (Exception e) { return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessageUtils.describe(e, "Failed to publish project.")); }
+        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to publish this project."); }
+        catch (IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not publish that project."); }
+        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to publish project."); }
     }
 }

@@ -4,7 +4,7 @@ import { Link as LinkIcon, Check, Eye, EyeOff, Trash2, Plus } from 'lucide-react
 import { userClient } from '../api/userClient';
 import { BACKEND_URL } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
+import { extractApiErrorMessage } from '@/utils/api';
 import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, GoogleMonoBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import type { User } from '@/types';
 
@@ -15,7 +15,7 @@ interface ConnectionsSettingsProps {
 
 export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps) {
     const [showUnlinkModal, setShowUnlinkModal] = useState<{provider: string, label: string} | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
 
     const accounts = user.connectedAccounts || [];
 
@@ -25,9 +25,12 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
             await userClient.unlinkConnection(showUnlinkModal.provider);
             onUpdate();
             setShowUnlinkModal(null);
-            setError(null);
-        } catch (e: any) {
-            setError(e.response?.data || "Failed to unlink account.");
+            setStatusModal(null);
+        } catch (e: unknown) {
+            setStatusModal({
+                title: 'Account Unlink Failed',
+                msg: extractApiErrorMessage(e, `We could not unlink your ${showUnlinkModal.label} account.`)
+            });
             setShowUnlinkModal(null);
         }
     };
@@ -36,9 +39,12 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
         try {
             await userClient.toggleConnectionVisibility(provider);
             onUpdate();
-            setError(null);
-        } catch (e: any) {
-            setError(e.response?.data || "Failed to toggle visibility.");
+            setStatusModal(null);
+        } catch (e: unknown) {
+            setStatusModal({
+                title: 'Visibility Update Failed',
+                msg: extractApiErrorMessage(e, 'We could not update the visibility for that connected account.')
+            });
         }
     };
 
@@ -106,7 +112,14 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
 
     return (
         <>
-            {error && <ErrorBanner message={error} className="mb-6" />}
+            {statusModal && (
+                <StatusModal
+                    type="error"
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                />
+            )}
             {showUnlinkModal && createPortal(
                 <StatusModal type="warning" title={`Unlink ${showUnlinkModal.label}?`} message={`Are you sure you want to unlink your ${showUnlinkModal.label} account? You will no longer be able to sign in with it.`} actionLabel="Yes, Unlink" onAction={handleUnlink} onClose={() => setShowUnlinkModal(null)} secondaryLabel="Cancel" />,
                 document.body

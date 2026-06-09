@@ -38,37 +38,39 @@ public class ApiKeyController {
     @PostMapping
     public ResponseEntity<?> createKey(@RequestBody CreateApiKeyRequest payload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before creating an API key.");
 
         if (!user.isEmailVerified()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Email verification required."));
+            return ErrorMessageUtils.forbidden("Verify your email address before creating an API key.");
         }
 
         String name = payload.getName();
         if (name == null || name.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "API key name is required."));
+            return ErrorMessageUtils.badRequest("An API key name is required before we can create the key.");
         }
 
         try {
             String rawKey = apiKeyService.createApiKey(user.getId(), name, payload.getContextPermissions());
             return ResponseEntity.ok(Map.of("key", rawKey));
         } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to create an API key with those scopes.");
         } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ErrorMessageUtils.badRequest(e, "We could not create that API key.");
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", ErrorMessageUtils.describe(e, "Failed to create API key.")));
+            return ErrorMessageUtils.internalServerError(e, "Failed to create API key.");
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> revokeKey(@PathVariable String id) {
+    public ResponseEntity<?> revokeKey(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before revoking an API key.");
 
-        apiKeyService.revokeKey(id, user.getId());
-        return ResponseEntity.ok().build();
+        try {
+            apiKeyService.revokeKey(id, user.getId());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ErrorMessageUtils.badRequest(e, "We could not revoke that API key.");
+        }
     }
 }

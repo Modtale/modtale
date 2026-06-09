@@ -1,6 +1,7 @@
 package net.modtale.config.security;
 
 import net.modtale.config.auth.ApiKeyAuthFilter;
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.LocalUserDetailsService;
@@ -380,9 +381,19 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exception -> exception
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.sendError(HttpStatus.FORBIDDEN.value(), "Access Denied: " + accessDeniedException.getMessage());
+                            ErrorMessageUtils.writeJsonError(
+                                    response,
+                                    HttpStatus.FORBIDDEN,
+                                    "You do not have permission to perform this action with the current account or API key."
+                            );
                         })
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            ErrorMessageUtils.writeJsonError(
+                                    response,
+                                    HttpStatus.UNAUTHORIZED,
+                                    "You need to sign in before performing this action. If you were already signed in, your session may have expired."
+                            );
+                        })
                 );
         return http.build();
     }
