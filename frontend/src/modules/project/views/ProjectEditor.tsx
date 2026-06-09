@@ -29,10 +29,12 @@ const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { PermissionSelector, PROJECT_PERMISSION_GROUPS } from '@/components/ui/PermissionSelector';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { ThemedInput } from '../components/FormShared';
 import { VersionFields } from '../components/VersionFields';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
+import type { ProjectRole } from '@/types';
 
 interface ProjectEditorViewProps {
     currentUser: User | null;
@@ -88,6 +90,14 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [isSavingVersion, setIsSavingVersion] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
+    const [inviteUsername, setInviteUsername] = useState('');
+    const [inviteUserId, setInviteUserId] = useState('');
+    const [inviteRoleId, setInviteRoleId] = useState('');
+    const [inviteRoleDropdownOpen, setInviteRoleDropdownOpen] = useState(false);
+    const [memberRoleDropdownOpen, setMemberRoleDropdownOpen] = useState<string | null>(null);
+    const [isInviting, setIsInviting] = useState(false);
+    const [editingRole, setEditingRole] = useState<Partial<ProjectRole> | null>(null);
+    const [roleModalOpen, setRoleModalOpen] = useState(false);
     const [galleryCropImage, setGalleryCropImage] = useState<string | null>(null);
     const [galleryCropFile, setGalleryCropFile] = useState<File | null>(null);
     const [statusModal, setStatusModal] = useState<any>(null);
@@ -122,11 +132,31 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isDirty]);
 
+    useEffect(() => {
+        if (!inviteUsername || inviteUsername.length < 2 || inviteUserId) {
+            setUserSearchResults([]);
+            return;
+        }
+
+        const delayDebounceFn = window.setTimeout(async () => {
+            try {
+                const res = await projectClient.searchUsers(inviteUsername);
+                setUserSearchResults(res);
+            } catch {
+            }
+        }, 300);
+
+        return () => window.clearTimeout(delayDebounceFn);
+    }, [inviteUsername, inviteUserId, setUserSearchResults]);
+
     if (loading || !projectData) return <div className="min-h-screen flex items-center justify-center"><Spinner /></div>;
 
     const readOnly = projectData.status === 'PENDING' || projectData.status === 'ARCHIVED';
     const isModpack = projectData.classification === 'MODPACK';
     const hasProjectPermission = (perm: string) => true;
+    const canInvite = !readOnly && hasProjectPermission('PROJECT_TEAM_INVITE');
+    const canManageRoles = !readOnly && hasProjectPermission('PROJECT_MEMBER_EDIT_ROLE');
+    const canRemove = !readOnly && hasProjectPermission('PROJECT_TEAM_REMOVE');
     const toggleTag = (tag: string) => {
         if (readOnly) return;
         markDirty();
@@ -160,6 +190,103 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             const slugInput = document.getElementById('project-custom-slug-input') as HTMLInputElement | null;
             slugInput?.focus();
         }, 0);
+    };
+    const handleInvite = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!projectData.id || !inviteUserId || !inviteRoleId) return;
+
+        setIsInviting(true);
+        try {
+            await projectClient.inviteUser(projectData.id, inviteUserId, inviteRoleId);
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            setInviteUsername('');
+            setInviteUserId('');
+            setInviteRoleId('');
+            setInviteRoleDropdownOpen(false);
+            setUserSearchResults([]);
+            onShowStatus('success', 'Invited', 'Contributor invitation sent successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Invitation Failed', extractApiErrorMessage(err, 'We could not send that project invite.'));
+        } finally {
+            setIsInviting(false);
+        }
+    };
+
+    const confirmRemoveMember = async () => {
+        if (!projectData.id || !memberToRemove) return;
+
+        try {
+            await projectClient.removeContributor(projectData.id, memberToRemove);
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            onShowStatus('success', memberToRemove === currentUser?.id ? 'Left Project' : 'Removed', memberToRemove === currentUser?.id ? 'You have left the project.' : 'Contributor removed successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Removal Failed', extractApiErrorMessage(err, 'We could not remove that contributor.'));
+        } finally {
+            setMemberToRemove(null);
+            setStatusModal(null);
+        }
+    };
+
+    const handleSaveRole = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!projectData.id || !editingRole?.name || !editingRole?.color) return;
+
+        try {
+            const updatedProject = await projectClient.saveProjectRole(projectData.id, editingRole);
+            setProjectData(updatedProject);
+            setRoleModalOpen(false);
+            setEditingRole(null);
+            onShowStatus('success', 'Saved', 'Project role saved successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Role Save Failed', extractApiErrorMessage(err, 'We could not save that project role.'));
+        }
+    };
+
+    const runDeleteRole = async (roleId: string) => {
+        if (!projectData.id) return;
+
+        try {
+            const updatedProject = await projectClient.deleteProjectRole(projectData.id, roleId);
+            setProjectData(updatedProject);
+            onShowStatus('success', 'Deleted', 'Project role deleted successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Role Delete Failed', extractApiErrorMessage(err, 'We could not delete that project role.'));
+        } finally {
+            setStatusModal(null);
+        }
+    };
+
+    const handleDeleteRole = (roleId: string) => {
+        const role = projectData.projectRoles?.find(r => r.id === roleId);
+        setStatusModal({
+            type: 'warning',
+            title: 'Delete Role?',
+            message: `Are you sure you want to delete "${role?.name || 'this role'}"? Contributors currently assigned to it will need to be reassigned before this action can succeed.`,
+            actionLabel: 'Delete Role',
+            secondaryLabel: 'Cancel',
+            onClose: () => setStatusModal(null),
+            onAction: () => runDeleteRole(roleId)
+        });
+    };
+
+    const handleRequestRemoveMember = (userId: string) => {
+        const target = contributors.find(contributor => contributor.id === userId);
+        const targetLabel = userId === currentUser?.id ? 'leave this project' : `remove "${target?.username || 'this contributor'}"`;
+        setMemberToRemove(userId);
+        setStatusModal({
+            type: 'warning',
+            title: userId === currentUser?.id ? 'Leave Project?' : 'Remove Contributor?',
+            message: `Are you sure you want to ${targetLabel}?`,
+            actionLabel: userId === currentUser?.id ? 'Leave Project' : 'Remove',
+            secondaryLabel: 'Cancel',
+            onClose: () => {
+                setMemberToRemove(null);
+                setStatusModal(null);
+            },
+            onAction: confirmRemoveMember
+        });
     };
 
     const availableTabs = [
@@ -415,8 +542,78 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                     actionLabel={statusModal.actionLabel}
                     secondaryLabel={statusModal.secondaryLabel}
                     onAction={statusModal.onAction}
-                    onClose={() => !isStatusChanging && setStatusModal(null)}
+                    onClose={() => {
+                        if (isStatusChanging) return;
+                        if (typeof statusModal.onClose === 'function') {
+                            statusModal.onClose();
+                            return;
+                        }
+                        setStatusModal(null);
+                    }}
                 />,
+                document.body)}
+            {roleModalOpen && editingRole && createPortal(
+                <div className={theme.components.modalOverlay}>
+                    <div className={`${theme.components.modalContent} w-full max-w-3xl max-h-[85vh]`}>
+                        <div className={theme.components.modalHeader}>
+                            <div>
+                                <h3 className={`text-xl font-black ${theme.colors.textPrimary}`}>{editingRole.id ? 'Edit Role' : 'Create Role'}</h3>
+                                <p className={`text-xs ${theme.colors.textMuted}`}>Configure permissions for this project role.</p>
+                            </div>
+                            <button onClick={() => { setRoleModalOpen(false); setEditingRole(null); }} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-xl transition-colors`}><X className="w-5 h-5" /></button>
+                        </div>
+
+                        <form onSubmit={handleSaveRole} className="flex flex-col flex-1 overflow-hidden">
+                            <div className={theme.components.modalBody}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role Name</label>
+                                        <input
+                                            type="text"
+                                            value={editingRole.name || ''}
+                                            onChange={e => setEditingRole({ ...editingRole, name: e.target.value })}
+                                            className={theme.components.inputField}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role Color</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="color"
+                                                value={editingRole.color || '#3b82f6'}
+                                                onChange={e => setEditingRole({ ...editingRole, color: e.target.value })}
+                                                className={`w-12 h-12 p-1 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl cursor-pointer`}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={editingRole.color || '#3b82f6'}
+                                                onChange={e => setEditingRole({ ...editingRole, color: e.target.value })}
+                                                className={`${theme.components.inputField} flex-1 font-mono`}
+                                                pattern="^#[0-9A-Fa-f]{6}$"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h4 className={`font-bold ${theme.colors.textPrimary} text-sm border-b ${theme.colors.borderFaint} pb-2`}>Permissions</h4>
+                                    <PermissionSelector
+                                        groups={PROJECT_PERMISSION_GROUPS}
+                                        selectedPermissions={editingRole.permissions || []}
+                                        onChange={(perms) => setEditingRole({ ...editingRole, permissions: perms })}
+                                        variant="card"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className={theme.components.modalFooter}>
+                                <button type="button" onClick={() => { setRoleModalOpen(false); setEditingRole(null); }} className={theme.components.buttonSecondary}>Cancel</button>
+                                <button type="submit" className={theme.components.buttonPrimary}>Save Role</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
                 document.body)}
             {showSlugPrompt && createPortal(
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -738,29 +935,29 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <Team
                                 projectData={projectData}
                                 currentUser={currentUser}
-                                canInvite={true}
-                                canManageRoles={true}
-                                canRemove={true}
-                                inviteUsername=""
-                                inviteUserId=""
-                                setInviteUsername={() => {}}
-                                setInviteUserId={() => {}}
-                                inviteRoleId=""
-                                setInviteRoleId={() => {}}
-                                userSearchResults={[]}
-                                setUserSearchResults={() => {}}
-                                inviteRoleDropdownOpen={false}
-                                setInviteRoleDropdownOpen={() => {}}
-                                memberRoleDropdownOpen={null}
-                                setMemberRoleDropdownOpen={() => {}}
-                                setMemberToRemove={() => {}}
-                                handleInvite={() => {}}
+                                canInvite={canInvite}
+                                canManageRoles={canManageRoles}
+                                canRemove={canRemove}
+                                inviteUsername={inviteUsername}
+                                inviteUserId={inviteUserId}
+                                setInviteUsername={setInviteUsername}
+                                setInviteUserId={setInviteUserId}
+                                inviteRoleId={inviteRoleId}
+                                setInviteRoleId={setInviteRoleId}
+                                userSearchResults={userSearchResults}
+                                setUserSearchResults={setUserSearchResults}
+                                inviteRoleDropdownOpen={inviteRoleDropdownOpen}
+                                setInviteRoleDropdownOpen={setInviteRoleDropdownOpen}
+                                memberRoleDropdownOpen={memberRoleDropdownOpen}
+                                setMemberRoleDropdownOpen={setMemberRoleDropdownOpen}
+                                setMemberToRemove={handleRequestRemoveMember}
+                                handleInvite={handleInvite}
                                 handleRoleUpdate={handleRoleUpdate}
                                 handleCancelInvite={handleCancelInvite}
-                                setEditingRole={() => {}}
-                                setRoleModalOpen={() => {}}
-                                handleDeleteRole={() => {}}
-                                isInviting={false}
+                                setEditingRole={setEditingRole}
+                                setRoleModalOpen={setRoleModalOpen}
+                                handleDeleteRole={handleDeleteRole}
+                                isInviting={isInviting}
                                 contributors={contributors}
                             />
                         )}
