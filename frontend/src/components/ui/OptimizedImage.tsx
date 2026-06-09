@@ -21,6 +21,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
                                                               }) => {
     const hasFallenBack = useRef(false);
     const hasReportedLoad = useRef(false);
+    const imgRef = useRef<HTMLImageElement | null>(null);
 
     const { downlink, effectiveType, isSaveData } = useMemo(() => {
         const conn = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
@@ -57,6 +58,25 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
     const wasLoadedInitially = useRef(isLoaded);
 
+    const reportImageReady = (img: HTMLImageElement) => {
+        const currentSrc = img.currentSrc || img.src;
+        if (currentSrc) {
+            loadedImageCache.add(currentSrc);
+            if (currentSrc === config.res2x) {
+                setIsLoaded(true);
+            }
+        }
+
+        if (!isBaseImageReady) {
+            setIsBaseImageReady(true);
+        }
+
+        if (!hasReportedLoad.current) {
+            hasReportedLoad.current = true;
+            onFirstLoad?.();
+        }
+    };
+
     useEffect(() => {
         const shouldBeLoaded = config.isFast || loadedImageCache.has(config.res2x);
         setIsLoaded(shouldBeLoaded);
@@ -85,6 +105,34 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         };
     }, [config.res2x, initialQuality, isBaseImageReady, isLoaded, priority]);
 
+    useEffect(() => {
+        let timeoutHandle = 0;
+        let attemptCount = 0;
+
+        const checkImageCompletion = () => {
+            const img = imgRef.current;
+            if (!img || hasReportedLoad.current) return;
+
+            if (img.complete && img.naturalWidth > 0) {
+                reportImageReady(img);
+                return;
+            }
+
+            if (typeof window !== 'undefined' && attemptCount < 20) {
+                attemptCount += 1;
+                timeoutHandle = window.setTimeout(checkImageCompletion, 50);
+            }
+        };
+
+        checkImageCompletion();
+
+        return () => {
+            if (timeoutHandle && typeof window !== 'undefined') {
+                window.clearTimeout(timeoutHandle);
+            }
+        };
+    }, [config.res2x, isBaseImageReady, onFirstLoad, src]);
+
     const srcSet = useMemo(() => {
         if (!isLoaded) return undefined;
         return config.isUltraSlow
@@ -100,6 +148,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
             style={{ aspectRatio }}
         >
             <img
+                ref={imgRef}
                 key={src}
                 src={isLoaded ? config.res2x : initialSrc}
                 srcSet={srcSet}
@@ -113,17 +162,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
                     isLoaded || initialQuality === 'standard' ? 'blur-0 scale-100' : 'blur-2xl scale-110'
                 }`}
                 onLoad={(e) => {
-                    const currentSrc = e.currentTarget.currentSrc || e.currentTarget.src;
-                    loadedImageCache.add(currentSrc);
-
-                    if (!isBaseImageReady) {
-                        setIsBaseImageReady(true);
-                    }
-
-                    if (!hasReportedLoad.current) {
-                        hasReportedLoad.current = true;
-                        onFirstLoad?.();
-                    }
+                    reportImageReady(e.currentTarget);
                 }}
                 onError={(e) => {
                     if (hasFallenBack.current) return;

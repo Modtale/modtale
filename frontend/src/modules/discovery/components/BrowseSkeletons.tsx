@@ -10,7 +10,7 @@ interface BrowseSkeletonsProps {
 const shimmer = "absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent";
 const pulse = "animate-pulse bg-slate-200/80 dark:bg-slate-800/60";
 
-const GridSkeletonCard = () => (
+export const GridSkeletonCard = () => (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
         <div className={`aspect-[3/1] ${pulse}`} />
         <div className="px-6 pb-6">
@@ -31,7 +31,7 @@ const GridSkeletonCard = () => (
     </div>
 );
 
-const ListSkeletonCard = () => (
+export const ListSkeletonCard = () => (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 sm:p-5">
         <div className="flex items-center sm:items-start gap-4 sm:gap-6">
             <div className={`h-24 w-24 sm:h-32 sm:w-32 rounded-xl shrink-0 ${pulse}`} />
@@ -56,7 +56,7 @@ const ListSkeletonCard = () => (
     </div>
 );
 
-const CompactSkeletonCard = () => (
+export const CompactSkeletonCard = () => (
     <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3">
         <div className="flex items-center gap-4">
             <div className={`h-12 w-12 rounded-lg shrink-0 ${pulse}`} />

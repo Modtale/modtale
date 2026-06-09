@@ -50,8 +50,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 
     const resolvedImage = project.imageUrl ? resolveUrl(project.imageUrl) : '/assets/favicon.svg';
     const resolvedBanner = project.bannerUrl ? resolveUrl(project.bannerUrl) : null;
-    const readyTimeoutMs = priority ? 120 : 180;
-
     const handleMouseEnter = () => {
         prefetchProject(project.id);
     };
@@ -70,11 +68,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     useEffect(() => {
         hasReportedReady.current = false;
     }, [project.id]);
-
-    useEffect(() => {
-        const fallbackTimer = window.setTimeout(reportReady, readyTimeoutMs);
-        return () => window.clearTimeout(fallbackTimer);
-    }, [readyTimeoutMs, reportReady]);
 
     useEffect(() => {
         if (!resolvedBanner || !isVisible || typeof window === 'undefined') {
