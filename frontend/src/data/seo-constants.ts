@@ -47,7 +47,7 @@ export const ROUTE_SEO: Record<string, { title: string, description: string, h1:
         title: "Upload Project - Modtale",
         h1: "Upload",
         description: "Share your Hytale creations with the community. Upload mods, plugins, art, and worlds.",
-        keywords: "upload hytale mod, share hytale content, publish hytale projects, mod hosting, hytale creator tools, distribute mods"
+        keywords: "upload hytale mod, share hytale content, publish hytale mods, mod hosting, hytale creator tools, distribute mods"
     }
 };
 
