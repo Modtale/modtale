@@ -134,7 +134,8 @@ class DownloadServiceTest {
         mainVersion.setFileUrl("files/123456789012345678901234567890123456-main.jar");
         mainVersion.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
-                new ProjectDependency("dep-b", "Dependency B", "2.0.0")
+                new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
+                new ProjectDependency("dep-c", "Dependency C", "3.0.0", false, true)
         ));
 
         Project dependencyB = dependencyProject("dep-b", ProjectClassification.DATA, "2.0.0", "files/123456789012345678901234567890123456-depb.jar");
@@ -153,6 +154,7 @@ class DownloadServiceTest {
                 "depb.jar", "depb-binary"
         ), entries);
         verify(projectService, never()).getRawProjectById("dep-a");
+        verify(projectService, never()).getRawProjectById("dep-c");
     }
 
     private static Project pack(String id, String slug, String title) {

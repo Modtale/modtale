@@ -172,7 +172,8 @@ class VersionControllerTest {
         ProjectVersion version = version("version-1", "1.0.0");
         version.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
-                new ProjectDependency("dep-b", "Dependency B", "2.0.0")
+                new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
+                new ProjectDependency("dep-c", "Dependency C", "3.0.0", false, true)
         ));
 
         when(downloadTokenService.validateAndConsume("bundle-token")).thenReturn(
@@ -197,6 +198,7 @@ class VersionControllerTest {
         verify(trackingService).logDownload("project-1", "version-1", "Ada", true, "192.0.2.11");
         verify(trackingService).logDownload("dep-b", null, null, true, "192.0.2.11");
         verify(trackingService, never()).logDownload(eq("dep-a"), isNull(), isNull(), anyBoolean(), anyString());
+        verify(trackingService, never()).logDownload(eq("dep-c"), isNull(), isNull(), anyBoolean(), anyString());
     }
 
     private static Project project(String id, String title, ProjectClassification classification) {

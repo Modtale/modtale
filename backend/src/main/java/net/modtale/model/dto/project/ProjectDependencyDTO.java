@@ -7,5 +7,6 @@ public record ProjectDependencyDTO(
         String projectId,
         String projectTitle,
         String versionNumber,
-        boolean isOptional
+        boolean isOptional,
+        boolean isEmbedded
 ) {}

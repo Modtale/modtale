@@ -239,6 +239,7 @@ public class VersionController {
             List<String> selectedDeps = dt.getSelectedDependencies();
             if (targetVersion.getDependencies() != null) {
                 targetVersion.getDependencies().forEach(dep -> {
+                    if (dep.isEmbedded()) return;
                     if (selectedDeps == null || selectedDeps.contains(dep.getModId())) {
                         trackingService.logDownload(dep.getModId(), null, null, isApi, clientIp);
                     }
