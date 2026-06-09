@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { PackageSearch } from 'lucide-react';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -19,7 +19,16 @@ interface ProjectGridProps {
 export const ProjectGrid: React.FC<ProjectGridProps> = ({
                                                             items, loading, viewStyle, itemsPerPage, likedProjectIds, onToggleFavorite, isLoggedIn
                                                         }) => {
-    if (loading) {
+    const [visibleIds, setVisibleIds] = useState<Record<string, true>>({});
+
+    const revealCard = useCallback((projectId: string) => {
+        setVisibleIds((current) => {
+            if (current[projectId]) return current;
+            return { ...current, [projectId]: true };
+        });
+    }, []);
+
+    if (loading && items.length === 0) {
         return <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />;
     }
 
@@ -45,6 +54,8 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                             isLoggedIn={isLoggedIn}
                             priority={isPriority}
                             viewStyle={viewStyle}
+                            isVisible={!!visibleIds[item.id]}
+                            onReady={revealCard}
                         />
                     </div>
                 );
