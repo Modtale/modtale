@@ -235,4 +235,52 @@ describe('useProjectSearch', () => {
         expect(latestSnapshot.totalItems).toBe(0);
         expect(latestSnapshot.loading).toBe(false);
     });
+
+    it('enters a pending state immediately when browse params change, before the fetch resolves', async () => {
+        let resolveSearch: ((value: any) => void) | undefined;
+        mockedDiscoveryClient.searchProjects.mockImplementation(() => new Promise((resolve) => {
+            resolveSearch = resolve;
+        }) as any);
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter initialEntries={['/mods']}>
+                    <Probe
+                        initialClassification="All"
+                        useSSRData={true}
+                        initialItems={[{ id: 'project-1' }]}
+                        initialTotalPages={1}
+                        initialTotalItems={1}
+                        onRender={snapshot => {
+                            latestSnapshot = snapshot;
+                        }}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        expect(latestSnapshot.isPending).toBe(false);
+        expect(latestSnapshot.items).toEqual([{ id: 'project-1' }]);
+
+        await act(async () => {
+            latestSnapshot.updateParams({ view: 'trending' });
+        });
+
+        expect(latestSnapshot.isPending).toBe(true);
+        expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            resolveSearch?.({
+                content: [{ id: 'project-2' }],
+                totalPages: 3,
+                totalElements: 25
+            });
+            await Promise.resolve();
+        });
+        await settle();
+
+        expect(latestSnapshot.isPending).toBe(false);
+        expect(latestSnapshot.items).toEqual([{ id: 'project-2' }]);
+    });
 });
