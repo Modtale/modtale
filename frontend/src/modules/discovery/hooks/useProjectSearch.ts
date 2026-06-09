@@ -82,6 +82,10 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         }
         if (previousQueryKeyRef.current !== queryKey) {
             previousQueryKeyRef.current = queryKey;
+            setItems([]);
+            setTotalPages(0);
+            setTotalItems(0);
+            setLoading(true);
             setIsPending(true);
         }
     }, [queryKey]);

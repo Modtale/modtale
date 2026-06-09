@@ -268,6 +268,9 @@ describe('useProjectSearch', () => {
         });
 
         expect(latestSnapshot.isPending).toBe(true);
+        expect(latestSnapshot.items).toEqual([]);
+        expect(latestSnapshot.totalPages).toBe(0);
+        expect(latestSnapshot.totalItems).toBe(0);
         expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledTimes(1);
 
         await act(async () => {
