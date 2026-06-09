@@ -10,18 +10,12 @@ import { getCategorySEO, generateDynamicSEO } from '@/data/seo-constants';
 import { BROWSE_VIEWS, PROJECT_TYPES } from '@/data/categories';
 import type { Classification } from '@/data/categories';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { BACKEND_URL } from '@/utils/api';
 
 import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
 import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { BrowseSkeletons } from '../components/BrowseSkeletons';
-
-const getResolvedImageUrl = (url?: string) => {
-    if (!url) return null;
-    return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
-};
 
 interface BrowseViewProps {
     likedProjectIds: string[];
@@ -82,13 +76,6 @@ export const Browse: React.FC<BrowseViewProps> = ({
         const crumbs = getBreadcrumbsForClassification(selectedClassification);
         return generateBreadcrumbSchema(crumbs);
     }, [selectedClassification]);
-
-    const lcpBannerUrl = useMemo(() => {
-        if (items.length > 0 && items[0].bannerUrl) {
-            return getResolvedImageUrl(items[0].bannerUrl);
-        }
-        return null;
-    }, [items]);
 
     useEffect(() => {
         let ticking = false;
@@ -189,7 +176,6 @@ export const Browse: React.FC<BrowseViewProps> = ({
                 <title>{dynamicSEO.title}</title>
                 <meta name="description" content={dynamicSEO.description} />
                 <meta name="keywords" content={seoContent.keywords} />
-                {lcpBannerUrl && <link rel="preload" as="image" href={lcpBannerUrl} fetchPriority="high" />}
                 {itemListSchema && <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>}
                 {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
             </Helmet>
