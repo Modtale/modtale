@@ -9,7 +9,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -65,7 +68,9 @@ class MediaControllerTest {
         var response = controller.updateBanner("project-1", file);
 
         assertEquals(400, response.getStatusCode().value());
-        assertEquals("File is too large", response.getBody());
+        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+        assertEquals("We could not update that project banner: File is too large", body.get("message"));
+        assertEquals("We could not update that project banner: File is too large", body.get("error"));
     }
 
     @Test
@@ -79,7 +84,9 @@ class MediaControllerTest {
         var response = controller.addGalleryImage("project-1", file);
 
         assertEquals(403, response.getStatusCode().value());
-        assertEquals("Not allowed", response.getBody());
+        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+        assertEquals("You do not have permission to upload gallery images for this project: Not allowed", body.get("message"));
+        assertEquals("You do not have permission to upload gallery images for this project: Not allowed", body.get("error"));
     }
 
     @Test
@@ -93,7 +100,9 @@ class MediaControllerTest {
         var response = controller.addGalleryImage("project-1", file);
 
         assertEquals(500, response.getStatusCode().value());
-        assertEquals("Failed to upload gallery image: boom", response.getBody());
+        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+        assertEquals("Failed to upload gallery image: boom", body.get("message"));
+        assertEquals("Failed to upload gallery image: boom", body.get("error"));
     }
 
     @Test
@@ -104,7 +113,9 @@ class MediaControllerTest {
         var response = controller.removeGalleryImage("project-1", new RemoveGalleryImageRequest());
 
         assertEquals(400, response.getStatusCode().value());
-        assertEquals("imageUrl is required", response.getBody());
+        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+        assertEquals("An image URL is required before a gallery image can be removed.", body.get("message"));
+        assertEquals("An image URL is required before a gallery image can be removed.", body.get("error"));
     }
 
     @Test
