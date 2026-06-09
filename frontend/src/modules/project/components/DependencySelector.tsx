@@ -7,6 +7,7 @@ import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project, ProjectVersion, ProjectDependency } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { parseDependencyEntry, serializeDependencyEntry } from '../utils/dependencyEntries';
 
 interface DependencyWizardProps {
     previousDeps: ProjectDependency[];
@@ -165,9 +166,12 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
         previousDeps.forEach(dep => {
             const newVer = selections[dep.projectId];
             if (newVer) {
-                let entry = `${dep.projectId}:${newVer}`;
-                if (dep.isOptional) entry += `:optional`;
-                result.push(entry);
+                result.push(serializeDependencyEntry({
+                    projectId: dep.projectId,
+                    versionNumber: newVer,
+                    isOptional: Boolean(dep.isOptional),
+                    isEmbedded: Boolean(dep.isEmbedded)
+                }));
             }
         });
         onConfirm(result);
@@ -236,6 +240,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     const [showIncompatible, setShowIncompatible] = useState(false);
     const [showAlphaBeta, setShowAlphaBeta] = useState(false);
     const [isOptional, setIsOptional] = useState(false);
+    const [isEmbedded, setIsEmbedded] = useState(false);
     const [showWizard, setShowWizard] = useState(false);
 
     const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>({});
@@ -286,10 +291,16 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
         setMetaCache(prev => ({ ...prev, [selectedModForVersion.id]: { title: selectedModForVersion.title, author: selectedModForVersion.author, icon: selectedModForVersion.imageUrl } }));
 
         const finalOptional = isModpack ? false : isOptional;
-        const entry = `${selectedModForVersion.id}:${versionNumber}${finalOptional ? ':optional' : ''}`;
+        const entry = serializeDependencyEntry({
+            projectId: selectedModForVersion.id,
+            versionNumber,
+            isOptional: finalOptional,
+            isEmbedded
+        });
         onChange([...selectedDeps, entry]);
         setSelectedModForVersion(null);
         setIsOptional(false);
+        setIsEmbedded(false);
         setSearch('');
         setResults([]);
     };
@@ -315,10 +326,22 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     const toggleOptionalExisting = (index: number) => {
         if (isModpack || disabled) return;
         const next = [...selectedDeps];
-        const parts = next[index].split(':');
-        const iscurrentlyOptional = parts.length === 3 && parts[2] === 'optional';
-        if (iscurrentlyOptional) next[index] = `${parts[0]}:${parts[1]}`;
-        else next[index] = `${parts[0]}:${parts[1]}:optional`;
+        const parsed = parseDependencyEntry(next[index]);
+        next[index] = serializeDependencyEntry({
+            ...parsed,
+            isOptional: !parsed.isOptional
+        });
+        onChange(next);
+    };
+
+    const toggleEmbeddedExisting = (index: number) => {
+        if (disabled) return;
+        const next = [...selectedDeps];
+        const parsed = parseDependencyEntry(next[index]);
+        next[index] = serializeDependencyEntry({
+            ...parsed,
+            isEmbedded: !parsed.isEmbedded
+        });
         onChange(next);
     };
 
@@ -376,6 +399,12 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                                     <span className="text-xs font-bold">Optional Dependency</span>
                                 </div>
                             )}
+                            <div className={`flex items-center gap-2 cursor-pointer transition-colors ${isEmbedded ? 'text-emerald-600 dark:text-emerald-400' : theme.colors.textMuted}`} onClick={() => setIsEmbedded(!isEmbedded)}>
+                                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isEmbedded ? 'bg-emerald-500 border-emerald-500 text-white' : theme.colors.border}`}>
+                                    {isEmbedded && <CheckSquare className="w-3 h-3" />}
+                                </div>
+                                <span className="text-xs font-bold">Embedded Dependency</span>
+                            </div>
                         </div>
 
                         <div className="p-3 sm:p-4 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
@@ -467,8 +496,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                 ) : (
                     <div className="grid grid-cols-1 gap-2">
                         {selectedDeps.map((entry, idx) => {
-                            const [id, ver, opt] = entry.split(':');
-                            const isOpt = opt === 'optional';
+                            const { projectId: id, versionNumber: ver, isOptional: isOpt, isEmbedded: embedded } = parseDependencyEntry(entry);
                             const meta = metaCache[id];
                             return (
                                 <div key={idx} className={`flex items-center justify-between ${theme.colors.bgBase} p-3 rounded-xl border ${theme.colors.border} text-sm shadow-sm group`}>
@@ -492,6 +520,9 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                                                 {isOpt ? 'Optional' : 'Required'}
                                             </button>
                                         )}
+                                        <button type="button" disabled={disabled} onClick={() => toggleEmbeddedExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${embedded ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/30 dark:text-emerald-400' : `border-slate-200 ${theme.colors.textMuted} hover:${theme.colors.textPrimary} hover:bg-slate-50`} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
+                                            {embedded ? 'Embedded' : 'Standalone'}
+                                        </button>
                                         <button type="button" disabled={disabled} onClick={() => removeDep(idx)} className={`${theme.colors.textMuted} p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : `hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`}><X className="w-4 h-4" /></button>
                                     </div>
                                 </div>

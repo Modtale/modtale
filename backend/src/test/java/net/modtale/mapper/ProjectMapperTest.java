@@ -113,13 +113,14 @@ class ProjectMapperTest {
         ProjectVersion version = version("v2");
         ProjectVersionSummaryDTO withoutReview = ProjectMapper.toVersionSummaryDTO(version, false);
         ProjectVersionSummaryDTO withReview = ProjectMapper.toVersionSummaryDTO(version, true);
-        ProjectDependency dependency = new ProjectDependency("modtale:core", "Core", "1.0.0", true);
+        ProjectDependency dependency = new ProjectDependency("modtale:core", "Core", "1.0.0", true, true);
 
         assertNull(withoutReview.reviewStatus());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, withReview.reviewStatus());
         assertEquals("Security review cleared", withReview.rejectionReason());
         assertEquals("modtale:core", ProjectMapper.toDependencyDTO(dependency).projectId());
         assertTrue(ProjectMapper.toDependencyDTO(dependency).isOptional());
+        assertTrue(ProjectMapper.toDependencyDTO(dependency).isEmbedded());
     }
 
     private static Project baseProject() {
@@ -186,7 +187,7 @@ class ProjectMapperTest {
         version.setDownloadCount(12);
         version.setReleaseDate("2026-01-01T10:00:00");
         version.setChangelog("Added features");
-        version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0", false)));
+        version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0", false, false)));
         version.setChannel(ProjectVersion.Channel.RELEASE);
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         version.setRejectionReason("Security review cleared");

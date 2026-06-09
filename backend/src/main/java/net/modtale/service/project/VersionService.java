@@ -131,7 +131,9 @@ public class VersionService {
                 if (parts.length < 2) throw new IllegalArgumentException("Invalid format.");
                 Project depProj = projectService.getRawProjectById(parts[0].trim());
                 if (depProj == null || depProj.getVersions().stream().noneMatch(v -> v.getVersionNumber().equalsIgnoreCase(parts[1].trim()))) throw new IllegalArgumentException("Dep missing.");
-                newDeps.add(new ProjectDependency(depProj.getId(), depProj.getTitle(), parts[1].trim(), !isModpack && parts.length >= 3 && "optional".equalsIgnoreCase(parts[2].trim())));
+                boolean optional = !isModpack && hasDependencyFlag(parts, "optional");
+                boolean embedded = hasDependencyFlag(parts, "embedded");
+                newDeps.add(new ProjectDependency(depProj.getId(), depProj.getTitle(), parts[1].trim(), optional, embedded));
                 simpleIds.add(depProj.getId());
             }
             if (isModpack && newDeps.size() < 2) throw new IllegalArgumentException("Min 2 deps.");
@@ -214,9 +216,12 @@ public class VersionService {
         if (projectIds != null) {
             for (String entry : projectIds) {
                 String[] parts = entry.split(":");
+                if (parts.length < 2) throw new IllegalArgumentException("Invalid format.");
                 Project depProj = projectService.getRawProjectById(parts[0].trim());
                 if (depProj == null || depProj.getStatus() == ProjectStatus.DRAFT) throw new IllegalArgumentException("Dep missing.");
-                ver.getDependencies().add(new ProjectDependency(depProj.getId(), depProj.getTitle(), parts[1].trim(), !isModpack && parts.length >= 3 && "optional".equalsIgnoreCase(parts[2].trim())));
+                boolean optional = !isModpack && hasDependencyFlag(parts, "optional");
+                boolean embedded = hasDependencyFlag(parts, "embedded");
+                ver.getDependencies().add(new ProjectDependency(depProj.getId(), depProj.getTitle(), parts[1].trim(), optional, embedded));
                 simpleIds.add(depProj.getId());
             }
         }
@@ -247,6 +252,13 @@ public class VersionService {
                     return true;
                 }
             }
+        }
+        return false;
+    }
+
+    private boolean hasDependencyFlag(String[] parts, String flag) {
+        for (int i = 2; i < parts.length; i++) {
+            if (flag.equalsIgnoreCase(parts[i].trim())) return true;
         }
         return false;
     }

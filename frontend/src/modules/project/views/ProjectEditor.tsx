@@ -20,6 +20,7 @@ import { Settings as SettingsTab } from '../tabs/Settings';
 import { WikiPreview } from '../tabs/WikiPreview';
 import { projectClient } from '../api/projectClient';
 import { api, extractApiErrorMessage } from '@/utils/api';
+import { serializeProjectDependency } from '../utils/dependencyEntries';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -264,7 +265,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const handleStartEditVersion = (version: ProjectVersion) => {
         setEditingVersion(version);
         setEditVersionData({
-            projectIds: (version.dependencies || []).map(dep => `${dep.projectId}:${dep.versionNumber}${dep.isOptional ? ':optional' : ''}`),
+            projectIds: (version.dependencies || []).map(serializeProjectDependency),
             versionNumber: version.versionNumber || '',
             gameVersions: version.gameVersions || (version.gameVersion ? [version.gameVersion] : []),
             changelog: version.changelog || '',

@@ -363,7 +363,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep));
+            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !dep?.isEmbedded);
             if (selectableDeps.length > 0) {
                 setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps });
                 setIsDepModalOpen(true);

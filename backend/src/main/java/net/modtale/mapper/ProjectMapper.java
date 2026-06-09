@@ -246,7 +246,8 @@ public class ProjectMapper {
                 dependency.getModId(),
                 dependency.getModTitle(),
                 dependency.getVersionNumber(),
-                dependency.isOptional()
+                dependency.isOptional(),
+                dependency.isEmbedded()
         );
     }
 }

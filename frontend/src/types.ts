@@ -54,6 +54,7 @@ export interface ProjectDependency {
     projectTitle: string;
     versionNumber: string;
     isOptional?: boolean;
+    isEmbedded?: boolean;
 }
 
 export interface ManifestDependencySuggestion {

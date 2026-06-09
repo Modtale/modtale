@@ -135,6 +135,7 @@ public class DownloadService {
 
             if (mainVersion.getDependencies() != null) {
                 for (ProjectDependency dep : mainVersion.getDependencies()) {
+                    if (dep.isEmbedded()) continue;
                     if (selectedDependencies != null && !selectedDependencies.contains(dep.getModId())) continue;
                     Project depProject = projectService.getRawProjectById(dep.getModId());
                     if (depProject == null) continue;
