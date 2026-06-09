@@ -203,7 +203,8 @@ class AuthenticationServiceTest {
 
     @Test
     void processUserLoginCreatesAGoogleAccountWithLinkMetadataAndSuggestedFields() {
-        when(userRepository.findByConnectedAccountsProviderId("google-123")).thenReturn(Optional.empty());
+        when(userRepository.findByConnectedAccountsProviderAndProviderId(OAuthProvider.GOOGLE, "google-123"))
+                .thenReturn(Optional.empty());
         when(userRepository.findByEmail("ada@example.com")).thenReturn(Optional.empty());
         when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
         when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(false);

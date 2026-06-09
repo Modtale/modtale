@@ -20,7 +20,7 @@ export const generateProjectMeta = (item: Project | any) => {
     if (item.about) {
         plainText = item.about
             .replace(/!\[.*?\]\(.*?\)/g, '')
-            .replace(/\[.*?\]\(.*?\)/g, '$1')
+            .replace(/\[(.*?)\]\(.*?\)/g, '$1')
             .replace(/#{1,6}\s/g, '')
             .replace(/(\*\*|__)(.*?)\1/g, '$2')
             .replace(/(\*|_)(.*?)\1/g, '$2')

@@ -64,7 +64,7 @@ public class ValidationService {
 
     public void validateRepositoryUrl(String url) {
         if (url != null && !url.isEmpty() && !REPO_URL_PATTERN.matcher(url).matches()) {
-            throw new IllegalArgumentException("Invalid Repository URL. Must be a valid HTTPS link to GitHub or GitLab.");
+            throw new IllegalArgumentException("Invalid Repository URL. Must be a valid HTTPS link to GitHub, GitLab, or Codeberg.");
         }
     }
 
