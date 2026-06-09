@@ -49,22 +49,22 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                         <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</h4>
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.browse()} className={linkClass}>
-                                <Layout className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Mods
+                                <Layout className="w-3.5 h-3.5 mr-2 opacity-70" /> Mods
                             </Link>
                             <Link to={SiteRoutes.browse('MODPACK')} className={linkClass}>
-                                <Layers className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Modpacks
+                                <Layers className="w-3.5 h-3.5 mr-2 opacity-70" /> Modpacks
                             </Link>
                             <Link to={SiteRoutes.browse('PLUGIN')} className={linkClass}>
-                                <Box className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Plugins
+                                <Box className="w-3.5 h-3.5 mr-2 opacity-70" /> Plugins
                             </Link>
                             <Link to={SiteRoutes.browse('SAVE')} className={linkClass}>
-                                <Save className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Worlds
+                                <Save className="w-3.5 h-3.5 mr-2 opacity-70" /> Worlds
                             </Link>
                             <Link to={SiteRoutes.browse('ART')} className={linkClass}>
-                                <Palette className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Art Assets
+                                <Palette className="w-3.5 h-3.5 mr-2 opacity-70" /> Art Assets
                             </Link>
                             <Link to={SiteRoutes.browse('DATA')} className={linkClass}>
-                                <Database className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Data Assets
+                                <Database className="w-3.5 h-3.5 mr-2 opacity-70" /> Data Assets
                             </Link>
                         </div>
                     </div>

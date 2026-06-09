@@ -147,7 +147,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
                                                 <Layout className="w-4 h-4 mr-3 text-slate-400" />
-                                                Hytale Mods
+                                                Mods
                                             </Link>
                                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>
                                             <Link
@@ -156,7 +156,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
                                                 <FileCode className="w-4 h-4 mr-3 text-slate-400" />
-                                                Hytale Plugins
+                                                Plugins
                                             </Link>
                                             <Link
                                                 to={SiteRoutes.browse('MODPACK')}
@@ -164,7 +164,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
                                                 <Layers className="w-4 h-4 mr-3 text-slate-400" />
-                                                Hytale Modpacks
+                                                Modpacks
                                             </Link>
                                             <Link
                                                 to={SiteRoutes.browse('SAVE')}
@@ -172,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
                                                 <Save className="w-4 h-4 mr-3 text-slate-400" />
-                                                Hytale Worlds
+                                                Worlds
                                             </Link>
                                             <Link
                                                 to={SiteRoutes.browse('ART')}
@@ -180,7 +180,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
                                                 <Palette className="w-4 h-4 mr-3 text-slate-400" />
-                                                Hytale Art Assets
+                                                Art Assets
                                             </Link>
                                             <Link
                                                 to={SiteRoutes.browse('DATA')}
@@ -188,7 +188,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
                                             >
                                                 <Database className="w-4 h-4 mr-3 text-slate-400" />
-                                                Hytale Data Assets
+                                                Data Assets
                                             </Link>
                                         </div>
                                     )}
