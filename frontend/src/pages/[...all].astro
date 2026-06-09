@@ -186,7 +186,7 @@ if (classification) {
                 });
 
                 if (data) {
-                    initialData = { browseData: data };
+                    initialData = { browseData: data, browseDataReady: true };
 
                     if (data.totalPages > pageNum + 1) {
                         const nextParams = new URLSearchParams();
@@ -206,14 +206,14 @@ if (classification) {
                     jsonLd = schemas;
                     ssrSuccessfullyCompleted = true;
                 } else {
-                    initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
+                    initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 }, browseDataReady: false };
                 }
             }
         } catch {
             if (isHome) {
                 initialData = { homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
             } else {
-                initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
+                initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 }, browseDataReady: false };
             }
         }
     } else {

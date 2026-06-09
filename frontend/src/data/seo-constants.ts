@@ -61,7 +61,7 @@ export const DEFAULT_SEO = {
 export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
     '/': {
         title: DEFAULT_SEO.title,
-        h1: 'Hytale Mods, Plugins, and Modding Projects',
+        h1: 'Hytale Mods, Plugins, and Modpacks',
         description: DEFAULT_SEO.description,
         keywords: DEFAULT_SEO.keywords,
         intro: 'Modtale helps Hytale players discover new mods and helps creators publish server plugins, save files, art assets, data assets, and curated project collections in one searchable community repository.',

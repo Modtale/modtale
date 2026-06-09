@@ -35,7 +35,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const [isMounted, setIsMounted] = useState(false);
 
     const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
-    const useSSR = initialData?.browseData && !hasComplexParams;
+    const hasUsableBrowseSSRData = Boolean(initialData?.browseData) && initialData?.browseDataReady !== false;
+    const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
     const canRenderHydratedContent = useSSR || isMounted;
 
     const {
