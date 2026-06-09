@@ -108,13 +108,13 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
                     )}
                 </div>
             </div>
-            {isEditingUsername && <p className="text-xs text-orange-600 dark:text-orange-400 font-bold mt-2 ml-1">Warning: Changing your username will break existing links to your profile.</p>}
+            {isEditingUsername && <p className="text-xs text-orange-600 dark:text-orange-400 font-bold mt-2 ml-1">Changing your username updates the profile label in your URL, but the link stays ID-backed.</p>}
         </div>
     );
 
     const actionContent = (
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
-            <Link to={SiteRoutes.creator(user.username)} target="_blank" className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm w-full md:w-auto whitespace-nowrap shadow-sm">
+            <Link to={SiteRoutes.creator(user.id, user.username)} target="_blank" className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm w-full md:w-auto whitespace-nowrap shadow-sm">
                 <ExternalLink className="w-4 h-4" />
             </Link>
 

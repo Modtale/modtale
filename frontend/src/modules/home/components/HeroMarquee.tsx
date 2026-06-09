@@ -57,7 +57,7 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
                     <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
                         <Link
-                            to={SiteRoutes.creator(project.author)}
+                            to={SiteRoutes.creator(project.authorId, project.author)}
                             className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-40 pointer-events-auto"
                             aria-label={`View profile for ${project.author}`}
                             onClick={(e) => e.stopPropagation()}

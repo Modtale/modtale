@@ -251,7 +251,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                     const score = getVoteScore(anyC);
                     const userVote = getUserVote(anyC);
 
-                    const profileLink = SiteRoutes.creator(authorUsername);
+                    const profileLink = authorId ? SiteRoutes.creator(authorId, authorUsername) : null;
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
 
                     return (
@@ -260,7 +260,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Link to={profileLink} className="shrink-0">
+                                    {profileLink ? <Link to={profileLink} className="shrink-0">
                                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all shadow-sm border border-slate-200 dark:border-white/5">
                                             {authorAvatar ? (
                                                 <OptimizedImage src={authorAvatar} alt={`${authorUsername} Avatar`} baseWidth={40} className="w-full h-full object-cover" />
@@ -268,11 +268,19 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                                 authorUsername.charAt(0).toUpperCase()
                                             )}
                                         </div>
-                                    </Link>
+                                    </Link> : <div className="shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden shadow-sm border border-slate-200 dark:border-white/5">
+                                            {authorAvatar ? (
+                                                <OptimizedImage src={authorAvatar} alt={`${authorUsername} Avatar`} baseWidth={40} className="w-full h-full object-cover" />
+                                            ) : (
+                                                authorUsername.charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                    </div>}
                                     <div className="flex flex-col">
-                                        <Link to={profileLink} className="font-bold text-sm sm:text-base text-slate-900 dark:text-white hover:text-modtale-accent transition-colors">
+                                        {profileLink ? <Link to={profileLink} className="font-bold text-sm sm:text-base text-slate-900 dark:text-white hover:text-modtale-accent transition-colors">
                                             {authorUsername}
-                                        </Link>
+                                        </Link> : <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">{authorUsername}</span>}
                                         <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                             {formatTimeAgo(comment.date)}
                                         </span>
@@ -340,7 +348,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                     const rawReplyAvatar = replyId ? replyProfile?.avatarUrl : null;
                                     const replyAvatar = resolveAvatar(rawReplyAvatar);
 
-                                    const replyProfileLink = SiteRoutes.creator(replyUsername);
+                                    const replyProfileLink = replyId ? SiteRoutes.creator(replyId, replyUsername) : null;
 
                                     const replyScore = getVoteScore(devReply);
                                     const replyUserVote = getUserVote(devReply);
@@ -354,7 +362,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
 
                                             <div className="flex-1 min-w-0 bg-modtale-accent/5 dark:bg-modtale-accent/[0.02] rounded-2xl p-4 border border-modtale-accent/10 dark:border-modtale-accent/20">
                                                 <div className="flex items-center gap-3 mb-2">
-                                                    <Link to={replyProfileLink} className="shrink-0">
+                                                    {replyProfileLink ? <Link to={replyProfileLink} className="shrink-0">
                                                         <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-black overflow-hidden hover:ring-2 hover:ring-modtale-accent transition-all shadow-sm border border-slate-200 dark:border-white/5">
                                                             {replyAvatar ? (
                                                                 <OptimizedImage src={replyAvatar} alt={`${replyUsername} Avatar`} baseWidth={32} className="w-full h-full object-cover" />
@@ -362,12 +370,23 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                                                 <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
                                                             )}
                                                         </div>
-                                                    </Link>
+                                                    </Link> : <div className="shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-black overflow-hidden shadow-sm border border-slate-200 dark:border-white/5">
+                                                            {replyAvatar ? (
+                                                                <OptimizedImage src={replyAvatar} alt={`${replyUsername} Avatar`} baseWidth={32} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
+                                                            )}
+                                                        </div>
+                                                    </div>}
                                                     <div className="flex flex-col">
-                                                        <Link to={replyProfileLink} className="font-bold text-sm text-slate-900 dark:text-white hover:text-modtale-accent transition-colors flex items-center gap-1.5">
+                                                        {replyProfileLink ? <Link to={replyProfileLink} className="font-bold text-sm text-slate-900 dark:text-white hover:text-modtale-accent transition-colors flex items-center gap-1.5">
                                                             {replyUsername}
                                                             <span className="bg-modtale-accent/10 text-modtale-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest flex items-center gap-1"><Crown className="w-2.5 h-2.5"/> Creator</span>
-                                                        </Link>
+                                                        </Link> : <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                            {replyUsername}
+                                                            <span className="bg-modtale-accent/10 text-modtale-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest flex items-center gap-1"><Crown className="w-2.5 h-2.5"/> Creator</span>
+                                                        </span>}
                                                         <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                                             {formatTimeAgo(comment.developerReply.date)}
                                                         </span>
