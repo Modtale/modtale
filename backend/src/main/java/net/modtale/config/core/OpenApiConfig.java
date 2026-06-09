@@ -31,6 +31,14 @@ import java.util.Set;
 @Configuration
 public class OpenApiConfig {
     private static final int EXAMPLE_MAX_DEPTH = 5;
+    private static final List<String> DOCS_EXCLUDED_PREFIXES = List.of(
+            "/api/v1/admin/",
+            "/api/v1/reports"
+    );
+    private static final List<String> DOCS_EXCLUDED_EXACT_PATHS = List.of(
+            "/api/v1/admin",
+            "/api/v1/analytics/platform/full"
+    );
 
     private static final Map<String, Object> TIER_EXEMPT = Map.of(
             "name", "Exempt",
@@ -537,8 +545,18 @@ public class OpenApiConfig {
     }
 
     private boolean isAdminOnlyDocPath(String path) {
-        return path.startsWith("/api/v1/admin/")
-                || path.equals("/api/v1/admin")
-                || path.equals("/api/v1/analytics/platform/full");
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+
+        if (DOCS_EXCLUDED_EXACT_PATHS.contains(path)) {
+            return true;
+        }
+
+        if (DOCS_EXCLUDED_PREFIXES.stream().anyMatch(path::startsWith)) {
+            return true;
+        }
+
+        return path.matches("^/api/v1/projects/\\{[^/]+}/comments(?:/\\{[^/]+})?(?:/vote)?$");
     }
 }

@@ -258,7 +258,7 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
                                             {memberRoleDropdownOpen === member.id && (
                                                 <div className={`absolute right-0 top-full mt-2 w-48 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95`}>
-                                                    <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                    <div className="max-h-48 overflow-y-auto py-1">
                                                         {org.organizationRoles?.filter(r => !r.isOwner || isOwner || myRole?.isOwner).map(r => (
                                                             <button key={r.id} type="button" onClick={() => { handleRoleUpdate(member.id, r.id); setMemberRoleDropdownOpen(null); }} className={`w-full flex items-center justify-between px-3 py-2 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
                                                                 <div className="flex items-center gap-2 truncate">

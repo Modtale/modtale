@@ -215,7 +215,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                             step={0.1}
                             aria-labelledby="Zoom"
                             onChange={(e) => setZoom(Number(e.target.value))}
-                            className="w-full accent-modtale-accent h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer"
+                            className="themed-range h-4 w-full cursor-pointer"
                         />
                     </div>
                     <div className="flex items-center gap-3 w-full sm:w-auto">

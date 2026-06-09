@@ -215,7 +215,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
                             </h3>
                         </div>
 
-                        <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1 max-h-[400px] overflow-y-auto custom-scrollbar">
+                        <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1 max-h-[400px] overflow-y-auto">
                             {keys.length === 0 ? (
                                 <div className="p-8 text-center text-slate-500 text-sm">No active keys found.</div>
                             ) : keys.map(k => {
@@ -314,7 +314,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
                                             </button>
                                         </div>
 
-                                        <div className="flex w-full overflow-x-auto gap-2 pb-2 pt-1 px-1 custom-scrollbar">
+                                        <div className="flex w-full overflow-x-auto gap-2 pb-2 pt-1 px-1">
                                             <button
                                                 type="button"
                                                 onClick={() => setActiveTab('PERSONAL')}

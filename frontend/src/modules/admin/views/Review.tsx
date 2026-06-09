@@ -318,7 +318,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-8">
                         {currentStep === 0 && (
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
                                 <div className="grid grid-cols-2 gap-6">

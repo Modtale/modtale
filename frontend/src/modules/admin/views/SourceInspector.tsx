@@ -130,13 +130,6 @@ const FileTreeNode: React.FC<{
 const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number }> = ({ content, filename, startLine, endLine }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    const scrollbarStyles = `
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #0f1117; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; border: 2px solid #0f1117; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-    `;
-
     const safeContent = useMemo(() => {
         if (content === null || content === undefined) return '';
         if (typeof content === 'object') {
@@ -159,24 +152,21 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [startLine, content]);
 
     return (
-        <>
-            <style>{scrollbarStyles}</style>
-            <div ref={scrollContainerRef} className="flex h-full font-mono text-xs overflow-auto custom-scrollbar bg-[#0d1117] relative">
-                <div className="sticky left-0 z-10 w-12 bg-[#0d1117] border-r border-white/5 text-slate-600 text-right py-4 pr-3 select-none leading-5 min-h-full h-fit">
-                    {lines.map((_, i) => (
-                        <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
-                            {i + 1}
-                        </div>
-                    ))}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                    <pre className="text-slate-300 leading-5 p-4 pt-4 w-fit min-w-full">
-                         <code>{safeContent}</code>
-                    </pre>
-                </div>
+        <div ref={scrollContainerRef} className="flex h-full overflow-auto bg-[#0d1117] font-mono text-xs relative">
+            <div className="sticky left-0 z-10 h-fit min-h-full w-12 select-none border-r border-white/5 bg-[#0d1117] py-4 pr-3 text-right leading-5 text-slate-600">
+                {lines.map((_, i) => (
+                    <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
+                        {i + 1}
+                    </div>
+                ))}
             </div>
-        </>
+
+            <div className="flex-1 min-w-0">
+                <pre className="text-slate-300 leading-5 p-4 pt-4 w-fit min-w-full">
+                     <code>{safeContent}</code>
+                </pre>
+            </div>
+        </div>
     );
 };
 
@@ -356,7 +346,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                             </button>
 
                             {showIssuesDropdown && (
-                                <div className="absolute top-full left-0 mt-2 w-[500px] max-h-[600px] overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2 custom-scrollbar">
+                                <div className="absolute top-full left-0 mt-2 w-[500px] max-h-[600px] overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2">
                                     <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2 flex justify-between sticky top-0 bg-slate-900 z-10 py-1">
                                         <span>Active Issues</span>
                                     </h4>
@@ -416,7 +406,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-2">
                         {fileSearch ? (
                             <div>
                                 {filteredFiles.length === 0 && (

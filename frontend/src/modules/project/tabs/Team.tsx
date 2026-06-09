@@ -101,7 +101,7 @@ export const Team: React.FC<TeamProps> = ({
                                         </button>
                                         {inviteRoleDropdownOpen && (
                                             <div className={`absolute top-full left-0 right-0 mt-2 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95`}>
-                                                <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                <div className="max-h-48 overflow-y-auto py-1">
                                                     {projectData.projectRoles.map(role => (
                                                         <button key={role.id} type="button" onClick={() => { setInviteRoleId(role.id); setInviteRoleDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
                                                             <div className="flex items-center gap-2 truncate"><div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: role.color}} /><span className={`font-bold text-sm ${theme.colors.textPrimary} truncate`}>{role.name}</span></div>
@@ -172,7 +172,7 @@ export const Team: React.FC<TeamProps> = ({
                                                     </button>
                                                     {memberRoleDropdownOpen === member.userId && (
                                                         <div className={`absolute right-0 top-full mt-2 w-48 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95`}>
-                                                            <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                            <div className="max-h-48 overflow-y-auto py-1">
                                                                 {projectData.projectRoles?.map(r => (
                                                                     <button key={r.id} type="button" onClick={() => { handleRoleUpdate(member.userId, r.id); setMemberRoleDropdownOpen(null); }} className={`w-full flex items-center justify-between px-3 py-2 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
                                                                         <div className="flex items-center gap-2 truncate"><div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: r.color}} /><span className={`font-bold text-xs ${theme.colors.textPrimary} truncate`}>{r.name}</span></div>

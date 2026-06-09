@@ -159,26 +159,6 @@ const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head'] as const;
 const EXAMPLE_MAX_DEPTH = 6;
 const ADMIN_RATE_LIMIT_TIER = 'Admin-Session';
 
-const ScrollbarStyles = () => (
-    <style>{`
-        .response-block::-webkit-scrollbar,
-        .param-list::-webkit-scrollbar {
-            height: 8px;
-            width: 8px;
-        }
-        .response-block::-webkit-scrollbar-thumb,
-        .param-list::-webkit-scrollbar-thumb {
-            background: #475569;
-            border-radius: 4px;
-        }
-        .response-block::-webkit-scrollbar-track,
-        .param-list::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-        }
-    `}</style>
-);
-
 const getMethodColor = (method: string): string => {
     if (method === 'GET') return 'bg-blue-600';
     if (method === 'POST') return 'bg-green-600';
@@ -1204,7 +1184,7 @@ const EndpointCard: React.FC<{ endpoint: EndpointDoc }> = ({ endpoint }) => {
                             <h4 className="font-bold text-slate-500 uppercase mb-2 flex items-center gap-2">
                                 <Layers className="w-3 h-3" /> Parameters
                             </h4>
-                            <div className="param-list max-h-52 overflow-auto space-y-2">
+                            <div className="max-h-52 overflow-auto space-y-2">
                                 {endpoint.params.map((p) => (
                                     <div key={`${endpoint.path}:${endpoint.method}:${p.name}`} className="border-b border-slate-200 dark:border-white/10 last:border-0 pb-2 last:pb-0">
                                         <div className="font-mono text-slate-700 dark:text-slate-200 break-all">
@@ -1243,7 +1223,7 @@ const EndpointCard: React.FC<{ endpoint: EndpointDoc }> = ({ endpoint }) => {
 
                 </div>
 
-                <div className="response-block bg-slate-900 p-4 rounded-lg text-xs font-mono text-slate-300 overflow-auto border border-slate-800 h-fit max-h-[480px]">
+                <div className="bg-slate-900 p-4 rounded-lg text-xs font-mono text-slate-300 overflow-auto border border-slate-800 h-fit max-h-[480px]">
                     <h4 className="font-bold text-slate-500 uppercase mb-2">Responses</h4>
                     {endpoint.responses.length > 0 ? (
                         <div className="space-y-3">
@@ -1353,8 +1333,6 @@ export const ApiDocs: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
             <div className="w-full max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto py-16 overflow-x-hidden">
-                <ScrollbarStyles />
-
                 <div className="text-center mb-12 w-full">
                     <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
                         Modtale <span className="text-modtale-accent">API v1</span>
@@ -1393,7 +1371,6 @@ export const ApiDocs: React.FC = () => {
 
                 {!data && !error && (
                     <div className="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 shadow-2xl overflow-hidden">
-                        <div className="h-1.5 bg-gradient-to-r from-modtale-accent via-sky-400 to-emerald-400 animate-pulse" />
                         <div className="p-6 md:p-8">
                             <div className="flex items-center gap-3 mb-5">
                                 <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-modtale-accent">

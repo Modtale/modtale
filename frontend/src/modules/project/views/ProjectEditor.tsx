@@ -818,7 +818,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                         </SidebarSection>
                         {!isModpack && (
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
-                                <div className={`bg-slate-50 dark:bg-slate-950/50 border ${theme.colors.border} rounded-xl p-2 max-h-80 overflow-y-auto custom-scrollbar`}>
+                                <div className={`bg-slate-50 dark:bg-slate-950/50 border ${theme.colors.border} rounded-xl p-2 max-h-80 overflow-y-auto`}>
                                     {LICENSES.map(lic => (
                                         <button
                                             key={lic.id}

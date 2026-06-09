@@ -141,7 +141,7 @@ export const InlineDownloadUI = () => {
                     <button onClick={() => setView('download')} aria-label="Close Changelog" className={`p-2 rounded-full ${theme.colors.bgSurfaceHover} ${theme.colors.textMuted} transition-colors`}><X className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                 </div>
 
-                <div className={`${theme.components.modalBody} p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4 relative`}>
+                <div className={`${theme.components.modalBody} p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 relative`}>
                     {visibleVersions.length > 0 ? (
                         visibleVersions.map(ver => (
                             <div key={ver.id} className={`rounded-xl p-3 sm:p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-colors`}>
