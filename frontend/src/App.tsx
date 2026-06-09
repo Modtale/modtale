@@ -139,7 +139,7 @@ const AppContent: React.FC = () => {
     };
 
     const handleNavigate = (page: string) => { navigate(page === 'home' ? SiteRoutes.home() : `/${page}`); };
-    const handleUserClick = (username: string) => { navigate(SiteRoutes.creator(username)); };
+    const handleUserClick = (userId: string, username?: string) => { navigate(SiteRoutes.creator(userId, username)); };
 
     const handleToggleFavorite = async (id: string) => {
         if (!user) return;
@@ -257,7 +257,7 @@ const AppContent: React.FC = () => {
                                     </React.Fragment>
                                 ))}
 
-                                <Route path="/creator/:username" element={
+                                <Route path="/creator/:id" element={
                                     <UserProfile
                                         onBack={() => navigate(SiteRoutes.home())}
                                         likedModIds={user?.likedProjectIds || []}

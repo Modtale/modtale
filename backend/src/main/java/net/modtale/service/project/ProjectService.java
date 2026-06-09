@@ -40,6 +40,8 @@ public class ProjectService {
         Cache cache = cacheManager.getCache("projectDetails");
         if (cache != null) {
             if (project.getId() != null) cache.evict(project.getId());
+            String routeHandle = buildProjectHandle(project);
+            if (routeHandle != null) cache.evict(routeHandle);
             if (project.getSlug() != null) cache.evict(project.getSlug());
         }
     }
@@ -47,6 +49,10 @@ public class ProjectService {
     public String extractId(String slugOrId) {
         if (slugOrId == null) return null;
         String clean = slugOrId.replaceAll("\\.(png|jpg|jpeg)$", "");
+        int separatorIndex = clean.lastIndexOf('~');
+        if (separatorIndex >= 0 && separatorIndex < clean.length() - 1) {
+            return clean.substring(separatorIndex + 1);
+        }
         if (clean.length() >= 36) {
             String possibleId = clean.substring(clean.length() - 36);
             if (possibleId.matches("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")) {
@@ -59,9 +65,7 @@ public class ProjectService {
     public Project getRawProjectById(String identifier) {
         String extracted = extractId(identifier);
         if (extracted == null) return null;
-        Optional<Project> direct = projectRepository.findById(extracted);
-        if (direct.isEmpty()) direct = projectRepository.findBySlug(extracted.toLowerCase());
-        return direct.orElse(null);
+        return projectRepository.findById(extracted).orElse(null);
     }
 
     @Cacheable(value = "projectDetails", key = "#identifier")
@@ -101,7 +105,6 @@ public class ProjectService {
 
     private void populateRelatedUsers(Project project) {
         Set<String> userIdsToFetch = new HashSet<>();
-        Set<String> usernamesToFetch = new HashSet<>();
 
         if (project.getTeamMembers() != null) project.getTeamMembers().forEach(m -> userIdsToFetch.add(m.getUserId()));
         if (project.getTeamInvites() != null) project.getTeamInvites().forEach(m -> userIdsToFetch.add(m.getUserId()));
@@ -115,10 +118,9 @@ public class ProjectService {
             }
         }
 
-        if (!userIdsToFetch.isEmpty() || !usernamesToFetch.isEmpty()) {
+        if (!userIdsToFetch.isEmpty()) {
             List<User> users = new ArrayList<>();
             if (!userIdsToFetch.isEmpty()) users.addAll(mongoTemplate.find(new Query(Criteria.where("_id").in(userIdsToFetch)), User.class));
-            if (!usernamesToFetch.isEmpty()) users.addAll(userRepository.findByUsernameIn(usernamesToFetch));
 
             Map<String, User> userMapById = users.stream().collect(Collectors.toMap(User::getId, u -> u));
 
@@ -138,9 +140,33 @@ public class ProjectService {
     }
 
     public String getProjectLink(Project project) {
-        String slug = project.getSlug() != null && !project.getSlug().isEmpty() ? project.getSlug() : project.getId();
-        if ("MODPACK".equals(project.getClassification().name())) return "/modpack/" + slug;
-        if ("SAVE".equals(project.getClassification().name())) return "/world/" + slug;
-        return "/mod/" + slug;
+        String handle = buildProjectHandle(project);
+        if ("MODPACK".equals(project.getClassification().name())) return "/modpack/" + handle;
+        if ("SAVE".equals(project.getClassification().name())) return "/world/" + handle;
+        return "/mod/" + handle;
+    }
+
+    private String buildProjectHandle(Project project) {
+        if (project == null || project.getId() == null || project.getId().isBlank()) return null;
+        String base = project.getSlug();
+        if (base == null || base.isBlank()) {
+            base = createSlug(project.getTitle());
+        }
+        if (base != null && project.getId() != null) {
+            if (base.equals(project.getId())) return project.getId();
+            if (base.endsWith("~" + project.getId())) base = base.substring(0, base.length() - project.getId().length() - 1);
+            else if (base.endsWith("-" + project.getId())) base = base.substring(0, base.length() - project.getId().length() - 1);
+        }
+        if (base == null || base.isBlank()) return project.getId();
+        return base + "~" + project.getId();
+    }
+
+    private String createSlug(String title) {
+        if (title == null) return null;
+        String slug = title.toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-|-$)", "");
+        if (slug.length() > 30) slug = slug.substring(0, 30);
+        return slug;
     }
 }

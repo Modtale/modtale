@@ -118,7 +118,7 @@ public class ProjectController {
     }
 
     @PostMapping("/projects")
-    @PreAuthorize("@apiSecurity.hasCreateProjectPerm(#owner, authentication)")
+    @PreAuthorize("@apiSecurity.hasCreateProjectPerm(#requestPayload.owner, authentication)")
     public ResponseEntity<?> createProject(@ModelAttribute CreateProjectRequest requestPayload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

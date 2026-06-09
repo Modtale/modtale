@@ -96,7 +96,7 @@ class LifecycleServiceTest {
         when(projectRepository.existsByTitleIgnoreCase("Raw Title")).thenReturn(false);
         when(projectRepository.countByAuthorId("org-1")).thenReturn(0L);
         when(projectRepository.existsBySlug("Sky-Ship")).thenReturn(false);
-        when(mongoTemplate.findOne(any(Query.class), eq(User.class))).thenReturn(organization);
+        when(userRepository.findById("org-1")).thenReturn(java.util.Optional.of(organization));
         when(sanitizationService.sanitizePlainText("Raw Title")).thenReturn("Clean Title");
         when(sanitizationService.sanitizePlainText("Raw Description")).thenReturn("Clean Description");
         when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -106,7 +106,7 @@ class LifecycleServiceTest {
                 "Raw Description",
                 ProjectClassification.MODPACK,
                 creator,
-                "SkyOrg",
+                "org-1",
                 "Sky-Ship"
         );
 

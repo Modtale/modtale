@@ -71,7 +71,6 @@ class ProjectMapperTest {
         project.setAbout("Deep project details");
         project.setChildProjectIds(List.of("child-1"));
         project.setModIds(List.of("mod-1"));
-        project.setContributors(List.of("Ada", "Grace"));
         project.setGalleryImages(List.of("https://example.com/one.png"));
         project.setProjectRoles(List.of(new Project.ProjectRole("role-1", "Editor", "#fff", List.of("PROJECT_EDIT_METADATA"))));
         project.setTeamMembers(List.of(new Project.ProjectMember("user-1", "role-1")));

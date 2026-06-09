@@ -103,7 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             return (
                                 <Link
                                     key={member.id}
-                                    to={SiteRoutes.creator(member.username)}
+                                    to={SiteRoutes.creator(member.id, member.username)}
                                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <OptimizedImage
@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             return (
                                 <Link
                                     key={contributor.id}
-                                    to={SiteRoutes.creator(contributor.username)}
+                                    to={SiteRoutes.creator(contributor.id, contributor.username)}
                                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <OptimizedImage

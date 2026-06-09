@@ -42,26 +42,22 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
     public Page<Project> searchProjects(
             String search, List<String> tags, String gameVersion, String classification,
             Double minRating, Integer minDownloads, Integer minFavorites, Pageable pageable,
-            String currentUsername, String sortBy,
+            String currentUserId, String sortBy,
             String viewCategory, LocalDate dateCutoff, String authorId
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
 
-        if ("Your Projects".equals(viewCategory) && currentUsername != null) {
+        if ("Your Projects".equals(viewCategory) && currentUserId != null) {
             criteriaList.add(new Criteria().orOperator(
-                    authorId != null ? Criteria.where("authorId").is(authorId) : new Criteria(),
-                    Criteria.where("author").is(currentUsername),
-                    Criteria.where("contributors").is(currentUsername)
+                    Criteria.where("authorId").is(currentUserId),
+                    Criteria.where("teamMembers.userId").is(currentUserId)
             ));
         } else {
             criteriaList.add(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED));
         }
 
         if (authorId != null && !authorId.trim().isEmpty()) {
-            criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("authorId").is(authorId),
-                    Criteria.where("author").is(authorId)
-            ));
+            criteriaList.add(Criteria.where("authorId").is(authorId));
         }
 
         if (search != null && !search.trim().isEmpty()) {

@@ -1,6 +1,7 @@
 package net.modtale.service.project;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.NotificationType;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
@@ -37,7 +38,7 @@ public class TeamService {
         User target = userRepository.findById(targetUserId).orElseThrow(() -> new IllegalArgumentException("Target not found"));
         if (project.getAuthorId() != null && target.getId().equals(project.getAuthorId())) throw new IllegalArgumentException("Already owned by this entity.");
 
-        project.setPendingTransferTo(target.getUsername());
+        project.setPendingTransferTo(target.getId());
         projectRepository.save(project);
         projectService.evictProjectCache(project);
 
@@ -54,16 +55,19 @@ public class TeamService {
         if (project == null || project.getPendingTransferTo() == null) throw new IllegalArgumentException("Invalid request.");
         lifecycleService.ensureEditable(project);
 
-        if (!responder.getUsername().equalsIgnoreCase(project.getPendingTransferTo())) {
-            User tUser = userRepository.findByUsername(project.getPendingTransferTo()).orElse(null);
-            if (tUser == null || tUser.getAccountType() != User.AccountType.ORGANIZATION || tUser.getOrganizationMembers().stream().noneMatch(m -> m.getUserId().equals(responder.getId()) && "ADMIN".equalsIgnoreCase(m.getRole()))) {
+        if (!responder.getId().equals(project.getPendingTransferTo())) {
+            User tUser = userRepository.findById(project.getPendingTransferTo()).orElse(null);
+            if (tUser == null || tUser.getAccountType() != User.AccountType.ORGANIZATION || (
+                    !accessControlService.hasOrgPermission(tUser, responder.getId(), ApiKey.ApiPermission.PROJECT_EDIT_METADATA) &&
+                    !accessControlService.hasOrgPermission(tUser, responder.getId(), ApiKey.ApiPermission.PROJECT_CREATE)
+            )) {
                 throw new SecurityException("Unauthorized.");
             }
         }
 
         if (accept) {
             User oldOwner = userRepository.findById(project.getAuthorId()).orElse(null);
-            User newOwner = userRepository.findByUsernameIgnoreCase(project.getPendingTransferTo()).orElseThrow();
+            User newOwner = userRepository.findById(project.getPendingTransferTo()).orElseThrow();
 
             if (oldOwner != null) {
                 if (oldOwner.getAccountType() == User.AccountType.ORGANIZATION && oldOwner.getOrganizationMembers() != null) {

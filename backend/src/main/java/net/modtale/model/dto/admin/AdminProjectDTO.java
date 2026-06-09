@@ -39,7 +39,6 @@ public record AdminProjectDTO(
         String expiresAt,
         LocalDateTime deletedAt,
         String approvedBy,
-        List<String> contributors,
         List<String> galleryImages,
         List<Project.ProjectRole> projectRoles,
         List<Project.ProjectMember> teamMembers,

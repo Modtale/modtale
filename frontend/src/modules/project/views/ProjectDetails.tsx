@@ -398,7 +398,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     if (isNotFound) return <NotFound />;
     if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
 
-    const canEdit = project.canEdit ?? (currentUser && (currentUser.username === project.author || project.teamMembers?.some(m => m.userId === currentUser.id)));
+    const canEdit = project.canEdit ?? Boolean(
+        currentUser && (
+            currentUser.id === project.authorId ||
+            project.teamMembers?.some(m => m.userId === currentUser.id)
+        )
+    );
 
     const meta = generateProjectMeta(project);
     const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);

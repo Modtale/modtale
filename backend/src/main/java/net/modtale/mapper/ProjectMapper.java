@@ -91,7 +91,6 @@ public class ProjectMapper {
                 project.getExpiresAt(),
                 project.getDeletedAt(),
                 project.getApprovedBy(),
-                project.getContributors(),
                 project.getGalleryImages(),
                 project.getProjectRoles(),
                 project.getTeamMembers(),
@@ -148,8 +147,6 @@ public class ProjectMapper {
             dto.setProjectRoles(project.getProjectRoles());
             dto.setTeamMembers(project.getTeamMembers());
             dto.setTeamInvites(project.getTeamInvites());
-
-            dto.setContributors(project.getContributors());
             dto.setGalleryImages(project.getGalleryImages());
             dto.setComments(project.getComments() != null
                     ? project.getComments().stream()

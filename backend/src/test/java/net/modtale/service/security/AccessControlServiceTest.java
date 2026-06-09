@@ -81,7 +81,7 @@ class AccessControlServiceTest {
 
         assertTrue(accessControlService.hasCreateProjectPerm(null, null));
         assertTrue(accessControlService.hasCreateProjectPerm("", null));
-        assertTrue(accessControlService.hasCreateProjectPerm("ada", null));
+        assertTrue(accessControlService.hasCreateProjectPerm("u-1", null));
 
         User org = organization(
                 "org-1",
@@ -89,8 +89,8 @@ class AccessControlServiceTest {
                 List.of(orgRole("manager", false, Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA))),
                 List.of(orgMember("u-1", "manager", null))
         );
-        when(userRepository.findByUsernameIgnoreCase("SkyOrg")).thenReturn(Optional.of(org));
-        assertTrue(accessControlService.hasCreateProjectPerm("SkyOrg", null));
+        when(userRepository.findById("org-1")).thenReturn(Optional.of(org));
+        assertTrue(accessControlService.hasCreateProjectPerm("org-1", null));
 
         User admin = user("u-admin", "admin", List.of("ADMIN"));
         when(accountService.getCurrentUser()).thenReturn(admin);

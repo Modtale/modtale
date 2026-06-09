@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.bson.Document;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -95,10 +96,10 @@ public class NotificationService {
     private void voidAction(Notification n) {
         try {
             if (n.getType() == NotificationType.TRANSFER_REQUEST) {
-                String modId = n.getMetadata().get("modId");
-                if (modId != null) {
+                String projectId = n.getMetadata().get("projectId");
+                if (projectId != null) {
                     mongoTemplate.updateFirst(
-                            new Query(Criteria.where("_id").is(modId).and("pendingTransferTo").exists(true)),
+                            new Query(Criteria.where("_id").is(projectId).and("pendingTransferTo").exists(true)),
                             new Update().unset("pendingTransferTo"),
                             Project.class
                     );
@@ -108,20 +109,18 @@ public class NotificationService {
                 if (orgId != null) {
                     mongoTemplate.updateFirst(
                             new Query(Criteria.where("_id").is(orgId)),
-                            new Update().pull("pendingOrgInvites", new Query(Criteria.where("userId").is(n.getUserId()))),
+                            new Update().pull("pendingOrgInvites", new Document("userId", n.getUserId())),
                             User.class
                     );
                 }
             } else if (n.getType() == NotificationType.CONTRIBUTOR_INVITE) {
-                String modId = n.getMetadata().get("modId");
-                if (modId != null) {
-                    userRepository.findById(n.getUserId()).ifPresent(u -> {
-                        mongoTemplate.updateFirst(
-                                new Query(Criteria.where("_id").is(modId)),
-                                new Update().pull("pendingInvites", u.getUsername()),
-                                Project.class
-                        );
-                    });
+                String projectId = n.getMetadata().get("projectId");
+                if (projectId != null) {
+                    mongoTemplate.updateFirst(
+                            new Query(Criteria.where("_id").is(projectId)),
+                            new Update().pull("teamInvites", new Document("userId", n.getUserId())),
+                            Project.class
+                    );
                 }
             }
         } catch (Exception e) {

@@ -29,7 +29,7 @@ public class SearchService {
     @Autowired private AccountService accountService;
     @Autowired private MongoTemplate mongoTemplate;
 
-    public Page<Project> searchProjects(List<String> tags, String search, int page, int size, String sortBy, String gameVersion, String contentType, Integer minDownloads, Integer minFavorites, String viewCategory, String dateRange, String author) {
+    public Page<Project> searchProjects(List<String> tags, String search, int page, int size, String sortBy, String gameVersion, String contentType, Integer minDownloads, Integer minFavorites, String viewCategory, String dateRange, String authorId) {
         if ("Favorites".equals(viewCategory)) {
             User currentUser = accountService.getCurrentUser();
             List<String> likedIds = (currentUser != null && currentUser.getLikedModIds() != null) ? currentUser.getLikedModIds() : new ArrayList<>();
@@ -55,16 +55,10 @@ public class SearchService {
             } catch (Exception ignored) {}
         }
 
-        String authorIdParam = author;
-        if (author != null && !author.isEmpty()) {
-            Optional<User> u = userRepository.findByUsernameIgnoreCase(author);
-            if (u.isPresent()) authorIdParam = u.get().getId();
-        }
-
         User currentUser = accountService.getCurrentUser();
         Page<Project> results = projectRepository.searchProjects(
                 search, tags, gameVersion, contentType, null, minDownloads, minFavorites, PageRequest.of(page, size, sort),
-                currentUser != null ? currentUser.getUsername() : null, sortBy, viewCategory, dateCutoff, authorIdParam
+                currentUser != null ? currentUser.getId() : null, sortBy, viewCategory, dateCutoff, authorId
         );
 
         if (results.hasContent()) {

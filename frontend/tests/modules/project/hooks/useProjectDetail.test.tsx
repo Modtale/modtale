@@ -10,7 +10,6 @@ vi.mock('@/modules/project/api/projectClient', () => ({
         getProject: vi.fn(),
         trackView: vi.fn(),
         getUserProfile: vi.fn(),
-        lookupUser: vi.fn(),
         getOrgMembers: vi.fn(),
         getUsersBatch: vi.fn(),
         getDependencyMeta: vi.fn(),
@@ -92,6 +91,7 @@ describe('useProjectDetail', () => {
         const rawId = `sky-tools-${projectId}`;
         const project = {
             id: projectId,
+            authorId: 'org-1',
             author: 'SkyOrg',
             teamMembers: [{ userId: 'contrib-1', roleId: 'dev' }],
             versions: [
@@ -113,7 +113,6 @@ describe('useProjectDetail', () => {
         } satisfies User;
 
         mockedProjectClient.getProject.mockResolvedValue(project);
-        mockedProjectClient.lookupUser.mockResolvedValue({ id: 'org-1' });
         mockedProjectClient.getUserProfile.mockResolvedValue({
             id: 'org-1',
             username: 'SkyOrg',
@@ -157,7 +156,6 @@ describe('useProjectDetail', () => {
         expect(mockedProjectClient.getProject).toHaveBeenCalledWith(projectId);
         expect(mockedProjectClient.trackView).toHaveBeenCalledTimes(1);
         expect(mockedProjectClient.trackView).toHaveBeenCalledWith(projectId);
-        expect(mockedProjectClient.lookupUser).toHaveBeenCalledWith('SkyOrg');
         expect(mockedProjectClient.getUserProfile).toHaveBeenCalledWith('org-1');
         expect(mockedProjectClient.getOrgMembers).toHaveBeenCalledWith('org-1');
         expect(mockedProjectClient.getUsersBatch).toHaveBeenCalledWith(['contrib-1']);
@@ -188,7 +186,6 @@ describe('useProjectDetail', () => {
         expect(probe.dataset.loading).toBe('false');
         expect(probe.dataset.notFound).toBe('true');
         expect(mockedProjectClient.trackView).not.toHaveBeenCalled();
-        expect(mockedProjectClient.lookupUser).not.toHaveBeenCalled();
         expect(latestSnapshot.project).toBeNull();
     });
 

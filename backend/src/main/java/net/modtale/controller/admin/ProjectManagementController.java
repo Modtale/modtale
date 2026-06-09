@@ -78,10 +78,7 @@ public class ProjectManagementController {
         Project project = projectService.getRawProjectById(id);
         if (project == null) return ResponseEntity.notFound().build();
 
-        User author = userRepository.findByUsernameIgnoreCase(project.getAuthor()).orElse(null);
-        if (author == null) {
-            author = userRepository.findById(project.getAuthor()).orElse(null);
-        }
+        User author = userRepository.findById(project.getAuthorId()).orElse(null);
 
         AdminAuthorStatsDTO authorStats = new AdminAuthorStatsDTO(
                 author != null ? author.getCreatedAt() : "Unknown",
@@ -262,7 +259,7 @@ public class ProjectManagementController {
                     List.of(targetProject.getAuthorId()),
                     "Project Unlisted",
                     "Your project '" + targetProject.getTitle() + "' was unlisted from the public directory by an administrator. Reason: " + reason,
-                    URI.create("/mod/" + targetProject.getSlug()),
+                    URI.create(projectService.getProjectLink(targetProject)),
                     null
             );
 
