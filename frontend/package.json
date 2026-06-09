@@ -8,7 +8,8 @@
     "start": "node dist/server/entry.mjs",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "test": "vitest run"
   },
   "dependencies": {
     "@astrojs/node": "^8.2.0",
@@ -41,6 +42,8 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.0.0",
     "baseline-browser-mapping": "^2.10.32",
-    "typescript": "^5.9.3"
+    "jsdom": "^29.1.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.8"
   }
 }
