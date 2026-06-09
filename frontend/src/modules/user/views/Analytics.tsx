@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BarChart2, Star, PieChart, ChevronDown, Check, User as UserIcon, Building2, Download, Eye, TrendingUp, TrendingDown, Layers } from 'lucide-react';
+import { BarChart2, PieChart, ChevronDown, Check, User as UserIcon, Building2, Download, Eye, TrendingUp, TrendingDown, Layers, CalendarClock } from 'lucide-react';
 import { api } from '@/utils/api';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LineChart } from '@/components/ui/charts/LineChart';
@@ -159,13 +159,13 @@ export const Analytics: React.FC = () => {
                     });
 
                     setTableConfig({
-                        headers: ["Project Name", "Period Downloads", "Total Downloads", "Rating", "Action"],
+                        headers: ["Project Name", "Period Downloads", "Total Downloads", "Updated", "Action"],
                         rowRenderer: (pid, sum) => (
                             <>
                                 <td className="p-4 pl-6 font-bold text-slate-900 dark:text-white">{projectMeta[pid]?.title || pid}</td>
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">+{sum.toLocaleString()}</td>
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{(projectMeta[pid]?.totalDownloads || 0).toLocaleString()}</td>
-                                <td className="p-4"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 font-bold text-xs"><Star className="w-3 h-3 fill-current" /> {projectMeta[pid]?.currentRating ?? 'N/A'}</span></td>
+                                <td className="p-4"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-300 font-bold text-xs"><CalendarClock className="w-3 h-3" /> {projectMeta[pid]?.updatedAt || 'Unknown'}</span></td>
                                 <td className="p-4 text-right pr-6"><button onClick={() => navigate(`/dashboard/analytics/project/${pid}`)} className="text-slate-500 hover:text-modtale-accent font-bold text-xs border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl hover:border-modtale-accent transition-all bg-white/50 dark:bg-white/5 shadow-sm">Details</button></td>
                             </>
                         )
@@ -178,8 +178,6 @@ export const Analytics: React.FC = () => {
                     ]).then(r => [r[0].data, r[1].data as Project]);
                     const versionDownloads = normalizeSeriesMap(analytics?.versionDownloads);
                     const views = normalizePointSeries(analytics?.views);
-                    const ratingHistory = normalizePointSeries(analytics?.ratingHistory);
-
                     setMeta({ title: info.title, subtitle: "Project Performance & Reach" });
 
                     const vMap = new Map(info.versions.map((v: { id: any; }) => [v.id, v]));
@@ -200,11 +198,7 @@ export const Analytics: React.FC = () => {
                     });
                     setItemMeta(vMeta);
 
-                    setFourthChart(
-                        ratingHistory.length > 0
-                            ? { title: "Rating History", icon: <Star className="w-5 h-5 text-yellow-500" />, type: 'line', data: [{ id: 'avg_rating', label: 'Rating', color: '#f59e0b', data: ratingHistory }] }
-                            : null
-                    );
+                    setFourthChart(null);
 
                     setSummary({
                         downloads: { value: analytics.totalDownloads, total: info.downloadCount, trend: 0 },

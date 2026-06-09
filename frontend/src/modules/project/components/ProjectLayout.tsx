@@ -26,7 +26,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = React.memo(({
                                                                          }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
-    const MOBILE_VISIBLE_KEYWORDS = ['Downloads', 'Ratings', 'Dependencies', 'Supported Versions', 'Tags'];
+    const MOBILE_VISIBLE_KEYWORDS = ['Downloads', 'Dependencies', 'Supported Versions', 'Tags'];
     const isVisibleOnMobile = MOBILE_VISIBLE_KEYWORDS.some(keyword =>
         title.toLowerCase().includes(keyword.toLowerCase())
     );

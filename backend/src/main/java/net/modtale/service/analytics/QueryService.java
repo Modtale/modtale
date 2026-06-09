@@ -107,7 +107,7 @@ public class QueryService {
 
         Map<String, ProjectMeta> metaMap = new HashMap<>(); Map<String, List<AnalyticsDataPoint>> pDls = new HashMap<>(); Map<String, List<AnalyticsDataPoint>> pViews = new HashMap<>();
         ownedProjects.forEach(p -> {
-            metaMap.put(p.getId(), new ProjectMeta(p.getId(), p.getTitle(), p.getDownloadCount()));
+            metaMap.put(p.getId(), new ProjectMeta(p.getId(), p.getTitle(), p.getDownloadCount(), p.getUpdatedAt()));
             List<ProjectMonthlyStats> modStats = allStats.stream().filter(s -> s.getProjectId().equals(p.getId())).toList();
             pDls.put(p.getId(), buildTimeSeries(modStats, chartStart, end, true));
             pViews.put(p.getId(), buildTimeSeries(modStats, chartStart, end, false));

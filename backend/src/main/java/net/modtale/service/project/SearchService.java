@@ -56,9 +56,16 @@ public class SearchService {
         }
 
         User currentUser = accountService.getCurrentUser();
+        String resolvedAuthorId = authorId;
+        if (resolvedAuthorId != null && !resolvedAuthorId.trim().isEmpty()) {
+            Optional<User> resolvedAuthor = userRepository.findByUsernameIgnoreCase(resolvedAuthorId);
+            if (resolvedAuthor.isPresent()) {
+                resolvedAuthorId = resolvedAuthor.get().getId();
+            }
+        }
         Page<Project> results = projectRepository.searchProjects(
-                search, tags, gameVersion, contentType, null, minDownloads, minFavorites, PageRequest.of(page, size, sort),
-                currentUser != null ? currentUser.getId() : null, sortBy, viewCategory, dateCutoff, authorId
+                search, tags, gameVersion, contentType, minDownloads, minFavorites, PageRequest.of(page, size, sort),
+                currentUser != null ? currentUser.getId() : null, sortBy, viewCategory, dateCutoff, resolvedAuthorId
         );
 
         if (results.hasContent()) {
