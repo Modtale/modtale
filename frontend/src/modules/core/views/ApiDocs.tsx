@@ -17,6 +17,9 @@ import {
     Key,
     Gauge,
     Zap,
+    Search,
+    Braces,
+    ChevronRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BACKEND_URL } from '@/utils/api';
@@ -73,12 +76,29 @@ type OpenApiIndex = {
     server: string;
     totalEndpoints: number;
     rateLimitTiers: RateLimitTier[];
+    schemas: SchemaDoc[];
     endpoints: EndpointDoc[];
+};
+
+type SchemaField = {
+    name: string;
+    required: boolean;
+    type: string;
+    description?: string;
+};
+
+type SchemaDoc = {
+    name: string;
+    type: string;
+    description?: string;
+    fields: SchemaField[];
+    example: string;
 };
 
 type RawSchema = {
     type?: string;
     format?: string;
+    description?: string;
     enum?: unknown[];
     default?: unknown;
     example?: unknown;
@@ -224,6 +244,41 @@ const toHint = (schema: Record<string, unknown> | undefined): string => {
 
     const format = typeof schema.format === 'string' ? schema.format : null;
     return format ? `${schemaType} (${format})` : schemaType;
+};
+
+const schemaLabel = (schema: RawSchema | undefined, registry: Record<string, RawSchema>): string => {
+    if (!schema) return 'schema';
+    if (schema.$ref) {
+        const key = schema.$ref.includes('/') ? schema.$ref.substring(schema.$ref.lastIndexOf('/') + 1) : schema.$ref;
+        return key;
+    }
+
+    if (schema.enum && schema.enum.length > 0) {
+        const baseType = schema.type || 'enum';
+        return `${baseType} (${schema.enum.map((item) => String(item)).join(' | ')})`;
+    }
+
+    if (schema.allOf?.length) {
+        return schema.allOf.map((part) => schemaLabel(part, registry)).join(' & ');
+    }
+    if (schema.oneOf?.length) {
+        return schema.oneOf.map((part) => schemaLabel(part, registry)).join(' | ');
+    }
+    if (schema.anyOf?.length) {
+        return schema.anyOf.map((part) => schemaLabel(part, registry)).join(' | ');
+    }
+    if (schema.type === 'array' || schema.items) {
+        return `Array<${schemaLabel(schema.items, registry)}>`;
+    }
+    if (schema.additionalProperties) {
+        if (typeof schema.additionalProperties === 'object') {
+            return `Record<string, ${schemaLabel(schema.additionalProperties, registry)}>`;
+        }
+        return 'Record<string, unknown>';
+    }
+
+    const type = schema.type || 'object';
+    return schema.format ? `${type} (${schema.format})` : type;
 };
 
 const stringifyExample = (value: unknown): string => {
@@ -965,6 +1020,31 @@ const parseOpenApi = (raw: RawOpenApi): OpenApiIndex => {
     const rateLimitTierMap = new Map<string, RateLimitTier>();
     const paths = raw.paths || {};
     const schemas = raw.components?.schemas || {};
+    const schemaDocs: SchemaDoc[] = Object.entries(schemas)
+        .map(([name, schema]) => {
+            const resolved = schema.$ref ? resolveRefSchema(schema.$ref, schemas) || schema : schema;
+            const required = new Set(resolved.required || []);
+            const fields = Object.entries(resolved.properties || {})
+                .map(([fieldName, fieldSchema]) => ({
+                    name: fieldName,
+                    required: required.has(fieldName),
+                    type: schemaLabel(fieldSchema, schemas),
+                    description: fieldSchema.description,
+                }))
+                .sort((a, b) => {
+                    if (a.required !== b.required) return a.required ? -1 : 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+            return {
+                name,
+                type: schemaLabel(resolved, schemas),
+                description: resolved.description,
+                fields,
+                example: stringifyExample(buildSchemaExample(resolved, schemas, name, 0, new Set())),
+            };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     Object.entries(paths).forEach(([path, pathItem]) => {
         if (isAdminOnlyPath(path)) return;
@@ -1030,8 +1110,60 @@ const parseOpenApi = (raw: RawOpenApi): OpenApiIndex => {
         server,
         totalEndpoints: endpoints.length,
         rateLimitTiers: Array.from(rateLimitTierMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
+        schemas: schemaDocs,
         endpoints,
     };
+};
+
+const SchemaCard: React.FC<{ schema: SchemaDoc }> = ({ schema }) => {
+    return (
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-4 p-5 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-slate-950/40 overflow-hidden">
+            <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white break-all">{schema.name}</h3>
+                    <span className="px-2 py-1 rounded-full text-[11px] font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300">
+                        {schema.type}
+                    </span>
+                </div>
+                {schema.description && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">{schema.description}</p>
+                )}
+
+                {schema.fields.length > 0 ? (
+                    <div className="space-y-2">
+                        {schema.fields.map((field) => (
+                            <div key={`${schema.name}:${field.name}`} className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/70 p-3">
+                                <div className="flex flex-wrap items-center gap-2 text-sm">
+                                    <span className="font-mono font-bold text-slate-900 dark:text-white break-all">{field.name}</span>
+                                    <ChevronRight className="w-3 h-3 text-slate-400" />
+                                    <span className="font-mono text-slate-600 dark:text-slate-300 break-all">{field.type}</span>
+                                    {field.required && (
+                                        <span className="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-[10px] uppercase font-bold tracking-wide text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20">
+                                            Required
+                                        </span>
+                                    )}
+                                </div>
+                                {field.description && (
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{field.description}</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No explicit properties are defined for this schema.</p>
+                )}
+            </div>
+
+            <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-[0.22em] font-bold text-slate-500 dark:text-slate-400 mb-2">
+                    Example Payload
+                </div>
+                <pre className="whitespace-pre-wrap break-all text-[11px] bg-slate-950 text-slate-200 p-4 rounded-xl border border-slate-800 overflow-auto max-h-[28rem]">
+                    {schema.example}
+                </pre>
+            </div>
+        </div>
+    );
 };
 
 const EndpointCard: React.FC<{ endpoint: EndpointDoc }> = ({ endpoint }) => {
@@ -1145,6 +1277,7 @@ const EndpointCard: React.FC<{ endpoint: EndpointDoc }> = ({ endpoint }) => {
 export const ApiDocs: React.FC = () => {
     const [data, setData] = useState<OpenApiIndex | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [schemaQuery, setSchemaQuery] = useState('');
 
     useEffect(() => {
         let isMounted = true;
@@ -1196,6 +1329,20 @@ export const ApiDocs: React.FC = () => {
     const publicTier = rateTierByName.get('Public-IP');
     const standardTier = rateTierByName.get('Standard-API');
     const enterpriseTier = rateTierByName.get('Enterprise-API');
+    const filteredSchemas = useMemo(() => {
+        if (!data) return [];
+        const query = schemaQuery.trim().toLowerCase();
+        if (!query) return data.schemas;
+
+        return data.schemas.filter((schema) => {
+            if (schema.name.toLowerCase().includes(query)) return true;
+            if ((schema.description || '').toLowerCase().includes(query)) return true;
+            return schema.fields.some((field) =>
+                field.name.toLowerCase().includes(query) ||
+                field.type.toLowerCase().includes(query) ||
+                (field.description || '').toLowerCase().includes(query));
+        });
+    }, [data, schemaQuery]);
 
     const fmt = (value: number | string | undefined): string => {
         if (typeof value === 'number') return value.toLocaleString();
@@ -1245,8 +1392,24 @@ export const ApiDocs: React.FC = () => {
                 )}
 
                 {!data && !error && (
-                    <div className="p-6 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-600 dark:text-slate-300">
-                        Loading generated API reference...
+                    <div className="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 shadow-2xl overflow-hidden">
+                        <div className="h-1.5 bg-gradient-to-r from-modtale-accent via-sky-400 to-emerald-400 animate-pulse" />
+                        <div className="p-6 md:p-8">
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-modtale-accent">
+                                    <Braces className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Loading API reference</h2>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">Pulling live OpenAPI metadata, examples, and schemas from the backend.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
+                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
+                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -1317,6 +1480,45 @@ export const ApiDocs: React.FC = () => {
                                             <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">For high-volume integrations.</p>
                                         </div>
                                     </div>
+                                </div>
+                            </section>
+                        )}
+
+                        {data.schemas.length > 0 && (
+                            <section className="w-full">
+                                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                            <Braces className="w-6 h-6 text-slate-400" /> Schemas
+                                        </h2>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                            Browse the shared request and response models generated from the same live OpenAPI source.
+                                        </p>
+                                    </div>
+                                    <label className="relative block w-full md:w-80">
+                                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                        <input
+                                            type="search"
+                                            value={schemaQuery}
+                                            onChange={(event) => setSchemaQuery(event.target.value)}
+                                            placeholder="Search schema names or fields"
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-modtale-accent/40"
+                                        />
+                                    </label>
+                                </div>
+
+                                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl w-full overflow-hidden">
+                                    {filteredSchemas.length > 0 ? (
+                                        <div className="space-y-4">
+                                            {filteredSchemas.map((schema) => (
+                                                <SchemaCard key={schema.name} schema={schema} />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-white/10 p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                                            No schemas matched <span className="font-mono text-slate-700 dark:text-slate-200">{schemaQuery}</span>.
+                                        </div>
+                                    )}
                                 </div>
                             </section>
                         )}
