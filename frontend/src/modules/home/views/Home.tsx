@@ -42,24 +42,27 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
 };
 
 export const Home: React.FC = () => {
+    const DESKTOP_BREAKPOINT = 1024;
+    const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
+    const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
+
     const { initialData: ssrData } = useSSRData();
     const homeSeo = ROUTE_SEO['/'];
 
-    const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
-    const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+    const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_BREAKPOINT : true);
+    const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_HERO_MIN_WIDTH_ENTER : true);
     const [projects, setProjects] = useState<Project[]>(ssrData?.homeProjects || []);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const [readyForHeavyUI, setReadyForHeavyUI] = useState(false);
+    const heroGridRef = useRef<HTMLDivElement>(null);
     const heroTextColumnRef = useRef<HTMLDivElement>(null);
     const heroMarqueeDesktopRef = useRef<HTMLDivElement>(null);
     const heroActionsRef = useRef<HTMLElement>(null);
-    const safeSamplesRef = useRef(0);
-    const lastLayoutSwitchAtRef = useRef(0);
 
     const formatMetric = (value?: number) => (value || 0).toLocaleString();
 
     useEffect(() => {
-        const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+        const handleResize = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
         window.addEventListener('resize', handleResize, { passive: true });
 
         let hasRunHeavyUi = false;
@@ -130,12 +133,19 @@ export const Home: React.FC = () => {
                 (window as Window & { cancelIdleCallback: (handle: number) => void }).cancelIdleCallback(fetchIdleHandle);
             }
         };
-    }, [ssrData?.homeProjects?.length, ssrData?.stats?.totalProjects]);
+    }, [DESKTOP_BREAKPOINT, ssrData?.homeProjects?.length, ssrData?.stats?.totalProjects]);
 
     useEffect(() => {
-        const shouldUseMobileFallback = (currentDesktopLayout: boolean) => {
+        let frameId = 0;
+
+        const shouldUseDesktopLayout = (currentDesktopLayout: boolean) => {
             const viewportWidth = window.innerWidth;
-            if (viewportWidth < 1024) return true;
+            if (viewportWidth < DESKTOP_BREAKPOINT) return false;
+
+            const gridEl = heroGridRef.current;
+            const gridWidth = gridEl?.clientWidth ?? viewportWidth;
+            const widthThreshold = currentDesktopLayout ? DESKTOP_HERO_MIN_WIDTH_EXIT : DESKTOP_HERO_MIN_WIDTH_ENTER;
+            if (gridWidth < widthThreshold) return false;
 
             const actionsEl = heroActionsRef.current;
             const textEl = heroTextColumnRef.current;
@@ -149,8 +159,11 @@ export const Home: React.FC = () => {
                     || (actionItems.length > 1 && actionItems.some((item) => item.offsetTop !== actionItems[0].offsetTop));
             }
 
+            const hasTextOverflow = !!textEl
+                && (textEl.scrollWidth > textEl.clientWidth + 1 || textEl.scrollHeight > textEl.clientHeight + 1);
+
             let hasHeroOverlap = false;
-            if (textEl && marqueeEl) {
+            if (currentDesktopLayout && textEl && marqueeEl) {
                 const textRect = textEl.getBoundingClientRect();
                 const marqueeRect = marqueeEl.getBoundingClientRect();
                 const hasCollision = !(
@@ -160,63 +173,51 @@ export const Home: React.FC = () => {
                     || textRect.top >= marqueeRect.bottom
                 );
                 const horizontalGap = marqueeRect.left - textRect.right;
-                hasHeroOverlap = hasCollision || horizontalGap < 40;
-            } else if (!currentDesktopLayout) {
-                // When fallback is active, do not force a width gate.
-                // Let desktop return once wrap/overlap risk is no longer detected.
-                hasHeroOverlap = false;
+                hasHeroOverlap = hasCollision || horizontalGap < 32;
             }
 
-            return hasWrappedButtons || hasHeroOverlap;
+            return !hasWrappedButtons && !hasTextOverflow && !hasHeroOverlap;
         };
 
         const recomputeLayout = () => {
+            frameId = 0;
             setUseDesktopHeroLayout((currentDesktopLayout) => {
-                const shouldFallback = shouldUseMobileFallback(currentDesktopLayout);
-                const now = Date.now();
-                const inCooldown = now - lastLayoutSwitchAtRef.current < 500;
-
-                if (currentDesktopLayout) {
-                    if (shouldFallback) {
-                        safeSamplesRef.current = 0;
-                        lastLayoutSwitchAtRef.current = now;
-                        return false;
-                    }
-                    return true;
-                }
-
-                if (shouldFallback || inCooldown) {
-                    safeSamplesRef.current = 0;
-                    return false;
-                }
-
-                // Require several consecutive safe samples to prevent layout ping-pong.
-                safeSamplesRef.current += 1;
-                const canReturnToDesktop = safeSamplesRef.current >= 4;
-                if (canReturnToDesktop) {
-                    safeSamplesRef.current = 0;
-                    lastLayoutSwitchAtRef.current = now;
-                }
-                return canReturnToDesktop;
+                const nextDesktopLayout = shouldUseDesktopLayout(currentDesktopLayout);
+                return currentDesktopLayout === nextDesktopLayout ? currentDesktopLayout : nextDesktopLayout;
             });
         };
 
-        recomputeLayout();
-        const rafId = window.requestAnimationFrame(recomputeLayout);
+        const scheduleRecomputeLayout = () => {
+            if (frameId) return;
+            frameId = window.requestAnimationFrame(recomputeLayout);
+        };
 
-        const observer = new ResizeObserver(() => recomputeLayout());
+        recomputeLayout();
+        scheduleRecomputeLayout();
+
+        const observer = new ResizeObserver(() => scheduleRecomputeLayout());
+        if (heroGridRef.current) observer.observe(heroGridRef.current);
         if (heroTextColumnRef.current) observer.observe(heroTextColumnRef.current);
         if (heroMarqueeDesktopRef.current) observer.observe(heroMarqueeDesktopRef.current);
         if (heroActionsRef.current) observer.observe(heroActionsRef.current);
 
-        window.addEventListener('resize', recomputeLayout, { passive: true });
+        window.addEventListener('resize', scheduleRecomputeLayout, { passive: true });
 
         return () => {
-            window.cancelAnimationFrame(rafId);
+            if (frameId) window.cancelAnimationFrame(frameId);
             observer.disconnect();
-            window.removeEventListener('resize', recomputeLayout);
+            window.removeEventListener('resize', scheduleRecomputeLayout);
         };
-    }, [projects.length, stats.totalDownloads, stats.totalProjects, stats.totalUsers, readyForHeavyUI]);
+    }, [
+        DESKTOP_BREAKPOINT,
+        DESKTOP_HERO_MIN_WIDTH_ENTER,
+        DESKTOP_HERO_MIN_WIDTH_EXIT,
+        projects.length,
+        stats.totalDownloads,
+        stats.totalProjects,
+        stats.totalUsers,
+        readyForHeavyUI
+    ]);
 
     const validFeaturedProjects = useMemo(() => {
         if (!readyForHeavyUI) return [];
@@ -394,7 +395,7 @@ export const Home: React.FC = () => {
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
 
-                    <div className={`relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 ${isDesktopHeroLayout ? 'home-hero-desktop-grid lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20' : ''} grid grid-cols-1 ${isDesktopHeroLayout ? '' : 'lg:grid-cols-1'} gap-8 sm:gap-12 items-stretch`}>
+                    <div ref={heroGridRef} className={`relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 ${isDesktopHeroLayout ? 'home-hero-desktop-grid lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20' : ''} grid grid-cols-1 ${isDesktopHeroLayout ? '' : 'lg:grid-cols-1'} gap-8 sm:gap-12 items-stretch`}>
 
                         <div
                             ref={heroTextColumnRef}
