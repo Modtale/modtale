@@ -139,16 +139,16 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         setUsername(user.username);
         setFoundUser(user);
         setShowResults(false);
-        fetchUserProfile(user.username);
+        fetchUserProfile(user.id);
     };
 
-    const fetchUserProfile = async (name: string) => {
+    const fetchUserProfile = async (userId: string) => {
         setLoading(true);
         try {
-            const data = await adminClient.getUserProfile(name);
+            const data = await adminClient.getUserProfile(userId);
             setFoundUser(data);
         } catch (e) {
-            setStatus({ type: 'error', title: 'User Not Found', msg: `Could not load details for "${name}"` });
+            setStatus({ type: 'error', title: 'User Not Found', msg: 'Could not load the selected user.' });
         } finally {
             setLoading(false);
         }
@@ -157,14 +157,36 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         setFoundUser(null);
-        fetchUserProfile(username);
+        const selectedUserId = searchResults.find(user => user.username === username)?.id || foundUser?.id;
+        if (selectedUserId) {
+            fetchUserProfile(selectedUserId);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const results = await adminClient.searchUsers(username);
+            const exactMatch = results.find((user: any) => user.username.toLowerCase() === username.trim().toLowerCase());
+            if (!exactMatch) {
+                setStatus({ type: 'error', title: 'User Not Found', msg: `Could not find "${username}"` });
+                return;
+            }
+            setSearchResults(results);
+            setFoundUser(exactMatch);
+            setUsername(exactMatch.username);
+            await fetchUserProfile(exactMatch.id);
+        } catch (e) {
+            setStatus({ type: 'error', title: 'User Not Found', msg: `Could not find "${username}"` });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleUpdateTier = async (newTier: 'USER' | 'ENTERPRISE') => {
         if (!foundUser) return;
         setLoading(true);
         try {
-            await adminClient.updateUserTier(foundUser.username, newTier);
+            await adminClient.updateUserTier(foundUser.id, newTier);
             setStatus({ type: 'success', title: 'Tier Updated', msg: `Successfully changed ${foundUser.username} to ${newTier}.` });
             setFoundUser({ ...foundUser, tier: newTier });
         } catch (e: any) {
@@ -181,12 +203,12 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
 
         try {
             if (hasAdmin) {
-                await adminClient.revokeAdmin(foundUser.username);
+                await adminClient.revokeAdmin(foundUser.id);
                 const roles = foundUser.roles.filter((r: string) => r !== 'ADMIN');
                 setFoundUser({ ...foundUser, roles });
                 setStatus({ type: 'info', title: 'Role Updated', msg: `Admin role revoked from ${foundUser.username}.` });
             } else {
-                await adminClient.grantAdmin(foundUser.username);
+                await adminClient.grantAdmin(foundUser.id);
                 const roles = foundUser.roles || [];
                 roles.push('ADMIN');
                 setFoundUser({ ...foundUser, roles });
@@ -203,7 +225,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         if (!foundUser || deleteConfirmUsername !== foundUser.username) return;
         setLoading(true);
         try {
-            await adminClient.deleteUser(foundUser.username, deleteUserReason);
+            await adminClient.deleteUser(foundUser.id, deleteUserReason);
             setStatus({ type: 'success', title: 'User Deleted', msg: `User ${foundUser.username} has been permanently deleted.` });
             setFoundUser(null);
             setUsername('');
@@ -220,7 +242,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const openRawEdit = async () => {
         setLoading(true);
         try {
-            const data = await adminClient.getUserRaw(foundUser.username);
+            const data = await adminClient.getUserRaw(foundUser.id);
             setRawJsonStr(JSON.stringify(data, null, 2));
             setJsonError(null);
             setShowRawModal(true);
@@ -255,10 +277,10 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         try {
             setLoading(true);
             const parsed = JSON.parse(rawJsonStr);
-            await adminClient.updateUserRaw(foundUser.username, parsed);
+            await adminClient.updateUserRaw(foundUser.id, parsed);
             setStatus({ type: 'success', title: 'Saved', msg: 'Raw user metadata updated successfully.' });
             setShowRawModal(false);
-            fetchUserProfile(foundUser.username);
+            fetchUserProfile(foundUser.id);
         } catch (e: any) {
             setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : (e.response?.data || 'Server error saving raw data.') });
         } finally {

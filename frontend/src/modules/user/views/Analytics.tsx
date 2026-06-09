@@ -124,8 +124,8 @@ export const Analytics: React.FC = () => {
 
                     const isOrgContext = selectedContext !== currentUser?.id;
                     const selectedOrg = myOrgs.find(o => o.id === selectedContext);
-                    const analyticsPath = isOrgContext && selectedOrg?.username
-                        ? `/user/analytics?range=${range}&username=${encodeURIComponent(selectedOrg.username)}`
+                    const analyticsPath = isOrgContext && selectedOrg?.id
+                        ? `/user/analytics?range=${range}&userId=${encodeURIComponent(selectedOrg.id)}`
                         : `/user/analytics?range=${range}`;
                     const res = await api.get(analyticsPath);
                     const data = res.data;

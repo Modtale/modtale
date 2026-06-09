@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, AlertCircle, Building2, User as UserIcon, Chevro
 import { api } from '@/utils/api';
 import { PROJECT_TYPES, type Classification } from '@/data/categories';
 import type { User } from '@/types';
+import { SiteRoutes } from '@/utils/routes';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -29,7 +30,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
     const [title, setTitle] = useState('');
     const [summary, setSummary] = useState('');
 
-    const [owner, setOwner] = useState<string>(currentUser?.username || '');
+    const [owner, setOwner] = useState<string>(currentUser?.id || '');
     const [myOrgs, setMyOrgs] = useState<User[]>([]);
     const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
     const ownerDropdownRef = useRef<HTMLDivElement>(null);
@@ -45,7 +46,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
             });
         } else {
             if (!owner) {
-                setOwner(currentUser.username);
+                setOwner(currentUser.id);
             }
 
             api.get('/user/orgs').then(res => {
@@ -115,7 +116,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
             setError("Please fill in all fields."); return;
         }
 
-        const effectiveOwner = owner || currentUser?.username;
+        const effectiveOwner = owner || currentUser?.id;
         if (!effectiveOwner) {
             setError("Unable to determine project owner. Please refresh and try again.");
             return;
@@ -135,12 +136,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
             const res = await api.post('/projects', formData, uploadConfig);
 
-            const slug = res.data.slug || res.data.id;
-            let prefix = '/mod';
-            if (res.data.classification === 'MODPACK') prefix = '/modpack';
-            if (res.data.classification === 'SAVE') prefix = '/world';
-
-            navigate(`${prefix}/${slug}/edit`);
+            navigate(SiteRoutes.projectEdit(res.data));
 
         } catch (e: any) {
             const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to create draft.");
@@ -230,7 +226,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
         );
     }
 
-    const selectedOwner = owner === currentUser?.username ? currentUser : myOrgs.find(o => o.username === owner);
+    const selectedOwner = owner === currentUser?.id ? currentUser : myOrgs.find(o => o.id === owner);
 
     return (
         <>
@@ -260,14 +256,14 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                             className="w-full flex items-center justify-between bg-white/90 dark:bg-black/50 border border-slate-300 dark:border-white/20 rounded-2xl px-5 py-4 text-left transition-all hover:bg-white dark:hover:bg-white/5 shadow-inner backdrop-blur-md"
                                         >
                                             <div className="flex items-center gap-4">
-                                                {owner === currentUser?.username ? (
+                                                {owner === currentUser?.id ? (
                                                     <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-800/30 shadow-sm"><UserIcon className="w-5 h-5"/></div>
                                                 ) : (
                                                     <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200 dark:border-purple-800/30 shadow-sm"><Building2 className="w-5 h-5"/></div>
                                                 )}
                                                 <div>
                                                     <div className="font-bold text-slate-900 dark:text-white text-base leading-none">{selectedOwner?.displayName || selectedOwner?.username}</div>
-                                                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1.5">{owner === currentUser?.username ? 'Personal' : 'Organization'}</div>
+                                                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1.5">{owner === currentUser?.id ? 'Personal' : 'Organization'}</div>
                                                 </div>
                                             </div>
                                             <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${ownerDropdownOpen ? 'rotate-180' : ''}`} />
@@ -275,23 +271,23 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
                                         {ownerDropdownOpen && (
                                             <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-2 shadow-modtale-accent/10">
-                                                <button onClick={() => { setOwner(currentUser?.username || ''); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
+                                                <button onClick={() => { setOwner(currentUser?.id || ''); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
                                                     <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform"><UserIcon className="w-5 h-5"/></div>
                                                     <div className="text-left flex-1">
                                                         <div className="font-bold text-slate-900 dark:text-white text-sm">{currentUser?.username}</div>
                                                         <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Personal Account</div>
                                                     </div>
-                                                    {owner === currentUser?.username && <Check className="w-5 h-5 text-modtale-accent" />}
+                                                    {owner === currentUser?.id && <Check className="w-5 h-5 text-modtale-accent" />}
                                                 </button>
                                                 <div className="h-px bg-slate-100 dark:bg-white/5 mx-3 my-2" />
                                                 {myOrgs.map(org => (
-                                                    <button key={org.id} onClick={() => { setOwner(org.username); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
+                                                    <button key={org.id} onClick={() => { setOwner(org.id); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
                                                         <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform"><Building2 className="w-5 h-5"/></div>
                                                         <div className="text-left flex-1">
                                                             <div className="font-bold text-slate-900 dark:text-white text-sm">{org.displayName || org.username}</div>
                                                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Organization</div>
                                                         </div>
-                                                        {owner === org.username && <Check className="w-4 h-4 text-modtale-accent" />}
+                                                        {owner === org.id && <Check className="w-4 h-4 text-modtale-accent" />}
                                                     </button>
                                                 ))}
                                             </div>

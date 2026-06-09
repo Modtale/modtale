@@ -97,7 +97,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             <p className={theme.colors.textMuted}>Manage organization settings and members</p>
                         </div>
                     </div>
-                    <Link to={SiteRoutes.creator(selectedOrg.username)} className={`flex items-center gap-2 px-4 py-2 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} hover:${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold shadow-sm`}>
+                    <Link to={SiteRoutes.creator(selectedOrg.id, selectedOrg.username)} className={`flex items-center gap-2 px-4 py-2 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} hover:${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold shadow-sm`}>
                         <ExternalLink className="w-4 h-4" /> View Profile
                     </Link>
                 </div>

@@ -509,7 +509,6 @@ const sampleProject = {
         },
     ],
     teamInvites: [],
-    contributors: ['modtale_creator'],
     galleryImages: [
         'https://cdn.modtale.net/projects/skyforge/gallery/1.png',
     ],
@@ -698,7 +697,6 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
 
     if (path === '/api/v1/users/search' && code === '200') return [sampleUserSummary];
     if (path === '/api/v1/users/batch' && code === '200') return [sampleUserSummary];
-    if (path === '/api/v1/users/lookup/{username}' && code === '200') return { id: sampleUserSummary.id };
     if (path === '/api/v1/user/me' && code === '200') return sampleUser;
     if (path === '/api/v1/user/profile/{userId}' && code === '200') {
         return {
@@ -763,7 +761,7 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
                 id: 'notif-83c120',
                 title: 'New follower',
                 message: 'buildercraft started following you.',
-                link: '/creator/modtale_creator',
+                link: SiteRoutes.creator(sampleUserSummary.id, sampleUserSummary.username),
                 iconUrl: 'https://cdn.modtale.net/avatars/buildercraft.png',
                 read: false,
                 type: 'NEW_FOLLOWER',
