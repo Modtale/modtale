@@ -8,7 +8,7 @@ export const BROWSE_VIEWS = [
     { id: 'trending', label: 'Trending', icon: Flame, defaultSort: 'trending' },
     { id: 'new', label: 'New Releases', icon: Zap, defaultSort: 'newest' },
     { id: 'updated', label: 'Recently Updated', icon: Clock, defaultSort: 'updated' },
-    { id: 'hidden_gems', label: 'Hidden Gems', icon: Gem, defaultSort: 'rating' },
+    { id: 'hidden_gems', label: 'Hidden Gems', icon: Gem, defaultSort: 'popular' },
     { id: 'favorites', label: 'My Favorites', icon: Heart, defaultSort: 'relevance' },
 ];
 

@@ -359,7 +359,6 @@ public class SecurityConfig {
                                 "/api/v1/user/settings/**",
                                 "/api/v1/user/repos/**",
                                 "/api/v1/projects/*/favorite",
-                                "/api/v1/projects/*/reviews",
                                 "/api/v1/auth/mfa/setup",
                                 "/api/v1/auth/mfa/verify",
                                 "/api/v1/auth/resend-verification",

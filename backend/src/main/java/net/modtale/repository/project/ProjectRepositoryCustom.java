@@ -13,7 +13,6 @@ public interface ProjectRepositoryCustom {
             List<String> tags,
             String gameVersion,
             String classification,
-            Double minRating,
             Integer minDownloads,
             Integer minFavorites,
             Pageable pageable,

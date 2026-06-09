@@ -75,11 +75,11 @@ class SearchServiceTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(projectRepository).findFavorites(eq(List.of("project-1", "project-2")), eq(""), pageableCaptor.capture());
         assertEquals(PageRequest.of(0, 12, Sort.by("title")), pageableCaptor.getValue());
-        verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    void searchProjectsResolvesTheAuthorAppliesDateFiltersAndSanitizesVersions() {
+    void searchProjectsAppliesDateFiltersAndSanitizesVersions() {
         User currentUser = user("viewer-1", "viewer");
         User author = user("author-1", "Ada");
         Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
@@ -89,17 +89,15 @@ class SearchServiceTest {
         Page<Project> page = new PageImpl<>(List.of(project));
 
         when(accountService.getCurrentUser()).thenReturn(currentUser);
-        when(userRepository.findByUsernameIgnoreCase("Ada")).thenReturn(Optional.of(author));
         when(projectRepository.searchProjects(
                 eq("sky"),
                 eq(List.of("magic")),
                 eq("1.20.1"),
                 eq("MOD"),
-                eq(null),
                 eq(10),
                 eq(5),
                 any(Pageable.class),
-                eq("viewer"),
+                eq("viewer-1"),
                 eq("downloads"),
                 eq("Browse"),
                 any(LocalDate.class),
@@ -119,7 +117,7 @@ class SearchServiceTest {
                 5,
                 "Browse",
                 "30d",
-                "Ada"
+                "author-1"
         );
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
@@ -129,11 +127,10 @@ class SearchServiceTest {
                 eq(List.of("magic")),
                 eq("1.20.1"),
                 eq("MOD"),
-                eq(null),
                 eq(10),
                 eq(5),
                 pageableCaptor.capture(),
-                eq("viewer"),
+                eq("viewer-1"),
                 eq("downloads"),
                 eq("Browse"),
                 cutoffCaptor.capture(),
