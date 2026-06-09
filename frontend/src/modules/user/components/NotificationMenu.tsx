@@ -5,6 +5,8 @@ import { useNotifications, type Notification } from '@/context/NotificationsCont
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useNavigate } from 'react-router-dom';
 import { SiteRoutes } from '@/utils/routes';
+import { useToast } from '@/components/ui/Toast';
+import { theme } from '@/styles/theme';
 
 export function NotificationMenu() {
     const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +14,7 @@ export function NotificationMenu() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
+    const { showToast } = useToast();
 
     const {
         notifications, unreadCount, isIdle, refresh,
@@ -62,7 +65,7 @@ export function NotificationMenu() {
             dismiss(n.id);
         } catch (err) {
             console.error("Action failed", err);
-            alert("Action failed. The request may have expired.");
+            showToast("Action failed. The request may have expired.", 'error');
         } finally {
             setActionLoading(null);
         }
@@ -93,15 +96,6 @@ export function NotificationMenu() {
         navigate(destination);
         setIsOpen(false);
     };
-
-    const customScrollbarStyles = `
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 20px; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.8); }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
-    `;
 
     return (
         <div className="relative" ref={menuRef}>
@@ -135,7 +129,7 @@ export function NotificationMenu() {
                         )}
                     </div>
 
-                    <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent custom-scrollbar flex-1">
+                    <div className="flex-1 overflow-y-auto">
                         {notifications.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs"><Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />No notifications</div>
                         ) : (
@@ -172,8 +166,8 @@ export function NotificationMenu() {
                                                         <span className="text-xs text-slate-400 italic">Processing...</span>
                                                     ) : (
                                                         <>
-                                                            <button onClick={(e) => handleAction(e, n, true)} className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"><Check className="w-3 h-3" /> Accept</button>
-                                                            <button onClick={(e) => handleAction(e, n, false)} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors"><XIcon className="w-3 h-3" /> Decline</button>
+                                                            <button onClick={(e) => handleAction(e, n, true)} className="flex-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 flex items-center justify-center gap-1"><Check className="w-3 h-3" /> Accept</button>
+                                                            <button onClick={(e) => handleAction(e, n, false)} className="flex-1 rounded-xl bg-red-500 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-red-600 flex items-center justify-center gap-1"><XIcon className="w-3 h-3" /> Decline</button>
                                                         </>
                                                     )}
                                                 </div>
@@ -185,14 +179,14 @@ export function NotificationMenu() {
                                         <div className="absolute top-3 right-3 flex flex-col gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                             <button
                                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); dismiss(n.id); }}
-                                                className="p-1 text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
+                                                className={`${theme.components.iconButton} rounded-lg p-1`}
                                                 title="Dismiss"
                                             >
                                                 <XIcon className="w-3.5 h-3.5" />
                                             </button>
                                             <button
                                                 onClick={(e) => toggleReadStatus(e, n.id, n.read)}
-                                                className="p-1 text-slate-400 hover:text-modtale-accent hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
+                                                className={`${theme.components.iconButton} rounded-lg p-1`}
                                                 title={n.read ? "Mark as unread" : "Mark as read"}
                                             >
                                                 <Circle className={`w-3.5 h-3.5 ${!n.read ? 'fill-modtale-accent text-modtale-accent' : ''}`} />
@@ -205,7 +199,6 @@ export function NotificationMenu() {
                     </div>
                 </div>
             )}
-            <style>{customScrollbarStyles}</style>
         </div>
     );
 }

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Loader2, X, Plus, AlertTriangle, FileText, CheckSquare, ShieldCheck, RefreshCw, Check, AlertCircle, ChevronRight, ChevronDown, ToggleRight, ToggleLeft } from 'lucide-react';
 import { projectClient } from '@/modules/project/api/projectClient';
-import { ScrollStyles } from './FormShared';
 import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project, ProjectVersion, ProjectDependency } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { parseDependencyEntry, serializeDependencyEntry } from '../utils/dependencyEntries';
+import { useToast } from '@/components/ui/Toast';
 
 interface DependencyWizardProps {
     previousDeps: ProjectDependency[];
@@ -112,7 +112,7 @@ const DependencyRow: React.FC<{ dep: ProjectDependency; targetGameVersion: strin
                         </button>
 
                         {isOpen && (
-                            <div id={`dropdown-${dep.projectId}`} style={dropdownStyle} className={`max-h-60 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg shadow-2xl custom-scrollbar`}>
+                            <div id={`dropdown-${dep.projectId}`} style={dropdownStyle} className={`max-h-60 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg shadow-2xl`}>
                                 {compatibleVersions.length > 0 ? (
                                     <>
                                         <div className={`px-3 py-2 text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-wider ${theme.colors.bgSurface} sticky top-0 z-10 backdrop-blur-sm`}>Compatible</div>
@@ -192,7 +192,7 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
                     <button onClick={onClose} className={`p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className={`p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1`}>
+                <div className={`p-4 sm:p-5 overflow-y-auto flex-1`}>
                     {!targetGameVersion && (
                         <div className={`mb-4 p-3 ${theme.colors.warningBg} border ${theme.colors.warningBorder} rounded-lg text-xs ${theme.colors.warningText} flex items-start gap-2`}>
                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -242,6 +242,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     const [isOptional, setIsOptional] = useState(false);
     const [isEmbedded, setIsEmbedded] = useState(false);
     const [showWizard, setShowWizard] = useState(false);
+    const { showToast } = useToast();
 
     const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>({});
 
@@ -287,7 +288,10 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     const confirmVersion = (versionNumber: string) => {
         if (!selectedModForVersion || disabled) return;
-        if (selectedDeps.some(d => d.startsWith(`${selectedModForVersion.id}:`))) { alert("Project already added."); return; }
+        if (selectedDeps.some(d => d.startsWith(`${selectedModForVersion.id}:`))) {
+            showToast("Project already added.", 'info');
+            return;
+        }
         setMetaCache(prev => ({ ...prev, [selectedModForVersion.id]: { title: selectedModForVersion.title, author: selectedModForVersion.author, icon: selectedModForVersion.imageUrl } }));
 
         const finalOptional = isModpack ? false : isOptional;
@@ -360,8 +364,6 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     return (
         <div className={`space-y-4 border ${theme.colors.border} rounded-2xl p-6 ${theme.colors.bgSurface} ${disabled ? 'opacity-70' : ''}`}>
-            <ScrollStyles />
-
             {showWizard && previousDependencies && !disabled && (
                 <DependencyUpdateWizard
                     previousDeps={previousDependencies}
@@ -407,7 +409,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                             </div>
                         </div>
 
-                        <div className="p-3 sm:p-4 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
+                        <div className="p-3 sm:p-4 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
                             {loadingProjectVersions ? (
                                 <div className={`p-4 text-center text-xs ${theme.colors.textMuted} flex items-center justify-center gap-2`}>
                                     <Loader2 className="w-4 h-4 animate-spin" /> Loading versions...
@@ -469,7 +471,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
             </div>
 
             {results.length > 0 && !disabled && (
-                <div className={`max-h-56 overflow-y-auto custom-scrollbar ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-lg divide-y ${theme.colors.borderFaint}`}>
+                <div className={`max-h-56 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-lg divide-y ${theme.colors.borderFaint}`}>
                     {results.map(mod => (
                         <button key={mod.id} onClick={(e) => { e.preventDefault(); void openVersionPicker(mod); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
                             <div className="flex items-center gap-3">

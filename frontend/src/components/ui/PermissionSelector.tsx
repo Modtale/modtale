@@ -130,7 +130,7 @@ export const PermissionSelector: React.FC<PermissionSelectorProps> = ({
     };
 
     const containerClasses = variant === 'panel'
-        ? `columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-4 custom-scrollbar bg-slate-100/50 dark:bg-black/20 rounded-2xl p-4 ${className}`
+        ? `columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4 max-h-[420px] overflow-y-auto pr-2 pb-4 bg-slate-100/50 dark:bg-black/20 rounded-2xl p-4 ${className}`
         : `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`;
 
     const groupClasses = variant === 'panel'

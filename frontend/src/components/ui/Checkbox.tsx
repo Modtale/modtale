@@ -25,7 +25,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
             checked={checked}
             disabled={disabled}
             onChange={(event) => onChange(event.target.checked)}
-            className={className}
+            className={`themed-checkbox ${className}`.trim()}
         />
     );
 };

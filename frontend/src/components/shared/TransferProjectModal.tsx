@@ -56,7 +56,7 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
                     Select a target to transfer <strong>{project.title}</strong> to. They must accept the request.
                 </p>
 
-                <div className="flex-1 overflow-y-auto mb-4 space-y-6 pr-2 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto mb-4 space-y-6 pr-2">
                     {myOrgs.length > 0 && (
                         <div>
                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Your Organizations</h4>

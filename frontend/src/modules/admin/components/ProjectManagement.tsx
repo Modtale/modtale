@@ -255,7 +255,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                     </div>
 
                     {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
                             {searchResults.map(mod => (
                                 <button key={mod.id} onClick={() => selectProject(mod)} className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0">
                                     <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0"><img src={mod.imageUrl || 'https://modtale.net/assets/favicon.svg'} alt="" className="w-full h-full object-cover" /></div>
@@ -361,7 +361,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                         <button onClick={formatJson} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold rounded-lg border border-white/10 transition-colors">Format JSON</button>
                                     </div>
                                     <div className="relative flex-1 rounded-xl border border-white/10 overflow-hidden bg-black/20 flex flex-col">
-                                        <textarea ref={textareaRef} value={rawJsonStr} onChange={handleJsonChange} onKeyDown={handleJsonKeyDown} className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto custom-scrollbar transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`} spellCheck={false} />
+                                        <textarea ref={textareaRef} value={rawJsonStr} onChange={handleJsonChange} onKeyDown={handleJsonKeyDown} className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`} spellCheck={false} />
                                         {jsonError && <div className="absolute bottom-0 left-0 right-0 bg-red-500/90 text-white text-xs font-bold px-4 py-2 truncate shadow-lg backdrop-blur-sm">Parse Error: {jsonError}</div>}
                                     </div>
                                 </div>
@@ -390,7 +390,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                 {confirmAction === 'RESTORE' && (
                                     <div className="mb-6">
                                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Restore To Status</label>
-                                        <select value={restoreTargetStatus} onChange={e => setRestoreTargetStatus(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold outline-none">
+                                        <select value={restoreTargetStatus} onChange={e => setRestoreTargetStatus(e.target.value)} className="themed-select w-full rounded-xl border border-slate-200 bg-slate-50 p-3 font-bold text-slate-900 outline-none transition-all focus:border-modtale-accent focus:ring-2 focus:ring-modtale-accent dark:border-white/10 dark:bg-black/20 dark:text-white">
                                             <option value="PUBLISHED">Published</option>
                                             <option value="DRAFT">Draft</option>
                                             <option value="UNLISTED">Unlisted</option>

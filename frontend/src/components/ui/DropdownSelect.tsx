@@ -83,7 +83,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
             </button>
 
             {isOpen && !disabled && (
-                <div className={`absolute ${alignmentClass} top-full mt-2 ${maxMenuHeightClassName} overflow-y-auto custom-scrollbar z-[100] ${menuClassName}`.trim()}>
+                <div className={`absolute ${alignmentClass} top-full mt-2 ${maxMenuHeightClassName} overflow-y-auto z-[100] ${menuClassName}`.trim()}>
                     {options.length > 0 ? (
                         options.map((option) => {
                             const isSelected = option.value === value;

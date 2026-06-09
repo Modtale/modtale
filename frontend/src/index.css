@@ -5,10 +5,13 @@
 @layer base {
     html {
         @apply bg-slate-50;
+        scrollbar-color: rgba(100, 116, 139, 0.72) transparent;
+        scrollbar-width: thin;
     }
 
     html.dark {
         @apply bg-slate-900;
+        scrollbar-color: rgba(148, 163, 184, 0.46) transparent;
     }
 
     body {
@@ -21,6 +24,43 @@
     #root {
         min-height: 100vh;
     }
+
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: inherit;
+    }
+
+    *::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    *::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(148, 163, 184, 0.9), rgba(71, 85, 105, 0.88));
+        border: 2px solid transparent;
+        border-radius: 9999px;
+        background-clip: padding-box;
+        min-height: 32px;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgba(100, 116, 139, 0.98), rgba(51, 65, 85, 0.96));
+        background-clip: padding-box;
+    }
+
+    .dark *::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(125, 211, 252, 0.4), rgba(71, 85, 105, 0.95));
+        background-clip: padding-box;
+    }
+
+    .dark *::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgba(186, 230, 253, 0.42), rgba(100, 116, 139, 0.98));
+        background-clip: padding-box;
+    }
 }
 
 ::view-transition-old(root),
@@ -29,13 +69,115 @@
     mix-blend-mode: normal;
 }
 
-@layer utilities {
-    .scrollbar-hide::-webkit-scrollbar {
-        display: none;
+@layer components {
+    .themed-checkbox {
+        appearance: none;
+        width: 1.1rem;
+        height: 1.1rem;
+        border-radius: 0.45rem;
+        border: 1px solid rgba(148, 163, 184, 0.9);
+        background: rgba(255, 255, 255, 0.92);
+        color: #ffffff;
+        display: inline-grid;
+        place-content: center;
+        transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
     }
 
-    .scrollbar-hide {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
+    .dark .themed-checkbox {
+        border-color: rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.9);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+
+    .themed-checkbox::before {
+        content: "";
+        width: 0.65rem;
+        height: 0.65rem;
+        transform: scale(0);
+        transform-origin: center;
+        transition: transform 150ms ease-in-out;
+        clip-path: polygon(14% 50%, 0 65%, 42% 100%, 100% 24%, 84% 10%, 41% 62%);
+        background: currentColor;
+    }
+
+    .themed-checkbox:hover:not(:disabled) {
+        border-color: rgba(59, 130, 246, 0.6);
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+    }
+
+    .themed-checkbox:checked {
+        border-color: rgba(37, 99, 235, 0.95);
+        background: linear-gradient(135deg, #2563eb, #0ea5e9);
+    }
+
+    .themed-checkbox:checked::before {
+        transform: scale(1);
+    }
+
+    .themed-checkbox:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+    }
+
+    .themed-checkbox:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    .themed-select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' d='m5 7 5 5 5-5'/%3E%3C/svg%3E");
+        background-position: right 0.9rem center;
+        background-repeat: no-repeat;
+        background-size: 1rem;
+        padding-right: 2.75rem;
+    }
+
+    .dark .themed-select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' d='m5 7 5 5 5-5'/%3E%3C/svg%3E");
+    }
+
+    .themed-range {
+        appearance: none;
+        background: transparent;
+    }
+
+    .themed-range::-webkit-slider-runnable-track {
+        height: 0.45rem;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, rgba(37, 99, 235, 0.95), rgba(14, 165, 233, 0.85));
+    }
+
+    .themed-range::-moz-range-track {
+        height: 0.45rem;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, rgba(37, 99, 235, 0.95), rgba(14, 165, 233, 0.85));
+    }
+
+    .themed-range::-webkit-slider-thumb {
+        appearance: none;
+        width: 1rem;
+        height: 1rem;
+        margin-top: -0.27rem;
+        border-radius: 9999px;
+        border: 2px solid rgba(255, 255, 255, 0.95);
+        background: #0f172a;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.28);
+    }
+
+    .themed-range::-moz-range-thumb {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.95);
+        border-radius: 9999px;
+        background: #0f172a;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.28);
+    }
+
+    .dark .themed-range::-webkit-slider-thumb,
+    .dark .themed-range::-moz-range-thumb {
+        background: #e2e8f0;
+        border-color: rgba(15, 23, 42, 0.95);
     }
 }
