@@ -40,7 +40,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
 
     const {
         page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
-        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, items,
+        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
 
@@ -248,7 +248,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                             />
                         </div>
 
-                        {!canRenderHydratedContent || (loading && items.length === 0) ? (
+                        {!canRenderHydratedContent || isPending ? (
                             <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />
                         ) : items.length > 0 ? (
                             <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
