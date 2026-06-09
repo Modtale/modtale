@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { BarChart } from '@/components/ui/charts/BarChart';
 import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
+import { formatDateTime } from '@/utils/modHelpers';
 import type { Project, User } from '@/types';
 import { hasOrgPermission } from '@/modules/organization/api/organizationClient';
 
@@ -218,7 +219,14 @@ export const Analytics: React.FC = () => {
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">+{sum.toLocaleString()}</td>
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{(vMeta[vid]?.total || 0).toLocaleString()}</td>
                                 <td className="p-4 text-xs font-mono text-slate-500">{vMeta[vid]?.gameVer}</td>
-                                <td className="p-4 text-right pr-6"><span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2.5 py-1 rounded-md text-slate-500 border border-slate-200 dark:border-white/5">{vMeta[vid]?.date}</span></td>
+                                <td className="p-4 text-right pr-6">
+                                    <span
+                                        className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2.5 py-1 rounded-md text-slate-500 border border-slate-200 dark:border-white/5"
+                                        title={vMeta[vid]?.date || 'Unknown'}
+                                    >
+                                        {formatDateTime(vMeta[vid]?.date)}
+                                    </span>
+                                </td>
                             </>
                         )
                     });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { compareSemVer, formatTimeAgo, getLicenseInfo, toTitleCase } from '@/utils/modHelpers';
+import { compareSemVer, formatDateTime, formatTimeAgo, getLicenseInfo, toTitleCase } from '@/utils/modHelpers';
 
 describe('mod helpers', () => {
     afterEach(() => {
@@ -16,6 +16,20 @@ describe('mod helpers', () => {
         expect(formatTimeAgo('2026-01-07T00:00:00Z')).toBe('3d ago');
         expect(formatTimeAgo('2025-11-10T00:00:00Z')).toBe('2mo ago');
         expect(formatTimeAgo('2024-01-10T00:00:00Z')).toBe('2y ago');
+    });
+
+    it('formats timestamps into readable local date-time labels', () => {
+        expect(formatDateTime('2026-06-01T21:59:41.107666477Z')).toBe(
+            new Intl.DateTimeFormat(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            }).format(new Date('2026-06-01T21:59:41.107666477Z'))
+        );
+        expect(formatDateTime('not-a-date')).toBe('not-a-date');
+        expect(formatDateTime()).toBe('Unknown');
     });
 
     it('compares semantic versions, including prereleases', () => {

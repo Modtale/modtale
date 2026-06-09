@@ -20,6 +20,21 @@ export const formatTimeAgo = (dateString: string) => {
     return "Just now";
 };
 
+export const formatDateTime = (dateString?: string | null) => {
+    if (!dateString) return 'Unknown';
+
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+
+    return new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    }).format(date);
+};
+
 export const ChannelBadge = ({ channel }: { channel?: string }) => {
     const baseClasses = "inline-flex items-center gap-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded border w-fit whitespace-nowrap";
 
