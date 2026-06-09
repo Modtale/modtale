@@ -1,5 +1,5 @@
 {
   "name": "Modtale",
-  "description": "A Hytale mod and plugin marketplace featuring GitHub SSO integration, direct downloads, and Markdown support.",
+  "description": "Community repository for Hytale mods, Hytale plugins, versioned releases, creator galleries, dependency-aware downloads, and public API tooling.",
   "requestFramePermissions": []
 }

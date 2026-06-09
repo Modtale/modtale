@@ -23,7 +23,7 @@ const {
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
-const image = propImage || "https://modtale.net/assets/favicon.svg";
+const image = propImage || 'https://modtale.net/assets/logo.svg';
 
 const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
@@ -59,7 +59,7 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : 
     <link rel="dns-prefetch" href={BACKEND_URL} />
     <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
 
-    {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
+    {jsonLdString && <script is:inline type="application/ld+json" set:html={jsonLdString} />}
 
     <script is:inline set:html={`window.INITIAL_DATA = ${initialDataString};`}></script>
     <script is:inline>

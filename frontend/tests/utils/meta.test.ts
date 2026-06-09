@@ -7,66 +7,69 @@ describe('meta utils', () => {
         expect(generateUserMeta(null)).toBeNull();
     });
 
-    it('builds project metadata from markdown-heavy about text', () => {
+    it('builds plugin metadata from markdown-heavy about text', () => {
         const result = generateProjectMeta({
             title: 'Sky Tools',
             author: 'Ada',
             downloadCount: 1234,
-            classification: 'MODPACK',
-            about: '# Heading\n**Bold** text with [docs](https://example.com) and `code`\n- bullet\n![hero](https://example.com/hero.png)'
+            classification: 'PLUGIN',
+            about: '# Heading\n**Bold** text with [docs](https://example.com) and `code`\n- bullet\n![hero](https://example.com/hero.png)',
         });
 
         expect(result).toEqual({
-            title: 'Sky Tools | Modtale',
+            title: 'Sky Tools | Hytale Plugin | Modtale',
             author: 'Ada',
-            description: 'Heading Bold text with docs and code bullet — ⬇️ 1,234  🏷️ Modpack  👤 Ada'
+            description: 'Download Sky Tools, a Hytale server plugin by Ada, on Modtale. Heading Bold text with docs and code bullet 1,234 downloads.',
         });
     });
 
-    it('falls back to description text and unknown author when about is unavailable', () => {
+    it('uses category-aware labels for non-plugin projects', () => {
         const result = generateProjectMeta({
             title: 'World Builder',
             description: 'Craft *bigger* builds with #style',
             downloadCount: 0,
-            classification: 'SAVE'
+            classification: 'SAVE',
         });
 
         expect(result).toEqual({
-            title: 'World Builder | Modtale',
+            title: 'World Builder | Hytale World | Modtale',
             author: 'Unknown',
-            description: 'Craft bigger builds with style — ⬇️ 0  🏷️ World  👤 Unknown'
+            description: 'Download World Builder, a Hytale world save by Unknown, on Modtale. Craft bigger builds with style 0 downloads.',
         });
     });
 
-    it('truncates long project descriptions before appending the stats line', () => {
+    it('truncates long project descriptions before appending the download count', () => {
         const longText = 'a'.repeat(170);
         const result = generateProjectMeta({
             title: 'Longform',
             author: 'Ada',
             downloadCount: 10,
             classification: 'DATA',
-            about: longText
+            about: longText,
         });
 
-        expect(result?.description.startsWith(`${'a'.repeat(150)}... — ⬇️ 10  🏷️ Data  👤 Ada`)).toBe(true);
+        expect(result?.title).toBe('Longform | Hytale Data Asset | Modtale');
+        expect(result?.description).toContain('Download Longform, a Hytale data asset by Ada, on Modtale.');
+        expect(result?.description).toContain('10 downloads.');
+        expect(result?.description?.length).toBeLessThanOrEqual(160);
     });
 
-    it('uses display names and pluralizes follower counts for user metadata', () => {
+    it('uses creator wording for user metadata', () => {
         expect(generateUserMeta({
             username: 'ada',
             displayName: 'Ada Lovelace',
-            followerIds: ['u1']
+            followerIds: ['u1'],
         })).toEqual({
-            title: 'Ada Lovelace | Modtale',
-            description: '👥 1 follower'
+            title: 'Ada Lovelace | Modtale Creator',
+            description: 'Creator profile on Modtale with 1 follower.',
         });
 
         expect(generateUserMeta({
             username: 'grace',
-            followerIds: ['u1', 'u2']
+            followerIds: ['u1', 'u2'],
         })).toEqual({
-            title: 'grace | Modtale',
-            description: '👥 2 followers'
+            title: 'grace | Modtale Creator',
+            description: 'Creator profile on Modtale with 2 followers.',
         });
     });
 });

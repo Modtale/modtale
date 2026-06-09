@@ -16,7 +16,7 @@ const isBot = isBotUserAgent(userAgent);
 let userData = null;
 let title = ROUTE_SEO['/mods'].title;
 let description = ROUTE_SEO['/mods'].description;
-let image = "https://modtale.net/assets/favicon.svg";
+let image = 'https://modtale.net/assets/logo.svg';
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 let ogType = "website";
@@ -48,7 +48,7 @@ if (isBot && handle) {
 
             const personSchema = {
                 "@context": "https://schema.org",
-                "@type": userData.accountType === 'ORGANIZATION' ? "Organization" : "",
+                "@type": userData.accountType === 'ORGANIZATION' ? 'Organization' : 'Person',
                 "name": userData.displayName || userData.username,
                 "description": userData.bio,
                 "image": userData.avatarUrl,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code } from 'lucide-react';
+import {Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { BlueskyBrandIcon, DiscordBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { SiteRoutes } from '@/utils/routes';
@@ -15,17 +15,17 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
     const getFooterDescription = () => {
         switch (path) {
             case SiteRoutes.browse('PLUGIN'):
-                return "The premier community repository for Hytale plugins. Discover, download, and share Hytale plugins, admin tools, gameplay scripts, and libraries.";
+                return 'The premier community repository for Hytale plugins. Discover, download, and share server plugins, admin tools, gameplay extensions, and supporting libraries.';
             case SiteRoutes.browse('MODPACK'):
-                return "The premier community repository for Hytale modpacks. Discover, download, and share curated Hytale modpacks, collections, and tech packs.";
+                return 'The premier community repository for Hytale modpacks. Discover, download, and share curated Hytale modpacks, collections, and bundled project setups.';
             case SiteRoutes.browse('SAVE'):
-                return "The premier community repository for Hytale worlds. Discover, download, and share Hytale maps, lobbies, schematics, and spawns.";
+                return 'The premier community repository for Hytale worlds. Discover, download, and share Hytale save files, maps, lobbies, schematics, and spawns.';
             case SiteRoutes.browse('ART'):
-                return "The premier community repository for Hytale art assets. Discover, download, and share Hytale models, textures, animations, and resources.";
+                return 'The premier community repository for Hytale art assets. Discover, download, and share Hytale models, textures, animations, and creator resources.';
             case SiteRoutes.browse('DATA'):
-                return "The premier community repository for Hytale data assets. Discover, download, and share Hytale configs, loot tables, and data packs.";
+                return 'The premier community repository for Hytale data assets. Discover, download, and share Hytale configs, loot tables, recipes, and data-driven files.';
             default:
-                return "The premier community repository for Hytale. Discover, download, and share Hytale mods, worlds, plugins, art + data assets, and modpacks.";
+                return 'The premier community repository for Hytale. Discover, download, and share Hytale mods, server plugins, worlds, art assets, data assets, and modpacks.';
         }
     };
 
@@ -48,20 +48,23 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     <div className="col-span-1">
                         <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</h4>
                         <div className="flex flex-col space-y-3">
+                            <Link to={SiteRoutes.browse()} className={linkClass}>
+                                <Layout className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Mods
+                            </Link>
                             <Link to={SiteRoutes.browse('MODPACK')} className={linkClass}>
-                                <Layers className="w-3.5 h-3.5 mr-2 opacity-70" /> Modpacks
+                                <Layers className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Modpacks
                             </Link>
                             <Link to={SiteRoutes.browse('PLUGIN')} className={linkClass}>
-                                <Box className="w-3.5 h-3.5 mr-2 opacity-70" /> Plugins
+                                <Box className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Plugins
                             </Link>
                             <Link to={SiteRoutes.browse('SAVE')} className={linkClass}>
-                                <Save className="w-3.5 h-3.5 mr-2 opacity-70" /> Worlds
+                                <Save className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Worlds
                             </Link>
                             <Link to={SiteRoutes.browse('ART')} className={linkClass}>
-                                <Palette className="w-3.5 h-3.5 mr-2 opacity-70" /> Art Assets
+                                <Palette className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Art Assets
                             </Link>
                             <Link to={SiteRoutes.browse('DATA')} className={linkClass}>
-                                <Database className="w-3.5 h-3.5 mr-2 opacity-70" /> Data Assets
+                                <Database className="w-3.5 h-3.5 mr-2 opacity-70" /> Hytale Data Assets
                             </Link>
                         </div>
                     </div>

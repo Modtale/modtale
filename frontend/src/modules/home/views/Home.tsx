@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { Search, Upload, ChevronRight, Github, Code } from 'lucide-react';
 import '@fontsource-variable/inter';
 import { api } from '@/utils/api';
+import { ROUTE_SEO } from '@/data/seo-constants';
 import type { Project } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
@@ -42,6 +43,7 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
 
 export const Home: React.FC = () => {
     const { initialData: ssrData } = useSSRData();
+    const homeSeo = ROUTE_SEO['/'];
 
     const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
     const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -236,8 +238,9 @@ export const Home: React.FC = () => {
             style={{ fontFamily: '"Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         >
             <Helmet>
-                <title>Modtale - The Hytale Community Repository</title>
-                <meta name="description" content="The community repository for Hytale. Discover, download, and share Hytale mods, worlds, plugins, asset packs, and modpacks." />
+                <title>{homeSeo.title}</title>
+                <meta name="description" content={homeSeo.description} />
+                <meta name="keywords" content={homeSeo.keywords} />
                 <link rel="preload" as="image" href="/assets/logo.svg" />
                 <style>{`
                     @keyframes marquee-up {
@@ -426,7 +429,7 @@ export const Home: React.FC = () => {
                             </h1>
 
                             <p className={`text-base sm:text-lg ${isDesktopHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-8 sm:mb-10 font-medium leading-relaxed`}>
-                                Discover, download, and seamlessly share Hytale mods, worlds, plugins, asset packs, and modpacks.
+                                Discover, download, and seamlessly share Hytale projects, worlds, plugins, asset packs, and modpacks.
                             </p>
 
                             <nav ref={heroActionsRef} aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mb-8 sm:mb-10 2xl:mb-14">
