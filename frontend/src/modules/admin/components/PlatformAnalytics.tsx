@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Eye, Download, TrendingUp, TrendingDown, PackagePlus, Server, UserPlus, Activity } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { LineChart } from '@/components/ui/charts/LineChart';
+import { extractApiErrorMessage } from '@/utils/api';
 import { sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
@@ -35,18 +36,20 @@ export function PlatformAnalytics() {
     const [range, setRange] = useState('30d');
     const [data, setData] = useState<any>(null);
     const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            try {
-                const res = await adminClient.getPlatformAnalytics(range);
-                setData(res);
-            } catch (e) {
-                console.error("Failed to fetch platform analytics", e);
-            } finally {
-                setLoading(false);
-            }
+        try {
+            const res = await adminClient.getPlatformAnalytics(range);
+            setData(res);
+            setErrorMessage(null);
+        } catch (e) {
+            setErrorMessage(extractApiErrorMessage(e, 'We could not load platform analytics.'));
+        } finally {
+            setLoading(false);
+        }
         };
         fetchData();
     }, [range]);
@@ -73,7 +76,14 @@ export function PlatformAnalytics() {
         </div>
     );
 
-    if (!data) return null;
+    if (!data) {
+        if (!errorMessage) return null;
+        return (
+            <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-5 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                {errorMessage}
+            </div>
+        );
+    }
 
     const calcTrend = (current: number, previous: number) => {
         if (!previous) return current > 0 ? 100 : 0;
@@ -125,6 +135,11 @@ export function PlatformAnalytics() {
 
     return (
         <div className="relative animate-in fade-in duration-500">
+            {errorMessage && (
+                <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                    {errorMessage}
+                </div>
+            )}
             <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Platform Analytics</h1>

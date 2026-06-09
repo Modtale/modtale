@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Send, Edit, Trash, Flag, CornerDownRight, Crown, ArrowBigUp, ArrowBigDown } from 'lucide-react';
 import { projectClient } from '../api/projectClient';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { StatusModal } from '@/components/ui/StatusModal';
 import { formatTimeAgo } from '@/utils/modHelpers';
-import { BACKEND_URL } from '@/utils/api';
+import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import type { Comment, User } from '@/types';
 
@@ -60,6 +62,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
     const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
     const [userProfiles, setUserProfiles] = useState<Record<string, {username: string, avatarUrl: string}>>({});
+    const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
 
     useEffect(() => {
         const userIds = new Set<string>();
@@ -92,14 +95,14 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
 
     const handleVote = async (commentId: string, isReply: boolean, upvote: boolean) => {
         if (!currentUser) {
-            onError("Log in to vote on comments.");
+            onError('You need to sign in before you can vote on comments.');
             return;
         }
         try {
             await projectClient.voteComment(projectId, commentId, upvote, isReply);
             await refreshComments();
-        } catch {
-            onError("Failed to register vote.");
+        } catch (err: unknown) {
+            onError(extractApiErrorMessage(err, 'We could not register your vote.'));
         }
     };
 
@@ -152,23 +155,27 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
             setEditingCommentId(null);
             setText('');
         } catch (err: any) {
-            onError(err.response?.data || 'Failed to post comment.');
+            onError(extractApiErrorMessage(
+                err,
+                editingCommentId ? 'We could not save your edited comment.' : 'We could not post your comment.'
+            ));
         } finally {
             setSubmitting(false);
         }
     };
 
-    const deleteComment = async (commentId: string) => {
-        if(!window.confirm("Are you sure you want to delete this comment?")) return;
+    const confirmDeleteComment = async () => {
+        if (!commentToDelete) return;
         setSubmitting(true);
         try {
-            await projectClient.deleteComment(projectId, commentId);
+            await projectClient.deleteComment(projectId, commentToDelete.id);
             await refreshComments();
             onSuccess('Comment deleted.');
-        } catch (err: any) {
-            onError(err.response?.data || 'Failed to delete.');
+        } catch (err: unknown) {
+            onError(extractApiErrorMessage(err, 'We could not delete this comment.'));
         } finally {
             setSubmitting(false);
+            setCommentToDelete(null);
         }
     };
 
@@ -182,8 +189,8 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
             setReplyingCommentId(null);
             setReplyText('');
             onSuccess('Reply posted!');
-        } catch (err: any) {
-            onError(err.response?.data || 'Failed to post reply.');
+        } catch (err: unknown) {
+            onError(extractApiErrorMessage(err, 'We could not post that reply.'));
         } finally {
             setSubmitting(false);
         }
@@ -195,6 +202,18 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
 
     return (
         <div ref={innerRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5">
+            {commentToDelete && createPortal(
+                <StatusModal
+                    type="warning"
+                    title="Delete Comment?"
+                    message="This will permanently remove the selected comment from the discussion."
+                    actionLabel="Delete Comment"
+                    secondaryLabel="Cancel"
+                    onAction={confirmDeleteComment}
+                    onClose={() => setCommentToDelete(null)}
+                />,
+                document.body
+            )}
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
                 <MessageSquare className="w-6 h-6 text-modtale-accent" aria-hidden="true" /> {comments.length} Comments
             </h2>
@@ -313,7 +332,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                         </button>
                                     )}
                                     {(isCreator || isCommentOwner) && (
-                                        <button aria-label="Delete comment" type="button" onClick={() => deleteComment(comment.id)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
+                                        <button aria-label="Delete comment" type="button" onClick={() => setCommentToDelete(comment)} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors">
                                             <Trash className="w-4 h-4" aria-hidden="true"/> Delete
                                         </button>
                                     )}

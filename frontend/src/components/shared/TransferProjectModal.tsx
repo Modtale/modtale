@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { api } from '@/utils/api';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
 
 interface TransferProjectModalProps {
@@ -42,8 +43,8 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
             await api.post(`/projects/${project.id}/transfer`, { userId: selectedUserId });
             onSuccess(`Transfer request sent.`);
             onClose();
-        } catch (e: any) {
-            onError(e.response?.data || "Failed to send request.");
+        } catch (e: unknown) {
+            onError(extractApiErrorMessage(e, 'We could not send that transfer request.'));
         }
     };
 

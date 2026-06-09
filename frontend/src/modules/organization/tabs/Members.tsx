@@ -4,9 +4,9 @@ import { UserPlus, ChevronDown, Check, Shield, Trash2 } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { Spinner } from '@/components/ui/Spinner';
-import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
 
 interface MembersProps {
@@ -20,7 +20,6 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
     const [members, setMembers] = useState<User[]>([]);
     const [invites, setInvites] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviteUserId, setInviteUserId] = useState('');
@@ -48,8 +47,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
                 ]);
                 setMembers(m);
                 setInvites(i);
-            } catch (err) {
-                console.error(err);
+            } catch (err: unknown) {
+                showStatus('error', 'Member Load Failed', extractApiErrorMessage(err, 'We could not load this organization roster.'));
             } finally {
                 setLoading(false);
             }
@@ -75,7 +74,6 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
         e.preventDefault();
         if (!inviteUserId || !inviteRoleId) return;
         setIsInviting(true);
-        setError(null);
         try {
             await organizationClient.addMember(org.id, inviteUserId, inviteRoleId);
             setInvites(await organizationClient.getInvites(org.id));
@@ -83,8 +81,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
             setInviteUserId('');
             setUserSearchResults([]);
             showStatus('success', 'Invited', 'Member invitation sent successfully.');
-        } catch (err: any) {
-            setError(err.response?.data || "Failed to add member.");
+        } catch (err: unknown) {
+            showStatus('error', 'Invitation Failed', extractApiErrorMessage(err, 'We could not send that organization invite.'));
         } finally {
             setIsInviting(false);
         }
@@ -95,8 +93,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
             await organizationClient.updateMemberRole(org.id, userId, newRoleId);
             setMembers(await organizationClient.getMembers(org.id));
             showStatus('success', 'Updated', 'Member role updated.');
-        } catch (err: any) {
-            showStatus('error', 'Update Failed', err.response?.data || "Failed to update member role.");
+        } catch (err: unknown) {
+            showStatus('error', 'Role Update Failed', extractApiErrorMessage(err, 'We could not update that member role.'));
         }
     };
 
@@ -110,8 +108,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
                 setMembers(await organizationClient.getMembers(org.id));
                 showStatus('success', 'Removed', 'Member has been removed.');
             }
-        } catch (err: any) {
-            showStatus('error', 'Failed', err.response?.data || "Could not remove member.");
+        } catch (err: unknown) {
+            showStatus('error', 'Member Removal Failed', extractApiErrorMessage(err, 'We could not remove that member from the organization.'));
         } finally {
             setMemberToRemove(null);
         }
@@ -121,8 +119,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
         try {
             await organizationClient.cancelInvite(org.id, userId);
             setInvites(await organizationClient.getInvites(org.id));
-        } catch (err: any) {
-            showStatus('error', 'Cancel Failed', err.response?.data || "Could not cancel invite.");
+        } catch (err: unknown) {
+            showStatus('error', 'Invite Cancel Failed', extractApiErrorMessage(err, 'We could not cancel that pending invite.'));
         }
     };
 
@@ -133,8 +131,6 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
             {memberRoleDropdownOpen && (
                 <div className="fixed inset-0 z-[90]" onClick={() => { setMemberRoleDropdownOpen(null); }} />
             )}
-
-            {error && <ErrorBanner message={error} />}
 
             {memberToRemove && createPortal(
                 <StatusModal

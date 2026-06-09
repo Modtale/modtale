@@ -1,5 +1,6 @@
 package net.modtale.controller.analytics;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.user.User;
 import net.modtale.model.project.Project;
@@ -68,14 +69,14 @@ public class PlatformAnalyticsController {
     }
 
     @GetMapping("/full")
-    public ResponseEntity<PlatformAnalyticsSummary> getPlatformAnalytics(@RequestParam(defaultValue = "30d") String range) {
+    public ResponseEntity<?> getPlatformAnalytics(@RequestParam(defaultValue = "30d") String range) {
         User user = accountService.getCurrentUser();
 
         boolean isLegacySuperAdmin = user != null && SUPER_ADMIN_ID.equals(user.getId());
         boolean hasSuperAdminRole = user != null && user.getRoles() != null && user.getRoles().contains("SUPER_ADMIN");
 
         if (!isLegacySuperAdmin && !hasSuperAdminRole) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ErrorMessageUtils.forbidden("Only Super Admin can view platform analytics.");
         }
 
         return ResponseEntity.ok()

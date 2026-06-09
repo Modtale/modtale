@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Check, X, Loader2, ArrowRight } from 'lucide-react';
 import { authClient } from '../api/authClient';
+import { extractApiErrorMessage } from '@/utils/api';
 
 export function VerifyEmail() {
     const [searchParams] = useSearchParams();
@@ -24,7 +25,7 @@ export function VerifyEmail() {
             })
             .catch((err) => {
                 setStatus('error');
-                setMessage(err.response?.data?.error || 'Failed to verify email. The link may have expired.');
+                setMessage(extractApiErrorMessage(err, 'We could not verify this email link. It may have expired or already been used.'));
             });
     }, [token]);
 

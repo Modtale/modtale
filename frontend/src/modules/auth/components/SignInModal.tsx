@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, Github, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import { DiscordBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BACKEND_URL } from '@/utils/api';
+import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
+import { StatusModal } from '@/components/ui/StatusModal';
 import { useToast } from '@/components/ui/Toast';
 import { SiteRoutes } from '@/utils/routes';
 import { authClient } from '../api/authClient';
@@ -23,6 +24,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -44,6 +46,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        setStatusModal(null);
 
         try {
             if (mode === 'register') {
@@ -79,13 +82,22 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
             window.location.href = redirectTo;
         } catch (err: any) {
             console.error(err);
-            if (err.response?.status === 401) {
-                showToast("Invalid credentials.", 'error');
-            } else if (err.response?.data?.error) {
-                showToast(err.response.data.error, 'error');
-            } else {
-                showToast("An error occurred. Please try again.", 'error');
-            }
+            const fallbackByMode = mode === 'register'
+                ? 'We could not create that account.'
+                : mode === 'forgot-password'
+                    ? 'We could not send a password reset link.'
+                    : 'We could not sign you in.';
+
+            const titleByMode = mode === 'register'
+                ? 'Account Creation Failed'
+                : mode === 'forgot-password'
+                    ? 'Reset Link Failed'
+                    : 'Sign-In Failed';
+
+            setStatusModal({
+                title: titleByMode,
+                msg: extractApiErrorMessage(err, fallbackByMode)
+            });
         } finally {
             setLoading(false);
         }
@@ -93,6 +105,14 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
+            {statusModal && (
+                <StatusModal
+                    type="error"
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                />
+            )}
             <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl max-w-sm w-full shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                     <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">

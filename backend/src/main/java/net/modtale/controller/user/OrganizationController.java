@@ -37,18 +37,18 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_CREATE', authentication)")
     public ResponseEntity<?> createOrganization(@RequestBody CreateOrganizationRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before creating an organization.");
 
         String name = requestPayload.getName();
         if (name == null || name.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Organization name is required.");
+            return ErrorMessageUtils.badRequest("An organization name is required before we can create it.");
         }
 
         try {
             User org = organizationService.createOrganization(name, user);
             return ResponseEntity.ok(UserMapper.toDTO(org, true));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not create that organization.");
         }
     }
 
@@ -81,7 +81,7 @@ public class OrganizationController {
                     .collect(Collectors.toList());
             return ResponseEntity.ok(members);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            return ErrorMessageUtils.notFound("We couldn't find that organization or its member list.");
         }
     }
 
@@ -94,7 +94,7 @@ public class OrganizationController {
                     .map(UserMapper::toSummaryDTO)
                     .collect(Collectors.toList()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            return ErrorMessageUtils.notFound("We couldn't find that organization or its pending invites.");
         }
     }
 
@@ -102,19 +102,19 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
     public ResponseEntity<?> createOrgRole(@PathVariable String orgId, @RequestBody OrganizationRoleRequest payload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before creating an organization role.");
 
         if (payload.getName() == null || payload.getName().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Role name is required.");
+            return ErrorMessageUtils.badRequest("A role name is required before we can create an organization role.");
         }
 
         try {
             User updated = organizationService.createOrganizationRole(orgId, payload.getName(), payload.getColor(), payload.getPermissions(), user);
             return ResponseEntity.ok(UserMapper.toDTO(updated, true));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to create roles for this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not create that organization role.");
         }
     }
 
@@ -122,15 +122,15 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
     public ResponseEntity<?> updateOrgRole(@PathVariable String orgId, @PathVariable String roleId, @RequestBody OrganizationRoleRequest payload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating an organization role.");
 
         try {
             User updated = organizationService.updateOrganizationRole(orgId, roleId, payload.getName(), payload.getColor(), payload.getPermissions(), user);
             return ResponseEntity.ok(UserMapper.toDTO(updated, true));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to update roles for this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not update that organization role.");
         }
     }
 
@@ -138,15 +138,15 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
     public ResponseEntity<?> deleteOrgRole(@PathVariable String orgId, @PathVariable String roleId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before deleting an organization role.");
 
         try {
             User updated = organizationService.deleteOrganizationRole(orgId, roleId, user);
             return ResponseEntity.ok(UserMapper.toDTO(updated, true));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to delete roles for this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not delete that organization role.");
         }
     }
 
@@ -154,22 +154,22 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_INVITE', authentication)")
     public ResponseEntity<?> addOrgMember(@PathVariable String orgId, @RequestBody AddOrganizationMemberRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before inviting organization members.");
 
         String targetUserId = requestPayload.getUserId();
         String roleId = requestPayload.getRoleId();
 
         if (roleId == null) {
-            return ResponseEntity.badRequest().body("Role ID is required.");
+            return ErrorMessageUtils.badRequest("A role must be selected before we can send this organization invite.");
         }
 
         try {
             organizationService.inviteOrganizationMember(orgId, targetUserId, roleId, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to invite members to this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not send that organization invite.");
         }
     }
 
@@ -177,12 +177,12 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_REMOVE', authentication)")
     public ResponseEntity<?> removeOrgMember(@PathVariable String orgId, @PathVariable String userId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before removing an organization member.");
 
         if (userId.equals(user.getId())) {
             List<User> userOrgs = organizationService.getUserOrganizations(user.getId());
             if (userOrgs.stream().filter(o -> o.getId().equals(orgId)).findFirst().map(o -> o.getOrganizationMembers().size() <= 1).orElse(false)) {
-                return ResponseEntity.badRequest().body("You cannot leave the organization as you are the only member. Delete the organization instead.");
+                return ErrorMessageUtils.badRequest("You cannot leave this organization while you are its only member. Delete the organization instead.");
             }
         }
 
@@ -190,9 +190,9 @@ public class OrganizationController {
             organizationService.removeOrganizationMember(orgId, userId, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to remove this member from the organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not remove that organization member.");
         }
     }
 
@@ -200,18 +200,18 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_EDIT_ROLE', authentication)")
     public ResponseEntity<?> updateMemberRole(@PathVariable String orgId, @PathVariable String userId, @RequestBody UpdateOrganizationMemberRoleRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before changing an organization member role.");
 
         String newRoleId = requestPayload.getRoleId();
-        if (newRoleId == null) return ResponseEntity.badRequest().body("Role ID is required.");
+        if (newRoleId == null) return ErrorMessageUtils.badRequest("A replacement role is required before we can update this member.");
 
         try {
             organizationService.updateOrganizationMemberRole(orgId, userId, newRoleId, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to change member roles in this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not update that organization member role.");
         }
     }
 
@@ -219,7 +219,7 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_METADATA', authentication)")
     public ResponseEntity<?> updateOrganization(@PathVariable String orgId, @RequestBody UpdateOrganizationRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating organization settings.");
 
         String name = requestPayload.getDisplayName();
         if (name == null) name = requestPayload.getName();
@@ -229,9 +229,9 @@ public class OrganizationController {
             User updated = organizationService.updateOrganization(orgId, name, bio, user);
             return ResponseEntity.ok(UserMapper.toDTO(updated, true));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to update this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not update that organization.");
         }
     }
 
@@ -239,15 +239,15 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_DELETE', authentication)")
     public ResponseEntity<?> deleteOrganization(@PathVariable String orgId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before deleting an organization.");
 
         try {
             organizationService.deleteOrganization(orgId, user);
             return ResponseEntity.ok().build();
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to delete this organization.");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to delete organization."));
+            return ErrorMessageUtils.badRequest(e, "We could not delete that organization.");
         }
     }
 
@@ -255,7 +255,7 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_AVATAR', authentication)")
     public ResponseEntity<?> uploadOrgAvatar(@PathVariable String orgId, @RequestParam("file") MultipartFile file) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before uploading an organization avatar.");
         try {
             validationService.validateIcon(file);
             String path = storageService.upload(file, "avatars/" + orgId);
@@ -263,11 +263,11 @@ public class OrganizationController {
             organizationService.updateOrganizationAvatar(orgId, url, user);
             return ResponseEntity.ok(url);
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to upload an avatar for this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not upload that organization avatar.");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload avatar."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to upload avatar.");
         }
     }
 
@@ -275,7 +275,7 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_BANNER', authentication)")
     public ResponseEntity<?> uploadOrgBanner(@PathVariable String orgId, @RequestParam("file") MultipartFile file) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before uploading an organization banner.");
         try {
             validationService.validateBanner(file);
             String path = storageService.upload(file, "banners/" + orgId);
@@ -283,11 +283,11 @@ public class OrganizationController {
             organizationService.updateOrganizationBanner(orgId, url, user);
             return ResponseEntity.ok(url);
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
+            return ErrorMessageUtils.forbidden(e, "You do not have permission to upload a banner for this organization.");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not upload that organization banner.");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to upload banner."));
+            return ErrorMessageUtils.internalServerError(e, "Failed to upload banner.");
         }
     }
 
@@ -295,12 +295,12 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_INVITE_ACCEPT', authentication)")
     public ResponseEntity<?> acceptOrgInvite(@PathVariable String orgId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before accepting an organization invite.");
         try {
             organizationService.resolveOrgInvite(orgId, true, user);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to accept organization invite."));
+            return ErrorMessageUtils.badRequest(e, "We could not accept that organization invite.");
         }
     }
 
@@ -308,12 +308,12 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_INVITE_DECLINE', authentication)")
     public ResponseEntity<?> declineOrgInvite(@PathVariable String orgId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before declining an organization invite.");
         try {
             organizationService.resolveOrgInvite(orgId, false, user);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to decline organization invite."));
+            return ErrorMessageUtils.badRequest(e, "We could not decline that organization invite.");
         }
     }
 
@@ -321,12 +321,12 @@ public class OrganizationController {
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_INVITE', authentication)")
     public ResponseEntity<?> cancelOrgInvite(@PathVariable String orgId, @PathVariable String userId) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before canceling an organization invite.");
         try {
             organizationService.voidOrgInvite(orgId, userId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ErrorMessageUtils.describe(e, "Failed to cancel organization invite."));
+            return ErrorMessageUtils.badRequest(e, "We could not cancel that organization invite.");
         }
     }
 }

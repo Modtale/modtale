@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.AdminMapper;
 import net.modtale.model.dto.admin.ReportDTO;
 import net.modtale.model.dto.request.user.CreateReportRequest;
@@ -25,7 +26,7 @@ public class ReportController {
     @PostMapping("/reports")
     public ResponseEntity<?> submitReport(@RequestBody CreateReportRequest requestPayload) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(401).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before submitting a report.");
 
         String targetId = requestPayload.getTargetId();
         String targetTypeStr = requestPayload.getTargetType();
@@ -33,7 +34,7 @@ public class ReportController {
         String description = requestPayload.getDescription();
 
         if (targetId == null || targetTypeStr == null || reason == null) {
-            return ResponseEntity.badRequest().body("Target ID, Type, and Reason are required");
+            return ErrorMessageUtils.badRequest("The report target, target type, and reason are all required before we can submit your report.");
         }
 
         try {
@@ -41,7 +42,7 @@ public class ReportController {
             Report report = reportService.createReport(targetId, targetType, reason, description, user);
             return ResponseEntity.ok(Map.of("id", report.getId()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid target type or data: " + e.getMessage());
+            return ErrorMessageUtils.badRequest(e, "We could not submit that report.");
         }
     }
 
@@ -60,7 +61,7 @@ public class ReportController {
     @PostMapping("/admin/reports/{id}/resolve")
     public ResponseEntity<?> resolveReport(@PathVariable String id, @RequestBody ResolveReportRequest requestPayload) {
         User admin = accountService.getCurrentUser();
-        if (admin == null) return ResponseEntity.status(401).build();
+        if (admin == null) return ErrorMessageUtils.unauthorized("You need to sign in before resolving reports.");
 
         String statusStr = requestPayload.getStatus();
         String note = requestPayload.getNote();
@@ -70,7 +71,7 @@ public class ReportController {
             reportService.resolveReport(id, status, note, admin);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid status or report ID");
+            return ErrorMessageUtils.badRequest("The report could not be resolved because the requested status or report ID was invalid.");
         }
     }
 }

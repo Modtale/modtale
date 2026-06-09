@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
 import { Building2, Plus, Users, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -59,8 +59,12 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 });
                 setOrgProjects(orgData);
 
-            } catch (e) {
-                console.error("Failed to load projects", e);
+            } catch (e: unknown) {
+                setStatus({
+                    type: 'error',
+                    title: 'Projects Unavailable',
+                    msg: extractApiErrorMessage(e, 'We could not load your project dashboard.')
+                });
             } finally {
                 setLoading(false);
             }
@@ -84,8 +88,8 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
 
             setDeleteModal(null);
             setStatus({ type: 'success', title: 'Deleted', msg: "Project deleted successfully." });
-        } catch (e) {
-            setStatus({ type: 'error', title: 'Delete Failed', msg: "Could not delete project." });
+        } catch (e: unknown) {
+            setStatus({ type: 'error', title: 'Delete Failed', msg: extractApiErrorMessage(e, 'We could not delete that project.') });
         }
     };
 

@@ -69,21 +69,34 @@ describe('api utils', () => {
             response?: { data?: unknown };
         };
         responseStringError.response = { data: 'Readable backend error' };
-        expect(extractApiErrorMessage(responseStringError, 'Fallback')).toBe('Readable backend error');
+        expect(extractApiErrorMessage(responseStringError, 'Fallback')).toBe('Fallback. Readable backend error');
 
         const responseObjectError = new Error('Request failed') as Error & {
             response?: { data?: unknown };
         };
         responseObjectError.response = { data: { error: 'Validation failed' } };
-        expect(extractApiErrorMessage(responseObjectError, 'Fallback')).toBe('Validation failed');
+        expect(extractApiErrorMessage(responseObjectError, 'Fallback')).toBe('Fallback. Validation failed');
 
         const responseMessageError = new Error('Request failed') as Error & {
             response?: { data?: unknown };
         };
         responseMessageError.response = { data: { message: 'Token expired' } };
-        expect(extractApiErrorMessage(responseMessageError, 'Fallback')).toBe('Token expired');
+        expect(extractApiErrorMessage(responseMessageError, 'Fallback')).toBe('Fallback. Token expired');
 
-        expect(extractApiErrorMessage(new Error('Network offline'), 'Fallback')).toBe('Network offline');
+        expect(extractApiErrorMessage(new Error('Network offline'), 'Fallback')).toBe('Fallback. Network offline');
         expect(extractApiErrorMessage({ bad: 'shape' }, 'Fallback')).toBe('Fallback');
+    });
+
+    it('fills in blank auth and network failures with friendlier context', () => {
+        const unauthorizedError = new Error('Request failed with status code 401') as Error & {
+            response?: { status?: number };
+        };
+        unauthorizedError.response = { status: 401 };
+
+        expect(extractApiErrorMessage(unauthorizedError, 'Could not save profile.'))
+            .toBe('Could not save profile. You need to sign in again before trying this action. Your session may have expired.');
+
+        expect(extractApiErrorMessage(new Error('Network Error'), 'Could not save profile.'))
+            .toBe('Could not save profile. We could not reach the server. Check your internet connection and try again.');
     });
 });

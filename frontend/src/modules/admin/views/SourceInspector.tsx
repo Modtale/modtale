@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, CheckCircle2, Square, RefreshCw } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { ScanIssue } from '@/types';
 
 interface SourceInspectorProps {
@@ -188,6 +189,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     const [showIssuesDropdown, setShowIssuesDropdown] = useState(false);
     const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set());
     const [isScanning, setIsScanning] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     const [activeHighlight, setActiveHighlight] = useState<{
         file: string;
@@ -233,8 +235,11 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         try {
             const data = await adminClient.getFileContent(modId, version, path);
             setInspectorContent(data);
+            setActionError(null);
         } catch (e) {
-            setInspectorContent('// Error loading file content.');
+            const message = extractApiErrorMessage(e, 'We could not load this file from the archive.');
+            setActionError(message);
+            setInspectorContent(`// ${message}`);
         } finally {
             setLoadingFile(false);
         }
@@ -269,8 +274,9 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         setIsScanning(true);
         try {
             await adminClient.scanVersion(modId, versionId);
+            setActionError(null);
         } catch (e) {
-            console.error("Rescan failed", e);
+            setActionError(extractApiErrorMessage(e, 'We could not start a rescan for this version.'));
         } finally {
             setIsScanning(false);
         }
@@ -388,6 +394,12 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                     </button>
                 </div>
             </div>
+
+            {actionError && (
+                <div className="border-b border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+                    {actionError}
+                </div>
+            )}
 
             <div className="flex-1 flex overflow-hidden">
                 <div className="w-80 bg-slate-950 border-r border-white/10 flex flex-col">

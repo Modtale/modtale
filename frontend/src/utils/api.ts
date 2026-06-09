@@ -16,6 +16,13 @@ type RetriableAxiosConfig = InternalAxiosRequestConfig & {
     _csrfRefreshAttempted?: boolean;
 };
 
+const GENERIC_CLIENT_ERROR_PREFIXES = [
+    'request failed',
+    'network error',
+    'timeout of',
+    'canceled'
+];
+
 export const getCookie = (name: string): string | null => {
     if (typeof document === 'undefined') return null;
     if (!document.cookie) return null;
@@ -117,31 +124,139 @@ api.interceptors.response.use(
 );
 
 export const extractApiErrorMessage = (error: unknown, fallback: string): string => {
+    const trimTrailingPunctuation = (value: string) => value.trim().replace(/[.:;\s]+$/, '');
+    const ensureSentence = (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return '';
+        return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+    };
+
+    const normalizeText = (value: unknown): string | null => {
+        if (typeof value !== 'string') {
+            return null;
+        }
+
+        const trimmed = value.trim();
+        return trimmed ? trimmed : null;
+    };
+
+    const extractPayloadMessage = (payload: unknown): string | null => {
+        const directText = normalizeText(payload);
+        if (directText) {
+            return directText;
+        }
+
+        if (Array.isArray(payload)) {
+            const messages = payload
+                .map(item => extractPayloadMessage(item))
+                .filter((item): item is string => Boolean(item));
+            return messages.length > 0 ? messages.join(' ') : null;
+        }
+
+        if (!payload || typeof payload !== 'object') {
+            return null;
+        }
+
+        const payloadRecord = payload as Record<string, unknown>;
+        const keysToCheck = ['error', 'message', 'detail', 'details', 'reason'] as const;
+
+        for (const key of keysToCheck) {
+            const text = extractPayloadMessage(payloadRecord[key]);
+            if (text) {
+                return text;
+            }
+        }
+
+        const errors = extractPayloadMessage(payloadRecord.errors);
+        return errors || null;
+    };
+
+    const isGenericClientMessage = (message: string) => {
+        const lower = message.toLowerCase();
+        return GENERIC_CLIENT_ERROR_PREFIXES.some(prefix => lower === prefix || lower.startsWith(prefix));
+    };
+
+    const combineMessages = (baseFallback: string, detail?: string | null) => {
+        const normalizedFallback = trimTrailingPunctuation(baseFallback);
+        const normalizedDetail = detail?.trim() || '';
+
+        if (!normalizedDetail) {
+            return baseFallback.trim() || ensureSentence(normalizedFallback || fallback);
+        }
+
+        if (!normalizedFallback) {
+            return normalizedDetail;
+        }
+
+        const lowerFallback = normalizedFallback.toLowerCase();
+        const lowerDetail = normalizedDetail.toLowerCase();
+
+        if (
+            lowerDetail === lowerFallback ||
+            lowerDetail.startsWith(`${lowerFallback}:`) ||
+            lowerDetail.startsWith(`${lowerFallback}.`)
+        ) {
+            return normalizedDetail;
+        }
+
+        return `${ensureSentence(normalizedFallback)} ${normalizedDetail}`;
+    };
+
+    const buildStatusFallback = () => {
+        const status = (error as any)?.response?.status as number | undefined;
+        const code = (error as any)?.code as string | undefined;
+        const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
+
+        if (code === 'ECONNABORTED') {
+            return 'The request took too long to complete. Please try again in a moment.';
+        }
+
+        if (errorMessage.includes('failed to fetch') || errorMessage === 'network error') {
+            return 'We could not reach the server. Check your internet connection and try again.';
+        }
+
+        if (errorMessage.includes('canceled')) {
+            return 'The request was interrupted before it finished. Please try again.';
+        }
+
+        switch (status) {
+            case 400:
+            case 422:
+                return 'The server rejected part of this request. Review the details and try again.';
+            case 401:
+                return 'You need to sign in again before trying this action. Your session may have expired.';
+            case 403:
+                return 'Your account is signed in, but it does not have permission to do this.';
+            case 404:
+                return 'The item you were trying to access could not be found.';
+            case 409:
+                return 'This action conflicted with the current state of the data. Refresh and try again.';
+            case 413:
+                return 'The upload was too large for the server to accept.';
+            case 415:
+                return 'The server does not support the format that was submitted.';
+            case 429:
+                return 'Too many requests were sent too quickly. Please wait a moment and try again.';
+            default:
+                if (typeof status === 'number' && status >= 500) {
+                    return 'The server ran into an unexpected problem while handling this request. Please try again shortly.';
+                }
+                return null;
+        }
+    };
+
     if (typeof error === 'string' && error.trim()) {
-        return error;
+        return error.trim();
     }
 
-    if (error instanceof Error && error.message.trim()) {
-        const data = (error as any).response?.data;
-
-        if (typeof data === 'string' && data.trim()) {
-            return data;
-        }
-
-        if (data && typeof data === 'object') {
-            const errorMessage = 'error' in data && typeof data.error === 'string' ? data.error : null;
-            if (errorMessage?.trim()) {
-                return errorMessage;
-            }
-
-            const message = 'message' in data && typeof data.message === 'string' ? data.message : null;
-            if (message?.trim()) {
-                return message;
-            }
-        }
-
-        return error.message;
+    const payloadMessage = extractPayloadMessage((error as any)?.response?.data);
+    if (payloadMessage) {
+        return combineMessages(fallback, payloadMessage);
     }
 
-    return fallback;
+    if (error instanceof Error && error.message.trim() && !isGenericClientMessage(error.message)) {
+        return combineMessages(fallback, error.message);
+    }
+
+    return combineMessages(fallback, buildStatusFallback());
 };

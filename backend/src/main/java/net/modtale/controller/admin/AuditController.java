@@ -1,5 +1,6 @@
 package net.modtale.controller.admin;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.AdminMapper;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.AdminLogRepository;
@@ -41,7 +42,7 @@ public class AuditController {
             @RequestParam(required = false, defaultValue = "50") int size
     ) {
         User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!accessControlService.isSuperAdmin(currentUser)) return ErrorMessageUtils.forbidden("Only Super Admin can view audit logs.");
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
         return ResponseEntity.ok(adminLogRepository.findWithFilters(query, action, targetType, pageable)

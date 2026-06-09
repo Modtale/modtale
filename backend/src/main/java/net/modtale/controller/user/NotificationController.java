@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.mapper.UserResponseMapper;
 import net.modtale.model.user.User;
 import net.modtale.service.communication.NotificationService;
@@ -21,7 +22,7 @@ public class NotificationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_READ', authentication)")
     public ResponseEntity<?> getUserNotifications() {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before viewing notifications.");
         return ResponseEntity.ok(notificationService.getUserNotifications(user.getId()).stream()
                 .map(UserResponseMapper::toNotificationDTO)
                 .toList());
@@ -31,7 +32,7 @@ public class NotificationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_UPDATE', authentication)")
     public ResponseEntity<?> markAsRead(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating notifications.");
         notificationService.markAsRead(id, user.getId());
         return ResponseEntity.ok().build();
     }
@@ -40,7 +41,7 @@ public class NotificationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_UPDATE', authentication)")
     public ResponseEntity<?> markAsUnread(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating notifications.");
         notificationService.markAsUnread(id, user.getId());
         return ResponseEntity.ok().build();
     }
@@ -49,7 +50,7 @@ public class NotificationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_UPDATE', authentication)")
     public ResponseEntity<?> markAllAsRead() {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating notifications.");
         notificationService.markAllAsRead(user.getId());
         return ResponseEntity.ok().build();
     }
@@ -58,7 +59,7 @@ public class NotificationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_DELETE', authentication)")
     public ResponseEntity<?> deleteNotification(@PathVariable String id) {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before deleting notifications.");
         notificationService.deleteNotification(id, user.getId());
         return ResponseEntity.ok().build();
     }
@@ -67,7 +68,7 @@ public class NotificationController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('NOTIFICATION_DELETE', authentication)")
     public ResponseEntity<?> clearAll() {
         User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before clearing notifications.");
         notificationService.clearAll(user.getId());
         return ResponseEntity.ok().build();
     }

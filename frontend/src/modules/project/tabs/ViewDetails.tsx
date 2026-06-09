@@ -9,7 +9,7 @@ interface ViewDetailsProps {
     canEdit: boolean;
     commentsRef: React.RefObject<HTMLDivElement | null>;
     setProject: React.Dispatch<React.SetStateAction<Project | null>>;
-    setStatusModal: (data: any) => void;
+    setStatusModal: (data: { type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string }) => void;
     onRefresh: () => Promise<void>;
 }
 
@@ -26,10 +26,14 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, currentUser, 
                 isCreator={canEdit}
                 commentsDisabled={project.allowComments === false}
                 onCommentsUpdated={(c) => { setProject(prev => prev ? { ...prev, comments: c } : null); if (onRefresh) onRefresh(); }}
-                onError={(msg) => setStatusModal({ type: 'error', title: 'Error', msg })}
-                onSuccess={(msg) => setStatusModal({ type: 'success', title: 'Success', msg })}
+                onError={(msg) => setStatusModal({ type: 'error', title: 'Comment Action Failed', message: msg })}
+                onSuccess={(msg) => setStatusModal({ type: 'success', title: 'Action Complete', message: msg })}
                 innerRef={commentsRef}
-                onReport={(commentId) => setStatusModal({ type: 'warning', title: 'Report', msg: `Reporting comment context: ${commentId}` })}
+                onReport={() => setStatusModal({
+                    type: 'info',
+                    title: 'Comment Reporting Not Ready',
+                    message: 'Comment-specific reporting is not wired up in this view yet. For now, please report the project and mention the comment details in your report notes.'
+                })}
             />
         </>
     );

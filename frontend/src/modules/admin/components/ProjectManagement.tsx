@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson, Lock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
-import { API_BASE_URL } from '@/utils/api';
+import { API_BASE_URL, extractApiErrorMessage } from '@/utils/api';
 import { isSuperAdminUser } from '../utils/access';
 import type { Project, ScanIssue } from '@/types';
 
@@ -88,7 +88,11 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             setQuery(data.title);
             setShowResults(false);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Not Found', msg: `No project found with ID or Slug: ${idQuery}` });
+            setStatus({
+                type: 'error',
+                title: 'Lookup Failed',
+                msg: extractApiErrorMessage(e, `No project found with ID or slug "${idQuery.trim()}".`)
+            });
         } finally {
             setLoading(false);
         }
@@ -107,7 +111,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             const data = await adminClient.getProjectById(mod.id);
             setFoundProject(data);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch full project details.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not load the full project details.') });
         } finally {
             setLoading(false);
         }
@@ -162,7 +166,13 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             setShowRawModal(false);
             setFoundProject(parsed);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : (e.response?.data || 'Server error saving raw data.') });
+            setStatus({
+                type: 'error',
+                title: 'Error',
+                msg: e instanceof SyntaxError
+                    ? 'Invalid JSON format.'
+                    : extractApiErrorMessage(e, 'We could not save the raw project data.')
+            });
         } finally {
             setLoading(false);
         }
@@ -203,7 +213,16 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             setActionReason('');
             setTargetVersionId(null);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Action Failed', msg: e.response?.data || 'An error occurred.' });
+            const fallback = confirmAction === 'DELETE'
+                ? 'We could not delete this project.'
+                : confirmAction === 'HARD_DELETE'
+                    ? 'We could not permanently delete this project.'
+                    : confirmAction === 'RESTORE'
+                        ? 'We could not restore this project.'
+                        : confirmAction === 'UNLIST'
+                            ? 'We could not unlist this project.'
+                            : 'We could not delete this version.';
+            setStatus({ type: 'error', title: 'Action Failed', msg: extractApiErrorMessage(e, fallback) });
         } finally {
             setLoading(false);
         }
