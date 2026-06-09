@@ -1,0 +1,145 @@
+package net.modtale.config.auth;
+
+import jakarta.servlet.FilterChain;
+import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.User;
+import net.modtale.service.auth.ApiKeyService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+class ApiKeyAuthFilterTest {
+
+    private ApiKeyAuthFilter filter;
+    private ApiKeyService apiKeyService;
+
+    @BeforeEach
+    void setUp() {
+        filter = new ApiKeyAuthFilter();
+        apiKeyService = mock(ApiKeyService.class);
+        ReflectionTestUtils.setField(filter, "apiKeyService", apiKeyService);
+        SecurityContextHolder.clearContext();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void ignoresRequestsOutsideApiNamespace() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/health");
+        request.addHeader("X-MODTALE-KEY", "test-key");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilterInternal(request, response, chain);
+
+        verifyNoInteractions(apiKeyService);
+        verify(chain).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void ignoresBlankApiKeyHeaders() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
+        request.addHeader("X-MODTALE-KEY", "   ");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilterInternal(request, response, chain);
+
+        verifyNoInteractions(apiKeyService);
+        verify(chain).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void rejectsInvalidApiKeysWithUnauthorizedJsonPayload() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
+        request.addHeader("X-MODTALE-KEY", "bad-key");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        when(apiKeyService.resolveKey("bad-key")).thenReturn(null);
+
+        filter.doFilterInternal(request, response, chain);
+
+        assertEquals(401, response.getStatus());
+        assertEquals("application/json", response.getContentType());
+        assertEquals("{\"error\": \"Unauthorized\", \"message\": \"Invalid API Key.\"}", response.getContentAsString());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void populatesSecurityContextWithApiRoleAndScopedPermissions() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
+        request.addHeader("X-MODTALE-KEY", "valid-key");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        ApiKey apiKey = new ApiKey();
+        apiKey.setContextPermissions(Map.of(
+                "project-1",
+                EnumSet.of(ApiKey.ApiPermission.PROJECT_READ, ApiKey.ApiPermission.VERSION_DOWNLOAD)
+        ));
+
+        User user = new User();
+        user.setId("user-1");
+        user.setUsername("ada");
+
+        when(apiKeyService.resolveKey("valid-key")).thenReturn(apiKey);
+        when(apiKeyService.getUserFromKey(apiKey)).thenReturn(user);
+
+        filter.doFilterInternal(request, response, chain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth);
+        assertEquals(user, auth.getPrincipal());
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API")));
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SCOPE_project-1_PROJECT_READ")));
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SCOPE_project-1_VERSION_DOWNLOAD")));
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void fallsBackToLegacyPersonalScopeWhenContextPermissionsAreMissing() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
+        request.addHeader("X-MODTALE-KEY", "legacy-key");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        ApiKey apiKey = new ApiKey();
+        User user = new User();
+        user.setId("user-legacy");
+
+        when(apiKeyService.resolveKey("legacy-key")).thenReturn(apiKey);
+        when(apiKeyService.getUserFromKey(apiKey)).thenReturn(user);
+
+        filter.doFilterInternal(request, response, chain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth);
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SCOPE_PERSONAL_PROJECT_READ")));
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SCOPE_PERSONAL_NOTIFICATION_DELETE")));
+        verify(chain).doFilter(request, response);
+    }
+}
