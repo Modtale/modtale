@@ -10,7 +10,7 @@ Disallow: /analytics
 Disallow: /admin
 Disallow: /settings
 
-Sitemap: https://api.modtale.net/sitemap.xml
+Sitemap: https://modtale.net/sitemap.xml
 `;
 
 const DEV_ROBOTS = `User-agent: *

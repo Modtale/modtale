@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { generateBreadcrumbSchema, generateItemListSchema, getBreadcrumbsForClassification } from '@/utils/schema';
+import {
+    generateBreadcrumbSchema,
+    generateCollectionPageSchema,
+    generateFaqSchema,
+    generateItemListSchema,
+    generateOrganizationSchema,
+    generateWebsiteSchema,
+    getBreadcrumbsForClassification,
+} from '@/utils/schema';
 
 describe('schema utils', () => {
     it('returns null when no item list or breadcrumbs are provided', () => {
         expect(generateItemListSchema([] as any)).toBeNull();
         expect(generateBreadcrumbSchema([])).toBeNull();
+        expect(generateFaqSchema([])).toBeNull();
     });
 
     it('builds item list schema entries with project urls and backend image urls', () => {
@@ -15,7 +24,7 @@ describe('schema utils', () => {
                 description: 'Build faster',
                 author: 'Ada',
                 imageUrl: '/api/media/sky-tools.png',
-                classification: 'PLUGIN'
+                classification: 'PLUGIN',
             } as any,
             {
                 id: 'p2',
@@ -24,13 +33,15 @@ describe('schema utils', () => {
                 description: 'Shape a world',
                 author: 'Grace',
                 imageUrl: 'https://cdn.modtale.net/world.png',
-                classification: 'SAVE'
-            } as any
+                classification: 'SAVE',
+            } as any,
         ]);
 
         expect(schema).toEqual({
             '@context': 'https://schema.org',
             '@type': 'ItemList',
+            itemListOrder: 'https://schema.org/ItemListOrderAscending',
+            numberOfItems: 2,
             itemListElement: [
                 {
                     '@type': 'ListItem',
@@ -41,8 +52,8 @@ describe('schema utils', () => {
                     image: 'http://localhost:8080/api/media/sky-tools.png',
                     author: {
                         '@type': 'Person',
-                        name: 'Ada'
-                    }
+                        name: 'Ada',
+                    },
                 },
                 {
                     '@type': 'ListItem',
@@ -53,33 +64,33 @@ describe('schema utils', () => {
                     image: 'https://cdn.modtale.net/world.png',
                     author: {
                         '@type': 'Person',
-                        name: 'Grace'
-                    }
-                }
-            ]
+                        name: 'Grace',
+                    },
+                },
+            ],
         });
     });
 
     it('maps classification breadcrumbs to the correct browse routes', () => {
         expect(getBreadcrumbsForClassification('PLUGIN')).toEqual([
             { name: 'Home', url: '/' },
-            { name: 'Plugins', url: '/plugins' }
+            { name: 'Plugins', url: '/plugins' },
         ]);
 
         expect(getBreadcrumbsForClassification('ART')).toEqual([
             { name: 'Home', url: '/' },
-            { name: 'Art Assets', url: '/art' }
+            { name: 'Art Assets', url: '/art' },
         ]);
 
         expect(getBreadcrumbsForClassification('All')).toEqual([
-            { name: 'Home', url: '/' }
+            { name: 'Home', url: '/' },
         ]);
     });
 
     it('builds breadcrumb schema and normalizes relative urls to absolute ones', () => {
         const schema = generateBreadcrumbSchema([
             { name: 'Home', url: '/' },
-            { name: 'Docs', url: 'https://docs.modtale.net' }
+            { name: 'Docs', url: 'https://docs.modtale.net' },
         ]);
 
         expect(schema).toEqual({
@@ -90,15 +101,73 @@ describe('schema utils', () => {
                     '@type': 'ListItem',
                     position: 1,
                     name: 'Home',
-                    item: 'https://modtale.net/'
+                    item: 'https://modtale.net/',
                 },
                 {
                     '@type': 'ListItem',
                     position: 2,
                     name: 'Docs',
-                    item: 'https://docs.modtale.net'
-                }
-            ]
+                    item: 'https://docs.modtale.net',
+                },
+            ],
+        });
+    });
+
+    it('builds collection, faq, website, and organization schemas', () => {
+        expect(generateCollectionPageSchema({
+            name: 'Hytale Mods',
+            description: 'Browse Hytale mods.',
+            path: '/mods',
+            keywords: 'hytale mods, hytale modding',
+            about: ['Hytale mods', 'Hytale plugins'],
+        })).toEqual({
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            name: 'Hytale Mods',
+            headline: 'Hytale Mods',
+            description: 'Browse Hytale mods.',
+            url: 'https://modtale.net/mods',
+            keywords: 'hytale mods, hytale modding',
+            isPartOf: {
+                '@type': 'WebSite',
+                name: 'Modtale',
+                url: 'https://modtale.net/',
+            },
+            about: [
+                { '@type': 'Thing', name: 'Hytale mods' },
+                { '@type': 'Thing', name: 'Hytale plugins' },
+            ],
+        });
+
+        expect(generateFaqSchema([
+            { question: 'Where can I find Hytale mods?', answer: 'On Modtale.' },
+        ])).toEqual({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: [
+                {
+                    '@type': 'Question',
+                    name: 'Where can I find Hytale mods?',
+                    acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'On Modtale.',
+                    },
+                },
+            ],
+        });
+
+        expect(generateWebsiteSchema()).toMatchObject({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'Modtale',
+            url: 'https://modtale.net/',
+        });
+
+        expect(generateOrganizationSchema()).toMatchObject({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: 'Modtale',
+            url: 'https://modtale.net/',
         });
     });
 });

@@ -181,6 +181,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
             </Helmet>
 
             <main className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-2 pb-8 transition-[max-width] duration-300">
+                <h1 className="sr-only">{seoContent.h1}</h1>
+
                 <div className="flex flex-col md:flex-row gap-8">
                     <div className="hidden md:block w-60 flex-shrink-0 z-30 sticky top-24 pt-3 h-fit space-y-4">
                         <div className="mb-6">

@@ -18,7 +18,7 @@ const isBot = isBotUserAgent(userAgent);
 let modData = null;
 let title = ROUTE_SEO['/mods'].title;
 let description = ROUTE_SEO['/mods'].description;
-let image = slug ? `${BACKEND_URL}/api/v1/og/project/${slug}.png` : "https://modtale.net/assets/favicon.svg";
+let image = slug ? `${BACKEND_URL}/api/v1/og/project/${slug}.png` : 'https://modtale.net/assets/logo.svg';
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 
