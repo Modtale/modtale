@@ -41,10 +41,10 @@ describe('adminClient', () => {
     it('sends tier updates as form data', async () => {
         mockedApi.post.mockResolvedValue({ data: { ok: true } } as any);
 
-        await adminClient.updateUserTier('ada', 'ENTERPRISE');
+        await adminClient.updateUserTier('user-1', 'ENTERPRISE');
 
         const [url, formData] = mockedApi.post.mock.calls[0];
-        expect(url).toBe('/admin/users/ada/tier');
+        expect(url).toBe('/admin/users/user-1/tier');
         expect(formData).toBeInstanceOf(FormData);
         expect((formData as FormData).get('tier')).toBe('ENTERPRISE');
     });
@@ -53,11 +53,11 @@ describe('adminClient', () => {
         mockedApi.post.mockResolvedValue({ data: null } as any);
         mockedApi.delete.mockResolvedValue({ data: null } as any);
 
-        await adminClient.grantAdmin('ada');
-        await adminClient.revokeAdmin('ada');
+        await adminClient.grantAdmin('user-1');
+        await adminClient.revokeAdmin('user-1');
 
-        expect(mockedApi.post).toHaveBeenCalledWith('/admin/users/ada/role', null, { params: { role: 'ADMIN' } });
-        expect(mockedApi.delete).toHaveBeenCalledWith('/admin/users/ada/role', { params: { role: 'ADMIN' } });
+        expect(mockedApi.post).toHaveBeenCalledWith('/admin/users/user-1/role', null, { params: { role: 'ADMIN' } });
+        expect(mockedApi.delete).toHaveBeenCalledWith('/admin/users/user-1/role', { params: { role: 'ADMIN' } });
     });
 
     it('includes deletion reasons in admin delete requests', async () => {

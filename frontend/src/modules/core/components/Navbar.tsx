@@ -263,7 +263,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 </div>
 
                                                 <div className="px-2 space-y-0.5">
-                                                    <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                    <Link to={SiteRoutes.creator(user.id, user.username)} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                                                         <UserIcon className="w-4 h-4 text-slate-400" /> Your Profile
                                                     </Link>
                                                     <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
@@ -350,7 +350,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     {user ? (
                         <>
-                            <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
+                            <Link to={SiteRoutes.creator(user.id, user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
                                 <img src={user.avatarUrl} className="w-6 h-6 rounded-full" alt="" /> Profile
                             </Link>
                             <button onClick={() => { setIsFollowingOpen(true); setIsMobileMenuOpen(false); }} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">

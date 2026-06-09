@@ -59,13 +59,13 @@ public class AccessControlService {
         }
     }
 
-    public boolean hasCreateProjectPerm(String ownerName, Authentication authentication) {
+    public boolean hasCreateProjectPerm(String ownerId, Authentication authentication) {
         User user = accountService.getCurrentUser();
         if (user == null) return false;
         if (isAdmin(user)) return true;
-        if (ownerName == null || ownerName.isEmpty() || ownerName.equalsIgnoreCase(user.getUsername())) return true;
+        if (ownerId == null || ownerId.isEmpty() || ownerId.equals(user.getId())) return true;
 
-        User org = userRepository.findByUsernameIgnoreCase(ownerName).orElse(null);
+        User org = userRepository.findById(ownerId).orElse(null);
         if (org == null || org.getAccountType() != User.AccountType.ORGANIZATION) return false;
 
         return hasOrgProjectManagementAccess(org, user.getId());

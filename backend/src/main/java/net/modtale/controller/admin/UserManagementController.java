@@ -99,24 +99,24 @@ public class UserManagementController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/users/{username}")
-    public ResponseEntity<?> getUserDetails(@PathVariable String username) {
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<?> getUserDetails(@PathVariable String userId) {
         User currentUser = getSafeUser();
         if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        Optional<User> target = userRepository.findByUsernameIgnoreCase(username);
+        Optional<User> target = userRepository.findById(userId);
         if (target.isEmpty()) return ResponseEntity.notFound().build();
 
         return ResponseEntity.ok(UserMapper.toDTO(target.get(), true));
     }
 
-    @GetMapping("/users/{username}/raw")
-    public ResponseEntity<?> getRawUser(@PathVariable String username) {
+    @GetMapping("/users/{userId}/raw")
+    public ResponseEntity<?> getRawUser(@PathVariable String userId) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User target = userRepository.findById(userId).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
 
         target.setGithubAccessToken(null);
@@ -127,12 +127,12 @@ public class UserManagementController {
         return ResponseEntity.ok(target);
     }
 
-    @PutMapping("/users/{username}/raw")
-    public ResponseEntity<?> updateRawUser(@PathVariable String username, @RequestBody User updatedData) {
+    @PutMapping("/users/{userId}/raw")
+    public ResponseEntity<?> updateRawUser(@PathVariable String userId, @RequestBody User updatedData) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        User existing = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User existing = userRepository.findById(userId).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
 
         updatedData.setId(existing.getId());
@@ -152,16 +152,16 @@ public class UserManagementController {
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/users/{username}")
+    @DeleteMapping("/users/{userId}")
     public ResponseEntity<?> deleteUser(
-            @PathVariable String username,
+            @PathVariable String userId,
             @RequestParam(required = false, defaultValue = "Administrative enforcement action.") String reason
     ) {
         User currentUser = getSafeUser();
         if (!accessControlService.isAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User target = userRepository.findById(userId).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
 
         if (!canManageUser(currentUser, target)) {
@@ -182,15 +182,15 @@ public class UserManagementController {
         }
     }
 
-    @PostMapping("/users/{username}/tier")
-    public ResponseEntity<?> setUserTier(@PathVariable String username, @RequestParam String tier) {
+    @PostMapping("/users/{userId}/tier")
+    public ResponseEntity<?> setUserTier(@PathVariable String userId, @RequestParam String tier) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Access Denied", "message", "You do not have permission."));
         }
 
-        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User target = userRepository.findById(userId).orElse(null);
         if (target == null) return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", "Not Found", "message", "User not found."));
 
@@ -214,14 +214,14 @@ public class UserManagementController {
         }
     }
 
-    @PostMapping("/users/{username}/role")
-    public ResponseEntity<?> addUserRole(@PathVariable String username, @RequestParam String role) {
+    @PostMapping("/users/{userId}/role")
+    public ResponseEntity<?> addUserRole(@PathVariable String userId, @RequestParam String role) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
 
-        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User target = userRepository.findById(userId).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
 
         if (target.getRoles() == null) target.setRoles(new ArrayList<>());
@@ -233,14 +233,14 @@ public class UserManagementController {
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/users/{username}/role")
-    public ResponseEntity<?> removeUserRole(@PathVariable String username, @RequestParam String role) {
+    @DeleteMapping("/users/{userId}/role")
+    public ResponseEntity<?> removeUserRole(@PathVariable String userId, @RequestParam String role) {
         User currentUser = getSafeUser();
         if (!accessControlService.isSuperAdmin(currentUser)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only Super Admin can manage roles.");
         }
 
-        User target = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        User target = userRepository.findById(userId).orElse(null);
         if (target == null) return ResponseEntity.notFound().build();
 
         if (target.getRoles() != null) {

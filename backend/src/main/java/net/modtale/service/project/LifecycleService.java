@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.regex.Pattern;
 
 @Service
 public class LifecycleService {
@@ -51,15 +50,15 @@ public class LifecycleService {
         if (project.getStatus() == ProjectStatus.ARCHIVED) throw new IllegalStateException("Archived projects are read-only.");
     }
 
-    public Project createDraft(String title, String description, ProjectClassification classification, User user, String ownerName, String customSlug) {
+    public Project createDraft(String title, String description, ProjectClassification classification, User user, String ownerId, String customSlug) {
         if (!user.isEmailVerified()) throw new SecurityException("Email verification required.");
         if(projectRepository.existsByTitleIgnoreCase(title)) throw new IllegalArgumentException("Title taken.");
 
         String finalAuthorId = user.getId();
         String finalAuthorName = user.getUsername();
 
-        if (ownerName != null && !ownerName.isEmpty() && !ownerName.equalsIgnoreCase(user.getUsername())) {
-            User org = mongoTemplate.findOne(new Query(Criteria.where("username").regex("^" + Pattern.quote(ownerName) + "$", "i")), User.class);
+        if (ownerId != null && !ownerId.isEmpty() && !ownerId.equals(user.getId())) {
+            User org = userRepository.findById(ownerId).orElse(null);
             if (org == null || org.getAccountType() != User.AccountType.ORGANIZATION || org.getOrganizationMembers().stream().noneMatch(m -> m.getUserId().equals(user.getId()))) {
                 throw new SecurityException("No permission.");
             }

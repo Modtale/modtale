@@ -21,6 +21,7 @@ interface ProjectCardProps {
 export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid' }) => {
     const title = project.title || 'Untitled Project';
     const author = project.author || 'Unknown';
+    const authorPath = project.authorId ? SiteRoutes.creator(project.authorId, author) : null;
 
     const canonicalPath = path || SiteRoutes.project(project);
 
@@ -67,9 +68,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     </h3>
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
-                        <Link to={SiteRoutes.creator(author)} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
-                            {author}
-                        </Link>
+                        {authorPath ? (
+                            <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
+                                {author}
+                            </Link>
+                        ) : (
+                            <span className="font-bold truncate">{author}</span>
+                        )}
                     </div>
                 </div>
                 <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-tight relative z-20">
@@ -107,9 +112,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                             </h3>
                             <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
                                 <span>by</span>
-                                <Link to={SiteRoutes.creator(author)} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
-                                    {author}
-                                </Link>
+                                {authorPath ? (
+                                    <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
+                                        {author}
+                                    </Link>
+                                ) : (
+                                    <span className="truncate block">{author}</span>
+                                )}
                             </div>
                         </div>
                         <div className="hidden sm:flex bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5 pointer-events-none">
@@ -208,13 +217,17 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 
                     <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
-                        <Link
-                            to={SiteRoutes.creator(author)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
-                        >
-                            {author}
-                        </Link>
+                        {authorPath ? (
+                            <Link
+                                to={authorPath}
+                                onClick={(e) => e.stopPropagation()}
+                                className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
+                            >
+                                {author}
+                            </Link>
+                        ) : (
+                            <span>{author}</span>
+                        )}
                     </div>
                 </div>
 

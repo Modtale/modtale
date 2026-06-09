@@ -47,8 +47,6 @@ public class ProjectDTO {
     private List<Project.ProjectMember> teamMembers;
     private List<Project.ProjectMember> teamInvites;
 
-    private List<String> contributors;
-
     private List<String> galleryImages;
     private List<ProjectCommentDTO> comments;
     private List<ProjectVersionDTO> versions;
@@ -127,8 +125,6 @@ public class ProjectDTO {
     public List<Project.ProjectMember> getTeamInvites() { return teamInvites; }
     public void setTeamInvites(List<Project.ProjectMember> teamInvites) { this.teamInvites = teamInvites; }
 
-    public List<String> getContributors() { return contributors; }
-    public void setContributors(List<String> contributors) { this.contributors = contributors; }
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
     public List<ProjectCommentDTO> getComments() { return comments; }

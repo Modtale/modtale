@@ -17,10 +17,6 @@ export const projectClient = {
         const res = await api.get<User>(`/user/profile/${id}`);
         return res.data;
     },
-    lookupUser: async (username: string) => {
-        const res = await api.get<{ id: string }>(`/users/lookup/${username}`);
-        return res.data;
-    },
     getOrgMembers: async (orgId: string) => {
         const res = await api.get<User[]>(`/orgs/${orgId}/members`);
         return res.data;

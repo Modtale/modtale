@@ -12,9 +12,6 @@ import net.modtale.service.project.ProjectService;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.user.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +21,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -35,7 +31,6 @@ public class AnalyticsController {
     @Autowired private AccountService accountService;
     @Autowired private ProjectService projectService;
     @Autowired private AccessControlService accessControlService;
-    @Autowired private MongoTemplate mongoTemplate;
 
     private String getClientIp(HttpServletRequest request) {
         String xfHeader = request.getHeader("X-Forwarded-For");
@@ -51,15 +46,15 @@ public class AnalyticsController {
     public ResponseEntity<?> getCreatorAnalytics(
             @RequestParam(defaultValue = "30d") String range,
             @RequestParam(required = false) List<String> include,
-            @RequestParam(required = false) String username
+            @RequestParam(required = false) String userId
     ) {
         User currentUser = accountService.getCurrentUser();
         if (currentUser == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
         String resolvedTargetId = currentUser.getId();
 
-        if (username != null && !username.isEmpty() && !username.equalsIgnoreCase(currentUser.getUsername())) {
-            User target = mongoTemplate.findOne(new Query(Criteria.where("username").regex("^" + Pattern.quote(username) + "$", "i")), User.class);
+        if (userId != null && !userId.isEmpty() && !userId.equals(currentUser.getId())) {
+            User target = accountService.getPublicProfile(userId);
             if (target == null) return ResponseEntity.notFound().build();
 
             if (target.getAccountType() == User.AccountType.ORGANIZATION) {

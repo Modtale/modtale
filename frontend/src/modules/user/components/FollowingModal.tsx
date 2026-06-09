@@ -63,7 +63,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
                             {users.map(u => (
                                 <Link
                                     key={u.id}
-                                    to={SiteRoutes.creator(u.username)}
+                                    to={SiteRoutes.creator(u.id, u.username)}
                                     onClick={onClose}
                                     className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
                                 >

@@ -12,9 +12,6 @@ import java.util.Optional;
 
 public interface ProjectRepository extends MongoRepository<Project, String>, ProjectRepositoryCustom {
 
-    @Query(value = "{ '$or': [ { 'authorId': ?0 }, { 'author': { $regex: '^?0$', $options: 'i' } } ], 'deletedAt': null }")
-    Page<Project> findByAuthorIdOrAuthorIgnoreCase(String authorIdOrName, Pageable pageable);
-
     @Query(value = "{ 'authorId': ?0, 'deletedAt': null }")
     Page<Project> findByAuthorId(String authorId, Pageable pageable);
 
@@ -27,9 +24,6 @@ public interface ProjectRepository extends MongoRepository<Project, String>, Pro
     @Query(value = "{ 'authorId': ?0, 'deletedAt': null }")
     List<Project> findByAuthorIdList(String authorId);
 
-    @Query(value = "{ 'author': ?0, 'deletedAt': null }")
-    List<Project> findByAuthor(String author);
-
     @Query(value = "{ 'authorId': ?0, 'deletedAt': null }", fields = "{ 'title': 1, 'rating': 1, 'downloadCount': 1 }")
     List<Project> findMetaByAuthorId(String authorId);
 
@@ -41,9 +35,6 @@ public interface ProjectRepository extends MongoRepository<Project, String>, Pro
     long countByAuthorId(String authorId);
 
     boolean existsByTitleIgnoreCase(String title);
-
-    @Query(value = "{ 'contributors': ?0, 'deletedAt': null }")
-    Page<Project> findByContributors(String username, Pageable pageable);
 
     @Query("{ 'versions.dependencies.modId': ?0 }")
     List<Project> findByDependency(String modId);

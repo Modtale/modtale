@@ -35,8 +35,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -71,13 +69,6 @@ public class UserController {
         return ResponseEntity.ok(users.stream()
                 .map(UserMapper::toSummaryDTO)
                 .collect(Collectors.toList()));
-    }
-
-    @GetMapping("/users/lookup/{username}")
-    public ResponseEntity<Map<String, String>> lookupUserId(@PathVariable String username) {
-        Optional<User> target = userRepository.findByUsernameIgnoreCase(username);
-        if (target.isEmpty()) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(Map.of("id", target.get().getId()));
     }
 
     @GetMapping("/user/me")

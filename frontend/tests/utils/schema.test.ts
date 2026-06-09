@@ -35,7 +35,7 @@ describe('schema utils', () => {
                 {
                     '@type': 'ListItem',
                     position: 1,
-                    url: 'https://modtale.net/mod/sky-tools-p1',
+                    url: 'https://modtale.net/mod/sky-tools~p1',
                     name: 'Sky Tools',
                     description: 'Build faster',
                     image: 'http://localhost:8080/api/media/sky-tools.png',
@@ -47,7 +47,7 @@ describe('schema utils', () => {
                 {
                     '@type': 'ListItem',
                     position: 2,
-                    url: 'https://modtale.net/world/world-builder-p2',
+                    url: 'https://modtale.net/world/world-builder~p2',
                     name: 'World Builder',
                     description: 'Shape a world',
                     image: 'https://cdn.modtale.net/world.png',

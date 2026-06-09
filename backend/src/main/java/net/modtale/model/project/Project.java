@@ -139,9 +139,6 @@ public class Project {
 
     private String approvedBy;
 
-    private List<String> contributors = new ArrayList<>();
-    private List<String> pendingInvites = new ArrayList<>();
-
     private List<ProjectRole> projectRoles = new ArrayList<>();
     private List<ProjectMember> teamMembers = new ArrayList<>();
     private List<ProjectMember> teamInvites = new ArrayList<>();
@@ -232,11 +229,6 @@ public class Project {
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
     public String getApprovedBy() { return approvedBy; }
     public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
-
-    public List<String> getContributors() { return contributors; }
-    public void setContributors(List<String> contributors) { this.contributors = contributors; }
-    public List<String> getPendingInvites() { return pendingInvites; }
-    public void setPendingInvites(List<String> pendingInvites) { this.pendingInvites = pendingInvites; }
 
     public List<ProjectRole> getProjectRoles() { return projectRoles; }
     public void setProjectRoles(List<ProjectRole> projectRoles) { this.projectRoles = projectRoles; }

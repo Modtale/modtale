@@ -2,6 +2,7 @@ package net.modtale.controller.system;
 
 import net.modtale.model.project.Project;
 import net.modtale.service.project.SearchService;
+import net.modtale.service.project.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -18,6 +19,7 @@ import java.util.Set;
 public class SitemapController {
 
     @Autowired private SearchService searchService;
+    @Autowired private ProjectService projectService;
 
     @Value("${app.frontend.url:https://modtale.net}")
     private String baseUrl;
@@ -42,15 +44,11 @@ public class SitemapController {
         List<Project> projects = searchService.getPublishedProjects();
 
         for (Project p : projects) {
-            String prefix = "/mod/";
-            if ("MODPACK".equals(p.getClassification())) prefix = "/modpack/";
-            else if ("SAVE".equals(p.getClassification())) prefix = "/world/";
-
-            String slug = (p.getSlug() != null && !p.getSlug().isBlank()) ? p.getSlug() : createSlug(p.getTitle(), p.getId());
-
             if (p.getUpdatedAt() != null) {
-                addUrl(xml, baseUrl + prefix + slug, "0.8", parseDate(p.getUpdatedAt()));
-                activeAuthors.add(p.getAuthor());
+                addUrl(xml, baseUrl + projectService.getProjectLink(p), "0.8", parseDate(p.getUpdatedAt()));
+                if (p.getAuthorId() != null && !p.getAuthorId().isBlank()) {
+                    activeAuthors.add(p.getAuthorId());
+                }
             }
         }
 
@@ -79,14 +77,5 @@ public class SitemapController {
         } catch (Exception e) {
             return LocalDate.now();
         }
-    }
-
-    private String createSlug(String title, String id) {
-        if (title == null) return id;
-        String slug = title.toLowerCase()
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("(^-|-$)", "");
-        if (slug.length() > 30) slug = slug.substring(0, 30);
-        return slug.isEmpty() ? id : slug + "-" + id;
     }
 }
