@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.io.Serializable;
 
 @Document(collection = "users")
@@ -80,6 +81,7 @@ public class User implements Serializable {
     private LocalDateTime gitlabTokenExpiresAt;
 
     public User() {
+        this.id = UUID.randomUUID().toString();
         this.tier = ApiKey.Tier.USER;
         this.createdAt = LocalDate.now().toString();
         this.roles = new ArrayList<>();

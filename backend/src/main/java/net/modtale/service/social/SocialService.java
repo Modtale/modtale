@@ -6,6 +6,7 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.communication.NotificationService;
+import net.modtale.util.MongoIdUtils;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.security.SanitizationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -150,7 +151,7 @@ public class SocialService {
 
         List<String> ids = userOpt.get().getFollowingIds();
         if (ids == null || ids.isEmpty()) return new ArrayList<>();
-        Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(ids)).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id");
         return mongoTemplate.find(query, User.class);
     }
@@ -161,7 +162,7 @@ public class SocialService {
 
         List<String> ids = userOpt.get().getFollowerIds();
         if (ids == null || ids.isEmpty()) return new ArrayList<>();
-        Query query = new Query(Criteria.where("_id").in(ids).and("deletedAt").is(null));
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(ids)).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id");
         return mongoTemplate.find(query, User.class);
     }

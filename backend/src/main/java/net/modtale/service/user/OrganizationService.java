@@ -9,6 +9,7 @@ import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.security.SanitizationService;
+import net.modtale.util.MongoIdUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -256,7 +257,7 @@ public class OrganizationService {
         if (org.getOrganizationMembers() == null || org.getOrganizationMembers().isEmpty() || org.isDeleted()) return new ArrayList<>();
 
         List<String> memberIds = org.getOrganizationMembers().stream().map(User.OrganizationMember::getUserId).collect(Collectors.toList());
-        Query query = new Query(Criteria.where("_id").in(memberIds).and("deletedAt").is(null));
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(memberIds)).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "roles", "tier", "id", "bio");
         return mongoTemplate.find(query, User.class);
     }
@@ -266,7 +267,7 @@ public class OrganizationService {
         if (org.getPendingOrgInvites() == null || org.getPendingOrgInvites().isEmpty()) return new ArrayList<>();
 
         List<String> inviteIds = org.getPendingOrgInvites().stream().map(User.OrganizationMember::getUserId).collect(Collectors.toList());
-        Query query = new Query(Criteria.where("_id").in(inviteIds).and("deletedAt").is(null));
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(inviteIds)).and("deletedAt").is(null));
         query.fields().include("username", "avatarUrl", "id");
         return mongoTemplate.find(query, User.class);
     }

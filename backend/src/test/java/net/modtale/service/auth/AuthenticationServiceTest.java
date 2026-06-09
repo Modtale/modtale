@@ -19,8 +19,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -70,15 +72,11 @@ class AuthenticationServiceTest {
         when(userRepository.existsByUsernameIgnoreCase("Ada")).thenReturn(false);
         when(userRepository.findByEmail("ada@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("secret123")).thenReturn("encoded-secret");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            user.setId("user-1");
-            return user;
-        });
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         User saved = authenticationService.registerUser("Ada", "ada@example.com", "secret123");
 
-        assertEquals("user-1", saved.getId());
+        assertDoesNotThrow(() -> UUID.fromString(saved.getId()));
         assertEquals("Ada", saved.getUsername());
         assertEquals("encoded-secret", saved.getPassword());
         assertFalse(saved.isEmailVerified());
@@ -86,7 +84,7 @@ class AuthenticationServiceTest {
         assertNotNull(saved.getVerificationToken());
         assertNotNull(saved.getVerificationTokenExpiry());
         assertTrue(saved.getAvatarUrl().contains("name=Ada"));
-        verify(trackingService).logNewUser("user-1");
+        verify(trackingService).logNewUser(saved.getId());
         verify(emailService).sendVerificationEmail("ada@example.com", "Ada", saved.getVerificationToken());
         verify(reservedAccountGuardService).rejectReservedEmailInProduction("ada@example.com");
     }
@@ -205,14 +203,10 @@ class AuthenticationServiceTest {
     void processUserLoginCreatesAGoogleAccountWithLinkMetadataAndSuggestedFields() {
         when(userRepository.findByConnectedAccountsProviderAndProviderId(OAuthProvider.GOOGLE, "google-123"))
                 .thenReturn(Optional.empty());
-        when(userRepository.findByEmail("ada@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.empty());
         when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
         when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            user.setId("user-1");
-            return user;
-        });
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DefaultOAuth2User oauthUser = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
@@ -240,13 +234,14 @@ class AuthenticationServiceTest {
         assertEquals("google-123", savedUser.getConnectedAccounts().get(0).getProviderId());
         assertEquals("AdaExample", savedUser.getConnectedAccounts().get(0).getUsername());
         assertFalse(savedUser.getConnectedAccounts().get(0).isVisible());
+        assertDoesNotThrow(() -> UUID.fromString(savedUser.getId()));
 
         assertEquals(savedUser.getUsername(), principal.getAttribute("login"));
-        assertEquals("user-1", principal.getAttribute("id"));
+        assertEquals(savedUser.getId(), principal.getAttribute("id"));
         assertEquals(Boolean.TRUE, principal.getAttribute("is_new_account"));
         assertEquals("AdaExample", principal.getAttribute("suggested_username"));
         assertEquals("https://cdn.example/avatar.png", principal.getAttribute("suggested_avatar"));
-        verify(trackingService).logNewUser("user-1");
+        verify(trackingService).logNewUser(savedUser.getId());
     }
 
     private static User user(String id, String username, String email) {

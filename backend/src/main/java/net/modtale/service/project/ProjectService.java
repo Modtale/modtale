@@ -8,6 +8,7 @@ import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.user.AccountService;
+import net.modtale.util.MongoIdUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -120,7 +121,7 @@ public class ProjectService {
 
         if (!userIdsToFetch.isEmpty()) {
             List<User> users = new ArrayList<>();
-            if (!userIdsToFetch.isEmpty()) users.addAll(mongoTemplate.find(new Query(Criteria.where("_id").in(userIdsToFetch)), User.class));
+            if (!userIdsToFetch.isEmpty()) users.addAll(mongoTemplate.find(new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(userIdsToFetch))), User.class));
 
             Map<String, User> userMapById = users.stream().collect(Collectors.toMap(User::getId, u -> u));
 
