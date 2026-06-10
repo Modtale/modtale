@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Eye, EyeOff, Globe, Archive, Tag, Link2, ToggleRight, ToggleLeft, Trash2, Settings as SettingsIcon } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import type { Project } from '@/types';
@@ -13,6 +13,7 @@ interface SettingsProps {
     readOnly: boolean;
     hasProjectPermission: (perm: Permission) => boolean;
     handleRestore?: () => void;
+    handlePrivate?: () => void;
     handleUnlist?: () => void;
     handleArchive?: () => void;
     handleDelete?: () => void;
@@ -25,8 +26,14 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({
                                                       projectData, metaData, setMetaData, setProjectData, readOnly, hasProjectPermission,
-                                                      handleRestore, handleUnlist, handleArchive, handleDelete, slugError, handleSlugChange, getUrlPrefix, markDirty, isLoading
+                                                      handleRestore, handlePrivate, handleUnlist, handleArchive, handleDelete, slugError, handleSlugChange, getUrlPrefix, markDirty, isLoading
                                                   }) => {
+    const canManageVisibility = projectData?.status !== 'PENDING';
+    const canShowPublishedToggle = projectData?.status === 'PUBLISHED'
+        || projectData?.status === 'UNLISTED'
+        || projectData?.status === 'ARCHIVED'
+        || (projectData?.status === 'PRIVATE' && !!projectData?.createdAt);
+
     return (
         <div className="space-y-6">
             <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>
@@ -34,15 +41,21 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
 
             <div className={`${theme.colors.bgSurface} p-6 rounded-2xl border ${theme.colors.border}`}>
-                {(projectData?.status === 'PUBLISHED' || projectData?.status === 'UNLISTED') && (
+                {canManageVisibility && (
                     <div className={`mb-6 pb-6 border-b ${theme.colors.borderFaint}`}>
                         <h3 className={`text-sm font-bold ${theme.colors.textPrimary} flex items-center gap-2 mb-4`}><Eye className={`w-4 h-4 ${theme.colors.textMuted}`} /> Project Visibility</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <button type="button" onClick={handleRestore} disabled={isLoading || projectData.status === 'PUBLISHED' || !hasProjectPermission(Permission.PROJECT_STATUS_PUBLISH)} className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${projectData.status === 'PUBLISHED' ? 'bg-green-500/10 border-green-500 text-green-500' : `${theme.colors.bgBase} ${theme.colors.border} hover:border-green-500 hover:text-green-500 disabled:opacity-50`}`}>
-                                <Globe className="w-6 h-6" />
-                                <div className="text-center"><div className="font-bold text-sm">Published</div><div className="text-[10px] opacity-70">Visible to everyone</div></div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {canShowPublishedToggle && (
+                                <button type="button" onClick={handleRestore} disabled={isLoading || projectData?.status === 'PUBLISHED' || !hasProjectPermission(Permission.PROJECT_STATUS_PUBLISH)} className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${projectData?.status === 'PUBLISHED' ? 'bg-green-500/10 border-green-500 text-green-500' : `${theme.colors.bgBase} ${theme.colors.border} hover:border-green-500 hover:text-green-500 disabled:opacity-50`}`}>
+                                    <Globe className="w-6 h-6" />
+                                    <div className="text-center"><div className="font-bold text-sm">Published</div><div className="text-[10px] opacity-70">Visible to everyone</div></div>
+                                </button>
+                            )}
+                            <button type="button" onClick={handlePrivate} disabled={isLoading || projectData?.status === 'PRIVATE' || !hasProjectPermission(Permission.PROJECT_STATUS_UNLIST)} className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${projectData?.status === 'PRIVATE' ? 'bg-blue-500/10 border-blue-500 text-blue-500' : `${theme.colors.bgBase} ${theme.colors.border} hover:border-blue-500 hover:text-blue-500 disabled:opacity-50`}`}>
+                                <Eye className="w-6 h-6" />
+                                <div className="text-center"><div className="font-bold text-sm">Private</div><div className="text-[10px] opacity-70">Hidden, but fully editable</div></div>
                             </button>
-                            <button type="button" onClick={handleUnlist} disabled={isLoading || projectData.status === 'UNLISTED' || !hasProjectPermission(Permission.PROJECT_STATUS_UNLIST)} className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${projectData.status === 'UNLISTED' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : `${theme.colors.bgBase} ${theme.colors.border} hover:border-orange-500 hover:text-orange-500 disabled:opacity-50`}`}>
+                            <button type="button" onClick={handleUnlist} disabled={isLoading || projectData?.status === 'UNLISTED' || !hasProjectPermission(Permission.PROJECT_STATUS_UNLIST)} className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${projectData?.status === 'UNLISTED' ? 'bg-orange-500/10 border-orange-500 text-orange-500' : `${theme.colors.bgBase} ${theme.colors.border} hover:border-orange-500 hover:text-orange-500 disabled:opacity-50`}`}>
                                 <EyeOff className="w-6 h-6" />
                                 <div className="text-center"><div className="font-bold text-sm">Unlisted</div><div className="text-[10px] opacity-70">Hidden from search</div></div>
                             </button>

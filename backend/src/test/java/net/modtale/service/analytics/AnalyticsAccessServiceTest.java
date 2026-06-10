@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -58,6 +59,17 @@ class AnalyticsAccessServiceTest {
         when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(false);
 
         assertThrows(ForbiddenOperationException.class, () -> service.assertProjectAnalyticsAccess(project, currentUser));
+    }
+
+    @Test
+    void assertProjectAnalyticsAccessAllowsPrivateProjectsWithoutEditPermission() {
+        Project project = new Project();
+        project.setStatus(ProjectStatus.PRIVATE);
+        User currentUser = user("user-1", User.AccountType.USER);
+
+        when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(false);
+
+        assertDoesNotThrow(() -> service.assertProjectAnalyticsAccess(project, currentUser));
     }
 
     private static User user(String id, User.AccountType accountType) {

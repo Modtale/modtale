@@ -300,6 +300,14 @@ public class ProjectController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/projects/{id}/private")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_STATUS_UNLIST', authentication)")
+    public ResponseEntity<Void> privateProject(@PathVariable String id, Authentication authentication) {
+        User user = accountService.requireCurrentUser(authentication, "making a project private");
+        lifecycleService.privateProject(id, user);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/projects/{id}/publish")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_STATUS_PUBLISH', authentication)")
     public ResponseEntity<Void> publishProject(@PathVariable String id, Authentication authentication) {

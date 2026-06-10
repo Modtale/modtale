@@ -14,6 +14,7 @@ public class ProjectRetentionService {
     private static final EnumSet<ProjectStatus> RESTORABLE_STATUSES = EnumSet.of(
             ProjectStatus.PUBLISHED,
             ProjectStatus.DRAFT,
+            ProjectStatus.PRIVATE,
             ProjectStatus.UNLISTED,
             ProjectStatus.ARCHIVED
     );

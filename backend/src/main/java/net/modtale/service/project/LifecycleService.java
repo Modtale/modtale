@@ -41,6 +41,10 @@ public class LifecycleService {
         projectPublicationService.unlistProject(id, user);
     }
 
+    public void privateProject(String id, User user) {
+        projectPublicationService.privateProject(id, user);
+    }
+
     public void publishProject(String id, User user) {
         projectPublicationService.publishProject(id, user);
     }

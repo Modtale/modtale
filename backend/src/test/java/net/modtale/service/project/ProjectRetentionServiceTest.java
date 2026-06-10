@@ -65,6 +65,15 @@ class ProjectRetentionServiceTest {
     }
 
     @Test
+    void restoreSupportsPrivateStatus() {
+        Project project = project("project-1", ProjectStatus.DELETED);
+
+        service.restore(project, "private");
+
+        verify(projectDeletionService).restore(project, ProjectStatus.PRIVATE);
+    }
+
+    @Test
     void restoreRejectsInvalidTargetStatuses() {
         Project project = project("project-1", ProjectStatus.DELETED);
 
