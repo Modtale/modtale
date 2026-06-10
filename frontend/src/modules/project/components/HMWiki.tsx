@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
@@ -6,6 +6,14 @@ import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { SidebarSection } from '@/modules/project/components/ProjectLayout';
 import { theme } from '@/styles/theme';
 export { useHMWiki } from '../hooks/useHMWiki';
+
+const nodeContainsDescendantSlug = (node: any, slug?: string): boolean => {
+    if (!slug || !Array.isArray(node?.children)) return false;
+
+    return node.children.some((child: any) => (
+        child?.slug === slug || nodeContainsDescendantSlug(child, slug)
+    ));
+};
 
 const WikiNode: React.FC<{
     node: any;
@@ -17,21 +25,54 @@ const WikiNode: React.FC<{
     isFirst: boolean;
 }> = ({ node, projectUrl, currentSlug, indexSlug, onNavigate, depth, isFirst }) => {
     const hasChildren = node.children && node.children.length > 0;
+    const isActive = currentSlug === node.slug || (!currentSlug && (indexSlug === node.slug || (isFirst && depth === 0 && node.slug)));
+    const hasActiveDescendant = useMemo(() => hasChildren && nodeContainsDescendantSlug(node, currentSlug), [node, currentSlug, hasChildren]);
     const [isOpen, setIsOpen] = useState(true);
-    const isActive = !hasChildren && (currentSlug === node.slug || (!currentSlug && (indexSlug === node.slug || (isFirst && depth === 0))));
+    const isBranchOpen = isOpen || hasActiveDescendant;
+
+    useEffect(() => {
+        if (hasActiveDescendant) {
+            setIsOpen(true);
+        }
+    }, [hasActiveDescendant]);
+
+    const className = `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} ${theme.colors.bgSurfaceHover}`}`;
+
+    const navigateToNode = () => {
+        if (!node.slug || !onNavigate) return;
+        onNavigate(node.slug);
+        const el = document.getElementById('wiki-preview-container');
+        if (el) {
+            window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' });
+        }
+    };
 
     if (hasChildren) {
         return (
             <li key={node.id}>
-                <button
-                    type="button"
-                    onClick={() => setIsOpen(!isOpen)}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-widest ${theme.colors.textMuted} hover:${theme.colors.textPrimary} transition-colors ${depth > 0 ? 'mt-2' : ''}`}
-                >
-                    <span className="truncate pr-2">{node.title}</span>
-                    {isOpen ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-                </button>
-                {isOpen && (
+                <div className={`flex items-stretch gap-2 ${depth > 0 ? 'mt-2' : ''}`}>
+                    {node.slug ? (
+                        onNavigate ? (
+                            <button type="button" onClick={navigateToNode} className={`flex-1 ${className}`}>{node.title}</button>
+                        ) : (
+                            <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} className={`flex-1 ${className}`}>{node.title}</Link>
+                        )
+                    ) : (
+                        <div className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest ${theme.colors.textMuted}`}>
+                            <span className="truncate pr-2 block">{node.title}</span>
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(!isOpen)}
+                        aria-expanded={isBranchOpen}
+                        aria-label={`${isBranchOpen ? 'Collapse' : 'Expand'} ${node.title}`}
+                        className={`shrink-0 rounded-lg px-2 ${isActive ? 'bg-modtale-accent text-white' : `${theme.colors.textMuted} ${theme.colors.bgSurfaceHover}`} transition-colors`}
+                    >
+                        {isBranchOpen ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+                    </button>
+                </div>
+                {isBranchOpen && (
                     <ul className={`space-y-1 mt-1 ml-3 pl-3 border-l ${theme.colors.border}`}>
                         {node.children.map((child: any) => (
                             <WikiNode key={child.id} node={child} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={depth + 1} isFirst={false} />
@@ -42,12 +83,10 @@ const WikiNode: React.FC<{
         );
     }
 
-    const className = `block w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} ${theme.colors.bgSurfaceHover}`}`;
-
     return (
         <li key={node.id}>
             {onNavigate ? (
-                <button type="button" onClick={() => { onNavigate(node.slug); const el = document.getElementById('wiki-preview-container'); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' }); }} className={className}>{node.title}</button>
+                <button type="button" onClick={navigateToNode} className={className}>{node.title}</button>
             ) : (
                 <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} className={className}>{node.title}</Link>
             )}
