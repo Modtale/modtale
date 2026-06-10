@@ -113,6 +113,11 @@ const styleParam = searchParams.get('style') || 'grid';
 const sortParam = searchParams.get('sort') || '';
 const viewParam = searchParams.get('view') || '';
 const qParam = searchParams.get('q') || '';
+const normalizeSort = (sort: string) => (
+    sort === 'downloads' || sort === 'favorites' || sort === 'newest' || sort === 'updated'
+        ? sort
+        : 'relevance'
+);
 
 if (classification && !isHome) {
     const dynamicMeta = generateDynamicSEO(baseSEO, pageNum, sortParam, viewParam, qParam);
@@ -146,7 +151,7 @@ if (classification) {
         try {
             if (isHome) {
                 const [trending, stats] = await Promise.all([
-                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=24&sort=trending`),
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=24&sort=relevance&category=trending`),
                     fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`),
                 ]);
 
@@ -164,7 +169,7 @@ if (classification) {
 
                 ssrSuccessfullyCompleted = true;
             } else {
-                const sort = searchParams.get('sort') || 'relevance';
+                const sort = normalizeSort(searchParams.get('sort') || '');
                 const view = searchParams.get('view');
                 const page = searchParams.get('page') || '0';
 

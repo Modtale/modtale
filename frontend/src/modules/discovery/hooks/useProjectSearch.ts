@@ -5,14 +5,26 @@ import { captureError } from '@/utils/errorTracking';
 import type { Project } from '@/types';
 import type { Classification } from '@/data/categories';
 
-export type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'updated' | 'trending' | 'gems' | 'popular';
+export type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'updated';
+
+const normalizeSort = (sort: string | null): SortOption => {
+    switch (sort) {
+        case 'downloads':
+        case 'favorites':
+        case 'newest':
+        case 'updated':
+            return sort;
+        default:
+            return 'relevance';
+    }
+};
 
 export const useProjectSearch = (initialClassification: Classification | 'All', useSSRData: boolean, initialItems: Project[], initialTotalPages: number, initialTotalItems: number) => {
     const [searchParams, setSearchParams] = useSearchParams();
 
     const parsedPage = parseInt(searchParams.get('page') || '0', 10);
     const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 0;
-    const sortBy = (searchParams.get('sort') as SortOption) || 'relevance';
+    const sortBy = normalizeSort(searchParams.get('sort'));
     const activeViewId = searchParams.get('view') || 'all';
     const selectedVersion = searchParams.get('version') || 'Any';
     const minDownloads = parseInt(searchParams.get('minDl') || '0');
