@@ -68,8 +68,8 @@ public class OgImageController {
     private static final int PROJECT_PADDING = 70;
     private static final int ICON_SIZE = 210;
     private static final int STAT_VALUE_FONT_SIZE = 26;
-    private static final int STAT_GAP = 52;
-    private static final int STAT_BLOCK_X_OFFSET = 28;
+    private static final int STAT_GAP = 60;
+    private static final int STAT_TEXT_X_OFFSET = 10;
     private static final int LOGO_HEIGHT = 28;
     private static final int SVG_FALLBACK_SIZE = 1024;
     private static final int SVG_MAX_RENDER_SIZE = 2048;
@@ -524,7 +524,7 @@ public class OgImageController {
         int downloadWidth = drawStatWithIcon(g2d, -1000, y, "download", downloadVal);
         int heartWidth = drawStatWithIcon(g2d, -1000, y, "heart", heartVal);
 
-        int currentX = leftX + STAT_BLOCK_X_OFFSET;
+        int currentX = leftX;
         drawStatWithIcon(g2d, currentX, y, "download", downloadVal);
         currentX += downloadWidth + STAT_GAP;
         drawStatWithIcon(g2d, currentX, y, "heart", heartVal);
@@ -579,10 +579,10 @@ public class OgImageController {
             }
             iconG.dispose();
 
-            g2d.drawString(value, x + textXOffset, y);
+            g2d.drawString(value, x + textXOffset + STAT_TEXT_X_OFFSET, y);
         }
 
-        return textXOffset + fm.stringWidth(value);
+        return textXOffset + STAT_TEXT_X_OFFSET + fm.stringWidth(value);
     }
 
     private void drawBranding(Graphics2D g2d, int cardX, int cardY, int cardW, int cardH) {
