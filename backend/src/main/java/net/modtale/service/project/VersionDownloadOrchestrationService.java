@@ -8,8 +8,10 @@ import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
+import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.storage.DownloadService;
@@ -27,6 +29,7 @@ public class VersionDownloadOrchestrationService {
     private final ProjectService projectService;
     private final DownloadService downloadService;
     private final DownloadTokenService downloadTokenService;
+    private final AnalyticsEligibilityService analyticsEligibilityService;
     private final TrackingService trackingService;
     private final StorageService storageService;
     private final AccessControlService accessControlService;
@@ -37,6 +40,7 @@ public class VersionDownloadOrchestrationService {
             ProjectService projectService,
             DownloadService downloadService,
             DownloadTokenService downloadTokenService,
+            AnalyticsEligibilityService analyticsEligibilityService,
             TrackingService trackingService,
             StorageService storageService,
             AccessControlService accessControlService,
@@ -46,6 +50,7 @@ public class VersionDownloadOrchestrationService {
         this.projectService = projectService;
         this.downloadService = downloadService;
         this.downloadTokenService = downloadTokenService;
+        this.analyticsEligibilityService = analyticsEligibilityService;
         this.trackingService = trackingService;
         this.storageService = storageService;
         this.accessControlService = accessControlService;
@@ -93,12 +98,11 @@ public class VersionDownloadOrchestrationService {
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this download link.");
 
-        trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), context.apiRequest(), context.clientIp());
+        trackDownload(project, targetVersion.getId(), context);
 
         if (project.getClassification() == ProjectClassification.MODPACK) {
             if (targetVersion.getDependencies() != null) {
-                targetVersion.getDependencies().forEach(dep ->
-                        trackingService.logDownload(dep.getModId(), null, null, context.apiRequest(), context.clientIp()));
+                targetVersion.getDependencies().forEach(dep -> trackDependencyDownload(dep, context));
             }
             byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
             return new VersionDownloadPayload(buildModpackFilename(project, targetVersion), zipData);
@@ -125,7 +129,7 @@ public class VersionDownloadOrchestrationService {
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this bundle download link.");
 
-        trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), context.apiRequest(), context.clientIp());
+        trackDownload(project, targetVersion.getId(), context);
 
         List<String> selectedDependencies = downloadToken.getSelectedDependencies();
         if (targetVersion.getDependencies() != null) {
@@ -134,7 +138,7 @@ public class VersionDownloadOrchestrationService {
                     return;
                 }
                 if (selectedDependencies == null || selectedDependencies.contains(dep.getModId())) {
-                    trackingService.logDownload(dep.getModId(), null, null, context.apiRequest(), context.clientIp());
+                    trackDependencyDownload(dep, context);
                 }
             });
         }
@@ -187,6 +191,25 @@ public class VersionDownloadOrchestrationService {
     private void ensureReadable(Project project, User currentUser) {
         if (!accessControlService.canReadProject(project, currentUser)) {
             throw new ResourceNotFoundException("We couldn't find the project for this download link.");
+        }
+    }
+
+    private void trackDownload(Project project, String versionId, DownloadContext context) {
+        if (analyticsEligibilityService.shouldCountProjectEngagement(project, context.currentUser())) {
+            trackingService.logDownload(project.getId(), versionId, project.getAuthor(), context.apiRequest(), context.clientIp());
+        }
+    }
+
+    private void trackDependencyDownload(ProjectDependency dependency, DownloadContext context) {
+        Project dependencyProject = projectService.getRawProjectById(dependency.getModId());
+        if (dependencyProject == null || analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, context.currentUser())) {
+            trackingService.logDownload(
+                    dependency.getModId(),
+                    null,
+                    dependencyProject != null ? dependencyProject.getAuthor() : null,
+                    context.apiRequest(),
+                    context.clientIp()
+            );
         }
     }
 

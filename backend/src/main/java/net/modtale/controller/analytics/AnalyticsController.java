@@ -7,6 +7,7 @@ import net.modtale.model.analytics.ProjectAnalyticsDetail;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.AnalyticsAccessService;
+import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.QueryService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.project.ProjectService;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 public class AnalyticsController {
 
     private final AnalyticsAccessService analyticsAccessService;
+    private final AnalyticsEligibilityService analyticsEligibilityService;
     private final QueryService queryService;
     private final TrackingService trackingService;
     private final AccountService accountService;
@@ -36,12 +38,14 @@ public class AnalyticsController {
 
     public AnalyticsController(
             AnalyticsAccessService analyticsAccessService,
+            AnalyticsEligibilityService analyticsEligibilityService,
             QueryService queryService,
             TrackingService trackingService,
             AccountService accountService,
             ProjectService projectService
     ) {
         this.analyticsAccessService = analyticsAccessService;
+        this.analyticsEligibilityService = analyticsEligibilityService;
         this.queryService = queryService;
         this.trackingService = trackingService;
         this.accountService = accountService;
@@ -91,10 +95,13 @@ public class AnalyticsController {
     }
 
     @PostMapping({"/analytics/view/{id}", "/views/project/{id}"})
-    public ResponseEntity<Void> trackView(@PathVariable String id, HttpServletRequest request) {
+    public ResponseEntity<Void> trackView(@PathVariable String id, Authentication authentication, HttpServletRequest request) {
         Project project = projectService.getProjectById(id);
         if (project != null) {
-            trackingService.logView(project.getId(), project.getAuthorId(), getClientIp(request));
+            User currentUser = accountService.getCurrentUser(authentication);
+            if (analyticsEligibilityService.shouldCountProjectEngagement(project, currentUser)) {
+                trackingService.logView(project.getId(), project.getAuthorId(), getClientIp(request));
+            }
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.notFound().build();
