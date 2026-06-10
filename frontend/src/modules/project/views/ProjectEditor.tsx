@@ -79,7 +79,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     );
 
     const [wikiPreviewSlug, setWikiPreviewSlug] = useState<string | undefined>();
-    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(projectData?.hmWikiSlug, wikiPreviewSlug, activeTab === 'wiki' && projectData?.hmWikiEnabled === true);
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(projectData?.id, wikiPreviewSlug, activeTab === 'wiki' && projectData?.hmWikiEnabled === true);
 
     const [idCopied, setIdCopied] = useState(false);
     const [showCardPreview, setShowCardPreview] = useState(false);

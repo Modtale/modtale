@@ -1,13 +1,16 @@
 package net.modtale.service.storage;
 
 import net.coobird.thumbnailator.Thumbnails;
+import net.modtale.config.properties.AppR2Properties;
+import net.modtale.exception.InvalidProjectRequestException;
+import net.modtale.exception.StorageDownloadException;
+import net.modtale.exception.StorageUploadException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
@@ -24,14 +27,9 @@ public class StorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(StorageService.class);
 
-    @Autowired
-    private S3Client s3Client;
-
-    @Value("${app.r2.bucket}")
-    private String bucketName;
-
-    @Value("${app.r2.public-domain:#{null}}")
-    private String publicDomain;
+    private final S3Client s3Client;
+    private final String bucketName;
+    private final String publicDomain;
 
     private static final String DEFAULT_IMAGE = "default.png";
 
@@ -51,10 +49,19 @@ public class StorageService {
         MIME_TYPES.put("jar", "application/java-archive");
     }
 
-    public String upload(MultipartFile file, String pathPrefix) throws IOException {
+    public StorageService(
+            S3Client s3Client,
+            AppR2Properties r2Properties
+    ) {
+        this.s3Client = s3Client;
+        this.bucketName = r2Properties.bucket();
+        this.publicDomain = r2Properties.publicDomain();
+    }
+
+    public String upload(MultipartFile file, String pathPrefix) {
         validateUploadSize(file);
         if (bucketName == null || bucketName.isEmpty()) {
-            throw new IOException("Storage configuration error: Bucket name is not set.");
+            throw new StorageUploadException("Storage configuration error: Bucket name is not set.", null);
         }
 
         String originalName = file.getOriginalFilename();
@@ -79,37 +86,41 @@ public class StorageService {
 
             s3Client.putObject(putOb, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
             logger.info("Successfully uploaded {} to bucket {}", storageKey, bucketName);
-        } catch (S3Exception e) {
+        } catch (S3Exception | IOException e) {
             logger.error("Failed to upload to S3/R2. Bucket: {}, Key: {}. Error: {}", bucketName, storageKey, e.getMessage());
-            throw new IOException("Cloud storage error: " + e.getMessage(), e);
+            throw StorageUploadException.from(e, "Failed to upload the file to cloud storage.");
         }
 
         return storageKey;
     }
 
-    public String uploadAndResize(MultipartFile file, String pathPrefix, int targetWidth) throws IOException {
-        validateUploadSize(file);
-        String fileName = pathPrefix + "/" + UUID.randomUUID() + ".jpg";
+    public String uploadAndResize(MultipartFile file, String pathPrefix, int targetWidth) {
+        try {
+            validateUploadSize(file);
+            String fileName = pathPrefix + "/" + UUID.randomUUID() + ".jpg";
 
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        Thumbnails.of(file.getInputStream())
-                .size(targetWidth, targetWidth)
-                .outputQuality(0.8)
-                .outputFormat("jpg")
-                .toOutputStream(outputStream);
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            Thumbnails.of(file.getInputStream())
+                    .size(targetWidth, targetWidth)
+                    .outputQuality(0.8)
+                    .outputFormat("jpg")
+                    .toOutputStream(outputStream);
 
-        byte[] resizedBytes = outputStream.toByteArray();
+            byte[] resizedBytes = outputStream.toByteArray();
 
-        PutObjectRequest putOb = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(fileName)
-                .contentType("image/jpeg")
-                .cacheControl(CACHE_CONTROL_HEADER)
-                .build();
+            PutObjectRequest putOb = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileName)
+                    .contentType("image/jpeg")
+                    .cacheControl(CACHE_CONTROL_HEADER)
+                    .build();
 
-        s3Client.putObject(putOb, RequestBody.fromBytes(resizedBytes));
+            s3Client.putObject(putOb, RequestBody.fromBytes(resizedBytes));
 
-        return fileName;
+            return fileName;
+        } catch (IOException | SdkException ex) {
+            throw StorageUploadException.from(ex, "Failed to resize and upload the file.");
+        }
     }
 
     public void uploadDirect(String path, byte[] data, String contentType) {
@@ -143,12 +154,12 @@ public class StorageService {
                     .build();
             s3Client.deleteObject(deleteReq);
             logger.info("R2: Deleted file " + fileName + " from bucket " + bucketName);
-        } catch (Exception e) {
+        } catch (SdkException e) {
             logger.error("R2 ERROR: Failed to delete " + fileName + " from bucket " + bucketName, e);
         }
     }
 
-    public byte[] download(String fileName) throws IOException {
+    public byte[] download(String fileName) {
         try {
             GetObjectRequest getReq = GetObjectRequest.builder()
                     .bucket(bucketName)
@@ -157,11 +168,13 @@ public class StorageService {
             ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getReq);
             return response.readAllBytes();
         } catch (NoSuchKeyException e) {
-            throw new IOException("File not found in bucket " + bucketName + ": " + fileName);
+            throw new StorageDownloadException("The requested file is not available in storage.", e);
+        } catch (IOException | SdkException e) {
+            throw StorageDownloadException.from(e, "Failed to download the requested file.");
         }
     }
 
-    public InputStream getStream(String fileName) throws IOException {
+    public InputStream getStream(String fileName) {
         try {
             GetObjectRequest getReq = GetObjectRequest.builder()
                     .bucket(bucketName)
@@ -169,7 +182,9 @@ public class StorageService {
                     .build();
             return s3Client.getObject(getReq);
         } catch (NoSuchKeyException e) {
-            throw new IOException("File not found in bucket " + bucketName + ": " + fileName);
+            throw new StorageDownloadException("The requested file is not available in storage.", e);
+        } catch (SdkException e) {
+            throw StorageDownloadException.from(e, "Failed to stream the requested file.");
         }
     }
 
@@ -181,7 +196,11 @@ public class StorageService {
                     .build();
             HeadObjectResponse response = s3Client.headObject(headReq);
             return response.contentType();
-        } catch (Exception e) {
+        } catch (NoSuchKeyException e) {
+            logger.warn("R2 object not found while resolving content type for {}", fileName);
+            return "application/octet-stream";
+        } catch (SdkException e) {
+            logger.warn("Falling back to default content type for {} due to storage error", fileName, e);
             return "application/octet-stream";
         }
     }
@@ -195,7 +214,7 @@ public class StorageService {
 
     public void validateUploadSize(MultipartFile file) {
         if (file != null && file.getSize() > MAX_UPLOAD_BYTES) {
-            throw new IllegalArgumentException(MAX_UPLOAD_ERROR_MESSAGE);
+            throw new InvalidProjectRequestException(MAX_UPLOAD_ERROR_MESSAGE);
         }
     }
 

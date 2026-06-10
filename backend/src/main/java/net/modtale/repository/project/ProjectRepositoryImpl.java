@@ -7,7 +7,6 @@ import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.ScoringService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -32,11 +31,15 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
     private static final Logger logger = LoggerFactory.getLogger(ProjectRepositoryImpl.class);
 
-    @Autowired private MongoTemplate mongoTemplate;
-    @Autowired private UserRepository userRepository;
+    private final MongoTemplate mongoTemplate;
+    private final UserRepository userRepository;
+    private final ScoringService scoringService;
 
-    @Lazy
-    @Autowired private ScoringService scoringService;
+    public ProjectRepositoryImpl(MongoTemplate mongoTemplate, UserRepository userRepository, @Lazy ScoringService scoringService) {
+        this.mongoTemplate = mongoTemplate;
+        this.userRepository = userRepository;
+        this.scoringService = scoringService;
+    }
 
     @Override
     public Page<Project> searchProjects(

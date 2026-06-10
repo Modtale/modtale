@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 public final class ErrorMessageUtils {
@@ -45,50 +45,54 @@ public final class ErrorMessageUtils {
         return normalizedFallback + ": " + detail;
     }
 
-    public static Map<String, String> errorPayload(String message) {
-        return Map.of("error", message, "message", message);
+    public static ProblemDetail problemDetail(HttpStatus status, String message) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, message);
+        detail.setTitle(status.getReasonPhrase());
+        detail.setProperty("error", message);
+        detail.setProperty("message", message);
+        return detail;
     }
 
-    public static ResponseEntity<Map<String, String>> response(HttpStatus status, String message) {
-        return ResponseEntity.status(status).body(errorPayload(message));
+    public static ResponseEntity<ProblemDetail> response(HttpStatus status, String message) {
+        return ResponseEntity.status(status).body(problemDetail(status, message));
     }
 
-    public static ResponseEntity<Map<String, String>> response(HttpStatus status, Throwable throwable, String fallback) {
+    public static ResponseEntity<ProblemDetail> response(HttpStatus status, Throwable throwable, String fallback) {
         return response(status, describe(throwable, fallback));
     }
 
-    public static ResponseEntity<Map<String, String>> badRequest(String message) {
+    public static ResponseEntity<ProblemDetail> badRequest(String message) {
         return response(HttpStatus.BAD_REQUEST, message);
     }
 
-    public static ResponseEntity<Map<String, String>> badRequest(Throwable throwable, String fallback) {
+    public static ResponseEntity<ProblemDetail> badRequest(Throwable throwable, String fallback) {
         return response(HttpStatus.BAD_REQUEST, throwable, fallback);
     }
 
-    public static ResponseEntity<Map<String, String>> unauthorized(String message) {
+    public static ResponseEntity<ProblemDetail> unauthorized(String message) {
         return response(HttpStatus.UNAUTHORIZED, message);
     }
 
-    public static ResponseEntity<Map<String, String>> forbidden(String message) {
+    public static ResponseEntity<ProblemDetail> forbidden(String message) {
         return response(HttpStatus.FORBIDDEN, message);
     }
 
-    public static ResponseEntity<Map<String, String>> forbidden(Throwable throwable, String fallback) {
+    public static ResponseEntity<ProblemDetail> forbidden(Throwable throwable, String fallback) {
         return response(HttpStatus.FORBIDDEN, throwable, fallback);
     }
 
-    public static ResponseEntity<Map<String, String>> notFound(String message) {
+    public static ResponseEntity<ProblemDetail> notFound(String message) {
         return response(HttpStatus.NOT_FOUND, message);
     }
 
-    public static ResponseEntity<Map<String, String>> internalServerError(Throwable throwable, String fallback) {
+    public static ResponseEntity<ProblemDetail> internalServerError(Throwable throwable, String fallback) {
         return response(HttpStatus.INTERNAL_SERVER_ERROR, throwable, fallback);
     }
 
     public static void writeJsonError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        OBJECT_MAPPER.writeValue(response.getWriter(), errorPayload(message));
+        OBJECT_MAPPER.writeValue(response.getWriter(), problemDetail(status, message));
     }
 
     private static String mostSpecificMessage(Throwable throwable) {

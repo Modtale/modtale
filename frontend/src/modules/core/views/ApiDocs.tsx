@@ -679,10 +679,12 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
     }
     if (path === '/api/v1/projects' && method === 'POST' && code === '200') return sampleProject;
     if (path === '/api/v1/projects/{id}/versions/{version}/dependencies' && code === '200') {
-        return [
-            { projectId: '67f70e06d5de9b5f94b6a111', projectTitle: 'Skyforge Core', versionNumber: '3.1.0', isOptional: false },
-            { projectId: '67f70e06d5de9b5f94b6a222', projectTitle: 'Skyforge Map Layer', versionNumber: '1.4.2', isOptional: true },
-        ];
+        return {
+            dependencies: [
+                { projectId: '67f70e06d5de9b5f94b6a111', projectTitle: 'Skyforge Core', versionNumber: '3.1.0', isOptional: false },
+                { projectId: '67f70e06d5de9b5f94b6a222', projectTitle: 'Skyforge Map Layer', versionNumber: '1.4.2', isOptional: true },
+            ],
+        };
     }
     if (path === '/api/v1/projects/{id}/versions/dependency-suggestions' && code === '200') {
         return {
@@ -787,7 +789,7 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
         };
     }
     if ((path === '/api/v1/orgs/{orgId}/avatar' || path === '/api/v1/orgs/{orgId}/banner') && code === '200') {
-        return 'https://cdn.modtale.net/orgs/skyforge-studios/uploaded-image.png';
+        return { url: 'https://cdn.modtale.net/orgs/skyforge-studios/uploaded-image.png' };
     }
 
     if (path === '/api/v1/notifications' && code === '200') {
@@ -924,7 +926,7 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
         if (code === '403') return { error: 'Email verification required.' };
     }
 
-    if (path === '/api/v1/wiki/{slug}' && code === '200') {
+    if (path === '/api/v1/wiki/{id}' && code === '200') {
         return {
             project: {
                 slug: 'skyforge-utilities',

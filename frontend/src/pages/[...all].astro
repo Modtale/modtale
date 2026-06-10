@@ -82,6 +82,7 @@ if (collectionPageSchema) baseSchemas.push(collectionPageSchema);
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
 const identifier = all ? all.split('/').pop() : '';
+const projectId = identifier ? SiteRoutes.extractId(identifier) : '';
 
 const isProjectRoute = cleanPath.startsWith('/project/')
     || cleanPath.startsWith('/mod/')
@@ -89,7 +90,7 @@ const isProjectRoute = cleanPath.startsWith('/project/')
     || cleanPath.startsWith('/world/');
 
 let image = (isProjectRoute && identifier)
-    ? `${BACKEND_URL}/api/v1/og/project/${identifier}.png`
+    ? `${BACKEND_URL}/api/v1/og/project/${projectId}.png`
     : 'https://modtale.net/assets/logo.svg';
 
 let classification = null;
@@ -221,7 +222,7 @@ if (classification) {
     }
 } else if (isBot && identifier && isProjectRoute) {
     try {
-        const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${identifier}`, 2500);
+        const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${projectId}`, 2500);
 
         if (modData) {
             const projectUrl = SiteRoutes.project(modData);
@@ -273,7 +274,7 @@ if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 
-const projectBootstrapUrl = !initialData && isProjectRoute && identifier ? `${BACKEND_URL}/api/v1/projects/${identifier}` : undefined;
+const projectBootstrapUrl = !initialData && isProjectRoute && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
 ---
 
 <BaseLayout

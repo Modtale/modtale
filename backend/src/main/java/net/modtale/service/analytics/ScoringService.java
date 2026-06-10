@@ -6,7 +6,6 @@ import net.modtale.model.project.ProjectStatus;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
@@ -25,7 +24,11 @@ public class ScoringService {
 
     private static final Logger logger = LoggerFactory.getLogger(ScoringService.class);
 
-    @Autowired private MongoTemplate mongoTemplate;
+    private final MongoTemplate mongoTemplate;
+
+    public ScoringService(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
 
     @Scheduled(cron = "0 30 0 * * ?")
     public void updateProjectScores() {

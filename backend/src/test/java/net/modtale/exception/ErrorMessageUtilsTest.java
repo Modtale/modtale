@@ -1,8 +1,8 @@
 package net.modtale.exception;
 
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -33,10 +33,11 @@ class ErrorMessageUtilsTest {
     }
 
     @Test
-    void errorPayloadMirrorsTheMessageInBothFields() {
-        assertEquals(
-                Map.of("error", "Bad request", "message", "Bad request"),
-                ErrorMessageUtils.errorPayload("Bad request")
-        );
+    void problemDetailMirrorsTheMessageInBothFields() {
+        ProblemDetail detail = ErrorMessageUtils.problemDetail(HttpStatus.BAD_REQUEST, "Bad request");
+
+        assertEquals("Bad request", detail.getDetail());
+        assertEquals("Bad request", detail.getProperties().get("error"));
+        assertEquals("Bad request", detail.getProperties().get("message"));
     }
 }

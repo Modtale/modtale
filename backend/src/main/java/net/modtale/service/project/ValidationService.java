@@ -1,5 +1,6 @@
 package net.modtale.service.project;
 
+import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.ProjectClassification;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,26 +46,26 @@ public class ValidationService {
         }
 
         if (!invalidTags.isEmpty()) {
-            throw new IllegalArgumentException("Invalid tags detected: " + String.join(", ", invalidTags));
+            throw new InvalidProjectRequestException("Invalid tags detected: " + String.join(", ", invalidTags));
         }
         return normalized;
     }
 
     public void validateVersionNumber(String version) {
         if (version == null || !STRICT_VERSION_PATTERN.matcher(version).matches()) {
-            throw new IllegalArgumentException("Version number must follow SemVer format (e.g., 1.0.0, 1.0.0-rc.1, 1.0.0+build).");
+            throw new InvalidProjectRequestException("Version number must follow SemVer format (e.g., 1.0.0, 1.0.0-rc.1, 1.0.0+build).");
         }
     }
 
     public void validateSlug(String slug) {
         if (slug == null || !SLUG_PATTERN.matcher(slug).matches()) {
-            throw new IllegalArgumentException("Invalid URL Slug. Must be 3-50 characters, lowercase alphanumeric with dashes, and cannot start or end with a dash.");
+            throw new InvalidProjectRequestException("Invalid URL Slug. Must be 3-50 characters, lowercase alphanumeric with dashes, and cannot start or end with a dash.");
         }
     }
 
     public void validateRepositoryUrl(String url) {
         if (url != null && !url.isEmpty() && !REPO_URL_PATTERN.matcher(url).matches()) {
-            throw new IllegalArgumentException("Invalid Repository URL. Must be a valid HTTPS link to GitHub, GitLab, or Codeberg.");
+            throw new InvalidProjectRequestException("Invalid Repository URL. Must be a valid HTTPS link to GitHub, GitLab, or Codeberg.");
         }
     }
 

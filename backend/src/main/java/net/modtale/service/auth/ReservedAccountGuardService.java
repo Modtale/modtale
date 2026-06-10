@@ -1,10 +1,11 @@
 package net.modtale.service.auth;
 
+import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.exception.ReservedAccountAccessException;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -23,12 +24,14 @@ public class ReservedAccountGuardService {
     );
 
     private final UserRepository userRepository;
+    private final String frontendUrl;
 
-    @Value("${app.frontend.url:http://localhost:5173}")
-    private String frontendUrl;
-
-    public ReservedAccountGuardService(UserRepository userRepository) {
+    public ReservedAccountGuardService(
+            UserRepository userRepository,
+            AppFrontendProperties frontendProperties
+    ) {
         this.userRepository = userRepository;
+        this.frontendUrl = frontendProperties.url();
     }
 
     public boolean isProductionDeployment() {
@@ -63,7 +66,7 @@ public class ReservedAccountGuardService {
         if (!isReservedEmail(email)) return;
 
         purgeReservedAccountsIfProduction();
-        throw new IllegalArgumentException("Invalid credentials");
+        throw new ReservedAccountAccessException("Invalid credentials");
     }
 
     public void rejectReservedUserInProduction(User user) {
@@ -72,14 +75,15 @@ public class ReservedAccountGuardService {
 
         logger.error("Blocking sign-in for reserved account '{}' (id={}) in production.", user.getEmail(), user.getId());
         userRepository.deleteById(user.getId());
-        throw new IllegalArgumentException("Invalid credentials");
+        throw new ReservedAccountAccessException("Invalid credentials");
     }
 
     private String extractHost(String url) {
         if (url == null || url.isBlank()) return null;
         try {
             return URI.create(url).getHost();
-        } catch (Exception ignored) {
+        } catch (IllegalArgumentException ex) {
+            logger.warn("Invalid frontend URL configured for reserved-account guard: {}", url, ex);
             return null;
         }
     }

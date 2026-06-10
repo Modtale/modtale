@@ -1,18 +1,23 @@
 package net.modtale.controller.project;
 
+import net.modtale.exception.ForbiddenOperationException;
+import net.modtale.exception.InvalidProjectRequestException;
+import net.modtale.exception.ProjectOperationForbiddenException;
+import net.modtale.exception.ProjectMediaOperationException;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
 import net.modtale.model.user.User;
-import net.modtale.service.project.MetadataService;
+import net.modtale.service.project.ProjectMediaService;
 import net.modtale.service.user.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.security.core.Authentication;
 
-import java.util.Map;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -22,100 +27,83 @@ import static org.mockito.Mockito.when;
 class MediaControllerTest {
 
     private MediaController controller;
-    private MetadataService metadataService;
+    private ProjectMediaService projectMediaService;
     private AccountService accountService;
 
     @BeforeEach
     void setUp() {
-        controller = new MediaController();
-        metadataService = mock(MetadataService.class);
+        projectMediaService = mock(ProjectMediaService.class);
         accountService = mock(AccountService.class);
-
-        ReflectionTestUtils.setField(controller, "metadataService", metadataService);
-        ReflectionTestUtils.setField(controller, "accountService", accountService);
+        controller = new MediaController(projectMediaService, accountService);
     }
 
     @Test
     void updateIconRequiresAnAuthenticatedUser() {
-        when(accountService.getCurrentUser()).thenReturn(null);
+        when(accountService.requireCurrentUser(null, "updating a project icon"))
+                .thenThrow(new UnauthorizedException("You need to sign in before updating a project icon."));
 
-        var response = controller.updateIcon("project-1", file("icon.png"));
-
-        assertEquals(401, response.getStatusCode().value());
-        verifyNoInteractions(metadataService);
+        assertThrows(UnauthorizedException.class, () -> controller.updateIcon("project-1", file("icon.png"), null));
+        verifyNoInteractions(projectMediaService);
     }
 
     @Test
     void updateIconDelegatesToMetadataServiceForAuthenticatedUsers() throws Exception {
         User user = user("user-1");
         MockMultipartFile file = file("icon.png");
-        when(accountService.getCurrentUser()).thenReturn(user);
+        when(accountService.requireCurrentUser(null, "updating a project icon")).thenReturn(user);
 
-        var response = controller.updateIcon("project-1", file);
+        var response = controller.updateIcon("project-1", file, null);
 
         assertEquals(200, response.getStatusCode().value());
-        verify(metadataService).updateProjectImage("project-1", file, user, false);
+        verify(projectMediaService).updateProjectImage("project-1", file, user, false);
     }
 
     @Test
-    void updateBannerMapsValidationErrorsToBadRequests() throws Exception {
+    void updateBannerPropagatesDomainValidationErrors() {
         User user = user("user-1");
         MockMultipartFile file = file("banner.png");
-        when(accountService.getCurrentUser()).thenReturn(user);
-        doThrow(new IllegalStateException("File is too large")).when(metadataService)
+        when(accountService.requireCurrentUser(null, "updating a project banner")).thenReturn(user);
+        doThrow(new InvalidProjectRequestException("File is too large")).when(projectMediaService)
                 .updateProjectImage("project-1", file, user, true);
 
-        var response = controller.updateBanner("project-1", file);
+        InvalidProjectRequestException error = assertThrows(
+                InvalidProjectRequestException.class,
+                () -> controller.updateBanner("project-1", file, null)
+        );
 
-        assertEquals(400, response.getStatusCode().value());
-        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
-        assertEquals("We could not update that project banner: File is too large", body.get("message"));
-        assertEquals("We could not update that project banner: File is too large", body.get("error"));
+        assertEquals("File is too large", error.getMessage());
     }
 
     @Test
-    void addGalleryImageMapsSecurityExceptionsToForbidden() throws Exception {
+    void addGalleryImageTranslatesSecurityExceptions() throws Exception {
         User user = user("user-1");
         MockMultipartFile file = file("gallery.png");
-        when(accountService.getCurrentUser()).thenReturn(user);
-        doThrow(new SecurityException("Not allowed")).when(metadataService)
+        when(accountService.requireCurrentUser(null, "uploading a gallery image")).thenReturn(user);
+        doThrow(new ProjectOperationForbiddenException("Not allowed")).when(projectMediaService)
                 .addGalleryImage("project-1", file, user);
 
-        var response = controller.addGalleryImage("project-1", file);
+        ForbiddenOperationException error = assertThrows(
+                ForbiddenOperationException.class,
+                () -> controller.addGalleryImage("project-1", file, null)
+        );
 
-        assertEquals(403, response.getStatusCode().value());
-        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
-        assertEquals("You do not have permission to upload gallery images for this project: Not allowed", body.get("message"));
-        assertEquals("You do not have permission to upload gallery images for this project: Not allowed", body.get("error"));
+        assertEquals("Not allowed", error.getMessage());
     }
 
     @Test
-    void addGalleryImageWrapsUnexpectedFailuresWithTheUploadFallbackMessage() throws Exception {
+    void addGalleryImagePropagatesMediaOperationFailures() {
         User user = user("user-1");
         MockMultipartFile file = file("gallery.png");
-        when(accountService.getCurrentUser()).thenReturn(user);
-        doThrow(new RuntimeException("boom")).when(metadataService)
+        when(accountService.requireCurrentUser(null, "uploading a gallery image")).thenReturn(user);
+        doThrow(new ProjectMediaOperationException("Failed to upload gallery image: boom", new IOException("boom"))).when(projectMediaService)
                 .addGalleryImage("project-1", file, user);
 
-        var response = controller.addGalleryImage("project-1", file);
+        ProjectMediaOperationException error = assertThrows(
+                ProjectMediaOperationException.class,
+                () -> controller.addGalleryImage("project-1", file, null)
+        );
 
-        assertEquals(500, response.getStatusCode().value());
-        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
-        assertEquals("Failed to upload gallery image: boom", body.get("message"));
-        assertEquals("Failed to upload gallery image: boom", body.get("error"));
-    }
-
-    @Test
-    void removeGalleryImageRequiresAnImageUrl() {
-        User user = user("user-1");
-        when(accountService.getCurrentUser()).thenReturn(user);
-
-        var response = controller.removeGalleryImage("project-1", new RemoveGalleryImageRequest());
-
-        assertEquals(400, response.getStatusCode().value());
-        Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
-        assertEquals("An image URL is required before a gallery image can be removed.", body.get("message"));
-        assertEquals("An image URL is required before a gallery image can be removed.", body.get("error"));
+        assertEquals("Failed to upload gallery image: boom", error.getMessage());
     }
 
     @Test
@@ -123,12 +111,12 @@ class MediaControllerTest {
         User user = user("user-1");
         RemoveGalleryImageRequest request = new RemoveGalleryImageRequest();
         request.setImageUrl("https://cdn.example/gallery.png");
-        when(accountService.getCurrentUser()).thenReturn(user);
+        when(accountService.requireCurrentUser(null, "removing a gallery image")).thenReturn(user);
 
-        var response = controller.removeGalleryImage("project-1", request);
+        var response = controller.removeGalleryImage("project-1", request, null);
 
         assertEquals(200, response.getStatusCode().value());
-        verify(metadataService).removeGalleryImage("project-1", "https://cdn.example/gallery.png", user);
+        verify(projectMediaService).removeGalleryImage("project-1", "https://cdn.example/gallery.png", user);
     }
 
     private static MockMultipartFile file(String filename) {

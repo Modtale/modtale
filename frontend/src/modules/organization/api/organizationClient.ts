@@ -23,7 +23,7 @@ export const organizationClient = {
     uploadImage: async (orgId: string, type: 'avatar' | 'banner', file: File) => {
         const formData = new FormData();
         formData.append('file', file);
-        return (await api.post<string>(`/orgs/${orgId}/${type}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+        return (await api.post<{ url: string }>(`/orgs/${orgId}/${type}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })).data.url;
     },
 
     toggleVisibility: async (orgId: string, provider: string) => (await api.post(`/orgs/${orgId}/connections/${provider}/toggle-visibility`)).data,

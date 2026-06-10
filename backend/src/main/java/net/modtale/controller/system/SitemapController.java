@@ -1,15 +1,15 @@
 package net.modtale.controller.system;
 
+import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.project.Project;
-import net.modtale.service.project.SearchService;
 import net.modtale.service.project.ProjectService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import net.modtale.service.project.SearchService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
@@ -18,11 +18,19 @@ import java.util.Set;
 @RestController
 public class SitemapController {
 
-    @Autowired private SearchService searchService;
-    @Autowired private ProjectService projectService;
+    private final SearchService searchService;
+    private final ProjectService projectService;
+    private final String baseUrl;
 
-    @Value("${app.frontend.url:https://modtale.net}")
-    private String baseUrl;
+    public SitemapController(
+            SearchService searchService,
+            ProjectService projectService,
+            AppFrontendProperties frontendProperties
+    ) {
+        this.searchService = searchService;
+        this.projectService = projectService;
+        this.baseUrl = frontendProperties.url();
+    }
 
     @GetMapping(value = "/sitemap.xml", produces = MediaType.APPLICATION_XML_VALUE)
     public String generateSitemap() {
@@ -74,7 +82,7 @@ public class SitemapController {
         try {
             if (dateStr == null) return LocalDate.now();
             return LocalDate.parse(dateStr);
-        } catch (Exception e) {
+        } catch (DateTimeParseException e) {
             return LocalDate.now();
         }
     }

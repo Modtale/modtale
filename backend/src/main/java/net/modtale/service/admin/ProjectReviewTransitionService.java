@@ -1,0 +1,91 @@
+package net.modtale.service.admin;
+
+import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectStatus;
+import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.user.User;
+import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.project.LifecycleService;
+import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.ProjectVersionAccessService;
+import net.modtale.service.security.SecurityIssueAnalysisService;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+
+@Service
+public class ProjectReviewTransitionService {
+
+    private final ProjectRepository projectRepository;
+    private final ProjectService projectService;
+    private final LifecycleService lifecycleService;
+    private final SecurityIssueAnalysisService securityIssueAnalysisService;
+    private final ProjectVersionAccessService projectVersionAccessService;
+
+    public ProjectReviewTransitionService(
+            ProjectRepository projectRepository,
+            ProjectService projectService,
+            LifecycleService lifecycleService,
+            SecurityIssueAnalysisService securityIssueAnalysisService,
+            ProjectVersionAccessService projectVersionAccessService
+    ) {
+        this.projectRepository = projectRepository;
+        this.projectService = projectService;
+        this.lifecycleService = lifecycleService;
+        this.securityIssueAnalysisService = securityIssueAnalysisService;
+        this.projectVersionAccessService = projectVersionAccessService;
+    }
+
+    public void publishProject(User adminUser, String id) {
+        lifecycleService.publishProject(id, adminUser);
+    }
+
+    public VersionReviewDecision approveVersion(String id, String versionId) {
+        Project project = requireProject(id);
+        ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
+                () -> new ResourceNotFoundException("Version not found."));
+        securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(version);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        version.setRejectionReason(null);
+        version.setScheduledPublishDate(null);
+        project.setUpdatedAt(LocalDateTime.now().toString());
+        projectRepository.save(project);
+        projectService.evictProjectCache(project);
+        return new VersionReviewDecision(project, version, null);
+    }
+
+    public VersionReviewDecision rejectVersion(String id, String versionId, String reason) {
+        Project project = requireProject(id);
+        ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
+                () -> new ResourceNotFoundException("Version not found."));
+        version.setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);
+        version.setRejectionReason(reason);
+        version.setScheduledPublishDate(null);
+        projectRepository.save(project);
+        projectService.evictProjectCache(project);
+        return new VersionReviewDecision(project, version, reason);
+    }
+
+    public ProjectRejectionDecision rejectProject(String id, String reason) {
+        Project project = requireProject(id);
+        project.setStatus(ProjectStatus.DRAFT);
+        projectRepository.save(project);
+        projectService.evictProjectCache(project);
+        return new ProjectRejectionDecision(project, reason);
+    }
+
+    private Project requireProject(String id) {
+        Project project = projectService.getRawProjectById(id);
+        if (project == null) {
+            throw new ResourceNotFoundException("Project not found.");
+        }
+        return project;
+    }
+
+    public record VersionReviewDecision(Project project, ProjectVersion version, String reason) {
+    }
+
+    public record ProjectRejectionDecision(Project project, String reason) {
+    }
+}

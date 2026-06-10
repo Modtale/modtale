@@ -1,5 +1,8 @@
 package net.modtale.service.storage;
 
+import net.modtale.config.properties.AppLimitProperties;
+import net.modtale.exception.RateLimitExceededException;
+import net.modtale.exception.StorageDownloadException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
@@ -10,7 +13,6 @@ import net.modtale.service.project.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -43,15 +45,10 @@ class DownloadServiceTest {
 
     @BeforeEach
     void setUp() {
-        downloadService = new DownloadService();
         projectRepository = mock(ProjectRepository.class);
         projectService = mock(ProjectService.class);
         storageService = mock(StorageService.class);
-
-        ReflectionTestUtils.setField(downloadService, "projectRepository", projectRepository);
-        ReflectionTestUtils.setField(downloadService, "projectService", projectService);
-        ReflectionTestUtils.setField(downloadService, "storageService", storageService);
-        ReflectionTestUtils.setField(downloadService, "modpackGenLimitPerHour", 10);
+        downloadService = new DownloadService(projectRepository, projectService, storageService, limitProperties(10));
     }
 
     @Test
@@ -84,7 +81,8 @@ class DownloadServiceTest {
         Project pluginProject = dependencyProject("plugin-1", ProjectClassification.PLUGIN, "2.0.0", "files/123456789012345678901234567890123456-plugin.jar");
         Project assetProject = dependencyProject("asset-1", ProjectClassification.DATA, "3.0.0", "files/123456789012345678901234567890123456-assets.zip");
 
-        when(storageService.download("modpacks/missing.zip")).thenThrow(new IOException("missing"));
+        when(storageService.download("modpacks/missing.zip"))
+                .thenThrow(new StorageDownloadException("missing", new IOException("missing")));
         when(projectService.getRawProjectById("plugin-1")).thenReturn(pluginProject);
         when(projectService.getRawProjectById("asset-1")).thenReturn(assetProject);
         when(storageService.download("files/123456789012345678901234567890123456-plugin.jar"))
@@ -111,7 +109,7 @@ class DownloadServiceTest {
 
     @Test
     void generateModpackZipAppliesPerUserRateLimiting() throws Exception {
-        ReflectionTestUtils.setField(downloadService, "modpackGenLimitPerHour", 1);
+        downloadService = new DownloadService(projectRepository, projectService, storageService, limitProperties(1));
 
         Project pack = pack("pack-1", "tiny-pack", "Tiny Pack");
         ProjectVersion version = version("1.0.0");
@@ -119,8 +117,8 @@ class DownloadServiceTest {
 
         downloadService.generateModpackZip(pack, version, user);
 
-        IllegalStateException error = assertThrows(
-                IllegalStateException.class,
+        RateLimitExceededException error = assertThrows(
+                RateLimitExceededException.class,
                 () -> downloadService.generateModpackZip(pack, version, user)
         );
 
@@ -188,6 +186,10 @@ class DownloadServiceTest {
         User user = new User();
         user.setId(id);
         return user;
+    }
+
+    private static AppLimitProperties limitProperties(int modpackGenPerHour) {
+        return new AppLimitProperties(10, 5, 10, 5, 5, 50, 20, modpackGenPerHour);
     }
 
     private static Map<String, String> unzip(byte[] zipBytes) throws IOException {

@@ -1,10 +1,10 @@
 package net.modtale.service.security;
 
+import net.modtale.config.properties.AppWardenProperties;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.project.ScanStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -20,33 +20,25 @@ public class WardenClientService {
 
     private static final Logger logger = LoggerFactory.getLogger(WardenClientService.class);
     private final WebClient webClient;
-
-    @Value("${app.warden.enabled:true}")
-    private boolean wardenEnabled;
-
-    @Value("${app.warden.max-attempts:3}")
-    private int maxAttempts;
-
-    @Value("${app.warden.request-timeout-seconds:75}")
-    private long requestTimeoutSeconds;
+    private final AppWardenProperties wardenProperties;
 
     public WardenClientService(
-            @Value("${app.warden.url}") String wardenUrl,
-            @Value("${app.warden.api-key}") String wardenApiKey) {
+            AppWardenProperties wardenProperties) {
+        this.wardenProperties = wardenProperties;
         this.webClient = WebClient.builder()
-                .baseUrl(wardenUrl)
-                .defaultHeader("X-Warden-Api-Key", wardenApiKey)
+                .baseUrl(wardenProperties.url())
+                .defaultHeader("X-Warden-Api-Key", wardenProperties.apiKey())
                 .build();
     }
 
     public ScanResult scanFile(byte[] fileBytes, String filename) {
-        if (!wardenEnabled) {
+        if (!wardenProperties.enabled()) {
             logger.error("Warden scanner is DISABLED. Falling back to manual-review degraded result for file: {}", filename);
             return buildDegradedResult(filename, new IllegalStateException("Warden scanner disabled"));
         }
 
         Exception lastError = null;
-        int attempts = Math.max(1, maxAttempts);
+        int attempts = Math.max(1, wardenProperties.maxAttempts());
         for (int attempt = 1; attempt <= attempts; attempt++) {
             try {
                 MultipartBodyBuilder builder = new MultipartBodyBuilder();
@@ -63,7 +55,7 @@ public class WardenClientService {
                         .body(BodyInserters.fromMultipartData(builder.build()))
                         .retrieve()
                         .bodyToMono(ScanResult.class)
-                        .timeout(Duration.ofSeconds(Math.max(15, requestTimeoutSeconds)))
+                        .timeout(Duration.ofSeconds(Math.max(15, wardenProperties.requestTimeoutSeconds())))
                         .block();
 
                 if (response != null) {
@@ -97,7 +89,7 @@ public class WardenClientService {
         degraded.setStatus(ScanStatus.SUSPICIOUS);
         degraded.setVerdict("REVIEW");
         degraded.setRiskLevel("HIGH");
-        degraded.setScanState(wardenEnabled ? "UPSTREAM_UNAVAILABLE" : "UPSTREAM_DISABLED");
+        degraded.setScanState(wardenProperties.enabled() ? "UPSTREAM_UNAVAILABLE" : "UPSTREAM_DISABLED");
         degraded.setRiskScore(45);
         degraded.setConfidenceScore(25);
         degraded.setScanTimestamp(System.currentTimeMillis());

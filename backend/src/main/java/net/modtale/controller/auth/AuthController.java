@@ -3,7 +3,15 @@ package net.modtale.controller.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import net.modtale.exception.ErrorMessageUtils;
+import jakarta.validation.Valid;
+import net.modtale.exception.InvalidAuthenticationRequestException;
+import net.modtale.exception.UnauthorizedException;
+import net.modtale.model.dto.response.auth.MfaChallengeResponse;
+import net.modtale.model.dto.response.auth.MfaSetupResponse;
+import net.modtale.model.dto.response.auth.RegistrationResponse;
+import net.modtale.model.dto.response.auth.SignInResponse;
+import net.modtale.model.dto.response.common.MessageResponse;
+import net.modtale.model.dto.response.common.StatusResponse;
 import net.modtale.model.dto.request.auth.ChangePasswordRequest;
 import net.modtale.model.dto.request.auth.ForgotPasswordRequest;
 import net.modtale.model.dto.request.auth.MfaLoginRequest;
@@ -13,10 +21,10 @@ import net.modtale.model.dto.request.auth.SignInRequest;
 import net.modtale.model.dto.request.auth.UpdateCredentialsRequest;
 import net.modtale.model.dto.request.auth.VerifyMfaRequest;
 import net.modtale.model.user.User;
+import net.modtale.service.auth.AuthenticationMutationService;
 import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.TwoFactorService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -36,57 +44,57 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    @Autowired private AuthenticationService authenticationService;
-    @Autowired private AccountService accountService;
-    @Autowired private TwoFactorService twoFactorService;
-    @Autowired private SecurityContextRepository securityContextRepository;
+    private final AuthenticationService authenticationService;
+    private final AuthenticationMutationService authenticationMutationService;
+    private final AccountService accountService;
+    private final TwoFactorService twoFactorService;
+    private final SecurityContextRepository securityContextRepository;
+
+    public AuthController(
+            AuthenticationService authenticationService,
+            AuthenticationMutationService authenticationMutationService,
+            AccountService accountService,
+            TwoFactorService twoFactorService,
+            SecurityContextRepository securityContextRepository
+    ) {
+        this.authenticationService = authenticationService;
+        this.authenticationMutationService = authenticationMutationService;
+        this.accountService = accountService;
+        this.twoFactorService = twoFactorService;
+        this.securityContextRepository = securityContextRepository;
+    }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        try {
-            User user = authenticationService.registerUser(
-                    request.getUsername(),
-                    request.getEmail(),
-                    request.getPassword()
-            );
-            return ResponseEntity.ok(Map.of("message", "User registered successfully", "username", user.getUsername()));
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not create that account.");
-        }
+    public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody RegisterRequest request) {
+        User user = authenticationService.registerUser(
+                request.getUsername(),
+                request.getEmail(),
+                request.getPassword()
+        );
+        return ResponseEntity.ok(new RegistrationResponse("User registered successfully", user.getUsername()));
     }
 
     @PostMapping("/verify")
-    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
-        try {
-            authenticationService.verifyEmail(token);
-            return ResponseEntity.ok(Map.of("message", "Email verified successfully"));
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not verify that email address.");
-        }
+    public ResponseEntity<MessageResponse> verifyEmail(@RequestParam String token) {
+        authenticationMutationService.verifyEmail(token);
+        return ResponseEntity.ok(new MessageResponse("Email verified successfully"));
     }
 
     @PostMapping("/resend-verification")
-    public ResponseEntity<?> resendVerification() {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before requesting another verification email.");
-        try {
-            authenticationService.resendVerificationEmail(user);
-            return ResponseEntity.ok(Map.of("message", "Verification email sent"));
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not send another verification email.");
-        }
+    public ResponseEntity<MessageResponse> resendVerification() {
+        User user = accountService.requireCurrentUser("requesting another verification email");
+        authenticationMutationService.resendVerificationEmail(user);
+        return ResponseEntity.ok(new MessageResponse("Verification email sent"));
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest requestPayload) {
-        String email = requestPayload.getEmail();
-        if (email == null || email.isEmpty()) return ErrorMessageUtils.badRequest("An email address is required before we can send a password reset link.");
-        authenticationService.initiatePasswordReset(email);
-        return ResponseEntity.ok(Map.of("message", "If an account exists for that email, a password reset link has been sent."));
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest requestPayload) {
+        authenticationMutationService.initiatePasswordReset(requestPayload.getEmail());
+        return ResponseEntity.ok(new MessageResponse("If an account exists for that email, a password reset link has been sent."));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<StatusResponse> logout(HttpServletRequest request, HttpServletResponse response) {
         SecurityContextHolder.clearContext();
         securityContextRepository.saveContext(SecurityContextHolder.createEmptyContext(), request, response);
 
@@ -99,124 +107,83 @@ public class AuthController {
         expireCookie(response, "JSESSIONID");
         expireCookie(response, "XSRF-TOKEN");
 
-        return ResponseEntity.ok(Map.of("status", "success"));
+        return ResponseEntity.ok(new StatusResponse("success"));
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
-        try {
-            authenticationService.completePasswordReset(request.getToken(), request.getPassword());
-            return ResponseEntity.ok(Map.of("message", "Password reset successfully. You can now login."));
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not reset that password.");
-        }
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authenticationMutationService.completePasswordReset(request.getToken(), request.getPassword());
+        return ResponseEntity.ok(new MessageResponse("Password reset successfully. You can now login."));
     }
 
     @PutMapping("/credentials")
-    public ResponseEntity<?> updateCredentials(@RequestBody UpdateCredentialsRequest requestPayload) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating your email or password.");
-
-        String email = requestPayload.getEmail();
-        String password = requestPayload.getPassword();
-
-        try {
-            authenticationService.addCredentials(user.getId(), email, password);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not update those login credentials.");
-        }
+    public ResponseEntity<Void> updateCredentials(@Valid @RequestBody UpdateCredentialsRequest requestPayload) {
+        User user = accountService.requireCurrentUser("updating your email or password");
+        authenticationMutationService.addCredentials(user.getId(), requestPayload.getEmail(), requestPayload.getPassword());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest requestPayload) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before changing your password.");
-
-        String currentPassword = requestPayload.getCurrentPassword();
-        String newPassword = requestPayload.getNewPassword();
-
-        try {
-            authenticationService.changePassword(user.getId(), currentPassword, newPassword);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not change that password.");
-        }
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest requestPayload) {
+        User user = accountService.requireCurrentUser("changing your password");
+        authenticationMutationService.changePassword(user.getId(), requestPayload.getCurrentPassword(), requestPayload.getNewPassword());
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/mfa/setup")
-    public ResponseEntity<?> setupMfa() {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before setting up two-factor authentication.");
-        if (user.isMfaEnabled()) return ErrorMessageUtils.badRequest("Two-factor authentication is already enabled for this account.");
+    public ResponseEntity<MfaSetupResponse> setupMfa() {
+        User user = accountService.requireCurrentUser("setting up two-factor authentication");
+        if (user.isMfaEnabled()) {
+            throw new InvalidAuthenticationRequestException("Two-factor authentication is already enabled for this account.");
+        }
 
         String secret = twoFactorService.generateNewSecret();
-        authenticationService.setTempMfaSecret(user.getId(), secret);
+        authenticationMutationService.setTempMfaSecret(user.getId(), secret);
 
         String qrCode = twoFactorService.generateQrCodeImageUri(secret, user.getUsername());
-        return ResponseEntity.ok(Map.of("secret", secret, "qrCode", qrCode));
+        return ResponseEntity.ok(new MfaSetupResponse(secret, qrCode));
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<?> verifyMfaSetup(@RequestBody VerifyMfaRequest requestPayload) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before verifying two-factor authentication setup.");
-
-        String code = requestPayload.getCode();
-        if (code == null || code.length() != 6) {
-            return ErrorMessageUtils.badRequest("Two-factor authentication codes must be exactly 6 digits.");
+    public ResponseEntity<MessageResponse> verifyMfaSetup(@Valid @RequestBody VerifyMfaRequest requestPayload) {
+        User user = accountService.requireCurrentUser("verifying two-factor authentication setup");
+        if (!twoFactorService.isOtpValid(user.getMfaSecret(), requestPayload.getCode())) {
+            throw new InvalidAuthenticationRequestException("That verification code was not accepted, so two-factor authentication was not enabled.");
         }
-
-        String secret = user.getMfaSecret();
-
-        if (twoFactorService.isOtpValid(secret, code)) {
-            authenticationService.enableMfa(user.getId());
-            return ResponseEntity.ok(Map.of("message", "MFA enabled successfully"));
-        } else {
-            return ErrorMessageUtils.badRequest("That verification code was not accepted, so two-factor authentication was not enabled.");
-        }
+        authenticationMutationService.enableMfa(user.getId());
+        return ResponseEntity.ok(new MessageResponse("MFA enabled successfully"));
     }
 
     @PostMapping("/signin")
-    public ResponseEntity<?> login(@RequestBody SignInRequest requestPayload, HttpServletRequest request, HttpServletResponse response) {
-        String username = requestPayload.getUsername();
-        String password = requestPayload.getPassword();
+    public ResponseEntity<SignInResponse> login(@Valid @RequestBody SignInRequest requestPayload, HttpServletRequest request, HttpServletResponse response) {
+        User user = authenticationService.authenticate(requestPayload.getUsername(), requestPayload.getPassword());
 
-        try {
-            User user = authenticationService.authenticate(username, password);
-
-            if (user.isMfaEnabled()) {
-                String preAuthToken = authenticationService.generatePreAuthToken(user.getId());
-                return ResponseEntity.accepted().body(Map.of("mfa_required", true, "pre_auth_token", preAuthToken));
-            } else {
-                createSession(user, request, response);
-                return ResponseEntity.ok(Map.of("status", "success"));
-            }
-        } catch (Exception e) {
-            return ErrorMessageUtils.unauthorized("We couldn't sign you in with that username and password. Double-check both fields and try again.");
+        if (user.isMfaEnabled()) {
+            String preAuthToken = authenticationService.generatePreAuthToken(user.getId());
+            return ResponseEntity.accepted().body(new SignInResponse("mfa_required", true, preAuthToken));
         }
+
+        createSession(user, request, response);
+        return ResponseEntity.ok(new SignInResponse("success", false, null));
     }
 
     @PostMapping("/mfa/validate-login")
-    public ResponseEntity<?> validateLoginMfa(@RequestBody MfaLoginRequest requestPayload, HttpServletRequest request, HttpServletResponse response) {
-        String preAuthToken = requestPayload.getPre_auth_token();
-        String code = requestPayload.getCode();
-
-        User user = authenticationService.validatePreAuthToken(preAuthToken);
+    public ResponseEntity<StatusResponse> validateLoginMfa(@Valid @RequestBody MfaLoginRequest requestPayload, HttpServletRequest request, HttpServletResponse response) {
+        User user = authenticationService.validatePreAuthToken(requestPayload.getPre_auth_token());
         if (user == null) {
-            return ErrorMessageUtils.unauthorized("Your two-factor login session has expired or is no longer valid. Please sign in again.");
+            throw new UnauthorizedException("Your two-factor login session has expired or is no longer valid. Please sign in again.");
         }
 
-        if (user.isMfaEnabled()) {
-            if (twoFactorService.isOtpValid(user.getMfaSecret(), code)) {
-                createSession(user, request, response);
-                return ResponseEntity.ok(Map.of("status", "success"));
-            } else {
-                return ErrorMessageUtils.badRequest("That two-factor authentication code was not accepted. Check the current code in your authenticator app and try again.");
-            }
+        if (!user.isMfaEnabled()) {
+            throw new InvalidAuthenticationRequestException("Two-factor authentication is not enabled for this account.");
         }
 
-        return ErrorMessageUtils.badRequest("Two-factor authentication is not enabled for this account.");
+        if (!twoFactorService.isOtpValid(user.getMfaSecret(), requestPayload.getCode())) {
+            throw new InvalidAuthenticationRequestException("That two-factor authentication code was not accepted. Check the current code in your authenticator app and try again.");
+        }
+
+        createSession(user, request, response);
+        return ResponseEntity.ok(new StatusResponse("success"));
     }
 
     private void createSession(User user, HttpServletRequest request, HttpServletResponse response) {

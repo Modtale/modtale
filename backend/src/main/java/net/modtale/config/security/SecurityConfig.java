@@ -1,6 +1,7 @@
 package net.modtale.config.security;
 
 import net.modtale.config.auth.ApiKeyAuthFilter;
+import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationService;
@@ -10,8 +11,6 @@ import net.modtale.service.auth.OidcLoginService;
 import net.modtale.service.user.AccountService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -47,6 +46,8 @@ import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -60,26 +61,48 @@ public class SecurityConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
-    @Value("${app.frontend.url}")
-    private String frontendUrl;
+    private final ApiKeyAuthFilter apiKeyAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
+    private final OAuth2LoginService oauth2LoginService;
+    private final OidcLoginService oidcLoginService;
+    private final OAuth2AuthorizedClientRepository authorizedClientRepository;
+    private final LocalUserDetailsService userDetailsService;
+    private final PasswordEncoder passwordEncoder;
+    private final AccountService accountService;
+    private final AuthenticationService authenticationService;
+    private final AppFrontendProperties frontendProperties;
 
-    @Autowired private ApiKeyAuthFilter apiKeyAuthFilter;
-    @Autowired private RateLimitFilter rateLimitFilter;
-    @Autowired private OAuth2LoginService oauth2LoginService;
-    @Autowired private OidcLoginService oidcLoginService;
-    @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
-    @Autowired private LocalUserDetailsService userDetailsService;
-    @Autowired private PasswordEncoder passwordEncoder;
-
-    @Autowired private AccountService accountService;
-    @Autowired private AuthenticationService authenticationService;
+    public SecurityConfig(
+            ApiKeyAuthFilter apiKeyAuthFilter,
+            RateLimitFilter rateLimitFilter,
+            OAuth2LoginService oauth2LoginService,
+            OidcLoginService oidcLoginService,
+            OAuth2AuthorizedClientRepository authorizedClientRepository,
+            LocalUserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder,
+            AccountService accountService,
+            AuthenticationService authenticationService,
+            AppFrontendProperties frontendProperties
+    ) {
+        this.apiKeyAuthFilter = apiKeyAuthFilter;
+        this.rateLimitFilter = rateLimitFilter;
+        this.oauth2LoginService = oauth2LoginService;
+        this.oidcLoginService = oidcLoginService;
+        this.authorizedClientRepository = authorizedClientRepository;
+        this.userDetailsService = userDetailsService;
+        this.passwordEncoder = passwordEncoder;
+        this.accountService = accountService;
+        this.authenticationService = authenticationService;
+        this.frontendProperties = frontendProperties;
+    }
 
     @PostConstruct
     public void logConfig() {
-        logger.info("Security Config Initialized. Frontend URL: {}", frontendUrl);
+        logger.info("Security Config Initialized. Frontend URL: {}", frontendProperties.url());
     }
 
     private String getCleanFrontendUrl() {
+        String frontendUrl = frontendProperties.url();
         if (frontendUrl != null && frontendUrl.endsWith("/")) {
             return frontendUrl.substring(0, frontendUrl.length() - 1);
         }
@@ -88,8 +111,7 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
     }
@@ -97,12 +119,8 @@ public class SecurityConfig {
     private boolean isPreviewEnvironment() {
         String cleanUrl = getCleanFrontendUrl();
         if (cleanUrl == null || cleanUrl.isBlank()) return false;
-        try {
-            String host = URI.create(cleanUrl).getHost();
-            return (host != null && host.endsWith(".run.app")) || "dev.modtale.net".equalsIgnoreCase(host);
-        } catch (Exception e) {
-            return false;
-        }
+        String host = safeHostFromUrl(cleanUrl);
+        return (host != null && host.endsWith(".run.app")) || "dev.modtale.net".equalsIgnoreCase(host);
     }
 
     private boolean isLocalhost() {
@@ -121,8 +139,8 @@ public class SecurityConfig {
         }
 
         origins.add(cleanUrl);
-        try {
-            URI uri = URI.create(cleanUrl);
+        URI uri = safeUri(cleanUrl, "frontend URL");
+        if (uri != null) {
             String host = uri.getHost();
             String scheme = uri.getScheme();
             if (host == null || scheme == null) {
@@ -142,8 +160,6 @@ public class SecurityConfig {
                 origins.add("https://www.modtale.net");
                 origins.add("https://*.modtale.net");
             }
-        } catch (Exception ignored) {
-            // Keep at least the configured origin if parsing fails.
         }
 
         return origins;
@@ -153,14 +169,9 @@ public class SecurityConfig {
         if (host == null || host.isBlank()) return false;
         String normalized = host.toLowerCase();
         for (String originPattern : getAllowedFrontendOriginPatterns()) {
-            try {
-                URI uri = URI.create(originPattern);
-                String allowedHost = uri.getHost();
-                if (allowedHost != null && normalized.equalsIgnoreCase(allowedHost)) {
-                    return true;
-                }
-            } catch (Exception ignored) {
-                // Best-effort validation
+            String allowedHost = safeHostFromUrl(originPattern);
+            if (allowedHost != null && normalized.equalsIgnoreCase(allowedHost)) {
+                return true;
             }
         }
         return false;
@@ -181,17 +192,13 @@ public class SecurityConfig {
             serializer.setSameSite("Lax");
 
             if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
-                try {
-                    String host = URI.create(cleanUrl).getHost();
-                    if (host != null) {
-                        String[] parts = host.split("\\.");
-                        if (parts.length >= 2) {
-                            String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
-                            serializer.setDomainName(rootDomain);
-                        }
+                String host = safeHostFromUrl(cleanUrl);
+                if (host != null) {
+                    String[] parts = host.split("\\.");
+                    if (parts.length >= 2) {
+                        String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                        serializer.setDomainName(rootDomain);
                     }
-                } catch (Exception e) {
-                    logger.warn("Failed to parse frontend URL for cookie domain: {}", e.getMessage());
                 }
             }
         }
@@ -200,14 +207,13 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
-        tokenRepository.setCookieHttpOnly(false);
-        tokenRepository.setSecure(!isLocalhost());
+        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         tokenRepository.setCookiePath("/");
 
         tokenRepository.setCookieCustomizer(cookie -> {
             boolean isPreview = isPreviewEnvironment();
             String cleanUrl = getCleanFrontendUrl();
+            cookie.secure(!isLocalhost());
 
             if (isPreview) {
                 cookie.sameSite("None");
@@ -215,17 +221,13 @@ public class SecurityConfig {
             } else {
                 cookie.sameSite("Lax");
                 if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
-                    try {
-                        String host = URI.create(cleanUrl).getHost();
-                        if (host != null) {
-                            String[] parts = host.split("\\.");
-                            if (parts.length >= 2) {
-                                String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
-                                cookie.domain(rootDomain);
-                            }
+                    String host = safeHostFromUrl(cleanUrl);
+                    if (host != null) {
+                        String[] parts = host.split("\\.");
+                        if (parts.length >= 2) {
+                            String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                            cookie.domain(rootDomain);
                         }
-                    } catch (Exception e) {
-                        logger.warn("Failed to set CSRF cookie domain: {}", e.getMessage());
                     }
                 }
             }
@@ -325,14 +327,8 @@ public class SecurityConfig {
                             HttpServletRequest request = context.getRequest();
                             String origin = request.getHeader("Origin");
                             String referer = request.getHeader("Referer");
-                            String originHost = null;
-                            String refererHost = null;
-                            try {
-                                originHost = origin != null ? URI.create(origin).getHost() : null;
-                            } catch (Exception ignored) { }
-                            try {
-                                refererHost = referer != null ? URI.create(referer).getHost() : null;
-                            } catch (Exception ignored) { }
+                            String originHost = safeHostFromUrl(origin);
+                            String refererHost = safeHostFromUrl(referer);
 
                             boolean isValidOrigin = isAllowedFrontendHost(originHost);
                             boolean isValidReferer = isAllowedFrontendHost(refererHost);
@@ -516,9 +512,26 @@ public class SecurityConfig {
     @Bean
     public AuthenticationFailureHandler oauthFailureHandler() {
         return (request, response, exception) -> {
-            String errorParam = java.net.URLEncoder.encode(exception.getMessage(), "UTF-8");
+            String errorParam = URLEncoder.encode(exception.getMessage(), StandardCharsets.UTF_8);
             String cleanUrl = getCleanFrontendUrl();
             response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/?oauth_error=" + errorParam);
         };
+    }
+
+    private URI safeUri(String rawUri, String description) {
+        if (rawUri == null || rawUri.isBlank()) {
+            return null;
+        }
+        try {
+            return URI.create(rawUri);
+        } catch (IllegalArgumentException ex) {
+            logger.warn("Failed to parse {} '{}': {}", description, rawUri, ex.getMessage());
+            return null;
+        }
+    }
+
+    private String safeHostFromUrl(String rawUri) {
+        URI uri = safeUri(rawUri, "request origin");
+        return uri != null ? uri.getHost() : null;
     }
 }

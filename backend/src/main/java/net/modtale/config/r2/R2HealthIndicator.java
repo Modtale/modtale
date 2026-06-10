@@ -1,28 +1,30 @@
 package net.modtale.config.r2;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
+import net.modtale.config.properties.AppR2Properties;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Component
 public class R2HealthIndicator implements HealthIndicator {
 
-    @Autowired
-    private S3Client s3Client;
+    private final S3Client s3Client;
+    private final String bucketName;
 
-    @Value("${app.r2.bucket}")
-    private String bucketName;
+    public R2HealthIndicator(S3Client s3Client, AppR2Properties r2Properties) {
+        this.s3Client = s3Client;
+        this.bucketName = r2Properties.bucket();
+    }
 
     @Override
     public Health health() {
         try {
             s3Client.headBucket(HeadBucketRequest.builder().bucket(bucketName).build());
             return Health.up().withDetail("bucket", bucketName).build();
-        } catch (Exception e) {
+        } catch (S3Exception e) {
             return Health.down().withDetail("error", e.getMessage()).build();
         }
     }
