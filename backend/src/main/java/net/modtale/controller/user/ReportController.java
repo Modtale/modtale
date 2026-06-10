@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import net.modtale.exception.ApiKeyOperationForbiddenException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import net.modtale.mapper.AdminMapper;
@@ -11,8 +12,10 @@ import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
 import net.modtale.service.user.ReportService;
 import net.modtale.service.user.AccountService;
+import net.modtale.service.security.AccessControlService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,16 +29,29 @@ public class ReportController {
 
     private final ReportService reportService;
     private final AccountService accountService;
+    private final AccessControlService accessControlService;
 
-    public ReportController(ReportService reportService, AccountService accountService) {
+    public ReportController(
+            ReportService reportService,
+            AccountService accountService,
+            AccessControlService accessControlService
+    ) {
         this.reportService = reportService;
         this.accountService = accountService;
+        this.accessControlService = accessControlService;
     }
 
     @PostMapping("/reports")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
-    public ResponseEntity<IdResponse> submitReport(@Valid @RequestBody CreateReportRequest requestPayload) {
-        User user = accountService.requireCurrentUser("submitting a report");
+    public ResponseEntity<IdResponse> submitReport(
+            @Valid @RequestBody CreateReportRequest requestPayload,
+            Authentication authentication
+    ) {
+        if (accessControlService.isApiKey(authentication)) {
+            throw new ApiKeyOperationForbiddenException("API keys cannot be used for submitting reports.");
+        }
+
+        User user = accountService.requireCurrentUser(authentication, "submitting a report");
         Report.TargetType targetType = Report.TargetType.valueOf(requestPayload.getTargetType().toUpperCase(Locale.ROOT));
         Report report = reportService.createReport(
                 requestPayload.getTargetId(),

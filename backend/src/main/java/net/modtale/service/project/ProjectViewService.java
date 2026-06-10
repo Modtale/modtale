@@ -58,13 +58,13 @@ public class ProjectViewService {
             return null;
         }
 
-        return prepareProjectForViewer(project, privileged);
+        return prepareProjectForViewer(project, viewer, privileged);
     }
 
     public Project getPublicProjectById(String id) {
         Project project = getRawProjectById(id);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
-        return prepareProjectForViewer(project, false);
+        return prepareProjectForViewer(project, null, false);
     }
 
     public Project getAdminProjectDetails(String id) {
@@ -76,17 +76,22 @@ public class ProjectViewService {
         return project;
     }
 
-    private Project prepareProjectForViewer(Project project, boolean privileged) {
+    private Project prepareProjectForViewer(Project project, User viewer, boolean privileged) {
         if (project.getAuthorId() != null) {
             userRepository.findById(project.getAuthorId()).ifPresent(u -> project.setAuthor(u.getUsername()));
         }
 
-        if (!privileged && project.getVersions() != null) {
-            List<ProjectVersion> visibleVersions = project.getVersions().stream()
-                    .filter(v -> v.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
-                    .collect(Collectors.toList());
-            project.setVersions(visibleVersions);
-            project.getVersions().forEach(v -> v.setScanResult(null));
+        if (project.getVersions() != null) {
+            if (!privileged) {
+                List<ProjectVersion> visibleVersions = project.getVersions().stream()
+                        .filter(v -> v.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
+                        .collect(Collectors.toList());
+                project.setVersions(visibleVersions);
+            }
+
+            if (!accessControlService.isAdmin(viewer)) {
+                project.getVersions().forEach(v -> v.setScanResult(null));
+            }
         }
 
         if (!project.isAllowComments() && !privileged) project.setComments(new ArrayList<>());
