@@ -7,6 +7,7 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.AccountService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +20,7 @@ public class AccessControlService {
     private final ProjectRepository projectRepository;
 
     public AccessControlService(
-            AccountService accountService,
+            @Lazy AccountService accountService,
             UserRepository userRepository,
             ProjectRepository projectRepository
     ) {

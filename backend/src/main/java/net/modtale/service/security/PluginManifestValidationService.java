@@ -1,11 +1,11 @@
 package net.modtale.service.security;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
 import net.modtale.exception.InvalidProjectRequestException;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +51,7 @@ public class PluginManifestValidationService {
                     root.get("ServerVersion").asText(),
                     dependencies
             );
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new InvalidProjectRequestException("Failed to parse manifest.json. Ensure it is valid JSON.");
         }
     }
@@ -68,7 +68,7 @@ public class PluginManifestValidationService {
             throw new InvalidProjectRequestException((optional ? "OptionalDependencies" : "Dependencies") + " must be a JSON object.");
         }
 
-        node.fields().forEachRemaining(entry -> {
+        node.properties().forEach(entry -> {
             String key = entry.getKey();
             if (key == null || key.isBlank()) {
                 return;

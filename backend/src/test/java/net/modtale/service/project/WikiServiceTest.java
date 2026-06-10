@@ -1,6 +1,6 @@
 package net.modtale.service.project;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import net.modtale.config.properties.AppWikiProperties;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;

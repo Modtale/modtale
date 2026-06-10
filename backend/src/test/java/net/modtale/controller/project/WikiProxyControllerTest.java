@@ -1,6 +1,6 @@
 package net.modtale.controller.project;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import net.modtale.exception.UpstreamServiceException;
 import net.modtale.service.project.WikiService;
 import org.junit.jupiter.api.BeforeEach;

@@ -24,9 +24,9 @@ public class OAuthAvatarHealingService {
     private final RestClient restClient;
     private final Map<String, LocalDateTime> avatarHealCooldown = new ConcurrentHashMap<>();
 
-    public OAuthAvatarHealingService(UserRepository userRepository, RestClient.Builder restClientBuilder) {
+    public OAuthAvatarHealingService(UserRepository userRepository) {
         this.userRepository = userRepository;
-        this.restClient = restClientBuilder.build();
+        this.restClient = RestClient.create();
     }
 
     public void maybeHealOAuthAvatar(User user) {
