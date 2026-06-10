@@ -9,7 +9,6 @@ import type { Project } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
 
-import { AnimatedCounter } from '../components/AnimatedCounter';
 import { MarqueeColumn, MarqueeRow } from '../components/HeroMarquee';
 import { InlineDependencyUI, InlineDownloadUI, InlineNotificationUI } from '../components/FeaturePreviews';
 import { GLASS_CARD } from '../styles';
@@ -45,6 +44,7 @@ export const Home: React.FC = () => {
     const DESKTOP_BREAKPOINT = 1024;
     const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
     const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
+    const HERO_MARQUEE_PROJECT_LIMIT = 8;
 
     const { initialData: ssrData } = useSSRData();
     const homeSeo = ROUTE_SEO['/'];
@@ -53,7 +53,6 @@ export const Home: React.FC = () => {
     const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_HERO_MIN_WIDTH_ENTER : true);
     const [projects, setProjects] = useState<Project[]>(ssrData?.homeProjects || []);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
-    const [readyForHeavyUI, setReadyForHeavyUI] = useState(false);
     const heroGridRef = useRef<HTMLDivElement>(null);
     const heroTextColumnRef = useRef<HTMLDivElement>(null);
     const heroMarqueeDesktopRef = useRef<HTMLDivElement>(null);
@@ -66,73 +65,25 @@ export const Home: React.FC = () => {
         const handleResize = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
         window.addEventListener('resize', handleResize, { passive: true });
 
-        let hasRunHeavyUi = false;
-        const enableHeavyUi = () => {
-            if (hasRunHeavyUi) return;
-            hasRunHeavyUi = true;
-            setReadyForHeavyUI(true);
-        };
-
-        let uiIdleHandle: number | null = null;
-        if ('requestIdleCallback' in window) {
-            uiIdleHandle = (window as Window & { requestIdleCallback: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number })
-                .requestIdleCallback(() => enableHeavyUi(), { timeout: 1000 });
-        }
-        const uiFallbackTimer = window.setTimeout(() => enableHeavyUi(), 250);
-
         const shouldFetchFallbackProjects = !ssrData?.homeProjects?.length;
         const shouldFetchFallbackStats = !ssrData?.stats?.totalProjects;
 
-        let hasRunFallbackRequests = false;
-        const runFallbackRequests = () => {
-            if (hasRunFallbackRequests) return;
-            hasRunFallbackRequests = true;
-
-            if (shouldFetchFallbackProjects) {
-                api.get('/projects', { params: { size: 16, sort: 'relevance', category: 'trending' } })
-                    .then(res => {
-                        if (res.data?.content) setProjects(res.data.content);
-                    })
-                    .catch(() => {});
-            }
-
-            if (shouldFetchFallbackStats) {
-                api.get('/analytics/platform/stats')
-                    .then(res => setStats(res.data))
-                    .catch(() => {});
-            }
-        };
-
-        let fetchIdleHandle: number | null = null;
-        const scheduleFallbackRequests = () => {
-            if (!shouldFetchFallbackProjects && !shouldFetchFallbackStats) return;
-            if ('requestIdleCallback' in window) {
-                fetchIdleHandle = (window as Window & { requestIdleCallback: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number })
-                    .requestIdleCallback(() => runFallbackRequests(), { timeout: 6000 });
-            }
-        };
-
-        if (document.readyState === 'complete') {
-            scheduleFallbackRequests();
-        } else {
-            window.addEventListener('load', scheduleFallbackRequests, { once: true });
+        if (shouldFetchFallbackProjects) {
+            api.get('/projects', { params: { size: 16, sort: 'relevance', category: 'trending' } })
+                .then(res => {
+                    if (res.data?.content) setProjects(res.data.content);
+                })
+                .catch(() => {});
         }
 
-        const requestFallbackTimer = window.setTimeout(() => {
-            runFallbackRequests();
-        }, 7000);
+        if (shouldFetchFallbackStats) {
+            api.get('/analytics/platform/stats')
+                .then(res => setStats(res.data))
+                .catch(() => {});
+        }
 
         return () => {
             window.removeEventListener('resize', handleResize);
-            window.removeEventListener('load', scheduleFallbackRequests);
-            window.clearTimeout(uiFallbackTimer);
-            window.clearTimeout(requestFallbackTimer);
-            if (uiIdleHandle !== null && 'cancelIdleCallback' in window) {
-                (window as Window & { cancelIdleCallback: (handle: number) => void }).cancelIdleCallback(uiIdleHandle);
-            }
-            if (fetchIdleHandle !== null && 'cancelIdleCallback' in window) {
-                (window as Window & { cancelIdleCallback: (handle: number) => void }).cancelIdleCallback(fetchIdleHandle);
-            }
         };
     }, [DESKTOP_BREAKPOINT, ssrData?.homeProjects?.length, ssrData?.stats?.totalProjects]);
 
@@ -237,22 +188,22 @@ export const Home: React.FC = () => {
         projects.length,
         stats.totalDownloads,
         stats.totalProjects,
-        stats.totalUsers,
-        readyForHeavyUI
+        stats.totalUsers
     ]);
 
-    const validFeaturedProjects = useMemo(() => {
-        if (!readyForHeavyUI) return [];
-        return projects.filter(p => Boolean(p.bannerUrl) && Boolean(p.imageUrl) && !p.imageUrl?.includes('favicon'));
-    }, [projects, readyForHeavyUI]);
+    const validFeaturedProjects = useMemo(
+        () => projects.filter(p => Boolean(p.bannerUrl) && Boolean(p.imageUrl) && !p.imageUrl?.includes('favicon')),
+        [projects]
+    );
 
-    const randomDisplayProject = useMemo(() => {
-        if (!readyForHeavyUI || validFeaturedProjects.length === 0) return undefined;
-        return validFeaturedProjects[Math.floor(Math.random() * validFeaturedProjects.length)];
-    }, [validFeaturedProjects, readyForHeavyUI]);
+    const heroMarqueeProjects = useMemo(
+        () => validFeaturedProjects.slice(0, HERO_MARQUEE_PROJECT_LIMIT),
+        [HERO_MARQUEE_PROJECT_LIMIT, validFeaturedProjects]
+    );
 
-    const col1Projects = useMemo(() => validFeaturedProjects.filter((_, i) => i % 2 === 0), [validFeaturedProjects]);
-    const col2Projects = useMemo(() => validFeaturedProjects.filter((_, i) => i % 2 === 1), [validFeaturedProjects]);
+    const previewProject = validFeaturedProjects[0];
+    const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
+    const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
     const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
 
     return (
@@ -475,21 +426,21 @@ export const Home: React.FC = () => {
                             <div className={`${GLASS_CARD} home-hero-stats flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-4 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalProjects} /> : formatMetric(stats.totalProjects)}
+                                        {formatMetric(stats.totalProjects)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalDownloads} /> : formatMetric(stats.totalDownloads)}
+                                        {formatMetric(stats.totalDownloads)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
                                     <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                                        {readyForHeavyUI ? <AnimatedCounter value={stats.totalUsers} /> : formatMetric(stats.totalUsers)}
+                                        {formatMetric(stats.totalUsers)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
                                 </div>
@@ -576,7 +527,7 @@ export const Home: React.FC = () => {
                                     }}
                                 />
                                 <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
-                                    <InlineDependencyUI randomProject={randomDisplayProject} />
+                                    <InlineDependencyUI randomProject={previewProject} />
                                 </div>
                             </div>
                         </section>

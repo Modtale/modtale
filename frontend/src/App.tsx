@@ -7,6 +7,7 @@ import { api } from '@/utils/api';
 import { Navbar } from '@/modules/core/components/Navbar';
 import { Footer } from '@/modules/core/components/Footer';
 import { SEOHead } from '@/modules/core/components/SEOHead';
+import { Home } from '@/modules/home/views/Home';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBoundary } from '@/components/ui/error/ErrorBoundary';
@@ -26,7 +27,6 @@ const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').the
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
 const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
-const Home = lazy(() => import('@/modules/home/views/Home').then((module) => ({ default: module.Home })));
 const Browse = lazy(() => import('@/modules/discovery/views/Browse').then((module) => ({ default: module.Browse })));
 const ProjectDetails = lazy(() => import('@/modules/project/views/ProjectDetails').then((module) => ({ default: module.ProjectDetails })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
@@ -67,6 +67,7 @@ const AppContent: React.FC = () => {
 
     const navigate = useNavigate();
     const location = useLocation();
+    const isHomeRoute = location.pathname === SiteRoutes.home() || location.pathname === '/login';
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
@@ -218,74 +219,75 @@ const AppContent: React.FC = () => {
 
                 <div className="flex-1">
                     <ErrorBoundary>
-                        <Suspense fallback={<RouteLoading />}>
-                            <Routes>
-                                <Route path="/" element={<Home />} />
-                                <Route path="/login" element={<Home />} />
+                        {isHomeRoute ? (
+                            <Home />
+                        ) : (
+                            <Suspense fallback={<RouteLoading />}>
+                                <Routes>
+                                    <Route path="/mods" element={renderBrowse()} />
+                                    <Route path="/projects" element={<Navigate to={SiteRoutes.browse()} replace />} />
+                                    <Route path="/plugins" element={renderBrowse('PLUGIN')} />
+                                    <Route path="/modpacks" element={renderBrowse('MODPACK')} />
+                                    <Route path="/worlds" element={renderBrowse('SAVE')} />
+                                    <Route path="/art" element={renderBrowse('ART')} />
+                                    <Route path="/data" element={renderBrowse('DATA')} />
 
-                                <Route path="/mods" element={renderBrowse()} />
-                                <Route path="/projects" element={<Navigate to={SiteRoutes.browse()} replace />} />
-                                <Route path="/plugins" element={renderBrowse('PLUGIN')} />
-                                <Route path="/modpacks" element={renderBrowse('MODPACK')} />
-                                <Route path="/worlds" element={renderBrowse('SAVE')} />
-                                <Route path="/art" element={renderBrowse('ART')} />
-                                <Route path="/data" element={renderBrowse('DATA')} />
+                                    <Route path="/upload" element={
+                                        loadingAuth ? <RouteLoading /> :
+                                            <CreateProject onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
+                                    } />
 
-                                <Route path="/upload" element={
-                                    loadingAuth ? <RouteLoading /> :
-                                        <CreateProject onNavigate={handleNavigate} onRefresh={async () => {}} currentUser={user} />
-                                } />
+                                    <Route path="/dashboard/*" element={
+                                        loadingAuth ? <RouteLoading /> :
+                                            user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
+                                                <Navigate to={SiteRoutes.home()} />
+                                    } />
 
-                                <Route path="/dashboard/*" element={
-                                    loadingAuth ? <RouteLoading /> :
-                                        user ? <Dashboard user={user} onRefreshUser={fetchUser} /> :
-                                            <Navigate to={SiteRoutes.home()} />
-                                } />
+                                    {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
+                                        <React.Fragment key={path}>
+                                            <Route path={path} element={renderProjectDetail()} />
+                                            <Route path={`${path}/download`} element={renderProjectDetail()} />
+                                            <Route path={`${path}/changelog`} element={renderProjectDetail()} />
+                                            <Route path={`${path}/gallery`} element={renderProjectDetail()} />
+                                            <Route path={`${path}/wiki/*`} element={renderProjectDetail()} />
+                                            <Route path={`${path}/edit`} element={
+                                                loadingAuth ? <RouteLoading /> :
+                                                    user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
+                                                        <Navigate to={SiteRoutes.home()} />
+                                            } />
+                                        </React.Fragment>
+                                    ))}
 
-                                {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
-                                    <React.Fragment key={path}>
-                                        <Route path={path} element={renderProjectDetail()} />
-                                        <Route path={`${path}/download`} element={renderProjectDetail()} />
-                                        <Route path={`${path}/changelog`} element={renderProjectDetail()} />
-                                        <Route path={`${path}/gallery`} element={renderProjectDetail()} />
-                                        <Route path={`${path}/wiki/*`} element={renderProjectDetail()} />
-                                        <Route path={`${path}/edit`} element={
-                                            loadingAuth ? <RouteLoading /> :
-                                                user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
-                                                    <Navigate to={SiteRoutes.home()} />
-                                        } />
-                                    </React.Fragment>
-                                ))}
+                                    <Route path="/creator/:id" element={
+                                        <UserProfile
+                                            onBack={() => navigate(SiteRoutes.home())}
+                                            likedModIds={user?.likedProjectIds || []}
+                                            onToggleFavorite={handleToggleFavorite}
+                                            currentUser={user}
+                                            onRefreshUser={fetchUser}
+                                        />
+                                    } />
+                                    <Route path="/verify" element={<VerifyEmail />} />
+                                    <Route path="/reset-password" element={<ResetPassword />} />
+                                    <Route path="/mfa" element={<MfaVerify />} />
 
-                                <Route path="/creator/:id" element={
-                                    <UserProfile
-                                        onBack={() => navigate(SiteRoutes.home())}
-                                        likedModIds={user?.likedProjectIds || []}
-                                        onToggleFavorite={handleToggleFavorite}
-                                        currentUser={user}
-                                        onRefreshUser={fetchUser}
-                                    />
-                                } />
-                                <Route path="/verify" element={<VerifyEmail />} />
-                                <Route path="/reset-password" element={<ResetPassword />} />
-                                <Route path="/mfa" element={<MfaVerify />} />
+                                    <Route path="/terms" element={<TermsOfService />} />
+                                    <Route path="/privacy" element={<PrivacyPolicy />} />
+                                    <Route path="/status" element={<Status />} />
 
-                                <Route path="/terms" element={<TermsOfService />} />
-                                <Route path="/privacy" element={<PrivacyPolicy />} />
-                                <Route path="/status" element={<Status />} />
+                                    <Route path="/api-docs" element={<ApiDocs />} />
+                                    <Route path="/api-docs/swagger" element={<SwaggerDocs />} />
 
-                                <Route path="/api-docs" element={<ApiDocs />} />
-                                <Route path="/api-docs/swagger" element={<SwaggerDocs />} />
+                                    <Route path="/admin" element={
+                                        loadingAuth ? <RouteLoading /> :
+                                            user ? <AdminPanel currentUser={user} /> :
+                                                <Navigate to={SiteRoutes.home()} />
+                                    } />
 
-                                <Route path="/admin" element={
-                                    loadingAuth ? <RouteLoading /> :
-                                        user ? <AdminPanel currentUser={user} /> :
-                                            <Navigate to={SiteRoutes.home()} />
-                                } />
-
-                                <Route path="*" element={<NotFound />} />
-                            </Routes>
-                        </Suspense>
+                                    <Route path="*" element={<NotFound />} />
+                                </Routes>
+                            </Suspense>
+                        )}
                     </ErrorBoundary>
                 </div>
                 <Footer isDarkMode={isDarkMode} />
