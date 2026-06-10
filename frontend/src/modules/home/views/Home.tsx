@@ -452,7 +452,7 @@ export const Home: React.FC = () => {
                                 {validFeaturedProjects.length > 0 && (
                                     <aside
                                         ref={heroMarqueeDesktopRef}
-                                        className="absolute -inset-x-4 xl:-inset-x-8 inset-y-0 px-4 xl:px-8 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
+                                        className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
                                         style={{
                                             maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
                                             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
