@@ -61,6 +61,13 @@ public class AccessControlService {
         return user != null;
     }
 
+    public boolean isApiKey(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities() != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_API".equals(authority.getAuthority()));
+    }
+
     public boolean hasOrgPerm(String orgId, String permStr, Authentication authentication) {
         User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;

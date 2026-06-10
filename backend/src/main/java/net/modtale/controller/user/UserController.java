@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import net.modtale.exception.ApiKeyOperationForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -188,6 +189,7 @@ public class UserController {
     @PostMapping("/user/follow/{targetId}")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_FOLLOW', authentication)")
     public ResponseEntity<Void> followUser(@PathVariable String targetId, Authentication authentication) {
+        rejectApiKey(authentication, "following users");
         User currentUser = accountService.requireCurrentUser(authentication, "following a user");
         socialService.followUser(currentUser.getId(), targetId);
         return ResponseEntity.ok().build();
@@ -196,6 +198,7 @@ public class UserController {
     @PostMapping("/user/unfollow/{targetId}")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_UNFOLLOW', authentication)")
     public ResponseEntity<Void> unfollowUser(@PathVariable String targetId, Authentication authentication) {
+        rejectApiKey(authentication, "unfollowing users");
         User currentUser = accountService.requireCurrentUser(authentication, "unfollowing a user");
         socialService.unfollowUser(currentUser.getId(), targetId);
         return ResponseEntity.ok().build();
@@ -281,5 +284,11 @@ public class UserController {
                 && targetUser.getOrganizationMembers() != null
                 && targetUser.getOrganizationMembers().stream()
                 .anyMatch(member -> member.getUserId().equals(currentUser.getId()));
+    }
+
+    private void rejectApiKey(Authentication authentication, String action) {
+        if (accessControlService.isApiKey(authentication)) {
+            throw new ApiKeyOperationForbiddenException("API keys cannot be used for " + action + ".");
+        }
     }
 }

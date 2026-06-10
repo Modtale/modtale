@@ -4,6 +4,12 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.media.ObjectSchema;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,5 +53,37 @@ class OpenApiConfigTest {
         assertTrue(operation.getExtensions().containsKey("x-modtale-access"));
         assertTrue(operation.getExtensions().containsKey("x-modtale-rate-limit-tiers"));
         assertTrue(operation.getTags().contains("Projects, Versions & Downloads"));
+    }
+
+    @Test
+    void apiDocsCustomizerPrunesSchemasUsedOnlyByExcludedRoutes() {
+        Schema<?> keptSchema = new ObjectSchema();
+        Schema<?> sensitiveSchema = new ObjectSchema();
+
+        OpenAPI openApi = new OpenAPI()
+                .components(new Components()
+                        .addSchemas("KeptSchema", keptSchema)
+                        .addSchemas("SensitiveSchema", sensitiveSchema))
+                .paths(new Paths()
+                        .addPathItem("/api/v1/projects", new PathItem().get(new Operation()
+                                .operationId("listProjects")
+                                .responses(new io.swagger.v3.oas.models.responses.ApiResponses()
+                                        .addApiResponse("200", jsonResponse("#/components/schemas/KeptSchema")))))
+                        .addPathItem("/api/v1/reports", new PathItem().post(new Operation()
+                                .operationId("submitReport")
+                                .responses(new io.swagger.v3.oas.models.responses.ApiResponses()
+                                        .addApiResponse("200", jsonResponse("#/components/schemas/SensitiveSchema"))))));
+
+        openApiConfig.apiDocsOpenApiCustomizer().customise(openApi);
+
+        assertTrue(openApi.getComponents().getSchemas().containsKey("KeptSchema"));
+        assertFalse(openApi.getComponents().getSchemas().containsKey("SensitiveSchema"));
+    }
+
+    private static ApiResponse jsonResponse(String schemaRef) {
+        return new ApiResponse().content(new Content().addMediaType(
+                "application/json",
+                new MediaType().schema(new Schema<>().$ref(schemaRef))
+        ));
     }
 }

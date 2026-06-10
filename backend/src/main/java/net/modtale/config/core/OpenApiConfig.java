@@ -37,7 +37,10 @@ public class OpenApiConfig {
     );
     private static final List<String> DOCS_EXCLUDED_EXACT_PATHS = List.of(
             "/api/v1/admin",
-            "/api/v1/analytics/platform/full"
+            "/api/v1/analytics/platform/full",
+            "/api/v1/projects/{id}/favorite",
+            "/api/v1/user/follow/{targetId}",
+            "/api/v1/user/unfollow/{targetId}"
     );
 
     private static final Map<String, Object> TIER_EXEMPT = Map.of(
@@ -120,6 +123,7 @@ public class OpenApiConfig {
             }
 
             paths.entrySet().removeIf(entry -> isAdminOnlyDocPath(entry.getKey()));
+            pruneUnusedSchemas(openApi);
 
             paths.forEach((path, pathItem) -> {
                 if (pathItem == null) {
@@ -222,6 +226,122 @@ public class OpenApiConfig {
 
         String normalized = contentType.toLowerCase(Locale.ROOT);
         return normalized.contains("json") || normalized.endsWith("+json");
+    }
+
+    private void pruneUnusedSchemas(OpenAPI openApi) {
+        if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) {
+            return;
+        }
+
+        Map<String, Schema> schemaRegistry = openApi.getComponents().getSchemas();
+        if (schemaRegistry.isEmpty()) {
+            return;
+        }
+
+        Set<String> referencedSchemas = new LinkedHashSet<>();
+        Paths paths = openApi.getPaths();
+        if (paths != null) {
+            paths.forEach((ignoredPath, pathItem) -> {
+                if (pathItem == null) {
+                    return;
+                }
+
+                pathItem.readOperations().forEach(operation -> collectOperationSchemaRefs(operation, schemaRegistry, referencedSchemas));
+            });
+        }
+
+        schemaRegistry.keySet().retainAll(referencedSchemas);
+    }
+
+    private void collectOperationSchemaRefs(
+            io.swagger.v3.oas.models.Operation operation,
+            Map<String, Schema> schemaRegistry,
+            Set<String> referencedSchemas
+    ) {
+        if (operation == null) {
+            return;
+        }
+
+        if (operation.getParameters() != null) {
+            operation.getParameters().forEach(parameter -> {
+                if (parameter == null) {
+                    return;
+                }
+
+                collectSchemaRefs(parameter.getSchema(), schemaRegistry, referencedSchemas);
+                if (parameter.getContent() != null) {
+                    parameter.getContent().values().forEach(mediaType -> {
+                        if (mediaType != null) {
+                            collectSchemaRefs(mediaType.getSchema(), schemaRegistry, referencedSchemas);
+                        }
+                    });
+                }
+            });
+        }
+
+        if (operation.getRequestBody() != null && operation.getRequestBody().getContent() != null) {
+            operation.getRequestBody().getContent().values().forEach(mediaType -> {
+                if (mediaType != null) {
+                    collectSchemaRefs(mediaType.getSchema(), schemaRegistry, referencedSchemas);
+                }
+            });
+        }
+
+        if (operation.getResponses() != null) {
+            operation.getResponses().values().forEach(response -> {
+                if (response == null || response.getContent() == null) {
+                    return;
+                }
+
+                response.getContent().values().forEach(mediaType -> {
+                    if (mediaType != null) {
+                        collectSchemaRefs(mediaType.getSchema(), schemaRegistry, referencedSchemas);
+                    }
+                });
+            });
+        }
+    }
+
+    private void collectSchemaRefs(Schema<?> schema, Map<String, Schema> schemaRegistry, Set<String> referencedSchemas) {
+        if (schema == null) {
+            return;
+        }
+
+        if (schema.get$ref() != null) {
+            String ref = schema.get$ref();
+            String key = ref.contains("/") ? ref.substring(ref.lastIndexOf('/') + 1) : ref;
+            if (!referencedSchemas.add(key)) {
+                return;
+            }
+
+            collectSchemaRefs(schemaRegistry.get(key), schemaRegistry, referencedSchemas);
+            return;
+        }
+
+        if (schema instanceof ComposedSchema composedSchema) {
+            if (composedSchema.getAllOf() != null) {
+                composedSchema.getAllOf().forEach(part -> collectSchemaRefs(part, schemaRegistry, referencedSchemas));
+            }
+            if (composedSchema.getOneOf() != null) {
+                composedSchema.getOneOf().forEach(part -> collectSchemaRefs(part, schemaRegistry, referencedSchemas));
+            }
+            if (composedSchema.getAnyOf() != null) {
+                composedSchema.getAnyOf().forEach(part -> collectSchemaRefs(part, schemaRegistry, referencedSchemas));
+            }
+        }
+
+        if (schema instanceof ArraySchema arraySchema) {
+            collectSchemaRefs(arraySchema.getItems(), schemaRegistry, referencedSchemas);
+        }
+
+        if (schema.getProperties() != null) {
+            schema.getProperties().values().forEach(property -> collectSchemaRefs((Schema<?>) property, schemaRegistry, referencedSchemas));
+        }
+
+        Object additionalProperties = schema.getAdditionalProperties();
+        if (additionalProperties instanceof Schema<?> additionalSchema) {
+            collectSchemaRefs(additionalSchema, schemaRegistry, referencedSchemas);
+        }
     }
 
     private Object buildExample(Schema schema,
@@ -557,6 +677,8 @@ public class OpenApiConfig {
             return true;
         }
 
-        return path.matches("^/api/v1/projects/\\{[^/]+}/comments(?:/\\{[^/]+})?(?:/vote)?$");
+        return path.matches("^/api/v1/projects/\\{[^/]+}/comments(?:/\\{[^/]+})?(?:/vote)?$")
+                || path.matches("^/api/v1/projects/\\{[^/]+}/favorite$")
+                || path.matches("^/api/v1/user/(?:follow|unfollow)/\\{[^/]+}$");
     }
 }

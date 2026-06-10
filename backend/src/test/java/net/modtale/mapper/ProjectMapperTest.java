@@ -5,6 +5,7 @@ import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.project.ProjectVersionSummaryDTO;
+import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
 import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
@@ -113,11 +114,13 @@ class ProjectMapperTest {
         ProjectVersion version = version("v2");
         ProjectVersionSummaryDTO withoutReview = ProjectMapper.toVersionSummaryDTO(version, false);
         ProjectVersionSummaryDTO withReview = ProjectMapper.toVersionSummaryDTO(version, true);
+        AdminProjectVersionSummaryDTO adminVersion = ProjectMapper.toAdminVersionSummaryDTO(version);
         ProjectDependency dependency = new ProjectDependency("modtale:core", "Core", "1.0.0", true, true);
 
         assertNull(withoutReview.reviewStatus());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, withReview.reviewStatus());
         assertEquals("Security review cleared", withReview.rejectionReason());
+        assertNotNull(adminVersion.scanResult());
         assertEquals("modtale:core", ProjectMapper.toDependencyDTO(dependency).projectId());
         assertTrue(ProjectMapper.toDependencyDTO(dependency).isOptional());
         assertTrue(ProjectMapper.toDependencyDTO(dependency).isEmbedded());

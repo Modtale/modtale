@@ -1,6 +1,7 @@
 package net.modtale.mapper;
 
 import net.modtale.model.dto.admin.AdminProjectDTO;
+import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
 import net.modtale.model.dto.project.ProjectCommentReplyDTO;
@@ -95,7 +96,7 @@ public class ProjectMapper {
                 project.getProjectRoles(),
                 project.getTeamMembers(),
                 project.getTeamInvites(),
-                toVersionSummaryDTOs(project.getVersions(), true)
+                toAdminVersionSummaryDTOs(project.getVersions())
         );
     }
 
@@ -225,8 +226,7 @@ public class ProjectMapper {
                 version.getReleaseDate(),
                 version.getChannel(),
                 includeReviewData ? version.getReviewStatus() : null,
-                includeReviewData ? version.getRejectionReason() : null,
-                includeReviewData ? version.getScanResult() : null
+                includeReviewData ? version.getRejectionReason() : null
         );
     }
 
@@ -234,6 +234,28 @@ public class ProjectMapper {
         if (versions == null) return new ArrayList<>();
         return versions.stream()
                 .map(v -> toVersionSummaryDTO(v, includeReviewData))
+                .collect(Collectors.toList());
+    }
+
+    public static AdminProjectVersionSummaryDTO toAdminVersionSummaryDTO(ProjectVersion version) {
+        if (version == null) return null;
+        return new AdminProjectVersionSummaryDTO(
+                version.getId(),
+                version.getVersionNumber(),
+                version.getGameVersions(),
+                version.getDownloadCount(),
+                version.getReleaseDate(),
+                version.getChannel(),
+                version.getReviewStatus(),
+                version.getRejectionReason(),
+                version.getScanResult()
+        );
+    }
+
+    public static List<AdminProjectVersionSummaryDTO> toAdminVersionSummaryDTOs(List<ProjectVersion> versions) {
+        if (versions == null) return new ArrayList<>();
+        return versions.stream()
+                .map(ProjectMapper::toAdminVersionSummaryDTO)
                 .collect(Collectors.toList());
     }
 
