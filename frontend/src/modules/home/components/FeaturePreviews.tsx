@@ -704,7 +704,6 @@ export const TrendingProjectsSection = ({
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         Trending
                     </h2>
-                    <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500 dark:from-orange-400 dark:to-rose-400">Popular mods gaining traction recently.</p>
                 </div>
                 <Link
                     to={`${SiteRoutes.browse()}?view=trending`}
@@ -752,7 +751,6 @@ export const NewReleasesSection = ({
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         New Releases
                     </h2>
-                    <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">Latest published mods and updates.</p>
                 </div>
                 <Link
                     to={`${SiteRoutes.browse()}?sort=newest`}
@@ -784,15 +782,15 @@ export const NewReleasesSection = ({
 export const DirectDownloadsSection = () => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-3 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-3xl sm:text-4xl 2xl:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                     Direct Downloads
                 </h2>
-                <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-400 dark:to-pink-400">
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-400 dark:to-pink-400">
                     Versioned builds & changelogs.
                 </p>
-                <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
-                    Review compatible game patches, release notes, and experimental build tags directly before installation to guarantee system stability.
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                    Finding the right file shouldn't be a puzzle. Modtale makes it easy to find projects for your game version and review changelogs before you hit download.
                 </p>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
@@ -806,15 +804,15 @@ export const DirectDownloadsSection = () => {
 export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Project }) => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-3 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-3xl sm:text-4xl 2xl:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                     Smart Dependencies
                 </h2>
-                <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
                     Automated library resolution.
                 </p>
-                <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
-                    Say goodbye to startup crashes and missing library files. Modtale automatically verifies, selects, and bundles necessary core components for your mods.
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                    Forget hunting down core libraries or confusing projectpacks. Modtale allows you to seamlessly download all required projects in one swift action.
                 </p>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
@@ -828,14 +826,14 @@ export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Pr
 export const ProjectAnalyticsSection = () => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-3 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-3xl sm:text-4xl 2xl:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                     Project Analytics
                 </h2>
-                <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
                     Track growth, downloads, and views over time.
                 </p>
-                <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
                     Keep tabs on how your Hytale uploads perform in real-time. Review clean graphs, growth percentages, and historical metrics in your developer hub.
                 </p>
             </div>
@@ -850,14 +848,14 @@ export const ProjectAnalyticsSection = () => {
 export const CommunityThreadsSection = ({ project, currentUser }: { project?: Project; currentUser?: User | null }) => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-3 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-3xl sm:text-4xl 2xl:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                     Comment Threads
                 </h2>
-                <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500 dark:from-violet-400 dark:to-purple-400">
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500 dark:from-violet-400 dark:to-purple-400">
                     Engage and share feedback.
                 </p>
-                <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
                     Provide direct feedback, report immediate bugs, or collaborate with the creator team through nested, upvotable community comment sections.
                 </p>
             </div>
@@ -872,14 +870,14 @@ export const CommunityThreadsSection = ({ project, currentUser }: { project?: Pr
 export const RealTimeAlertsSection = () => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-3 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-3xl sm:text-4xl 2xl:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                     Push Notifications
                 </h2>
-                <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400">
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400">
                     Real-time updates on activity.
                 </p>
-                <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
                     Never miss a crucial patch or follow-up reply. Real-time platform notifications let you track your favorite projects and active discussions instantly.
                 </p>
             </div>
@@ -894,15 +892,15 @@ export const RealTimeAlertsSection = () => {
 export const AccountPreferencesSection = () => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-3 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-3xl sm:text-4xl 2xl:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                     Notification Control
                 </h2>
-                <p className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500">
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500">
                     Tailored settings for alerts.
                 </p>
-                <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
-                    Adjust toggles to choose exactly which events trigger browser notifications, e-mail updates, or inline activity log alerts.
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                    Adjust toggles to choose exactly which events trigger notifications.
                 </p>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
