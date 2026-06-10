@@ -58,6 +58,7 @@ export const Home: React.FC = () => {
     const heroTextColumnRef = useRef<HTMLDivElement>(null);
     const heroMarqueeDesktopRef = useRef<HTMLDivElement>(null);
     const heroActionsRef = useRef<HTMLElement>(null);
+    const desktopHeroRetryGridWidthRef = useRef<number | null>(null);
 
     const formatMetric = (value?: number) => (value || 0).toLocaleString();
 
@@ -137,15 +138,28 @@ export const Home: React.FC = () => {
 
     useEffect(() => {
         let frameId = 0;
+        const DESKTOP_HERO_RETRY_BUFFER = 24;
 
         const shouldUseDesktopLayout = (currentDesktopLayout: boolean) => {
             const viewportWidth = window.innerWidth;
-            if (viewportWidth < DESKTOP_BREAKPOINT) return false;
+            if (viewportWidth < DESKTOP_BREAKPOINT) {
+                desktopHeroRetryGridWidthRef.current = null;
+                return false;
+            }
 
             const gridEl = heroGridRef.current;
             const gridWidth = gridEl?.clientWidth ?? viewportWidth;
             const widthThreshold = currentDesktopLayout ? DESKTOP_HERO_MIN_WIDTH_EXIT : DESKTOP_HERO_MIN_WIDTH_ENTER;
             if (gridWidth < widthThreshold) return false;
+
+            const blockedRetryGridWidth = desktopHeroRetryGridWidthRef.current;
+            if (
+                !currentDesktopLayout
+                && blockedRetryGridWidth !== null
+                && gridWidth <= blockedRetryGridWidth + DESKTOP_HERO_RETRY_BUFFER
+            ) {
+                return false;
+            }
 
             const actionsEl = heroActionsRef.current;
             const textEl = heroTextColumnRef.current;
@@ -176,7 +190,15 @@ export const Home: React.FC = () => {
                 hasHeroOverlap = hasCollision || horizontalGap < 32;
             }
 
-            return !hasWrappedButtons && !hasTextOverflow && !hasHeroOverlap;
+            const nextDesktopLayout = !hasWrappedButtons && !hasTextOverflow && !hasHeroOverlap;
+
+            if (nextDesktopLayout) {
+                desktopHeroRetryGridWidthRef.current = null;
+            } else if (currentDesktopLayout) {
+                desktopHeroRetryGridWidthRef.current = gridWidth;
+            }
+
+            return nextDesktopLayout;
         };
 
         const recomputeLayout = () => {
