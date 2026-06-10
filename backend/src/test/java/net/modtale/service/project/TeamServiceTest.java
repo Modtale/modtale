@@ -1,6 +1,7 @@
 package net.modtale.service.project;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 
@@ -122,7 +124,7 @@ class TeamServiceTest {
         service.removeContributor("project-1", "user-2", requester);
 
         assertTrue(project.getTeamMembers().isEmpty());
-        verify(apiKeyService).syncUserProjectPermissions(eq("user-2"), eq("project-1"), argThat(List::isEmpty));
+        verify(apiKeyService).syncUserProjectPermissions(eq("user-2"), eq("project-1"), argThat(Set::isEmpty));
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
     }
@@ -147,7 +149,7 @@ class TeamServiceTest {
         assertEquals("user-2", project.getAuthorId());
         assertNull(project.getPendingTransferTo());
         assertTrue(project.getTeamMembers().isEmpty());
-        verify(apiKeyService).syncUserProjectPermissions(eq("owner-1"), eq("project-1"), argThat(List::isEmpty));
+        verify(apiKeyService).syncUserProjectPermissions(eq("owner-1"), eq("project-1"), argThat(Set::isEmpty));
         verify(notificationService).sendNotifcation(
                 eq(List.of("owner-1")),
                 eq("Transfer Accepted"),

@@ -17,19 +17,27 @@ import { api, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Spinner } from '@/components/ui/Spinner';
 import type { User, Project } from '@/types';
-import { PermissionSelector, ALL_PERMISSION_GROUPS, getPermissionLabel, TOTAL_PERMISSIONS } from '@/components/ui/PermissionSelector';
+import { PermissionSelector } from '@/components/ui/PermissionSelector';
+import { ALL_PERMISSION_GROUPS, getPermissionLabel, Permission, TOTAL_PERMISSIONS } from '@/modules/permissions/permissions';
 
 interface ApiKey {
     id: string;
     name: string;
     prefix: string;
     tier: 'USER' | 'ENTERPRISE';
-    contextPermissions: Record<string, string[]>;
+    contextPermissions: Record<string, Permission[]>;
     createdAt: string;
     lastUsed: string | null;
 }
 
-const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ', 'NOTIFICATION_READ'];
+const DEFAULT_PERMISSIONS = [
+    Permission.PROJECT_READ,
+    Permission.VERSION_READ,
+    Permission.VERSION_DOWNLOAD,
+    Permission.PROFILE_READ,
+    Permission.ORG_READ,
+    Permission.NOTIFICATION_READ
+];
 
 interface DeveloperSettingsProps {
     user: User;
@@ -44,7 +52,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
     const [newKey, setNewKey] = useState<string | null>(null);
     const [keyName, setKeyName] = useState('');
 
-    const [contextPerms, setContextPerms] = useState<Record<string, string[]>>({ PERSONAL: DEFAULT_PERMISSIONS });
+    const [contextPerms, setContextPerms] = useState<Record<string, Permission[]>>({ PERSONAL: DEFAULT_PERMISSIONS });
     const [activeTab, setActiveTab] = useState<string>('PERSONAL');
 
     const [isCreating, setIsCreating] = useState(false);
@@ -103,7 +111,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const cleanContexts: Record<string, string[]> = {};
+        const cleanContexts: Record<string, Permission[]> = {};
         let hasAnyPerms = false;
 
         Object.entries(contextPerms).forEach(([ctx, perms]) => {

@@ -12,6 +12,7 @@ import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
+import net.modtale.model.user.ApiKey;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -72,7 +73,7 @@ class ProjectMapperTest {
         project.setChildProjectIds(List.of("child-1"));
         project.setModIds(List.of("mod-1"));
         project.setGalleryImages(List.of("https://example.com/one.png"));
-        project.setProjectRoles(List.of(new Project.ProjectRole("role-1", "Editor", "#fff", List.of("PROJECT_EDIT_METADATA"))));
+        project.setProjectRoles(List.of(new Project.ProjectRole("role-1", "Editor", "#fff", Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA))));
         project.setTeamMembers(List.of(new Project.ProjectMember("user-1", "role-1")));
         project.setTeamInvites(List.of(new Project.ProjectMember("user-2", "role-1")));
         project.setComments(List.of(comment()));

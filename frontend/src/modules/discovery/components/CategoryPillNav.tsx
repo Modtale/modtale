@@ -72,7 +72,7 @@ export const CategoryPillNav: React.FC<{ selectedClassification: Classification 
             <div className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-50/80 via-slate-50/80 to-transparent dark:from-[#0B1120]/80 dark:via-[#0B1120]/80 pointer-events-none z-30 transition-opacity duration-300 ${showLeftFade ? 'opacity-100' : 'opacity-0'}`} />
             <div className={`absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-50/80 via-slate-50/80 to-transparent dark:from-[#0B1120]/80 dark:via-[#0B1120]/80 pointer-events-none z-30 transition-opacity duration-300 ${showRightFade ? 'opacity-100' : 'opacity-0'}`} />
 
-            <div ref={navContainerRef} className="relative inline-flex h-11 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-white/10 max-w-full overflow-x-auto snap-x z-10 shadow-sm">
+            <div ref={navContainerRef} className="pill-nav-scrollbar-hidden relative inline-flex h-11 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-white/10 max-w-full overflow-x-auto snap-x z-10 shadow-sm">
                 <div className="absolute top-1 bottom-1 bg-modtale-accent shadow-md rounded-xl transition-all duration-300 ease-out z-0" style={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.opacity }} />
 
                 <div className="flex relative z-10 h-full w-max">

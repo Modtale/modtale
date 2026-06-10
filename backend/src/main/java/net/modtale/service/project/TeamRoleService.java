@@ -2,13 +2,14 @@ package net.modtale.service.project;
 
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.Project;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.auth.ApiKeyService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -31,7 +32,7 @@ public class TeamRoleService {
         this.apiKeyService = apiKeyService;
     }
 
-    public Project createProjectRole(String id, String name, String color, List<String> perms, User requester) {
+    public Project createProjectRole(String id, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_MEMBER_EDIT_ROLE",
                 "You do not have permission to manage project roles.");
         if (project.getProjectRoles() == null) {
@@ -46,7 +47,7 @@ public class TeamRoleService {
         return project;
     }
 
-    public Project updateProjectRole(String id, String roleId, String name, String color, List<String> perms, User requester) {
+    public Project updateProjectRole(String id, String roleId, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_MEMBER_EDIT_ROLE",
                 "You do not have permission to manage project roles.");
 

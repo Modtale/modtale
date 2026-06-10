@@ -82,8 +82,8 @@ public class ApiKeyIssuanceService {
         return plainKey;
     }
 
-    public void syncUserProjectPermissions(String userId, String projectId, List<String> allowedPermsList) {
-        requestedContextAuthorizationService.syncUserProjectPermissions(userId, projectId, allowedPermsList);
+    public void syncUserProjectPermissions(String userId, String projectId, Set<ApiKey.ApiPermission> allowedPerms) {
+        requestedContextAuthorizationService.syncUserProjectPermissions(userId, projectId, allowedPerms);
     }
 
     public void pruneInvalidContexts(ApiKey apiKey) {

@@ -60,7 +60,7 @@ public class OrganizationController {
     }
 
     @GetMapping("/orgs/{orgId}/members")
-    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_READ', authentication)")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('ORG_READ', authentication)")
     public ResponseEntity<List<UserSummaryDTO>> getOrgMembers(@PathVariable String orgId) {
         return ResponseEntity.ok(organizationApplicationService.getOrganizationMembers(orgId));
     }

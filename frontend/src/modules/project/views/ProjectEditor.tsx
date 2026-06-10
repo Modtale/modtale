@@ -29,12 +29,13 @@ const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { PermissionSelector, PROJECT_PERMISSION_GROUPS } from '@/components/ui/PermissionSelector';
+import { PermissionSelector } from '@/components/ui/PermissionSelector';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { ThemedInput } from '../components/FormShared';
 import { VersionFields } from '../components/VersionFields';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
 import type { ProjectRole } from '@/types';
+import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
 
 interface ProjectEditorViewProps {
     currentUser: User | null;
@@ -153,10 +154,10 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
     const readOnly = projectData.status === 'PENDING' || projectData.status === 'ARCHIVED';
     const isModpack = projectData.classification === 'MODPACK';
-    const hasProjectPermission = (perm: string) => true;
-    const canInvite = !readOnly && hasProjectPermission('PROJECT_TEAM_INVITE');
-    const canManageRoles = !readOnly && hasProjectPermission('PROJECT_MEMBER_EDIT_ROLE');
-    const canRemove = !readOnly && hasProjectPermission('PROJECT_TEAM_REMOVE');
+    const hasProjectPermission = (_perm: Permission) => true;
+    const canInvite = !readOnly && hasProjectPermission(Permission.PROJECT_TEAM_INVITE);
+    const canManageRoles = !readOnly && hasProjectPermission(Permission.PROJECT_MEMBER_EDIT_ROLE);
+    const canRemove = !readOnly && hasProjectPermission(Permission.PROJECT_TEAM_REMOVE);
     const toggleTag = (tag: string) => {
         if (readOnly) return;
         markDirty();
@@ -822,7 +823,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                     {LICENSES.map(lic => (
                                         <button
                                             key={lic.id}
-                                            disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                            disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                             onClick={() => { markDirty(); setMetaData({ ...metaData, license: lic.id }); }}
                                             className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${metaData.license === lic.id ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                         >
@@ -831,7 +832,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                         </button>
                                     ))}
                                     <button
-                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                         onClick={() => { markDirty(); if (!metaData.license || LICENSES.some(l => l.id === metaData.license)) setMetaData({ ...metaData, license: '' }); }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between border-t ${theme.colors.border} mt-1 pt-2 ${isCustomLicense ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                     >
@@ -844,14 +845,14 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                                 value={metaData.license || ''}
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, license: e.target.value }); }}
                                                 placeholder="License Name"
-                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                                 className={`w-full ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs`}
                                             />
                                             <input
                                                 value={metaData.links.LICENSE || ''}
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, links: { ...metaData.links, LICENSE: e.target.value } }); }}
                                                 placeholder="License URL"
-                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                                 className={`w-full ${theme.colors.bgSurfaceAlt} border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : theme.colors.border}`}
                                             />
                                             {!metaData.links.LICENSE && (
@@ -866,7 +867,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <div className="flex flex-wrap gap-2">
                                 {GLOBAL_TAGS.map(tag => (
                                     <button
-                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                         key={tag}
                                         onClick={() => toggleTag(tag)}
                                         className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${metaData.tags.includes(tag) ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10'}`}
@@ -881,7 +882,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 {['WEBSITE', 'WIKI', 'ISSUE_TRACKER', 'DISCORD'].map(k => (
                                     <ThemedInput
                                         key={k}
-                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                         label={k.replace('_', ' ')}
                                         value={metaData.links[k] || ''}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,3 +1,5 @@
+import type { Permission } from '@/modules/permissions/permissions';
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;
@@ -10,7 +12,7 @@ export interface OrganizationRole {
     id: string;
     name: string;
     color: string;
-    permissions: string[];
+    permissions: Permission[];
     isOwner?: boolean;
 }
 
@@ -206,7 +208,7 @@ export interface ProjectRole {
     id: string;
     name: string;
     color: string;
-    permissions: string[];
+    permissions: Permission[];
 }
 
 export interface ProjectMember {

@@ -8,6 +8,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanStatus;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
@@ -16,6 +17,7 @@ import net.modtale.service.security.SanitizationService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -110,14 +112,21 @@ public class ProjectDraftWorkflowService {
                 UUID.randomUUID().toString(),
                 "Admin",
                 "#fbbf24",
-                List.of("PROJECT_EDIT_METADATA", "VERSION_CREATE", "VERSION_EDIT", "VERSION_DELETE",
-                        "PROJECT_TEAM_INVITE", "PROJECT_TEAM_REMOVE", "PROJECT_MEMBER_EDIT_ROLE")
+                EnumSet.of(
+                        ApiKey.ApiPermission.PROJECT_EDIT_METADATA,
+                        ApiKey.ApiPermission.VERSION_CREATE,
+                        ApiKey.ApiPermission.VERSION_EDIT,
+                        ApiKey.ApiPermission.VERSION_DELETE,
+                        ApiKey.ApiPermission.PROJECT_TEAM_INVITE,
+                        ApiKey.ApiPermission.PROJECT_TEAM_REMOVE,
+                        ApiKey.ApiPermission.PROJECT_MEMBER_EDIT_ROLE
+                )
         );
         Project.ProjectRole devRole = new Project.ProjectRole(
                 UUID.randomUUID().toString(),
                 "Developer",
                 "#3b82f6",
-                List.of("VERSION_CREATE")
+                EnumSet.of(ApiKey.ApiPermission.VERSION_CREATE)
         );
         project.setProjectRoles(new ArrayList<>(List.of(adminRole, devRole)));
         project.setTeamMembers(new ArrayList<>());

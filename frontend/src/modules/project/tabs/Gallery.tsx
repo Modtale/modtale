@@ -4,11 +4,12 @@ import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Project } from '@/types';
+import { Permission } from '@/modules/permissions/permissions';
 
 interface GalleryProps {
     projectData: Project | null;
     readOnly: boolean;
-    hasProjectPermission: (perm: string) => boolean;
+    hasProjectPermission: (perm: Permission) => boolean;
     handleGalleryDelete: (url: string) => Promise<void>;
     handleGallerySelect: (file: File) => void;
     isLoading: boolean;
@@ -55,7 +56,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                             fetchPriority={idx === 0 ? 'high' : 'auto'}
                             decoding="async"
                         />
-                        {!readOnly && hasProjectPermission('PROJECT_GALLERY_REMOVE') && (
+                        {!readOnly && hasProjectPermission(Permission.PROJECT_GALLERY_REMOVE) && (
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <button type="button" onClick={() => handleGalleryDelete(projectData?.galleryImages?.[idx] || img)} disabled={isLoading} className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transform scale-90 group-hover:scale-100 transition-transform"><Trash2 className="w-5 h-5" /></button>
                             </div>
@@ -63,7 +64,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                     </div>
                 ))}
 
-                {!readOnly && hasProjectPermission('PROJECT_GALLERY_ADD') && (
+                {!readOnly && hasProjectPermission(Permission.PROJECT_GALLERY_ADD) && (
                     <div
                         onClick={() => fileInputRef.current?.click()}
                         className={`aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${theme.colors.border} ${theme.colors.bgSurfaceAlt} hover:border-modtale-accent hover:${theme.colors.bgSurfaceHover}`}

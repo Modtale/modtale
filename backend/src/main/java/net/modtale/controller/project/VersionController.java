@@ -47,13 +47,19 @@ public class VersionController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/dependencies")
-    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_READ', authentication)")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<VersionDependenciesView> getDependencies(
             @PathVariable String id,
             @PathVariable String version,
-            @RequestParam(value = "gameVersion", required = false) String gameVersion
+            @RequestParam(value = "gameVersion", required = false) String gameVersion,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(versionApplicationService.getDependencies(id, version, gameVersion));
+        return ResponseEntity.ok(versionApplicationService.getDependencies(
+                id,
+                version,
+                gameVersion,
+                accountService.getCurrentUser(authentication)
+        ));
     }
 
     @PostMapping("/projects/{id}/versions")
@@ -105,12 +111,19 @@ public class VersionController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-url")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<DownloadUrlResponse> getDownloadUrl(
             @PathVariable String id,
             @PathVariable String version,
-            @RequestParam(value = "gameVersion", required = false) String gameVersion
+            @RequestParam(value = "gameVersion", required = false) String gameVersion,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(versionApplicationService.createDownloadUrl(id, version, gameVersion));
+        return ResponseEntity.ok(versionApplicationService.createDownloadUrl(
+                id,
+                version,
+                gameVersion,
+                accountService.getCurrentUser(authentication)
+        ));
     }
 
     @GetMapping("/download/{token}")
@@ -131,13 +144,21 @@ public class VersionController {
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-bundle-url")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<BundleDownloadUrlResponse> getDownloadBundleUrl(
             @PathVariable String id,
             @PathVariable String version,
             @RequestParam(value = "gameVersion", required = false) String gameVersion,
-            @RequestParam(value = "deps", required = false) List<String> deps
+            @RequestParam(value = "deps", required = false) List<String> deps,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(versionApplicationService.createBundleDownloadUrl(id, version, gameVersion, deps));
+        return ResponseEntity.ok(versionApplicationService.createBundleDownloadUrl(
+                id,
+                version,
+                gameVersion,
+                deps,
+                accountService.getCurrentUser(authentication)
+        ));
     }
 
     @GetMapping("/download-bundle/{token}")

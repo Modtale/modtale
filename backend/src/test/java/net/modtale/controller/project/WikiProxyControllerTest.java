@@ -2,6 +2,7 @@ package net.modtale.controller.project;
 
 import tools.jackson.databind.ObjectMapper;
 import net.modtale.exception.UpstreamServiceException;
+import net.modtale.service.user.AccountService;
 import net.modtale.service.project.WikiService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,11 +20,13 @@ class WikiProxyControllerTest {
 
     private WikiProxyController controller;
     private WikiService wikiService;
+    private AccountService accountService;
 
     @BeforeEach
     void setUp() {
         wikiService = mock(WikiService.class);
-        controller = new WikiProxyController(wikiService);
+        accountService = mock(AccountService.class);
+        controller = new WikiProxyController(wikiService, accountService);
     }
 
     @Test
@@ -32,13 +35,13 @@ class WikiProxyControllerTest {
         request.setRequestURI("/api/v1/wiki/project-1/guides/getting-started");
         var payload = new ObjectMapper().readTree("{\"title\":\"Getting Started\"}");
 
-        when(wikiService.getWikiPage("project-1", "guides/getting-started")).thenReturn(payload);
+        when(wikiService.getWikiPage("project-1", "guides/getting-started", null)).thenReturn(payload);
 
-        var response = controller.getWikiPage("project-1", request);
+        var response = controller.getWikiPage("project-1", request, null);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("Getting Started", response.getBody().get("title").asText());
-        verify(wikiService).getWikiPage("project-1", "guides/getting-started");
+        verify(wikiService).getWikiPage("project-1", "guides/getting-started", null);
     }
 
     @Test
@@ -46,7 +49,7 @@ class WikiProxyControllerTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/not-wiki/project-1/page");
 
-        assertThrows(IllegalArgumentException.class, () -> controller.getWikiPage("project-1", request));
+        assertThrows(IllegalArgumentException.class, () -> controller.getWikiPage("project-1", request, null));
     }
 
     @Test

@@ -2,7 +2,6 @@ package net.modtale.service.project;
 
 import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
@@ -55,8 +54,7 @@ public class ProjectViewService {
         if (project == null || project.getDeletedAt() != null) return null;
 
         boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
-        boolean canReadHiddenProject = accessControlService.hasProjectPermission(project, viewer, "PROJECT_READ");
-        if (!privileged && !isPubliclyVisible(project) && !canReadHiddenProject) {
+        if (!privileged && !accessControlService.canReadProject(project, viewer)) {
             return null;
         }
 
@@ -65,7 +63,7 @@ public class ProjectViewService {
 
     public Project getPublicProjectById(String id) {
         Project project = getRawProjectById(id);
-        if (project == null || project.getDeletedAt() != null || !isPubliclyVisible(project)) return null;
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         return prepareProjectForViewer(project, false);
     }
 
@@ -95,14 +93,6 @@ public class ProjectViewService {
         populateRelatedUsers(project);
 
         return project;
-    }
-
-    private boolean isPubliclyVisible(Project project) {
-        return project != null && (
-                project.getStatus() == ProjectStatus.PUBLISHED
-                        || project.getStatus() == ProjectStatus.UNLISTED
-                        || project.getStatus() == ProjectStatus.ARCHIVED
-        );
     }
 
     private void populateRelatedUsers(Project project) {

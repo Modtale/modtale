@@ -16,6 +16,7 @@ import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { BlueskyBrandIcon, GitHubBrandIcon, GitLabBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
 
@@ -48,9 +49,9 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const bannerInputRef = useRef<HTMLInputElement>(null);
 
-    const canEditProfile = hasOrgPermission(org, currentUser.id, 'ORG_EDIT_METADATA');
-    const canManageConnections = hasOrgPermission(org, currentUser.id, 'ORG_CONNECTION_MANAGE');
-    const canDelete = hasOrgPermission(org, currentUser.id, 'ORG_DELETE');
+    const canEditProfile = hasOrgPermission(org, currentUser.id, Permission.ORG_EDIT_METADATA);
+    const canManageConnections = hasOrgPermission(org, currentUser.id, Permission.ORG_CONNECTION_MANAGE);
+    const canDelete = hasOrgPermission(org, currentUser.id, Permission.ORG_DELETE);
 
     if (!canEditProfile) {
         return <div className={`text-center py-10 ${theme.colors.textMuted}`}>You do not have permission to edit this organization's settings.</div>;

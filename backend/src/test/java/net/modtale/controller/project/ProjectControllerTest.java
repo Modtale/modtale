@@ -219,6 +219,7 @@ class ProjectControllerTest {
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(null);
         when(projectService.getProjectById("project-1", null)).thenReturn(project);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
 
         var response = controller.getProject("project-1", null);
 

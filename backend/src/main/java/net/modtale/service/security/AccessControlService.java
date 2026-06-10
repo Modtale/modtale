@@ -52,7 +52,7 @@ public class AccessControlService {
     }
 
     public boolean hasAnyPerm(String perm, Authentication authentication) {
-        if ("PROJECT_READ".equals(perm)) return true;
+        if (isPublicReadPermission(perm)) return true;
         return accountService.getCurrentUser(authentication) != null;
     }
 
@@ -93,12 +93,8 @@ public class AccessControlService {
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project == null) return true;
 
-        if ("PROJECT_READ".equals(permStr)) {
-            if (project.getStatus() == ProjectStatus.PUBLISHED ||
-                    project.getStatus() == ProjectStatus.UNLISTED ||
-                    project.getStatus() == ProjectStatus.ARCHIVED) {
-                return true;
-            }
+        if (isProjectReadPermission(permStr) && isPubliclyReadable(project)) {
+            return true;
         }
 
         User user = accountService.getCurrentUser(authentication);
@@ -106,6 +102,22 @@ public class AccessControlService {
         if (isAdmin(user)) return true;
 
         return hasProjectPermission(project, user, permStr);
+    }
+
+    public boolean canReadProject(Project project, User user) {
+        if (project == null) return false;
+        if (isPubliclyReadable(project)) return true;
+        if (user == null) return false;
+        if (isAdmin(user)) return true;
+        return hasProjectPermission(project, user, "PROJECT_READ");
+    }
+
+    public boolean isPubliclyReadable(Project project) {
+        return project != null && (
+                project.getStatus() == ProjectStatus.PUBLISHED
+                        || project.getStatus() == ProjectStatus.UNLISTED
+                        || project.getStatus() == ProjectStatus.ARCHIVED
+        );
     }
 
     public boolean hasOrgPermission(User org, String userId, ApiKey.ApiPermission perm) {
@@ -126,15 +138,13 @@ public class AccessControlService {
     }
 
     public boolean hasProjectPermission(Project project, User user, String permStr) {
+        ApiKey.ApiPermission perm = parsePermission(permStr);
+        return perm != null && hasProjectPermission(project, user, perm);
+    }
+
+    public boolean hasProjectPermission(Project project, User user, ApiKey.ApiPermission perm) {
         if (project == null || user == null) return false;
         if (project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) return true;
-
-        ApiKey.ApiPermission perm;
-        try {
-            perm = ApiKey.ApiPermission.valueOf(permStr);
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
 
         User authorUser = userRepository.findById(project.getAuthorId())
                 .filter(author -> !author.isDeleted())
@@ -152,7 +162,7 @@ public class AccessControlService {
                 Project.ProjectRole role = project.getProjectRoles().stream()
                         .filter(r -> r.getId().equals(member.getRoleId())).findFirst().orElse(null);
 
-                if (role != null && role.getPermissions() != null && role.getPermissions().contains(permStr)) {
+                if (role != null && role.getPermissions() != null && role.getPermissions().contains(perm)) {
                     return true;
                 }
             }
@@ -161,7 +171,7 @@ public class AccessControlService {
     }
 
     public boolean hasEditPermission(Project project, User user) {
-        return isOwner(project, user) || hasProjectPermission(project, user, "PROJECT_EDIT_METADATA");
+        return isOwner(project, user) || hasProjectPermission(project, user, ApiKey.ApiPermission.PROJECT_EDIT_METADATA);
     }
 
     public boolean isOwner(Project project, User user) {
@@ -207,5 +217,23 @@ public class AccessControlService {
         }
 
         return "ADMIN".equalsIgnoreCase(member.getRole());
+    }
+
+    private boolean isProjectReadPermission(String permStr) {
+        return "PROJECT_READ".equals(permStr) || "VERSION_READ".equals(permStr);
+    }
+
+    private boolean isPublicReadPermission(String permStr) {
+        return "PROJECT_READ".equals(permStr)
+                || "PROFILE_READ".equals(permStr)
+                || "ORG_READ".equals(permStr);
+    }
+
+    private ApiKey.ApiPermission parsePermission(String permStr) {
+        try {
+            return ApiKey.ApiPermission.valueOf(permStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

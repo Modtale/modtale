@@ -5,13 +5,14 @@ import { Spinner } from '../../../components/ui/Spinner';
 import { theme } from '../../../styles/theme';
 import type { Project, ProjectVersion } from '@/types';
 import type { VersionFormData } from '../components/FormShared';
+import { Permission } from '@/modules/permissions/permissions';
 
 interface FilesProps {
     projectData: Project | null;
     versionData: VersionFormData;
     setVersionData: React.Dispatch<React.SetStateAction<VersionFormData>>;
     readOnly: boolean;
-    hasProjectPermission: (perm: string) => boolean;
+    hasProjectPermission: (perm: Permission) => boolean;
     classification: string;
     handleUploadVersion: () => void;
     handleEditVersion: (version: ProjectVersion) => void;
@@ -24,7 +25,7 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
 
     return (
         <div className="space-y-8">
-            {!readOnly && hasProjectPermission('VERSION_CREATE') && !hasUploadedDraftVersion && (
+            {!readOnly && hasProjectPermission(Permission.VERSION_CREATE) && !hasUploadedDraftVersion && (
                 <div className={`${theme.colors.bgSurface} p-6 rounded-2xl border ${theme.colors.border}`}>
                     <VersionFields data={versionData} onChange={setVersionData} isModpack={classification === 'MODPACK'} projectType={typeof classification === 'string' ? classification : 'PLUGIN'} currentProjectId={projectData?.id} disabled={readOnly} />
                     <div className="mt-6 flex justify-end">
@@ -49,10 +50,10 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
                     </div>
                     {!readOnly && (
                         <div className="flex items-center gap-2">
-                            {hasProjectPermission('VERSION_EDIT') && (
+                            {hasProjectPermission(Permission.VERSION_EDIT) && (
                                 <button type="button" onClick={() => handleEditVersion(v)} className={`p-2 ${theme.colors.textMuted} hover:${theme.colors.accent} hover:${theme.colors.accentAlpha} rounded-lg transition-colors`} title="Edit Version Metadata"><Edit2 className="w-4 h-4" /></button>
                             )}
-                            {handleDeleteVersion && hasProjectPermission('VERSION_DELETE') && (
+                            {handleDeleteVersion && hasProjectPermission(Permission.VERSION_DELETE) && (
                                 <button type="button" onClick={() => handleDeleteVersion(v.id)} className={`p-2 ${theme.colors.textMuted} hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg} rounded-lg transition-colors`}><Trash2 className="w-4 h-4" /></button>
                             )}
                         </div>

@@ -73,7 +73,7 @@ class AnalyticsControllerTest {
         when(projectService.getProjectById("project-1", null)).thenReturn(project);
         when(queryService.getProjectAnalytics("project-1", "anon", "7d")).thenReturn(detail);
 
-        var response = controller.getProjectAnalytics("project-1", "7d");
+        var response = controller.getProjectAnalytics("project-1", "7d", null);
 
         assertEquals(200, response.getStatusCode().value());
         assertSame(detail, response.getBody());

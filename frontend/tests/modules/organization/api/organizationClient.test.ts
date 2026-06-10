@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/utils/api';
 import { hasOrgPermission, organizationClient } from '@/modules/organization/api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 
 vi.mock('@/utils/api', () => ({
     api: {
@@ -58,9 +59,9 @@ describe('organizationClient', () => {
             ]
         } as any;
 
-        expect(hasOrgPermission(org, 'owner', 'ANYTHING')).toBe(true);
-        expect(hasOrgPermission(org, 'builder', 'PROJECT_CREATE')).toBe(true);
-        expect(hasOrgPermission(org, 'builder', 'PROJECT_DELETE')).toBe(false);
-        expect(hasOrgPermission(org, 'missing', 'PROJECT_CREATE')).toBe(false);
+        expect(hasOrgPermission(org, 'owner', Permission.PROJECT_DELETE)).toBe(true);
+        expect(hasOrgPermission(org, 'builder', Permission.PROJECT_CREATE)).toBe(true);
+        expect(hasOrgPermission(org, 'builder', Permission.PROJECT_DELETE)).toBe(false);
+        expect(hasOrgPermission(org, 'missing', Permission.PROJECT_CREATE)).toBe(false);
     });
 });

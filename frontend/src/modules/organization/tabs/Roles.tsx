@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Settings as SettingsIcon, Trash2, X, ShieldCheck, Palette } from 'lucide-react';
 import { theme } from '@/styles/theme';
-import { PermissionSelector, ALL_PERMISSION_GROUPS } from '@/components/ui/PermissionSelector';
+import { PermissionSelector } from '@/components/ui/PermissionSelector';
+import { ALL_PERMISSION_GROUPS, Permission } from '@/modules/permissions/permissions';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
 import { extractApiErrorMessage } from '@/utils/api';
@@ -20,7 +21,7 @@ export const Roles: React.FC<RolesProps> = ({ org, currentUser, onUpdateOrg, sho
     const [roleModalOpen, setRoleModalOpen] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState<OrganizationRole | null>(null);
 
-    const canManageRoles = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_EDIT_ROLE');
+    const canManageRoles = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_EDIT_ROLE);
 
     const handleSaveRole = async (e: React.FormEvent) => {
         e.preventDefault();

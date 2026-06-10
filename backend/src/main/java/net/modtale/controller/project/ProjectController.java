@@ -14,7 +14,6 @@ import net.modtale.model.dto.request.project.CreateProjectRequest;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
-import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.User;
 import net.modtale.service.project.GameVersionService;
 import net.modtale.service.project.LifecycleService;
@@ -163,7 +162,7 @@ public class ProjectController {
             project.setIsOwner(accessControlService.isOwner(project, currentUser));
         }
 
-        boolean publicProject = project.getStatus() == ProjectStatus.PUBLISHED || project.getStatus() == ProjectStatus.ARCHIVED;
+        boolean publicProject = accessControlService.isPubliclyReadable(project);
         CacheControl cacheControl = currentUser == null && publicProject
                 ? CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic()
                 : CacheControl.noCache();

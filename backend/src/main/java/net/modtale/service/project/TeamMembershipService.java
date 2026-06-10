@@ -4,6 +4,7 @@ import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.ProjectOperationForbiddenException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
@@ -12,6 +13,7 @@ import net.modtale.service.security.AccessControlService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 @Service
@@ -106,7 +108,7 @@ public class TeamMembershipService {
         if (project != null && (accessControlService.hasProjectPermission(project, requester, "PROJECT_TEAM_REMOVE") || requester.getId().equals(targetUserId))) {
             projectMutationGuard.ensureEditable(project);
             if (project.getTeamMembers() != null && project.getTeamMembers().removeIf(member -> member.getUserId().equals(targetUserId))) {
-                apiKeyService.syncUserProjectPermissions(targetUserId, id, new ArrayList<>());
+                apiKeyService.syncUserProjectPermissions(targetUserId, id, EnumSet.noneOf(ApiKey.ApiPermission.class));
             }
             saveProject(project);
             return;

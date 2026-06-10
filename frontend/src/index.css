@@ -70,6 +70,15 @@
 }
 
 @layer components {
+    .pill-nav-scrollbar-hidden {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .pill-nav-scrollbar-hidden::-webkit-scrollbar {
+        display: none;
+    }
+
     .themed-checkbox {
         appearance: none;
         width: 1.1rem;
