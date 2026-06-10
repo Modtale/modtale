@@ -30,7 +30,7 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
                     <OptimizedImage
                         src={bannerUrl}
                         alt={`${project.title} Banner`}
-                        baseWidth={400}
+                        baseWidth={320}
                         priority={priority}
                         className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
                     />
@@ -80,7 +80,7 @@ export const MarqueeColumn = ({ projects, duration }: { projects: Project[], dur
     <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0">
         <div className="flex flex-col gap-6 animate-marquee-up will-change-transform" style={{ '--marquee-duration': duration } as any}>
             {[...projects, ...projects].map((mod, index) => (
-                <FeaturedModCard key={`${mod.id}-${index}`} project={mod} priority={index < 2} />
+                <FeaturedModCard key={`${mod.id}-${index}`} project={mod} priority={index === 0} />
             ))}
         </div>
     </div>
@@ -95,7 +95,7 @@ export const MarqueeRow = ({ projects, duration, reverse = false }: { projects: 
             <div className="flex gap-4 pr-4">
                 {projects.map((mod, index) => (
                     <div key={`row1-${mod.id}-${index}`} className="w-[220px] sm:w-[280px] shrink-0">
-                        <FeaturedModCard project={mod} priority={index < 2 && !reverse} />
+                        <FeaturedModCard project={mod} priority={index === 0 && !reverse} />
                     </div>
                 ))}
             </div>

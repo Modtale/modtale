@@ -88,6 +88,38 @@ describe('Home fallback requests', () => {
         vi.useRealTimers();
     });
 
+    it('renders hero marquee content immediately when SSR projects are already available', async () => {
+        await act(async () => {
+            root.render(
+                <SSRProvider
+                    data={{
+                        homeProjects: [
+                            {
+                                id: 'project-1',
+                                title: 'Skyforge Utilities',
+                                authorId: 'user-1',
+                                author: 'Ada',
+                                imageUrl: '/images/skyforge-icon.png',
+                                bannerUrl: '/images/skyforge-banner.png',
+                                downloadCount: 1200
+                            }
+                        ],
+                        stats: { totalProjects: 2842, totalDownloads: 92841653, totalUsers: 49713 }
+                    }}
+                    initialPath="/"
+                >
+                    <HelmetProvider>
+                        <MemoryRouter initialEntries={['/']}>
+                            <Home />
+                        </MemoryRouter>
+                    </HelmetProvider>
+                </SSRProvider>
+            );
+        });
+
+        expect(container.querySelector('[data-testid="marquee-column"], [data-testid="marquee-row"]')).toBeTruthy();
+    });
+
     it('fetches trending home projects via category instead of an invalid sort value', async () => {
         mockedApi.get
             .mockResolvedValueOnce({ data: { content: [] } } as any)
