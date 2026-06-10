@@ -1,16 +1,25 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Upload, ChevronRight, Github, Code } from 'lucide-react';
+import { Search, Upload, Github, Code } from 'lucide-react';
 import '@fontsource-variable/inter';
 import { api } from '@/utils/api';
 import { ROUTE_SEO } from '@/data/seo-constants';
-import type { Project } from '@/types';
+import type { Project, User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
 
 import { MarqueeColumn, MarqueeRow } from '../components/HeroMarquee';
-import { InlineDependencyUI, InlineDownloadUI, InlineNotificationUI } from '../components/FeaturePreviews';
+import {
+    TrendingProjectsSection,
+    NewReleasesSection,
+    DirectDownloadsSection,
+    SmartDependenciesSection,
+    ProjectAnalyticsSection,
+    CommunityThreadsSection,
+    RealTimeAlertsSection,
+    AccountPreferencesSection
+} from '../components/FeaturePreviews';
 import { GLASS_CARD } from '../styles';
 
 const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHeight: string }) => {
@@ -40,7 +49,19 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
     );
 };
 
-export const Home: React.FC = () => {
+const dedupeProjects = (items: Project[]) => Array.from(new Map(items.map((project) => [project.id, project])).values());
+
+export const Home: React.FC<{
+    likedProjectIds?: string[];
+    onToggleFavorite?: (projectId: string) => void;
+    isLoggedIn?: boolean;
+    currentUser?: User | null;
+}> = ({
+    likedProjectIds = [],
+    onToggleFavorite = () => {},
+    isLoggedIn = false,
+    currentUser = null,
+}) => {
     const DESKTOP_BREAKPOINT = 1024;
     const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
     const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
@@ -48,10 +69,13 @@ export const Home: React.FC = () => {
 
     const { initialData: ssrData } = useSSRData();
     const homeSeo = ROUTE_SEO['/'];
+    const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
+    const initialNewestProjects = ssrData?.homeNewestProjects || [];
 
     const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_BREAKPOINT : true);
     const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_HERO_MIN_WIDTH_ENTER : true);
-    const [projects, setProjects] = useState<Project[]>(ssrData?.homeProjects || []);
+    const [projects, setProjects] = useState<Project[]>(initialTrendingProjects);
+    const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const heroGridRef = useRef<HTMLDivElement>(null);
     const heroTextColumnRef = useRef<HTMLDivElement>(null);
@@ -65,13 +89,22 @@ export const Home: React.FC = () => {
         const handleResize = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
         window.addEventListener('resize', handleResize, { passive: true });
 
-        const shouldFetchFallbackProjects = !ssrData?.homeProjects?.length;
+        const shouldFetchFallbackProjects = !initialTrendingProjects.length;
+        const shouldFetchFallbackNewest = !initialNewestProjects.length;
         const shouldFetchFallbackStats = !ssrData?.stats?.totalProjects;
 
         if (shouldFetchFallbackProjects) {
             api.get('/projects', { params: { size: 16, sort: 'relevance', category: 'trending' } })
                 .then(res => {
                     if (res.data?.content) setProjects(res.data.content);
+                })
+                .catch(() => {});
+        }
+
+        if (shouldFetchFallbackNewest) {
+            api.get('/projects', { params: { size: 12, sort: 'newest' } })
+                .then(res => {
+                    if (res.data?.content) setNewestProjects(res.data.content);
                 })
                 .catch(() => {});
         }
@@ -85,7 +118,7 @@ export const Home: React.FC = () => {
         return () => {
             window.removeEventListener('resize', handleResize);
         };
-    }, [DESKTOP_BREAKPOINT, ssrData?.homeProjects?.length, ssrData?.stats?.totalProjects]);
+    }, [DESKTOP_BREAKPOINT, initialNewestProjects.length, initialTrendingProjects.length, ssrData?.stats?.totalProjects]);
 
     useEffect(() => {
         let frameId = 0;
@@ -201,7 +234,25 @@ export const Home: React.FC = () => {
         [HERO_MARQUEE_PROJECT_LIMIT, validFeaturedProjects]
     );
 
-    const previewProject = validFeaturedProjects[0];
+    const combinedProjectPool = useMemo(
+        () => dedupeProjects([...projects, ...newestProjects]),
+        [newestProjects, projects]
+    );
+
+    const previewProject = combinedProjectPool.find((project) => Boolean(project.imageUrl)) || validFeaturedProjects[0];
+    const trendingSpotlightProjects = useMemo(
+        () => dedupeProjects(projects).slice(0, 6),
+        [projects]
+    );
+    const newestSpotlightProjects = useMemo(() => {
+        if (newestProjects.length > 0) {
+            return dedupeProjects(newestProjects).slice(0, 6);
+        }
+
+        return [...combinedProjectPool]
+            .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0).getTime() - new Date(a.createdAt || a.updatedAt || 0).getTime())
+            .slice(0, 6);
+    }, [combinedProjectPool, newestProjects]);
     const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
     const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
@@ -362,7 +413,7 @@ export const Home: React.FC = () => {
             </Helmet>
 
             <main className="relative z-10 contain-content">
-                <section className={`home-hero ${isDesktopHeroLayout ? 'home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh]' : ''} relative w-full min-h-[100vh] flex flex-col items-center justify-center pt-16 sm:pt-[7vh] pb-[5vh] border-b border-slate-200 dark:border-white/5 overflow-hidden`}>
+                <section className={`home-hero ${isDesktopHeroLayout ? 'home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh]' : ''} relative w-full min-h-[100vh] flex flex-col items-center justify-center pt-16 sm:pt-[7vh] pb-[5vh] overflow-hidden`}>
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none transform-gpu" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
@@ -475,107 +526,128 @@ export const Home: React.FC = () => {
                             </div>
                         )}
                     </div>
+
+                    <div className="absolute bottom-0 left-0 right-0 h-[150px] bg-gradient-to-t from-slate-100/30 dark:from-[#080d19] to-transparent pointer-events-none z-10" />
                 </section>
 
-                <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 space-y-16 sm:space-y-24 lg:space-y-32 2xl:space-y-40 py-16 sm:py-24 lg:py-32 2xl:py-40 relative z-20">
-                    <LazySection minHeight="400px">
-                        <section className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
-                            <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
-                                <span className="text-blue-600 dark:text-blue-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-blue-50 dark:bg-blue-500/10 w-fit px-3 py-1 rounded-full border border-blue-100 dark:border-blue-500/20 mx-auto lg:mx-0">Version Management</span>
-                                <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Install Hytale Mods with Confidence.</h2>
-                                <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                    Finding the right file shouldn't be a puzzle. Modtale makes it easy to find projects for your game version and review changelogs before you hit download.
-                                </p>
-                                <Link to={SiteRoutes.browse()} className="inline-flex items-center font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group text-base sm:text-lg mx-auto lg:mx-0">
-                                    Start browsing <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1.5 transition-transform" aria-hidden="true" />
-                                </Link>
-                            </div>
-                            <div className="flex-1 w-full relative mt-4 lg:mt-0 overflow-visible">
-                                <div
-                                    className="absolute inset-0 z-0 pointer-events-none transform-gpu"
-                                    aria-hidden="true"
-                                    style={{
-                                        background: 'radial-gradient(110% 90% at 22% 35%, rgba(59, 130, 246, 0.18), transparent 58%), radial-gradient(95% 85% at 78% 72%, rgba(125, 211, 252, 0.14), transparent 62%)',
-                                        filter: 'blur(56px)',
-                                        transform: 'translate3d(0, 0, 0) scale(1.22)'
-                                    }}
-                                />
-                                <div className="relative z-10 w-full max-w-lg mx-auto lg:ml-auto">
-                                    <InlineDownloadUI />
-                                </div>
-                            </div>
-                        </section>
-                    </LazySection>
+                <section className="w-full bg-slate-50 dark:bg-[#0B1120] pt-14 sm:pt-20 pb-20 sm:pb-28 relative overflow-hidden z-20">
 
-                    <LazySection minHeight="400px">
-                        <section className="flex flex-col lg:flex-row-reverse items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
-                            <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-emerald-50 dark:bg-emerald-500/10 w-fit px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-500/20 mx-auto lg:mx-0">Library Resolution</span>
-                                <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Automated Hytale Mods Dependencies.</h2>
-                                <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                    Forget hunting down core libraries or confusing modpacks. Modtale allows you to seamlessly download all required projects in one swift action.
-                                </p>
-                            </div>
-                            <div className="flex-1 w-full relative mt-4 lg:mt-0 overflow-visible">
-                                <div
-                                    className="absolute inset-0 z-0 pointer-events-none transform-gpu"
-                                    aria-hidden="true"
-                                    style={{
-                                        background: 'radial-gradient(115% 92% at 76% 34%, rgba(16, 185, 129, 0.18), transparent 56%), radial-gradient(90% 82% at 24% 76%, rgba(52, 211, 153, 0.13), transparent 60%)',
-                                        filter: 'blur(58px)',
-                                        transform: 'translate3d(0, 0, 0) scale(1.24)'
-                                    }}
-                                />
-                                <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
-                                    <InlineDependencyUI randomProject={previewProject} />
-                                </div>
-                            </div>
-                        </section>
-                    </LazySection>
+                    <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
 
-                    <LazySection minHeight="400px">
-                        <section className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16 2xl:gap-24">
-                            <div className="flex-1 space-y-5 sm:space-y-6 2xl:space-y-8 flex flex-col items-center text-center lg:items-start lg:text-left">
-                                <span className="text-amber-600 dark:text-amber-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-1 sm:mb-2 block bg-amber-50 dark:bg-amber-500/10 w-fit px-3 py-1 rounded-full border border-amber-100 dark:border-amber-500/20 mx-auto lg:mx-0">Community Hub</span>
-                                <h2 className="text-3xl sm:text-4xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Always in the loop.</h2>
-                                <p className="text-base sm:text-lg 2xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed font-medium max-w-2xl">
-                                    Modtale keeps the Hytale community connected. Receive real-time alerts when tracked projects drop new updates, or when developers reply directly to your feedback.
-                                </p>
-                            </div>
-                            <div className="flex-1 w-full relative mt-4 lg:mt-0 overflow-visible">
-                                <div
-                                    className="absolute inset-0 z-0 pointer-events-none transform-gpu"
-                                    aria-hidden="true"
-                                    style={{
-                                        background: 'radial-gradient(112% 90% at 26% 30%, rgba(251, 191, 36, 0.18), transparent 56%), radial-gradient(92% 80% at 74% 74%, rgba(245, 158, 11, 0.12), transparent 60%)',
-                                        filter: 'blur(56px)',
-                                        transform: 'translate3d(0, 0, 0) scale(1.22)'
-                                    }}
+                        <LazySection minHeight="400px">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 items-start">
+                                <TrendingProjectsSection
+                                    projects={trendingSpotlightProjects}
+                                    likedProjectIds={likedProjectIds}
+                                    onToggleFavorite={onToggleFavorite}
+                                    isLoggedIn={isLoggedIn}
                                 />
-                                <div className="relative z-10 w-full max-w-lg mx-auto lg:mr-auto">
-                                    <InlineNotificationUI />
-                                </div>
+                                <NewReleasesSection
+                                    projects={newestSpotlightProjects}
+                                    likedProjectIds={likedProjectIds}
+                                    onToggleFavorite={onToggleFavorite}
+                                    isLoggedIn={isLoggedIn}
+                                />
                             </div>
-                        </section>
-                    </LazySection>
+                        </LazySection>
+                    </div>
+                </section>
 
+                <div className="w-full bg-slate-50 dark:bg-[#080d19] relative overflow-hidden z-20">
+
+                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
+                            <LazySection minHeight="450px">
+                                <DirectDownloadsSection />
+                            </LazySection>
+                        </div>
+                    </section>
+
+                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
+                            <LazySection minHeight="450px">
+                                <SmartDependenciesSection randomProject={previewProject} />
+                            </LazySection>
+                        </div>
+                    </section>
+
+                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
+                            <LazySection minHeight="450px">
+                                <ProjectAnalyticsSection />
+                            </LazySection>
+                        </div>
+                    </section>
+
+                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
+                            <LazySection minHeight="450px">
+                                <CommunityThreadsSection project={previewProject} currentUser={currentUser} />
+                            </LazySection>
+                        </div>
+                    </section>
+
+                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
+                            <LazySection minHeight="450px">
+                                <RealTimeAlertsSection />
+                            </LazySection>
+                        </div>
+                    </section>
+
+                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
+                            <LazySection minHeight="450px">
+                                <AccountPreferencesSection />
+                            </LazySection>
+                        </div>
+                    </section>
                 </div>
 
                 <LazySection minHeight="300px">
-                    <section className="py-16 sm:py-20 lg:py-32 border-t border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/20 relative z-20">
-                        <div className="max-w-4xl mx-auto px-6 text-center">
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl sm:rounded-3xl mx-auto mb-6 sm:mb-8 flex items-center justify-center shadow-inner border border-slate-300/50 dark:border-white/5">
-                                <Code className="w-8 h-8 sm:w-10 sm:h-10 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+                    <section className="relative z-20 overflow-hidden border-t border-slate-200/60 dark:border-white/[0.04]">
+                        <div className="absolute inset-0 bg-slate-50 dark:bg-[#080d19]" />
+
+                        <div className="relative z-20 py-24 sm:py-32 lg:py-40 max-w-5xl mx-auto px-6 text-center">
+                            <div className="flex justify-center mb-10 sm:mb-12">
+                                <img
+                                    src="/assets/logo.svg"
+                                    alt="Modtale"
+                                    className="h-10 sm:h-12 w-auto object-contain drop-shadow-sm dark:hidden"
+                                    loading="lazy"
+                                />
+                                <img
+                                    src="/assets/logo_light.svg"
+                                    alt="Modtale"
+                                    className="hidden h-10 sm:h-12 w-auto object-contain drop-shadow-sm dark:block"
+                                    loading="lazy"
+                                />
                             </div>
-                            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-tight">Built by the community,<br className="sm:hidden" /> for the community.</h2>
-                            <p className="text-base sm:text-lg lg:text-xl text-slate-600 dark:text-slate-300 mb-8 sm:mb-12 font-medium max-w-3xl mx-auto leading-relaxed">
-                                Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests. Explore our source code or utilize our public API to build your own tools.
+
+                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-tighter leading-[1.05]">
+                                Built by the community,<br />
+                                <span className="text-modtale-accent">
+                                    for the community.
+                                </span>
+                            </h2>
+
+                            <p className="text-base sm:text-lg lg:text-xl text-slate-600 dark:text-slate-300 mb-10 sm:mb-14 font-medium max-w-2xl mx-auto leading-relaxed">
+                                Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests.
                             </p>
-                            <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-                                <a href="https://github.com/Modtale/Modtale" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu">
+
+                            <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5">
+                                <a
+                                    href="https://github.com/Modtale/Modtale"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center justify-center px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 transform-gpu backdrop-blur-sm"
+                                >
                                     <Github className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View Source Code
                                 </a>
-                                <Link to={SiteRoutes.apiDocs()} className="inline-flex items-center justify-center px-6 sm:px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/20 hover:-translate-y-0.5 transform-gpu">
+                                <Link
+                                    to={SiteRoutes.apiDocs()}
+                                    className="inline-flex items-center justify-center px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 transform-gpu ring-1 ring-blue-500"
+                                >
                                     <Code className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View API Docs
                                 </Link>
                             </nav>

@@ -62,7 +62,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
 
     useEffect(() => {
         setIsMounted(true);
-        const saved = localStorage.getItem('modtale_view_style');
+        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('modtale_view_style') : null;
         if (saved === 'grid' || saved === 'list' || saved === 'compact') {
             setViewStyle(saved as 'grid' | 'list' | 'compact');
         }

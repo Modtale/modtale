@@ -24,7 +24,6 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
 
     useEffect(() => {
         if (typeof window === 'undefined' || resolvedGalleryImages.length === 0) return;
-        // Warm a few upcoming images after initial paint without preloading the entire gallery.
         const warmup = resolvedGalleryImages.slice(1, 5);
         const preloaded = warmup.map((src) => {
             const image = new Image();

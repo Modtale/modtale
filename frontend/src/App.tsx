@@ -220,7 +220,12 @@ const AppContent: React.FC = () => {
                 <div className="flex-1">
                     <ErrorBoundary>
                         {isHomeRoute ? (
-                            <Home />
+                            <Home
+                                likedProjectIds={user?.likedProjectIds || []}
+                                onToggleFavorite={handleToggleFavorite}
+                                isLoggedIn={!!user}
+                                currentUser={user}
+                            />
                         ) : (
                             <Suspense fallback={<RouteLoading />}>
                                 <Routes>
