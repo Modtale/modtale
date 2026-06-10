@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import net.modtale.config.properties.AppGameVersionProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class GameVersionService {
     private volatile GameVersionCatalog cachedCatalog = new GameVersionCatalog(List.of(), List.of(), List.of(), List.of());
     private final Object refreshLock = new Object();
 
+    @Autowired
     public GameVersionService(MongoTemplate mongoTemplate, AppGameVersionProperties gameVersionProperties) {
         this(mongoTemplate, gameVersionProperties, new RestTemplate());
     }
@@ -35,7 +37,7 @@ public class GameVersionService {
         refreshCatalog();
     }
 
-    @Scheduled(fixedDelayString = "#{@appGameVersionProperties.pollMs()}")
+    @Scheduled(fixedDelayString = "${app.hytale.maven.poll-ms:3600000}")
     public void pollCatalog() {
         refreshCatalog();
     }

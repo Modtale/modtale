@@ -1,8 +1,8 @@
 package net.modtale.service.project;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
 import net.modtale.config.properties.AppWikiProperties;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.ResourceNotFoundException;
@@ -95,7 +95,7 @@ public class WikiService {
     private JsonNode readJson(String body, String failureMessage) {
         try {
             return objectMapper.readTree(body);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             logger.error("Wiki JSON parse failure: {}", e.getMessage(), e);
             throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, failureMessage, e);
         }
