@@ -691,6 +691,31 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                     </div>
                 </div>,
                 document.body)}
+            {showCardPreview && createPortal(
+                <div className={theme.components.modalOverlay} onClick={() => setShowCardPreview(false)}>
+                    <div
+                        className={`${theme.components.modalContent} w-full max-w-4xl`}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className={theme.components.modalHeader}>
+                            <div>
+                                <h3 className={`text-xl font-black ${theme.colors.textPrimary}`}>Project Card Preview</h3>
+                                <p className={`text-xs ${theme.colors.textMuted}`}>A larger look at how this card will appear in discovery.</p>
+                            </div>
+                            <button onClick={() => setShowCardPreview(false)} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-xl transition-colors`} aria-label="Close card preview">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className={`${theme.components.modalBody} !p-4 sm:!p-6`}>
+                            <div className="mx-auto w-full max-w-2xl">
+                                <div className="pointer-events-none select-none">
+                                    <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body)}
 
             <ProjectLayout
                 isEditing={true}
@@ -823,11 +848,20 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} />
                         )}
                         <SidebarSection title="Card Preview" icon={Eye}>
-                            <div className={`w-full max-w-[340px] mx-auto relative group cursor-pointer overflow-hidden rounded-2xl border ${theme.colors.border}`} onClick={() => setShowCardPreview(true)}>
+                            <button
+                                type="button"
+                                onClick={() => setShowCardPreview(true)}
+                                className={`w-full max-w-[340px] mx-auto relative group overflow-hidden rounded-2xl border ${theme.colors.border} text-left transition-all hover:shadow-lg hover:shadow-modtale-accent/10 focus:outline-none focus:ring-2 focus:ring-modtale-accent focus:ring-offset-2 dark:focus:ring-offset-slate-950`}
+                                aria-label="Expand project card preview"
+                            >
                                 <div className="pointer-events-none select-none">
                                     <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} />
                                 </div>
-                            </div>
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent px-4 py-3 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                                    <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Click to expand</span>
+                                    <ExternalLink className="w-4 h-4" />
+                                </div>
+                            </button>
                         </SidebarSection>
                         {!isModpack && (
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
