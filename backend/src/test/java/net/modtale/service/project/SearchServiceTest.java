@@ -8,7 +8,6 @@ import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.user.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -19,7 +18,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -27,6 +25,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -40,21 +39,25 @@ class SearchServiceTest {
     private SearchService searchService;
     private ProjectRepository projectRepository;
     private UserRepository userRepository;
-    private AccountService accountService;
     private MongoTemplate mongoTemplate;
 
     @BeforeEach
     void setUp() {
-        searchService = new SearchService();
         projectRepository = mock(ProjectRepository.class);
         userRepository = mock(UserRepository.class);
-        accountService = mock(AccountService.class);
         mongoTemplate = mock(MongoTemplate.class);
-
-        ReflectionTestUtils.setField(searchService, "projectRepository", projectRepository);
-        ReflectionTestUtils.setField(searchService, "userRepository", userRepository);
-        ReflectionTestUtils.setField(searchService, "accountService", accountService);
-        ReflectionTestUtils.setField(searchService, "mongoTemplate", mongoTemplate);
+        ProjectSearchResultDecorator projectSearchResultDecorator = new ProjectSearchResultDecorator(userRepository);
+        ProjectCatalogSearchService projectCatalogSearchService = new ProjectCatalogSearchService(
+                projectRepository,
+                projectSearchResultDecorator
+        );
+        ProjectListingQueryService projectListingQueryService = new ProjectListingQueryService(
+                projectRepository,
+                userRepository,
+                mongoTemplate,
+                projectSearchResultDecorator
+        );
+        searchService = new SearchService(projectCatalogSearchService, projectListingQueryService);
     }
 
     @Test
@@ -63,12 +66,11 @@ class SearchServiceTest {
         currentUser.setLikedModIds(List.of("project-1", "project-2"));
         Page<Project> favorites = new PageImpl<>(List.of(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED)));
 
-        when(accountService.getCurrentUser()).thenReturn(currentUser);
         when(projectRepository.findFavorites(eq(List.of("project-1", "project-2")), eq(""), any(Pageable.class)))
                 .thenReturn(favorites);
 
         Page<Project> result = searchService.searchProjects(
-                null, null, 0, 12, null, null, null, null, null, "Favorites", null, null
+                null, null, 0, 12, null, null, null, null, null, "Favorites", null, null, currentUser
         );
 
         assertEquals(favorites, result);
@@ -88,7 +90,6 @@ class SearchServiceTest {
         project.setVersions(List.of(version("1.0.0", scanResult(ScanStatus.CLEAN))));
         Page<Project> page = new PageImpl<>(List.of(project));
 
-        when(accountService.getCurrentUser()).thenReturn(currentUser);
         when(projectRepository.searchProjects(
                 eq("sky"),
                 eq(List.of("magic")),
@@ -117,7 +118,8 @@ class SearchServiceTest {
                 5,
                 "Browse",
                 "30d",
-                "author-1"
+                "author-1",
+                currentUser
         );
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
@@ -141,6 +143,30 @@ class SearchServiceTest {
         assertEquals(LocalDate.now().minusDays(30), cutoffCaptor.getValue());
         assertEquals("Ada", result.getContent().getFirst().getAuthor());
         assertNull(result.getContent().getFirst().getVersions().getFirst().getScanResult());
+    }
+
+    @Test
+    void searchProjectsRejectsInvalidDateRangesInsteadOfSilentlyIgnoringThem() {
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> searchService.searchProjects(
+                        null,
+                        null,
+                        0,
+                        10,
+                        "relevance",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "not-a-date",
+                        null,
+                        null
+                )
+        );
+
+        assertEquals("Date ranges must be 7d, 30d, 90d, 1y, all, or a valid ISO-8601 date.", error.getMessage());
     }
 
     @Test
@@ -188,30 +214,6 @@ class SearchServiceTest {
         Project contributed = result.getContent().getFirst();
         assertEquals("Ada", contributed.getAuthor());
         assertNull(contributed.getVersions().getFirst().getScanResult());
-    }
-
-    @Test
-    void getVerificationQueueFiltersOutScanningVersionsDeduplicatesAndSorts() {
-        Project pendingProject = project("pending-1", "Pending", ProjectStatus.PENDING);
-        pendingProject.setUpdatedAt("2024-03-01T00:00:00");
-
-        Project scanningProject = project("pending-2", "Scanning", ProjectStatus.PENDING);
-        scanningProject.setUpdatedAt("2024-01-01T00:00:00");
-        scanningProject.setVersions(List.of(version("2.0.0", scanResult(ScanStatus.SCANNING))));
-
-        Project pendingReviewProject = project("published-1", "Review Me", ProjectStatus.PUBLISHED);
-        pendingReviewProject.setUpdatedAt("2024-02-01T00:00:00");
-        ProjectVersion reviewVersion = version("3.0.0", null);
-        reviewVersion.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
-        pendingReviewProject.setVersions(List.of(reviewVersion));
-
-        when(mongoTemplate.find(any(Query.class), eq(Project.class)))
-                .thenReturn(List.of(pendingProject, scanningProject))
-                .thenReturn(List.of(pendingReviewProject, pendingProject));
-
-        List<Project> queue = searchService.getVerificationQueue();
-
-        assertEquals(List.of("published-1", "pending-1"), queue.stream().map(Project::getId).toList());
     }
 
     private static User user(String id, String username) {

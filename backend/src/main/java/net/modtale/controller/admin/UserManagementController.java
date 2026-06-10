@@ -1,252 +1,112 @@
 package net.modtale.controller.admin;
 
-import net.modtale.exception.ErrorMessageUtils;
-import net.modtale.mapper.AdminMapper;
-import net.modtale.mapper.UserMapper;
-import net.modtale.model.admin.AdminLog;
+import jakarta.validation.Valid;
 import net.modtale.model.dto.admin.BannedEmailDTO;
 import net.modtale.model.dto.request.admin.BanEmailRequest;
-import net.modtale.model.user.ApiKey;
+import net.modtale.model.dto.response.admin.UserTierUpdateResponse;
+import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.user.User;
-import net.modtale.repository.admin.AdminLogRepository;
-import net.modtale.repository.user.UserRepository;
 import net.modtale.service.admin.UserManagementService;
-import net.modtale.service.communication.EmailService;
-import net.modtale.service.security.AccessControlService;
 import net.modtale.service.user.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/admin")
 public class UserManagementController {
 
-    @Autowired private AccountService accountService;
-    @Autowired private UserManagementService userManagementService;
-    @Autowired private UserRepository userRepository;
-    @Autowired private AdminLogRepository adminLogRepository;
-    @Autowired private EmailService emailService;
-    @Autowired private AccessControlService accessControlService;
+    private final AccountService accountService;
+    private final UserManagementService userManagementService;
 
-    private boolean canManageUser(User currentUser, User targetUser) {
-        if (accessControlService.isSuperAdmin(currentUser)) return true;
-        if (targetUser != null && targetUser.getRoles() != null && targetUser.getRoles().contains("ADMIN")) {
-            return false;
-        }
-        return true;
-    }
-
-    private User getSafeUser() {
-        try {
-            return accountService.getCurrentUser();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private void logAction(String adminId, String action, String targetId, String targetType, String details) {
-        adminLogRepository.save(new AdminLog(adminId, action, targetId, targetType, details));
+    public UserManagementController(AccountService accountService, UserManagementService userManagementService) {
+        this.accountService = accountService;
+        this.userManagementService = userManagementService;
     }
 
     @GetMapping("/users/bans")
-    public ResponseEntity<?> getBannedEmails() {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to view banned email addresses.");
-        }
-        return ResponseEntity.ok(userManagementService.getBannedEmails().stream()
-                .map(AdminMapper::toBannedEmailDTO)
-                .toList());
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<List<BannedEmailDTO>> getBannedEmails() {
+        return ResponseEntity.ok(userManagementService.getBannedEmailViews());
     }
 
     @PostMapping("/users/bans")
-    public ResponseEntity<?> banEmail(@RequestBody BanEmailRequest requestPayload) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to ban email addresses.");
-        }
-        String email = requestPayload.getEmail();
-        String reason = requestPayload.getReason();
-
-        Optional<User> targetByEmail = userRepository.findByEmail(email);
-        if (targetByEmail.isPresent() && !canManageUser(currentUser, targetByEmail.get())) {
-            return ErrorMessageUtils.forbidden("Cannot ban the email of an administrator.");
-        }
-
-        try {
-            userManagementService.banEmail(email, reason, currentUser.getId());
-            logAction(currentUser.getId(), "BAN_EMAIL", email, "EMAIL", "Reason: " + reason);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not ban that email address.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> banEmail(@Valid @RequestBody BanEmailRequest requestPayload) {
+        User currentUser = accountService.requireCurrentUser("banning email addresses");
+        userManagementService.banEmail(currentUser, requestPayload.getEmail(), requestPayload.getReason());
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/users/bans")
-    public ResponseEntity<?> unbanEmail(@RequestParam String email) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to unban email addresses.");
-        }
-        userManagementService.unbanEmail(email);
-        logAction(currentUser.getId(), "UNBAN_EMAIL", email, "EMAIL", null);
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> unbanEmail(@RequestParam String email) {
+        User currentUser = accountService.requireCurrentUser("unbanning email addresses");
+        userManagementService.unbanEmail(currentUser.getId(), email);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/users/{userId}")
-    public ResponseEntity<?> getUserDetails(@PathVariable String userId) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to view this user in the admin console.");
-        }
-        Optional<User> target = userRepository.findById(userId);
-        if (target.isEmpty()) return ErrorMessageUtils.notFound("User not found.");
-
-        return ResponseEntity.ok(UserMapper.toDTO(target.get(), true));
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<UserDTO> getUserDetails(@PathVariable String userId) {
+        return ResponseEntity.ok(userManagementService.getUserDetails(userId));
     }
 
     @GetMapping("/users/{userId}/raw")
-    public ResponseEntity<?> getRawUser(@PathVariable String userId) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) return ErrorMessageUtils.forbidden("Only Super Admin can view raw user data.");
-
-        User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ErrorMessageUtils.notFound("User not found.");
-
-        target.setGithubAccessToken(null);
-        target.setGitlabAccessToken(null);
-        target.setGitlabRefreshToken(null);
-        target.setGitlabTokenExpiresAt(null);
-
-        return ResponseEntity.ok(target);
+    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    public ResponseEntity<User> getRawUser(@PathVariable String userId) {
+        return ResponseEntity.ok(userManagementService.getRawUser(userId));
     }
 
     @PutMapping("/users/{userId}/raw")
-    public ResponseEntity<?> updateRawUser(@PathVariable String userId, @RequestBody User updatedData) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) return ErrorMessageUtils.forbidden("Only Super Admin can edit raw user data.");
-
-        User existing = userRepository.findById(userId).orElse(null);
-        if (existing == null) return ErrorMessageUtils.notFound("User not found.");
-
-        updatedData.setId(existing.getId());
-        updatedData.setPassword(existing.getPassword());
-        updatedData.setMfaSecret(existing.getMfaSecret());
-        updatedData.setVerificationToken(existing.getVerificationToken());
-        updatedData.setVerificationTokenExpiry(existing.getVerificationTokenExpiry());
-        updatedData.setPasswordResetToken(existing.getPasswordResetToken());
-        updatedData.setPasswordResetTokenExpiry(existing.getPasswordResetTokenExpiry());
-        updatedData.setGithubAccessToken(existing.getGithubAccessToken());
-        updatedData.setGitlabAccessToken(existing.getGitlabAccessToken());
-        updatedData.setGitlabRefreshToken(existing.getGitlabRefreshToken());
-        updatedData.setGitlabTokenExpiresAt(existing.getGitlabTokenExpiresAt());
-
-        userRepository.save(updatedData);
-        logAction(currentUser.getId(), "RAW_UPDATE_USER", existing.getId(), "USER", "Updated via Raw JSON");
+    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    public ResponseEntity<Void> updateRawUser(@PathVariable String userId, @RequestBody User updatedData) {
+        User currentUser = accountService.requireCurrentUser("editing raw user data");
+        userManagementService.updateRawUser(currentUser.getId(), userId, updatedData);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/users/{userId}")
-    public ResponseEntity<?> deleteUser(
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> deleteUser(
             @PathVariable String userId,
             @RequestParam(required = false, defaultValue = "Administrative enforcement action.") String reason
     ) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to delete users.");
-        }
-        User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ErrorMessageUtils.notFound("User not found.");
-
-        if (!canManageUser(currentUser, target)) {
-            return ErrorMessageUtils.forbidden("Only Super Admin can delete other admins.");
-        }
-
-        try {
-            accountService.deleteUser(target.getId());
-            try {
-                if (target.getEmail() != null && !target.getEmail().isEmpty()) {
-                    emailService.sendAccountDeletionEmail(target.getEmail(), target.getUsername(), reason);
-                }
-            } catch (Exception e) {}
-            logAction(currentUser.getId(), "DELETE_USER", target.getId(), "USER", "Username: " + target.getUsername() + ", Reason: " + reason);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not delete this user.");
-        }
+        User currentUser = accountService.requireCurrentUser("deleting users");
+        userManagementService.deleteUser(currentUser, userId, reason);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/users/{userId}/tier")
-    public ResponseEntity<?> setUserTier(@PathVariable String userId, @RequestParam String tier) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("Only Super Admin can manage user tiers.");
-        }
-
-        User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ErrorMessageUtils.notFound("User not found.");
-
-        try {
-            ApiKey.Tier tierEnum;
-            if ("USER".equalsIgnoreCase(tier) || "FREE".equalsIgnoreCase(tier)) {
-                tierEnum = ApiKey.Tier.USER;
-            } else {
-                tierEnum = ApiKey.Tier.valueOf(tier.toUpperCase());
-            }
-
-            userManagementService.setUserTier(target.getId(), tierEnum);
-            logAction(currentUser.getId(), "UPDATE_TIER", target.getId(), "USER", "New Tier: " + tierEnum.name());
-
-            return ResponseEntity.ok(Map.<String, Object>of(
-                    "status", "success",
-                    "message", "User " + target.getUsername() + " updated to tier " + tierEnum.name()
-            ));
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest("Tier must be USER or ENTERPRISE.");
-        }
+    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    public ResponseEntity<UserTierUpdateResponse> setUserTier(@PathVariable String userId, @RequestParam String tier) {
+        User currentUser = accountService.requireCurrentUser("managing user tiers");
+        return ResponseEntity.ok(userManagementService.setUserTier(currentUser.getId(), userId, tier));
     }
 
     @PostMapping("/users/{userId}/role")
-    public ResponseEntity<?> addUserRole(@PathVariable String userId, @RequestParam String role) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("Only Super Admin can manage roles.");
-        }
-
-        User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ErrorMessageUtils.notFound("User not found.");
-
-        if (target.getRoles() == null) target.setRoles(new ArrayList<>());
-        if (!target.getRoles().contains(role)) {
-            target.getRoles().add(role);
-        }
-        userRepository.save(target);
-        logAction(currentUser.getId(), "ADD_ROLE", target.getId(), "USER", "Role: " + role);
+    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    public ResponseEntity<Void> addUserRole(@PathVariable String userId, @RequestParam String role) {
+        User currentUser = accountService.requireCurrentUser("managing user roles");
+        userManagementService.addUserRole(currentUser.getId(), userId, role);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/users/{userId}/role")
-    public ResponseEntity<?> removeUserRole(@PathVariable String userId, @RequestParam String role) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("Only Super Admin can manage roles.");
-        }
-
-        User target = userRepository.findById(userId).orElse(null);
-        if (target == null) return ErrorMessageUtils.notFound("User not found.");
-
-        if (target.getRoles() != null) {
-            target.getRoles().remove(role);
-            userRepository.save(target);
-        }
-        logAction(currentUser.getId(), "REMOVE_ROLE", target.getId(), "USER", "Role: " + role);
+    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    public ResponseEntity<Void> removeUserRole(@PathVariable String userId, @RequestParam String role) {
+        User currentUser = accountService.requireCurrentUser("managing user roles");
+        userManagementService.removeUserRole(currentUser.getId(), userId, role);
         return ResponseEntity.ok().build();
     }
 }

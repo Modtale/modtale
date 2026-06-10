@@ -99,4 +99,8 @@ public class DownloadTokenService {
         cleanExpiredTokens();
         return tokens.size();
     }
+
+    public int getTokenValiditySeconds() {
+        return TOKEN_VALIDITY_MINUTES * 60;
+    }
 }

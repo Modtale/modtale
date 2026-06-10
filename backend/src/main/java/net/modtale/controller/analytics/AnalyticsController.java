@@ -1,20 +1,20 @@
 package net.modtale.controller.analytics;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Pattern;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.analytics.ProjectAnalyticsDetail;
 import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.User;
+import net.modtale.service.analytics.AnalyticsAccessService;
 import net.modtale.service.analytics.QueryService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.project.ProjectService;
-import net.modtale.service.security.AccessControlService;
 import net.modtale.service.user.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -23,14 +23,29 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @RestController
+@Validated
 @RequestMapping("/api/v1")
 public class AnalyticsController {
 
-    @Autowired private QueryService queryService;
-    @Autowired private TrackingService trackingService;
-    @Autowired private AccountService accountService;
-    @Autowired private ProjectService projectService;
-    @Autowired private AccessControlService accessControlService;
+    private final AnalyticsAccessService analyticsAccessService;
+    private final QueryService queryService;
+    private final TrackingService trackingService;
+    private final AccountService accountService;
+    private final ProjectService projectService;
+
+    public AnalyticsController(
+            AnalyticsAccessService analyticsAccessService,
+            QueryService queryService,
+            TrackingService trackingService,
+            AccountService accountService,
+            ProjectService projectService
+    ) {
+        this.analyticsAccessService = analyticsAccessService;
+        this.queryService = queryService;
+        this.trackingService = trackingService;
+        this.accountService = accountService;
+        this.projectService = projectService;
+    }
 
     private String getClientIp(HttpServletRequest request) {
         String xfHeader = request.getHeader("X-Forwarded-For");
@@ -43,41 +58,30 @@ public class AnalyticsController {
     }
 
     @GetMapping("/user/analytics")
-    public ResponseEntity<?> getCreatorAnalytics(
-            @RequestParam(defaultValue = "30d") String range,
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<CreatorAnalytics> getCreatorAnalytics(
+            @RequestParam(defaultValue = "30d")
+            @Pattern(regexp = "7d|30d|90d|1y", message = "Analytics ranges must be 7d, 30d, 90d, or 1y.")
+            String range,
             @RequestParam(required = false) List<String> include,
             @RequestParam(required = false) String userId
     ) {
-        User currentUser = accountService.getCurrentUser();
-        if (currentUser == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-
-        String resolvedTargetId = currentUser.getId();
-
-        if (userId != null && !userId.isEmpty() && !userId.equals(currentUser.getId())) {
-            User target = accountService.getPublicProfile(userId);
-            if (target == null) return ResponseEntity.notFound().build();
-
-            if (target.getAccountType() == User.AccountType.ORGANIZATION) {
-                if (!accessControlService.hasOrgPerm(target.getId(), "PROJECT_EDIT_METADATA", null)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Permission denied.");
-                }
-            } else return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-            resolvedTargetId = target.getId();
-        }
-
+        User currentUser = accountService.requireCurrentUser("viewing creator analytics");
+        String resolvedTargetId = analyticsAccessService.resolveCreatorAnalyticsTargetId(currentUser, userId);
         CreatorAnalytics data = queryService.getCreatorDashboard(resolvedTargetId, range, include);
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate()).body(data);
     }
 
     @GetMapping("/projects/{id}/analytics")
-    public ResponseEntity<?> getProjectAnalytics(@PathVariable String id, @RequestParam(defaultValue = "30d") String range) {
+    public ResponseEntity<ProjectAnalyticsDetail> getProjectAnalytics(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "30d")
+            @Pattern(regexp = "7d|30d|90d|1y", message = "Analytics ranges must be 7d, 30d, 90d, or 1y.")
+            String range
+    ) {
         User user = accountService.getCurrentUser();
-        Project project = projectService.getProjectById(id);
-
-        if (project != null && project.getStatus() == ProjectStatus.DRAFT) {
-            if (user == null || !accessControlService.hasEditPermission(project, user)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
+        Project project = projectService.getProjectById(id, user);
+        analyticsAccessService.assertProjectAnalyticsAccess(project, user);
         String projectId = (project != null) ? project.getId() : id;
         ProjectAnalyticsDetail data = queryService.getProjectAnalytics(projectId, user != null ? user.getUsername() : "anon", range);
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate()).body(data);

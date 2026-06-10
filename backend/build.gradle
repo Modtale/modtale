@@ -1,7 +1,7 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.3.4'
-    id 'io.spring.dependency-management' version '1.1.6'
+    id 'org.springframework.boot' version '4.0.6'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'net.modtale'
@@ -22,27 +22,27 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-    implementation 'org.springframework.session:spring-session-data-mongodb'
+    implementation 'org.springframework.session:spring-session-data-mongodb:3.5.7'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
     implementation 'dev.samstevens.totp:totp-spring-boot-starter:1.7.1'
     implementation 'com.github.ben-manes.caffeine:caffeine'
 
-    implementation platform('software.amazon.awssdk:bom:2.25.11')
+    implementation platform('software.amazon.awssdk:bom:2.46.6')
     implementation 'software.amazon.awssdk:s3'
 
-    implementation 'com.giffing.bucket4j.spring.boot.starter:bucket4j-spring-boot-starter:0.10.3'
-    implementation 'com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20240325.1'
-    implementation 'net.coobird:thumbnailator:0.4.20'
+    implementation 'com.giffing.bucket4j.spring.boot.starter:bucket4j-spring-boot-starter:0.14.0'
+    implementation 'com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20260313.1'
+    implementation 'net.coobird:thumbnailator:0.4.21'
     implementation 'com.github.usefulness:webp-imageio:0.10.2'
 
-    implementation 'com.github.weisj:jsvg:1.6.0'
+    implementation 'com.github.weisj:jsvg:2.1.0'
 
-    implementation 'org.vineflower:vineflower:1.11.2'
+    implementation 'org.vineflower:vineflower:1.12.0'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'

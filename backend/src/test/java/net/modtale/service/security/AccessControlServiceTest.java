@@ -9,7 +9,7 @@ import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +17,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,14 +30,10 @@ class AccessControlServiceTest {
 
     @BeforeEach
     void setUp() {
-        accessControlService = new AccessControlService();
         accountService = mock(AccountService.class);
         userRepository = mock(UserRepository.class);
         projectRepository = mock(ProjectRepository.class);
-
-        ReflectionTestUtils.setField(accessControlService, "accountService", accountService);
-        ReflectionTestUtils.setField(accessControlService, "userRepository", userRepository);
-        ReflectionTestUtils.setField(accessControlService, "projectRepository", projectRepository);
+        accessControlService = new AccessControlService(accountService, userRepository, projectRepository);
     }
 
     @Test
@@ -77,7 +74,7 @@ class AccessControlServiceTest {
     @Test
     void hasCreateProjectPermAllowsSelfAdminsAndOrganizationManagers() {
         User currentUser = user("u-1", "Ada", List.of("USER"));
-        when(accountService.getCurrentUser()).thenReturn(currentUser);
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
 
         assertTrue(accessControlService.hasCreateProjectPerm(null, null));
         assertTrue(accessControlService.hasCreateProjectPerm("", null));
@@ -93,7 +90,7 @@ class AccessControlServiceTest {
         assertTrue(accessControlService.hasCreateProjectPerm("org-1", null));
 
         User admin = user("u-admin", "admin", List.of("ADMIN"));
-        when(accountService.getCurrentUser()).thenReturn(admin);
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(admin);
         assertTrue(accessControlService.hasCreateProjectPerm("someone-else", null));
     }
 
@@ -111,7 +108,7 @@ class AccessControlServiceTest {
         project.setTeamMembers(List.of(new Project.ProjectMember("u-editor", "role-1")));
         project.setProjectRoles(List.of(new Project.ProjectRole("role-1", "Editor", "#fff", List.of("PROJECT_EDIT_METADATA"))));
 
-        when(accountService.getCurrentUser()).thenReturn(currentUser);
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
 
         assertTrue(accessControlService.hasProjectPerm("project-1", "PROJECT_EDIT_METADATA", null));
         assertFalse(accessControlService.hasProjectPerm("project-1", "PROJECT_DELETE", null));
@@ -129,7 +126,7 @@ class AccessControlServiceTest {
         Project project = new Project();
         project.setAuthorId("org-1");
 
-        when(accountService.getPublicProfile("org-1")).thenReturn(org);
+        when(userRepository.findById("org-1")).thenReturn(Optional.of(org));
 
         assertTrue(accessControlService.isOwner(project, member));
         assertTrue(accessControlService.hasEditPermission(project, member));

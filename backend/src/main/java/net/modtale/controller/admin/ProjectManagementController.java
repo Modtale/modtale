@@ -1,319 +1,165 @@
 package net.modtale.controller.admin;
 
-import net.modtale.mapper.ProjectMapper;
-import net.modtale.model.admin.AdminLog;
-import net.modtale.model.dto.admin.AdminAuthorStatsDTO;
+import jakarta.validation.Valid;
+import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
-import net.modtale.model.dto.request.admin.RejectReasonRequest;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
+import net.modtale.model.dto.request.admin.RejectReasonRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
-import net.modtale.exception.ErrorMessageUtils;
-import net.modtale.repository.admin.AdminLogRepository;
-import net.modtale.repository.project.ProjectRepository;
-import net.modtale.repository.user.UserRepository;
-import net.modtale.service.admin.ProjectManagementService;
-import net.modtale.service.communication.NotificationService;
-import net.modtale.service.project.LifecycleService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.project.SearchService;
-import net.modtale.service.security.AccessControlService;
-import net.modtale.service.security.ScanService;
+import net.modtale.service.admin.ProjectAdminOperationsService;
+import net.modtale.service.admin.ProjectReviewAdminService;
 import net.modtale.service.user.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admin")
 public class ProjectManagementController {
 
-    @Autowired private AccountService accountService;
-    @Autowired private ProjectService projectService;
-    @Autowired private SearchService searchService;
-    @Autowired private ProjectManagementService projectManagementService;
-    @Autowired private LifecycleService lifecycleService;
-    @Autowired private ScanService scanService;
-    @Autowired private UserRepository userRepository;
-    @Autowired private ProjectRepository projectRepository;
-    @Autowired private AdminLogRepository adminLogRepository;
-    @Autowired private NotificationService notificationService;
-    @Autowired private AccessControlService accessControlService;
+    private final AccountService accountService;
+    private final ProjectReviewAdminService projectReviewAdminService;
+    private final ProjectAdminOperationsService projectAdminOperationsService;
 
-    private User getSafeUser() {
-        try {
-            return accountService.getCurrentUser();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private void logAction(String adminId, String action, String targetId, String targetType, String details) {
-        adminLogRepository.save(new AdminLog(adminId, action, targetId, targetType, details));
+    public ProjectManagementController(
+            AccountService accountService,
+            ProjectReviewAdminService projectReviewAdminService,
+            ProjectAdminOperationsService projectAdminOperationsService
+    ) {
+        this.accountService = accountService;
+        this.projectReviewAdminService = projectReviewAdminService;
+        this.projectAdminOperationsService = projectAdminOperationsService;
     }
 
     @GetMapping("/verification/queue")
-    public ResponseEntity<?> getVerificationQueue() {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to review the verification queue.");
-        }
-        return ResponseEntity.ok(searchService.getVerificationQueue().stream()
-                .map(p -> ProjectMapper.toSummaryDTO(p, true))
-                .toList());
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<List<ProjectSummaryDTO>> getVerificationQueue() {
+        return ResponseEntity.ok(projectReviewAdminService.getVerificationQueue());
     }
 
     @GetMapping("/projects/{id}/review-details")
-    public ResponseEntity<?> getProjectReviewDetails(@PathVariable String id) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to review project details.");
-        }
-
-        Project project = projectService.getRawProjectById(id);
-        if (project == null) return ErrorMessageUtils.notFound("Project not found.");
-
-        User author = userRepository.findById(project.getAuthorId()).orElse(null);
-
-        AdminAuthorStatsDTO authorStats = new AdminAuthorStatsDTO(
-                author != null ? author.getCreatedAt() : "Unknown",
-                author != null ? author.getTier().name() : "Unknown",
-                author != null ? (author.getAvatarUrl() != null ? author.getAvatarUrl() : "") : "",
-                author != null ? searchService.getCreatorProjects(author.getId(), PageRequest.of(0, 10000)).getTotalElements() : 0
-        );
-
-        return ResponseEntity.ok(new AdminProjectReviewDTO(ProjectMapper.toAdminDTO(project), authorStats));
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<AdminProjectReviewDTO> getProjectReviewDetails(@PathVariable String id) {
+        return ResponseEntity.ok(projectReviewAdminService.getProjectReviewDetails(id));
     }
 
     @GetMapping("/projects/{id}")
-    public ResponseEntity<?> getProjectById(@PathVariable String id) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to view this project in the admin console.");
-
-        Project project = projectService.getAdminProjectDetails(id);
-        if (project == null) return ErrorMessageUtils.notFound("Project not found.");
-        return ResponseEntity.ok(ProjectMapper.toAdminDTO(project));
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<AdminProjectDTO> getProjectById(@PathVariable String id) {
+        return ResponseEntity.ok(projectAdminOperationsService.getProjectById(id));
     }
 
     @PutMapping("/projects/{id}/raw")
-    public ResponseEntity<?> updateRawProject(@PathVariable String id, @RequestBody Project updatedProject) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isSuperAdmin(currentUser)) return ErrorMessageUtils.forbidden("Only Super Admin can edit raw project data.");
-
-        Project existing = projectService.getRawProjectById(id);
-        if (existing == null) return ErrorMessageUtils.notFound("Project not found.");
-
-        updatedProject.setId(existing.getId());
-        projectRepository.save(updatedProject);
-
-        logAction(currentUser.getId(), "RAW_UPDATE_PROJECT", existing.getId(), "PROJECT", "Updated via Raw JSON");
+    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    public ResponseEntity<Void> updateRawProject(@PathVariable String id, @RequestBody Project updatedProject) {
+        User currentUser = accountService.requireCurrentUser("editing raw project data");
+        projectAdminOperationsService.updateRawProject(currentUser.getId(), id, updatedProject);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/publish")
-    public ResponseEntity<?> publishProject(@PathVariable String id) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to publish projects.");
-        try {
-            lifecycleService.publishProject(id, currentUser);
-            logAction(currentUser.getId(), "PUBLISH_PROJECT", id, "PROJECT", null);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not publish this project.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> publishProject(@PathVariable String id) {
+        User currentUser = accountService.requireCurrentUser("publishing projects");
+        projectReviewAdminService.publishProject(currentUser, id);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/approve")
-    public ResponseEntity<?> approveVersion(@PathVariable String id, @PathVariable String versionId) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to approve project versions.");
-        try {
-            projectManagementService.approveVersion(id, versionId);
-            logAction(currentUser.getId(), "APPROVE_VERSION", id, "VERSION", "VerID: " + versionId);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not approve this version.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> approveVersion(@PathVariable String id, @PathVariable String versionId) {
+        User currentUser = accountService.requireCurrentUser("approving project versions");
+        projectReviewAdminService.approveVersion(currentUser, id, versionId);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/reject")
-    public ResponseEntity<?> rejectVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody RejectReasonRequest requestPayload) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to reject project versions.");
-        try {
-            projectManagementService.rejectVersion(id, versionId, requestPayload.getReason());
-            logAction(currentUser.getId(), "REJECT_VERSION", id, "VERSION", "VerID: " + versionId + ", Reason: " + requestPayload.getReason());
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not reject this version.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> rejectVersion(@PathVariable String id, @PathVariable String versionId, @Valid @RequestBody RejectReasonRequest requestPayload) {
+        User currentUser = accountService.requireCurrentUser("rejecting project versions");
+        projectReviewAdminService.rejectVersion(currentUser, id, versionId, requestPayload.getReason());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/reject")
-    public ResponseEntity<?> rejectProject(@PathVariable String id, @RequestBody RejectReasonRequest requestPayload) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) {
-            return ErrorMessageUtils.forbidden("You do not have permission to reject projects.");
-        }
-        try {
-            projectManagementService.rejectProject(id, requestPayload.getReason());
-            logAction(currentUser.getId(), "REJECT_PROJECT", id, "PROJECT", "Reason: " + requestPayload.getReason());
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not reject this project.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> rejectProject(@PathVariable String id, @Valid @RequestBody RejectReasonRequest requestPayload) {
+        User currentUser = accountService.requireCurrentUser("rejecting projects");
+        projectReviewAdminService.rejectProject(currentUser, id, requestPayload.getReason());
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/projects/{id}")
-    public ResponseEntity<?> deleteProject(
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> deleteProject(
             @PathVariable String id,
             @RequestParam(required = false, defaultValue = "Administrative action.") String reason
     ) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to delete projects.");
-        try {
-            Project targetProject = projectService.getRawProjectById(id);
-            if (targetProject == null) return ErrorMessageUtils.notFound("Project not found.");
-
-            projectManagementService.adminDeleteProject(id);
-
-            notificationService.sendNotifcation(
-                    List.of(targetProject.getAuthorId()),
-                    "Project Deleted",
-                    "Your project '" + targetProject.getTitle() + "' was deleted by an administrator. Reason: " + reason,
-                    URI.create("/dashboard"),
-                    null
-            );
-
-            logAction(currentUser.getId(), "DELETE_PROJECT", id, "PROJECT", "Reason: " + reason);
-            return ResponseEntity.ok().build();
-        } catch (SecurityException e) {
-            return ErrorMessageUtils.forbidden(e, "You do not have permission to delete this project.");
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not delete this project.");
-        }
+        User currentUser = accountService.requireCurrentUser("deleting projects");
+        projectAdminOperationsService.deleteProject(currentUser, id, reason);
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/projects/{id}/hard")
-    public ResponseEntity<?> hardDeleteProject(
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> hardDeleteProject(
             @PathVariable String id,
             @RequestParam(required = false, defaultValue = "Administrative action.") String reason
     ) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to permanently delete projects.");
-        try {
-            Project targetProject = projectService.getRawProjectById(id);
-            if (targetProject == null) return ErrorMessageUtils.notFound("Project not found.");
-
-            projectManagementService.adminHardDeleteProject(id);
-
-            notificationService.sendNotifcation(
-                    List.of(targetProject.getAuthorId()),
-                    "Project Permanently Deleted",
-                    "Your project '" + targetProject.getTitle() + "' was permanently removed by an administrator. Reason: " + reason,
-                    URI.create("/dashboard"),
-                    null
-            );
-
-            logAction(currentUser.getId(), "HARD_DELETE_PROJECT", id, "PROJECT", "Reason: " + reason);
-            return ResponseEntity.ok().build();
-        } catch (SecurityException e) {
-            return ErrorMessageUtils.forbidden(e, "You do not have permission to permanently delete this project.");
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not permanently delete this project.");
-        }
+        User currentUser = accountService.requireCurrentUser("permanently deleting projects");
+        projectAdminOperationsService.hardDeleteProject(currentUser, id, reason);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/restore")
-    public ResponseEntity<?> restoreProject(@PathVariable String id, @RequestParam(defaultValue = "PUBLISHED") String status) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to restore projects.");
-        try {
-            projectManagementService.adminRestoreProject(id, status);
-            logAction(currentUser.getId(), "RESTORE_PROJECT", id, "PROJECT", "To Status: " + status);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not restore this project.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> restoreProject(@PathVariable String id, @RequestParam(defaultValue = "PUBLISHED") String status) {
+        User currentUser = accountService.requireCurrentUser("restoring projects");
+        projectAdminOperationsService.restoreProject(currentUser, id, status);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/unlist")
-    public ResponseEntity<?> unlistProject(@PathVariable String id, @RequestBody(required = false) RejectReasonRequest requestPayload) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to unlist projects.");
-        try {
-            String reason = (requestPayload != null && requestPayload.getReason() != null && !requestPayload.getReason().isBlank())
-                    ? requestPayload.getReason()
-                    : "Administrative action.";
-            Project targetProject = projectService.getRawProjectById(id);
-            if (targetProject == null) return ErrorMessageUtils.notFound("Project not found.");
-
-            projectManagementService.adminUnlistProject(id);
-
-            notificationService.sendNotifcation(
-                    List.of(targetProject.getAuthorId()),
-                    "Project Unlisted",
-                    "Your project '" + targetProject.getTitle() + "' was unlisted from the public directory by an administrator. Reason: " + reason,
-                    URI.create(projectService.getProjectLink(targetProject)),
-                    null
-            );
-
-            logAction(currentUser.getId(), "UNLIST_PROJECT", id, "PROJECT", "Reason: " + reason);
-            return ResponseEntity.ok().build();
-        } catch (SecurityException e) {
-            return ErrorMessageUtils.forbidden(e, "You do not have permission to unlist this project.");
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not unlist this project.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> unlistProject(@PathVariable String id, @RequestBody(required = false) RejectReasonRequest requestPayload) {
+        User currentUser = accountService.requireCurrentUser("unlisting projects");
+        String reason = requestPayload != null && requestPayload.getReason() != null && !requestPayload.getReason().isBlank()
+                ? requestPayload.getReason()
+                : "Administrative action.";
+        projectAdminOperationsService.unlistProject(currentUser, id, reason);
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/projects/{id}/versions/{versionId}")
-    public ResponseEntity<?> deleteProjectVersion(@PathVariable String id, @PathVariable String versionId) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to delete project versions.");
-        try {
-            projectManagementService.adminDeleteVersion(id, versionId);
-            logAction(currentUser.getId(), "DELETE_VERSION", id, "VERSION", "VerID: " + versionId);
-            return ResponseEntity.ok().build();
-        } catch (SecurityException e) {
-            return ErrorMessageUtils.forbidden(e, "You do not have permission to delete this project version.");
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not delete this project version.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> deleteProjectVersion(@PathVariable String id, @PathVariable String versionId) {
+        User currentUser = accountService.requireCurrentUser("deleting project versions");
+        projectAdminOperationsService.deleteProjectVersion(currentUser, id, versionId);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/projects/search")
-    public ResponseEntity<?> searchProjects(@RequestParam String query, @RequestParam(required = false, defaultValue = "false") boolean deleted) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to search projects in the admin console.");
-
-        if (deleted) {
-            return ResponseEntity.ok(searchService.searchDeletedProjects(query, PageRequest.of(0, 10)).getContent().stream()
-                    .map(p -> ProjectMapper.toSummaryDTO(p, true))
-                    .toList());
-        } else {
-            return ResponseEntity.ok(searchService.searchProjects(null, query, 0, 10, "relevance", null, null, null, null, null, null, null).getContent().stream()
-                    .map(p -> ProjectMapper.toSummaryDTO(p, true))
-                    .toList());
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<List<ProjectSummaryDTO>> searchProjects(@RequestParam String query, @RequestParam(required = false, defaultValue = "false") boolean deleted) {
+        return ResponseEntity.ok(projectAdminOperationsService.searchProjects(query, deleted));
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/scan")
-    public ResponseEntity<?> rescanVersion(@PathVariable String id, @PathVariable String versionId) {
-        User currentUser = getSafeUser();
-        if (!accessControlService.isAdmin(currentUser)) return ErrorMessageUtils.forbidden("You do not have permission to rescan project versions.");
-        try {
-            scanService.triggerRescan(id, versionId);
-            logAction(currentUser.getId(), "RESCAN_VERSION", id, "VERSION", "VerID: " + versionId);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ErrorMessageUtils.badRequest(e, "We could not start a rescan for this version.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> rescanVersion(@PathVariable String id, @PathVariable String versionId) {
+        User currentUser = accountService.requireCurrentUser("rescanning project versions");
+        projectAdminOperationsService.rescanVersion(currentUser, id, versionId);
+        return ResponseEntity.ok().build();
     }
 }

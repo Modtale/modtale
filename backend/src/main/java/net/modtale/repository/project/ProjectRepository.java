@@ -27,8 +27,6 @@ public interface ProjectRepository extends MongoRepository<Project, String>, Pro
     @Query(value = "{ 'authorId': ?0, 'deletedAt': null }", fields = "{ 'title': 1, 'downloadCount': 1, 'updatedAt': 1 }")
     List<Project> findMetaByAuthorId(String authorId);
 
-    Optional<Project> findBySlug(String slug);
-
     boolean existsBySlug(String slug);
 
     @Query(value = "{ 'authorId': ?0, 'deletedAt': null }", count = true)

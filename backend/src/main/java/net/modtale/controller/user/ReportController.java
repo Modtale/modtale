@@ -1,77 +1,74 @@
 package net.modtale.controller.user;
 
-import net.modtale.exception.ErrorMessageUtils;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import net.modtale.mapper.AdminMapper;
 import net.modtale.model.dto.admin.ReportDTO;
 import net.modtale.model.dto.request.user.CreateReportRequest;
 import net.modtale.model.dto.request.user.ResolveReportRequest;
+import net.modtale.model.dto.response.common.IdResponse;
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
 import net.modtale.service.user.ReportService;
 import net.modtale.service.user.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 
 @RestController
+@Validated
 @RequestMapping("/api/v1")
 public class ReportController {
 
-    @Autowired private ReportService reportService;
-    @Autowired private AccountService accountService;
+    private final ReportService reportService;
+    private final AccountService accountService;
+
+    public ReportController(ReportService reportService, AccountService accountService) {
+        this.reportService = reportService;
+        this.accountService = accountService;
+    }
 
     @PostMapping("/reports")
-    public ResponseEntity<?> submitReport(@RequestBody CreateReportRequest requestPayload) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before submitting a report.");
-
-        String targetId = requestPayload.getTargetId();
-        String targetTypeStr = requestPayload.getTargetType();
-        String reason = requestPayload.getReason();
-        String description = requestPayload.getDescription();
-
-        if (targetId == null || targetTypeStr == null || reason == null) {
-            return ErrorMessageUtils.badRequest("The report target, target type, and reason are all required before we can submit your report.");
-        }
-
-        try {
-            Report.TargetType targetType = Report.TargetType.valueOf(targetTypeStr);
-            Report report = reportService.createReport(targetId, targetType, reason, description, user);
-            return ResponseEntity.ok(Map.of("id", report.getId()));
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest(e, "We could not submit that report.");
-        }
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<IdResponse> submitReport(@Valid @RequestBody CreateReportRequest requestPayload) {
+        User user = accountService.requireCurrentUser("submitting a report");
+        Report.TargetType targetType = Report.TargetType.valueOf(requestPayload.getTargetType().toUpperCase(Locale.ROOT));
+        Report report = reportService.createReport(
+                requestPayload.getTargetId(),
+                targetType,
+                requestPayload.getReason(),
+                requestPayload.getDescription(),
+                user
+        );
+        return ResponseEntity.ok(new IdResponse(report.getId()));
     }
 
     @GetMapping("/admin/reports/queue")
-    public ResponseEntity<List<ReportDTO>> getReportQueue(@RequestParam(defaultValue = "OPEN") String status) {
-        try {
-            Report.ReportStatus reportStatus = Report.ReportStatus.valueOf(status);
-            return ResponseEntity.ok(reportService.getReportsByStatus(reportStatus).stream()
-                    .map(AdminMapper::toReportDTO)
-                    .toList());
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<List<ReportDTO>> getReportQueue(
+            @RequestParam(defaultValue = "OPEN")
+            @Pattern(
+                    regexp = "(?i)OPEN|RESOLVED|DISMISSED",
+                    message = "Report statuses must be OPEN, RESOLVED, or DISMISSED."
+            )
+            String status
+    ) {
+        Report.ReportStatus reportStatus = Report.ReportStatus.valueOf(status.toUpperCase(Locale.ROOT));
+        return ResponseEntity.ok(reportService.getReportsByStatus(reportStatus).stream()
+                .map(AdminMapper::toReportDTO)
+                .toList());
     }
 
     @PostMapping("/admin/reports/{id}/resolve")
-    public ResponseEntity<?> resolveReport(@PathVariable String id, @RequestBody ResolveReportRequest requestPayload) {
-        User admin = accountService.getCurrentUser();
-        if (admin == null) return ErrorMessageUtils.unauthorized("You need to sign in before resolving reports.");
-
-        String statusStr = requestPayload.getStatus();
-        String note = requestPayload.getNote();
-
-        try {
-            Report.ReportStatus status = Report.ReportStatus.valueOf(statusStr);
-            reportService.resolveReport(id, status, note, admin);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ErrorMessageUtils.badRequest("The report could not be resolved because the requested status or report ID was invalid.");
-        }
+    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    public ResponseEntity<Void> resolveReport(@PathVariable String id, @Valid @RequestBody ResolveReportRequest requestPayload) {
+        User admin = accountService.requireCurrentUser("resolving reports");
+        Report.ReportStatus status = Report.ReportStatus.valueOf(requestPayload.getStatus().toUpperCase(Locale.ROOT));
+        reportService.resolveReport(id, status, requestPayload.getNote(), admin);
+        return ResponseEntity.ok().build();
     }
 }

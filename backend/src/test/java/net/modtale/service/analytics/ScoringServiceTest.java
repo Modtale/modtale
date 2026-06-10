@@ -2,10 +2,12 @@ package net.modtale.service.analytics;
 
 import net.modtale.model.project.Project;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
 
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -15,7 +17,7 @@ class ScoringServiceTest {
 
     @Test
     void ensureScoresSkipsNullEmptyAndZeroDownloadProjects() {
-        ScoringService scoringService = spy(new ScoringService());
+        ScoringService scoringService = spy(new ScoringService(mock(MongoTemplate.class)));
         doNothing().when(scoringService).updateProjectScores();
 
         Project zeroDownloads = new Project();
@@ -30,7 +32,7 @@ class ScoringServiceTest {
 
     @Test
     void ensureScoresTriggersRecalculationWhenAnyScoredProjectLooksMissing() {
-        ScoringService scoringService = spy(new ScoringService());
+        ScoringService scoringService = spy(new ScoringService(mock(MongoTemplate.class)));
         doNothing().when(scoringService).updateProjectScores();
 
         Project complete = new Project();

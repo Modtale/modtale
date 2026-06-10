@@ -7,7 +7,6 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -15,9 +14,19 @@ import org.springframework.stereotype.Service;
 public class AccessControlService {
     private static final String LEGACY_SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
 
-    @Autowired private AccountService accountService;
-    @Autowired private UserRepository userRepository;
-    @Autowired private ProjectRepository projectRepository;
+    private final AccountService accountService;
+    private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
+
+    public AccessControlService(
+            AccountService accountService,
+            UserRepository userRepository,
+            ProjectRepository projectRepository
+    ) {
+        this.accountService = accountService;
+        this.userRepository = userRepository;
+        this.projectRepository = projectRepository;
+    }
 
     public boolean isAdmin(User user) {
         return user != null && (
@@ -33,18 +42,26 @@ public class AccessControlService {
         );
     }
 
+    public boolean isAdmin(Authentication authentication) {
+        return isAdmin(accountService.getCurrentUser(authentication));
+    }
+
+    public boolean isSuperAdmin(Authentication authentication) {
+        return isSuperAdmin(accountService.getCurrentUser(authentication));
+    }
+
     public boolean hasAnyPerm(String perm, Authentication authentication) {
         if ("PROJECT_READ".equals(perm)) return true;
-        return accountService.getCurrentUser() != null;
+        return accountService.getCurrentUser(authentication) != null;
     }
 
     public boolean hasPersonalPerm(String permStr, Authentication authentication) {
-        User user = accountService.getCurrentUser();
+        User user = accountService.getCurrentUser(authentication);
         return user != null;
     }
 
     public boolean hasOrgPerm(String orgId, String permStr, Authentication authentication) {
-        User user = accountService.getCurrentUser();
+        User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;
         if (isAdmin(user)) return true;
 
@@ -60,7 +77,7 @@ public class AccessControlService {
     }
 
     public boolean hasCreateProjectPerm(String ownerId, Authentication authentication) {
-        User user = accountService.getCurrentUser();
+        User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;
         if (isAdmin(user)) return true;
         if (ownerId == null || ownerId.isEmpty() || ownerId.equals(user.getId())) return true;
@@ -83,7 +100,7 @@ public class AccessControlService {
             }
         }
 
-        User user = accountService.getCurrentUser();
+        User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;
         if (isAdmin(user)) return true;
 
@@ -118,7 +135,9 @@ public class AccessControlService {
             return false;
         }
 
-        User authorUser = accountService.getPublicProfile(project.getAuthorId());
+        User authorUser = userRepository.findById(project.getAuthorId())
+                .filter(author -> !author.isDeleted())
+                .orElse(null);
         if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
             if (hasOrgPermission(authorUser, user.getId(), perm)) return true;
             if (hasOrgProjectManagementAccess(authorUser, user.getId())) return true;
@@ -148,7 +167,9 @@ public class AccessControlService {
         if (project == null || user == null) return false;
         if (project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) return true;
 
-        User authorUser = accountService.getPublicProfile(project.getAuthorId());
+        User authorUser = userRepository.findById(project.getAuthorId())
+                .filter(author -> !author.isDeleted())
+                .orElse(null);
         if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
             return hasOrgProjectManagementAccess(authorUser, user.getId());
         }

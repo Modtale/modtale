@@ -1,5 +1,6 @@
 package net.modtale.service.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -19,7 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FileValidationServiceTest {
 
-    private final FileValidationService fileValidationService = new FileValidationService();
+    private final FileValidationService fileValidationService = new FileValidationService(
+            new ProjectArchiveValidationService(new PluginManifestValidationService(new ObjectMapper())),
+            new ProjectImageValidationService()
+    );
 
     @Test
     void resolveUploadClassificationInfersArchiveTypeFromFilename() throws IOException {

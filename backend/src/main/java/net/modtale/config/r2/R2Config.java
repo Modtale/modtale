@@ -1,8 +1,8 @@
 package net.modtale.config.r2;
 
+import net.modtale.config.properties.AppR2Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -18,17 +18,15 @@ public class R2Config {
 
     private static final Logger logger = LoggerFactory.getLogger(R2Config.class);
 
-    @Value("${app.r2.access-key}")
-    private String accessKey;
+    private final AppR2Properties r2Properties;
 
-    @Value("${app.r2.secret-key}")
-    private String secretKey;
-
-    @Value("${app.r2.endpoint}")
-    private String endpoint;
+    public R2Config(AppR2Properties r2Properties) {
+        this.r2Properties = r2Properties;
+    }
 
     @Bean
     public S3Client s3Client() {
+        String endpoint = r2Properties.endpoint();
         URI uri = URI.create(endpoint);
         String cleanEndpoint = uri.getScheme() + "://" + uri.getAuthority();
 
@@ -40,7 +38,7 @@ public class R2Config {
                 .endpointOverride(URI.create(cleanEndpoint))
                 .region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)
+                        AwsBasicCredentials.create(r2Properties.accessKey(), r2Properties.secretKey())
                 ))
                 .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)

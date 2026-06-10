@@ -1,12 +1,18 @@
 package net.modtale.controller.project;
 
+import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
+import net.modtale.service.project.ProjectVersionAccessService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.VersionApplicationService;
+import net.modtale.service.project.VersionDownloadOrchestrationService;
+import net.modtale.service.project.VersionMutationApplicationService;
 import net.modtale.service.project.VersionService;
 import net.modtale.service.storage.DownloadService;
 import net.modtale.service.storage.DownloadTokenService;
@@ -19,8 +25,8 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,6 +34,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,6 +48,7 @@ class VersionControllerTest {
 
     private VersionController controller;
     private VersionService versionService;
+    private ProjectVersionAccessService projectVersionAccessService;
     private ProjectService projectService;
     private DownloadService downloadService;
     private DownloadTokenService downloadTokenService;
@@ -50,8 +58,8 @@ class VersionControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new VersionController();
         versionService = mock(VersionService.class);
+        projectVersionAccessService = mock(ProjectVersionAccessService.class);
         projectService = mock(ProjectService.class);
         downloadService = mock(DownloadService.class);
         downloadTokenService = mock(DownloadTokenService.class);
@@ -59,14 +67,23 @@ class VersionControllerTest {
         storageService = mock(StorageService.class);
         accountService = mock(AccountService.class);
 
-        ReflectionTestUtils.setField(controller, "versionService", versionService);
-        ReflectionTestUtils.setField(controller, "projectService", projectService);
-        ReflectionTestUtils.setField(controller, "downloadService", downloadService);
-        ReflectionTestUtils.setField(controller, "downloadTokenService", downloadTokenService);
-        ReflectionTestUtils.setField(controller, "trackingService", trackingService);
-        ReflectionTestUtils.setField(controller, "storageService", storageService);
-        ReflectionTestUtils.setField(controller, "accountService", accountService);
-        ReflectionTestUtils.setField(controller, "frontendUrl", "https://modtale.net");
+        VersionMutationApplicationService versionMutationApplicationService = new VersionMutationApplicationService(versionService);
+        VersionDownloadOrchestrationService versionDownloadOrchestrationService = new VersionDownloadOrchestrationService(
+                projectVersionAccessService,
+                projectService,
+                downloadService,
+                downloadTokenService,
+                trackingService,
+                storageService,
+                new AppFrontendProperties("https://modtale.net")
+        );
+        VersionApplicationService versionApplicationService = new VersionApplicationService(
+                versionMutationApplicationService,
+                versionDownloadOrchestrationService,
+                projectVersionAccessService,
+                projectService
+        );
+        controller = new VersionController(versionApplicationService, accountService);
         SecurityContextHolder.clearContext();
     }
 
@@ -78,19 +95,19 @@ class VersionControllerTest {
     @Test
     void addVersionSplitsCommaSeparatedDependencyIdsBeforeDelegating() throws Exception {
         User currentUser = user("user-1");
+        Authentication authentication = mock(Authentication.class);
         MockMultipartFile file = new MockMultipartFile("file", "mod.jar", "application/java-archive", new byte[]{1, 2, 3});
+        CreateVersionRequest requestPayload = new CreateVersionRequest();
+        requestPayload.setVersionNumber("1.0.0");
+        requestPayload.setGameVersions(List.of("1.0.0"));
+        requestPayload.setFile(file);
+        requestPayload.setModIds(List.of("dep-a, dep-b, , dep-c"));
+        requestPayload.setChangelog("Release notes");
+        requestPayload.setChannel("beta");
 
-        when(accountService.getCurrentUser()).thenReturn(currentUser);
+        when(accountService.requireCurrentUser(authentication, "uploading a project version")).thenReturn(currentUser);
 
-        var response = controller.addVersion(
-                "project-1",
-                "1.0.0",
-                List.of("1.0.0"),
-                file,
-                List.of("dep-a, dep-b, , dep-c"),
-                "Release notes",
-                "beta"
-        );
+        var response = controller.addVersion("project-1", requestPayload, authentication);
 
         assertEquals(200, response.getStatusCode().value());
         verify(versionService).addVersion(
@@ -116,15 +133,15 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", "1.1.0", null, Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
-        when(versionService.findVersion(project, "1.0.0", "1.1.0")).thenReturn(version);
-        when(accountService.getCurrentUser()).thenReturn(currentUser);
+        when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq("1.1.0"), any())).thenReturn(version);
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
         when(downloadService.generateModpackZip(project, version, currentUser)).thenReturn(new byte[]{9, 8, 7});
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download/token");
         request.addHeader("Referer", "https://modtale.net/mod/project-1");
         request.setRemoteAddr("198.51.100.8");
 
-        var response = controller.downloadWithToken("token", request);
+        var response = controller.downloadWithToken("token", null, request);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("attachment; filename=\"Sky_Tools-1.0.0.zip\"", response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));
@@ -146,14 +163,15 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, null, Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
-        when(versionService.findVersion(project, "1.0.0", null)).thenReturn(version);
+        when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
         when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3, 4});
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(null);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download/token");
         request.addHeader("Referer", "https://modtale.net/mod/project-1");
         request.setRemoteAddr("203.0.113.5");
 
-        var response = controller.downloadWithToken("token", request);
+        var response = controller.downloadWithToken("token", null, request);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("attachment; filename=\"actual.jar\"", response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));
@@ -180,14 +198,14 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, List.of("dep-b"), Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
-        when(versionService.findVersion(project, "1.0.0", null)).thenReturn(version);
-        when(accountService.getCurrentUser()).thenReturn(currentUser);
+        when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
         when(downloadService.generateBundleZip(project, version, List.of("dep-b"), currentUser)).thenReturn(new byte[]{6, 5, 4});
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download-bundle/bundle-token");
         request.setRemoteAddr("192.0.2.11");
 
-        var response = controller.downloadBundleWithToken("bundle-token", request);
+        var response = controller.downloadBundleWithToken("bundle-token", null, request);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("attachment; filename=\"Sky_Tools-UNZIP-ME.zip\"", response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));

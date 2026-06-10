@@ -61,12 +61,12 @@ export const projectClient = {
         const res = await api.post('/reports', { targetId, targetType, reason, description });
         return res.data;
     },
-    getWikiData: async (slug: string) => {
-        const res = await api.get(`/wiki/${slug}`);
+    getWikiData: async (projectId: string) => {
+        const res = await api.get(`/wiki/${projectId}`);
         return res.data;
     },
-    getWikiPage: async (projectSlug: string, pageSlug: string) => {
-        const res = await api.get(`/wiki/${projectSlug}/${pageSlug}`);
+    getWikiPage: async (projectId: string, pageSlug: string) => {
+        const res = await api.get(`/wiki/${projectId}/${pageSlug}`);
         return res.data;
     },
 

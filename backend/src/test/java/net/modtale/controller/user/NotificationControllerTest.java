@@ -1,5 +1,6 @@
 package net.modtale.controller.user;
 
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.user.NotificationDTO;
 import net.modtale.model.user.Notification;
 import net.modtale.model.user.NotificationType;
@@ -8,7 +9,6 @@ import net.modtale.service.communication.NotificationService;
 import net.modtale.service.user.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.net.URI;
 import java.util.List;
@@ -16,6 +16,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,21 +29,17 @@ class NotificationControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new NotificationController();
         notificationService = mock(NotificationService.class);
         accountService = mock(AccountService.class);
-
-        ReflectionTestUtils.setField(controller, "notificationService", notificationService);
-        ReflectionTestUtils.setField(controller, "accountService", accountService);
+        controller = new NotificationController(notificationService, accountService);
     }
 
     @Test
     void getUserNotificationsRequiresAuthenticatedUser() {
-        when(accountService.getCurrentUser()).thenReturn(null);
+        when(accountService.requireCurrentUser("viewing notifications"))
+                .thenThrow(new UnauthorizedException("You need to sign in before viewing notifications."));
 
-        var response = controller.getUserNotifications();
-
-        assertEquals(401, response.getStatusCode().value());
+        assertThrows(UnauthorizedException.class, () -> controller.getUserNotifications());
     }
 
     @Test
@@ -60,7 +57,7 @@ class NotificationControllerTest {
         notification.setId("notif-1");
         notification.setRead(true);
 
-        when(accountService.getCurrentUser()).thenReturn(user);
+        when(accountService.requireCurrentUser("viewing notifications")).thenReturn(user);
         when(notificationService.getUserNotifications("user-1")).thenReturn(List.of(notification));
 
         var response = controller.getUserNotifications();
@@ -78,7 +75,7 @@ class NotificationControllerTest {
     @Test
     void markAllAsReadUsesCurrentUserId() {
         User user = user("user-1");
-        when(accountService.getCurrentUser()).thenReturn(user);
+        when(accountService.requireCurrentUser("updating notifications")).thenReturn(user);
 
         var response = controller.markAllAsRead();
 
@@ -89,7 +86,7 @@ class NotificationControllerTest {
     @Test
     void deleteNotificationUsesCurrentUserId() {
         User user = user("user-1");
-        when(accountService.getCurrentUser()).thenReturn(user);
+        when(accountService.requireCurrentUser("deleting notifications")).thenReturn(user);
 
         var response = controller.deleteNotification("notif-1");
 

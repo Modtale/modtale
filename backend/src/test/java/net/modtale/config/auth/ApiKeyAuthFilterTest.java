@@ -1,6 +1,7 @@
 package net.modtale.config.auth;
 
 import jakarta.servlet.FilterChain;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.ApiKeyService;
@@ -11,9 +12,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
-import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Map;
 
@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -30,12 +33,13 @@ class ApiKeyAuthFilterTest {
 
     private ApiKeyAuthFilter filter;
     private ApiKeyService apiKeyService;
+    private HandlerExceptionResolver exceptionResolver;
 
     @BeforeEach
     void setUp() {
-        filter = new ApiKeyAuthFilter();
         apiKeyService = mock(ApiKeyService.class);
-        ReflectionTestUtils.setField(filter, "apiKeyService", apiKeyService);
+        exceptionResolver = mock(HandlerExceptionResolver.class);
+        filter = new ApiKeyAuthFilter(apiKeyService, exceptionResolver);
         SecurityContextHolder.clearContext();
     }
 
@@ -73,7 +77,7 @@ class ApiKeyAuthFilterTest {
     }
 
     @Test
-    void rejectsInvalidApiKeysWithUnauthorizedJsonPayload() throws Exception {
+    void rejectsInvalidApiKeysThroughTheSharedExceptionResolver() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
         request.addHeader("X-MODTALE-KEY", "bad-key");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -83,10 +87,8 @@ class ApiKeyAuthFilterTest {
 
         filter.doFilterInternal(request, response, chain);
 
-        assertEquals(401, response.getStatus());
-        assertEquals("application/json", response.getContentType());
-        assertEquals("{\"error\": \"Unauthorized\", \"message\": \"Invalid API Key.\"}", response.getContentAsString());
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verify(exceptionResolver).resolveException(eq(request), eq(response), isNull(), any(UnauthorizedException.class));
     }
 
     @Test

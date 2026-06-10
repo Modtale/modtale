@@ -100,7 +100,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
     const wikiPageSlug = wikiMatch?.[1];
 
-    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(project?.hmWikiSlug, wikiPageSlug, isWikiRoute && !!project?.hmWikiEnabled);
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(project?.id, wikiPageSlug, isWikiRoute && !!project?.hmWikiEnabled);
     const [displayWikiData, setDisplayWikiData] = useState(wikiData);
     const [displaySlug, setDisplaySlug] = useState(wikiPageSlug);
     const wikiContentRef = useRef<HTMLDivElement>(null);

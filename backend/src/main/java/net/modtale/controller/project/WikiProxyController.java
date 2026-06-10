@@ -1,8 +1,14 @@
 package net.modtale.controller.project;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.servlet.http.HttpServletRequest;
+import net.modtale.exception.ErrorMessageUtils;
+import net.modtale.exception.InvalidProjectRequestException;
+import net.modtale.exception.UpstreamServiceException;
 import net.modtale.service.project.WikiService;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,18 +24,26 @@ public class WikiProxyController {
         this.wikiService = wikiService;
     }
 
-    @GetMapping("/{slug}")
-    public ResponseEntity<?> getWikiProject(@PathVariable String slug) {
-        return wikiService.getWikiProject(slug);
+    @GetMapping("/{id}")
+    public ResponseEntity<JsonNode> getWikiProject(@PathVariable String id) {
+        return ResponseEntity.ok(wikiService.getWikiProject(id));
     }
 
-    @GetMapping("/{slug}/**")
-    public ResponseEntity<?> getWikiPage(@PathVariable String slug, HttpServletRequest request) {
+    @GetMapping("/{id}/**")
+    public ResponseEntity<JsonNode> getWikiPage(@PathVariable String id, HttpServletRequest request) {
         String path = request.getRequestURI();
-        String searchStr = "/wiki/" + slug + "/";
+        String searchStr = "/wiki/" + id + "/";
         int index = path.indexOf(searchStr);
-        if (index == -1) return ResponseEntity.badRequest().body("Invalid path");
+        if (index == -1) {
+            throw new InvalidProjectRequestException("Invalid wiki path.");
+        }
         String pagePath = path.substring(index + searchStr.length());
-        return wikiService.getWikiPage(slug, pagePath);
+        return ResponseEntity.ok(wikiService.getWikiPage(id, pagePath));
+    }
+
+    @ExceptionHandler(UpstreamServiceException.class)
+    public ResponseEntity<ProblemDetail> handleWikiUpstream(UpstreamServiceException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(ErrorMessageUtils.problemDetail(ex.getStatus(), ErrorMessageUtils.describe(ex, "Wiki upstream request failed.")));
     }
 }

@@ -1,269 +1,172 @@
 package net.modtale.controller.project;
 
-import net.modtale.exception.ErrorMessageUtils;
-import net.modtale.mapper.ProjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import net.modtale.model.dto.project.ManifestInspectionResult;
-import net.modtale.model.dto.project.ProjectDependencyDTO;
+import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.dto.request.project.UpdateVersionRequest;
-import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectDependency;
-import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
+import net.modtale.model.dto.response.project.DownloadUrlResponse;
+import net.modtale.model.dto.response.project.VersionDependenciesView;
 import net.modtale.model.user.User;
-import net.modtale.service.analytics.TrackingService;
-import net.modtale.service.project.*;
-import net.modtale.service.storage.DownloadTokenService;
-import net.modtale.service.storage.DownloadService;
-import net.modtale.service.storage.StorageService;
+import net.modtale.service.project.VersionApplicationService;
+import net.modtale.service.project.VersionDownloadPayload;
 import net.modtale.service.user.AccountService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import jakarta.servlet.http.HttpServletRequest;
 
-import java.util.Arrays;
+import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
 public class VersionController {
 
-    private static final Logger logger = LoggerFactory.getLogger(VersionController.class);
+    private final VersionApplicationService versionApplicationService;
+    private final AccountService accountService;
 
-    @Autowired private VersionService versionService;
-    @Autowired private ProjectService projectService;
-    @Autowired private DownloadService downloadService;
-    @Autowired private DownloadTokenService downloadTokenService;
-    @Autowired private TrackingService trackingService;
-    @Autowired private StorageService storageService;
-    @Autowired private AccountService accountService;
-
-    @Value("${app.frontend.url}") private String frontendUrl;
+    public VersionController(VersionApplicationService versionApplicationService, AccountService accountService) {
+        this.versionApplicationService = versionApplicationService;
+        this.accountService = accountService;
+    }
 
     @GetMapping("/projects/{id}/versions/{version}/dependencies")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_READ', authentication)")
-    public ResponseEntity<List<ProjectDependencyDTO>> getDependencies(@PathVariable String id, @PathVariable String version,
-                                                                      @RequestParam(value = "gameVersion", required = false) String gameVersion) {
-        Project project = projectService.getProjectById(id);
-        if (project == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        ProjectVersion v = versionService.findVersion(project, version, gameVersion);
-        if (v == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        return ResponseEntity.ok((v.getDependencies() != null ? v.getDependencies() : List.<ProjectDependency>of()).stream()
-                .map(ProjectMapper::toDependencyDTO)
-                .collect(Collectors.toList()));
+    public ResponseEntity<VersionDependenciesView> getDependencies(
+            @PathVariable String id,
+            @PathVariable String version,
+            @RequestParam(value = "gameVersion", required = false) String gameVersion
+    ) {
+        return ResponseEntity.ok(versionApplicationService.getDependencies(id, version, gameVersion));
     }
 
     @PostMapping("/projects/{id}/versions")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_CREATE', authentication)")
-    public ResponseEntity<?> addVersion(
-            @PathVariable String id, @RequestParam("versionNumber") String versionNumber,
-            @RequestParam(value = "gameVersions", required = false) List<String> gameVersions,
-            @RequestParam(value = "file", required = false) MultipartFile file,
-            @RequestParam(value = "modIds", required = false) List<String> projectIds,
-            @RequestParam(value = "changelog", required = false) String changelog,
-            @RequestParam(value = "channel", required = false, defaultValue = "RELEASE") String channel
+    public ResponseEntity<Void> addVersion(
+            @PathVariable String id,
+            @Valid @ModelAttribute CreateVersionRequest requestPayload,
+            Authentication authentication
     ) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before uploading a project version.");
-        try {
-            if (projectIds != null && projectIds.size() == 1 && projectIds.get(0).contains(",")) projectIds = Arrays.stream(projectIds.get(0).split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
-            versionService.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, ProjectVersion.Channel.valueOf(channel.toUpperCase()), user);
-            return ResponseEntity.ok().build();
-        } catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to add a version to this project."); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not add that project version."); }
-        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to add version."); }
+        User user = accountService.requireCurrentUser(authentication, "uploading a project version");
+        versionApplicationService.addVersion(id, requestPayload, user);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/versions/dependency-suggestions")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_CREATE', authentication)")
-    public ResponseEntity<?> suggestManifestDependencies(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before inspecting version dependencies.");
-        try {
-            ManifestInspectionResult result = versionService.inspectManifest(id, file, user);
-            return ResponseEntity.ok(result);
-        } catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not inspect that version manifest."); }
-        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to inspect versions for this project."); }
-        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to inspect version manifest."); }
+    public ResponseEntity<ManifestInspectionResult> suggestManifestDependencies(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "inspecting version dependencies");
+        return ResponseEntity.ok(versionApplicationService.inspectManifest(id, file, user));
     }
 
     @PutMapping("/projects/{id}/versions/{versionId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_EDIT', authentication)")
-    public ResponseEntity<?> updateVersion(@PathVariable String id, @PathVariable String versionId, @RequestBody UpdateVersionRequest requestPayload) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before updating a project version.");
-        try {
-            List<String> projectIds = requestPayload.getModIds();
-            List<String> gameVersions = requestPayload.getGameVersions();
-            String channelStr = requestPayload.getChannel();
-
-            ProjectVersion.Channel channel = channelStr != null ? ProjectVersion.Channel.valueOf(channelStr) : null;
-
-            versionService.updateVersion(id, versionId, projectIds, gameVersions, requestPayload.getChangelog(), channel, user);
-            return ResponseEntity.ok().build();
-        } catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to update this version."); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not update that project version."); }
-        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to update version."); }
+    public ResponseEntity<Void> updateVersion(
+            @PathVariable String id,
+            @PathVariable String versionId,
+            @Valid @RequestBody UpdateVersionRequest requestPayload,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "updating a project version");
+        versionApplicationService.updateVersion(id, versionId, requestPayload, user);
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/projects/{id}/versions/{versionId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'VERSION_DELETE', authentication)")
-    public ResponseEntity<?> deleteVersion(@PathVariable String id, @PathVariable String versionId) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ErrorMessageUtils.unauthorized("You need to sign in before deleting a project version.");
-        try { versionService.deleteVersion(id, versionId, user); return ResponseEntity.ok().build(); }
-        catch (SecurityException e) { return ErrorMessageUtils.forbidden(e, "You do not have permission to delete this version."); }
-        catch (IllegalArgumentException | IllegalStateException e) { return ErrorMessageUtils.badRequest(e, "We could not delete that project version."); }
-        catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to delete version."); }
+    public ResponseEntity<Void> deleteVersion(
+            @PathVariable String id,
+            @PathVariable String versionId,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "deleting a project version");
+        versionApplicationService.deleteVersion(id, versionId, user);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-url")
-    public ResponseEntity<?> getDownloadUrl(@PathVariable String id, @PathVariable String version,
-                                            @RequestParam(value = "gameVersion", required = false) String gameVersion) {
-        try {
-            Project project = projectService.getProjectById(id);
-            if (project == null) return ErrorMessageUtils.notFound("We couldn't find that project, so no download link could be generated.");
-            ProjectVersion target = versionService.findVersion(project, version, gameVersion);
-            if (target == null) return ErrorMessageUtils.notFound("We couldn't find the requested version for that project.");
-            String token = downloadTokenService.generateToken(id, version, gameVersion);
-            return ResponseEntity.ok(Map.of("downloadUrl", "/download/" + token, "expiresIn", 300));
-        } catch (Exception e) { return ErrorMessageUtils.internalServerError(e, "Failed to generate download URL."); }
+    public ResponseEntity<DownloadUrlResponse> getDownloadUrl(
+            @PathVariable String id,
+            @PathVariable String version,
+            @RequestParam(value = "gameVersion", required = false) String gameVersion
+    ) {
+        return ResponseEntity.ok(versionApplicationService.createDownloadUrl(id, version, gameVersion));
     }
 
     @GetMapping("/download/{token}")
-    public ResponseEntity<?> downloadWithToken(@PathVariable String token, HttpServletRequest request) {
-        try {
-            DownloadTokenService.DownloadToken dt = downloadTokenService.validateAndConsume(token);
-            if (dt == null) return ErrorMessageUtils.forbidden("This download link is invalid, expired, or has already been used.");
-
-            Project project = projectService.getRawProjectById(dt.getProjectId());
-            if (project == null) return ErrorMessageUtils.notFound("We couldn't find the project for this download link.");
-
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isApi = (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) || (request.getHeader("Referer") == null || !request.getHeader("Referer").startsWith(frontendUrl));
-            String clientIp = request.getHeader("X-Forwarded-For") == null ? request.getRemoteAddr() : request.getHeader("X-Forwarded-For").split(",")[0];
-
-            ProjectVersion targetVersion = versionService.findVersion(project, dt.getVersion(), dt.getGameVersion());
-            if (targetVersion == null) return ErrorMessageUtils.notFound("We couldn't find the version requested by this download link.");
-
-            trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
-
-            User user = accountService.getCurrentUser();
-
-            if (project.getClassification() != null && "MODPACK".equals(project.getClassification().name())) {
-                if (targetVersion.getDependencies() != null) {
-                    targetVersion.getDependencies().forEach(dep -> trackingService.logDownload(dep.getModId(), null, null, isApi, clientIp));
-                }
-                byte[] zipData = downloadService.generateModpackZip(project, targetVersion, user);
-                String zipFilename = project.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-" + targetVersion.getVersionNumber() + ".zip";
-                return ResponseEntity.ok()
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFilename + "\"")
-                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                        .body(new ByteArrayResource(zipData));
-            }
-
-            byte[] data = storageService.download(targetVersion.getFileUrl());
-
-            String filename = targetVersion.getFileUrl() != null && targetVersion.getFileUrl().contains("/")
-                    ? targetVersion.getFileUrl().substring(targetVersion.getFileUrl().lastIndexOf('/') + 1)
-                    : "download";
-
-            if (filename.length() > 37 && filename.charAt(36) == '-') filename = filename.substring(37);
-
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(new ByteArrayResource(data));
-
-        } catch (Exception e) {
-            logger.error("Error processing download", e);
-            return ErrorMessageUtils.internalServerError(e, "Failed to download file.");
-        }
+    public ResponseEntity<Resource> downloadWithToken(
+            @PathVariable String token,
+            Authentication authentication,
+            HttpServletRequest request
+    ) throws IOException {
+        VersionDownloadPayload payload = versionApplicationService.downloadVersion(
+                token,
+                hasApiRole(authentication),
+                request.getHeader("Referer"),
+                request.getRemoteAddr(),
+                request.getHeader("X-Forwarded-For"),
+                accountService.getCurrentUser(authentication)
+        );
+        return asDownloadResponse(payload);
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-bundle-url")
-    public ResponseEntity<?> getDownloadBundleUrl(
+    public ResponseEntity<BundleDownloadUrlResponse> getDownloadBundleUrl(
             @PathVariable String id,
             @PathVariable String version,
             @RequestParam(value = "gameVersion", required = false) String gameVersion,
-            @RequestParam(value = "deps", required = false) List<String> deps) {
-        try {
-            Project project = projectService.getProjectById(id);
-            if (project == null) return ErrorMessageUtils.notFound("We couldn't find that project, so no bundle download link could be generated.");
-            ProjectVersion target = versionService.findVersion(project, version, gameVersion);
-            if (target == null) return ErrorMessageUtils.notFound("We couldn't find the requested version for that bundle download.");
-            String token = downloadTokenService.generateToken(id, version, gameVersion, deps);
-            return ResponseEntity.ok(Map.of(
-                    "downloadUrl", "/download-bundle/" + token,
-                    "expiresIn", 300
-            ));
-        } catch (Exception e) {
-            return ErrorMessageUtils.internalServerError(e, "Failed to generate bundle download URL.");
-        }
+            @RequestParam(value = "deps", required = false) List<String> deps
+    ) {
+        return ResponseEntity.ok(versionApplicationService.createBundleDownloadUrl(id, version, gameVersion, deps));
     }
 
     @GetMapping("/download-bundle/{token}")
-    public ResponseEntity<?> downloadBundleWithToken(@PathVariable String token, HttpServletRequest request) {
-        try {
-            DownloadTokenService.DownloadToken dt = downloadTokenService.validateAndConsume(token);
-            if (dt == null) return ErrorMessageUtils.forbidden("This bundle download link is invalid, expired, or has already been used.");
-
-            Project project = projectService.getRawProjectById(dt.getProjectId());
-            if (project == null) return ErrorMessageUtils.notFound("We couldn't find the project for this bundle download link.");
-
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isApi = (auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API"))) || (request.getHeader("Referer") == null || !request.getHeader("Referer").startsWith(frontendUrl));
-            String clientIp = request.getHeader("X-Forwarded-For") == null ? request.getRemoteAddr() : request.getHeader("X-Forwarded-For").split(",")[0];
-
-            ProjectVersion targetVersion = versionService.findVersion(project, dt.getVersion(), dt.getGameVersion());
-
-            if (targetVersion == null) return ErrorMessageUtils.notFound("We couldn't find the version requested by this bundle download link.");
-
-            trackingService.logDownload(project.getId(), targetVersion.getId(), project.getAuthor(), isApi, clientIp);
-
-            List<String> selectedDeps = dt.getSelectedDependencies();
-            if (targetVersion.getDependencies() != null) {
-                targetVersion.getDependencies().forEach(dep -> {
-                    if (dep.isEmbedded()) return;
-                    if (selectedDeps == null || selectedDeps.contains(dep.getModId())) {
-                        trackingService.logDownload(dep.getModId(), null, null, isApi, clientIp);
-                    }
-                });
-            }
-
-            User user = accountService.getCurrentUser();
-            byte[] zipData = downloadService.generateBundleZip(project, targetVersion, selectedDeps, user);
-            String zipFilename = project.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_") + "-UNZIP-ME.zip";
-
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFilename + "\"")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(new ByteArrayResource(zipData));
-
-        } catch (Exception e) {
-            logger.error("Error processing bundle download", e);
-            return ErrorMessageUtils.internalServerError(e, "Failed to download bundle.");
-        }
+    public ResponseEntity<Resource> downloadBundleWithToken(
+            @PathVariable String token,
+            Authentication authentication,
+            HttpServletRequest request
+    ) throws IOException {
+        VersionDownloadPayload payload = versionApplicationService.downloadBundle(
+                token,
+                hasApiRole(authentication),
+                request.getHeader("Referer"),
+                request.getRemoteAddr(),
+                request.getHeader("X-Forwarded-For"),
+                accountService.getCurrentUser(authentication)
+        );
+        return asDownloadResponse(payload);
     }
 
-    @GetMapping("/version/{hash}")
-    @PreAuthorize("@apiSecurity.hasAnyPerm('VERSION_READ', authentication)")
-    public ResponseEntity<?> getVersionByHash(@PathVariable String hash) {
-        Optional<ProjectVersion> v = versionService.getVersionByHash(hash);
-        return v.isPresent() ? ResponseEntity.ok(ProjectMapper.toVersionDTO(v.get())) : ResponseEntity.notFound().build();
+    private ResponseEntity<Resource> asDownloadResponse(VersionDownloadPayload payload) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + payload.filename() + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new ByteArrayResource(payload.bytes()));
+    }
+
+    private boolean hasApiRole(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_API"));
     }
 }

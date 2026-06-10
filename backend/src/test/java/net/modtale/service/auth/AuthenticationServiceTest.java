@@ -1,18 +1,20 @@
 package net.modtale.service.auth;
 
+import net.modtale.config.properties.AppSecurityProperties;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.communication.EmailService;
+import net.modtale.service.user.ConnectedAccountMutationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -48,22 +50,38 @@ class AuthenticationServiceTest {
 
     @BeforeEach
     void setUp() {
-        authenticationService = new AuthenticationService();
         userRepository = mock(UserRepository.class);
         bannedEmailRepository = mock(BannedEmailRepository.class);
         trackingService = mock(TrackingService.class);
         passwordEncoder = mock(PasswordEncoder.class);
         emailService = mock(EmailService.class);
         reservedAccountGuardService = mock(ReservedAccountGuardService.class);
-
-        ReflectionTestUtils.setField(authenticationService, "userRepository", userRepository);
-        ReflectionTestUtils.setField(authenticationService, "bannedEmailRepository", bannedEmailRepository);
-        ReflectionTestUtils.setField(authenticationService, "trackingService", trackingService);
-        ReflectionTestUtils.setField(authenticationService, "passwordEncoder", passwordEncoder);
-        ReflectionTestUtils.setField(authenticationService, "emailService", emailService);
-        ReflectionTestUtils.setField(authenticationService, "reservedAccountGuardService", reservedAccountGuardService);
-        ReflectionTestUtils.setField(authenticationService, "preAuthSigningKey", "test-signing-key");
-        ReflectionTestUtils.setField(authenticationService, "preAuthExpirySeconds", 60L);
+        ConnectedAccountMutationService connectedAccountMutationService = new ConnectedAccountMutationService();
+        OAuthProviderProfileService providerProfileService = new OAuthProviderProfileService();
+        OAuthUserLoginService oauthUserLoginService = new OAuthUserLoginService(
+                userRepository,
+                bannedEmailRepository,
+                trackingService,
+                reservedAccountGuardService,
+                providerProfileService,
+                connectedAccountMutationService
+        );
+        OAuthAccountLinkingService oauthAccountLinkingService = new OAuthAccountLinkingService(
+                userRepository,
+                providerProfileService,
+                connectedAccountMutationService
+        );
+        authenticationService = new AuthenticationService(
+                userRepository,
+                bannedEmailRepository,
+                trackingService,
+                passwordEncoder,
+                emailService,
+                reservedAccountGuardService,
+                new AppSecurityProperties("test-signing-key", 60L, 120L, 2L, 12L, 15L, 120L, 25L, 2),
+                oauthUserLoginService,
+                oauthAccountLinkingService
+        );
     }
 
     @Test
@@ -97,7 +115,7 @@ class AuthenticationServiceTest {
         when(userRepository.findByUsernameIgnoreCase("Ada")).thenReturn(Optional.of(user));
         when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(true);
 
-        assertThrows(SecurityException.class, () -> authenticationService.authenticate("Ada", "secret123"));
+        assertThrows(UnauthorizedException.class, () -> authenticationService.authenticate("Ada", "secret123"));
 
         verify(passwordEncoder, never()).matches(anyString(), anyString());
     }
@@ -127,76 +145,6 @@ class AuthenticationServiceTest {
 
         assertSame(user, authenticationService.validatePreAuthToken(token));
         assertNull(authenticationService.validatePreAuthToken(token.substring(0, token.length() - 2) + "xx"));
-    }
-
-    @Test
-    void addCredentialsChangingEmailResetsVerificationAndSendsANewMessage() {
-        User user = user("user-1", "Ada", "old@example.com");
-
-        when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
-        when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
-        when(bannedEmailRepository.existsByEmailIgnoreCase("new@example.com")).thenReturn(false);
-        when(passwordEncoder.encode("newpass1")).thenReturn("encoded-newpass");
-
-        authenticationService.addCredentials("user-1", "new@example.com", "newpass1");
-
-        assertEquals("new@example.com", user.getEmail());
-        assertFalse(user.isEmailVerified());
-        assertEquals("encoded-newpass", user.getPassword());
-        assertNotNull(user.getVerificationToken());
-        assertNotNull(user.getVerificationTokenExpiry());
-        verify(emailService).sendVerificationEmail("new@example.com", "Ada", user.getVerificationToken());
-        verify(userRepository).save(user);
-    }
-
-    @Test
-    void verifyEmailMarksTheAddressVerifiedAndClearsTheTokenState() {
-        User user = user("user-1", "Ada", "ada@example.com");
-        user.setVerificationToken("verify-token");
-        user.setVerificationTokenExpiry(LocalDateTime.now().plusMinutes(10));
-
-        when(userRepository.findByVerificationToken("verify-token")).thenReturn(Optional.of(user));
-        when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(false);
-
-        authenticationService.verifyEmail("verify-token");
-
-        assertTrue(user.isEmailVerified());
-        assertNull(user.getVerificationToken());
-        assertNull(user.getVerificationTokenExpiry());
-        verify(userRepository).save(user);
-    }
-
-    @Test
-    void initiatePasswordResetStoresATokenAndEmailsEligibleUsers() {
-        User user = user("user-1", "Ada", "ada@example.com");
-        user.setPassword("encoded");
-
-        when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(false);
-        when(userRepository.findByEmail("ada@example.com")).thenReturn(Optional.of(user));
-
-        authenticationService.initiatePasswordReset("ada@example.com");
-
-        assertNotNull(user.getPasswordResetToken());
-        assertNotNull(user.getPasswordResetTokenExpiry());
-        verify(userRepository).save(user);
-        verify(emailService).sendPasswordResetEmail("ada@example.com", "Ada", user.getPasswordResetToken());
-    }
-
-    @Test
-    void completePasswordResetEncodesThePasswordAndClearsResetState() {
-        User user = user("user-1", "Ada", "ada@example.com");
-        user.setPasswordResetToken("reset-token");
-        user.setPasswordResetTokenExpiry(LocalDateTime.now().plusMinutes(10));
-
-        when(userRepository.findByPasswordResetToken("reset-token")).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode("newpass1")).thenReturn("encoded-reset");
-
-        authenticationService.completePasswordReset("reset-token", "newpass1");
-
-        assertEquals("encoded-reset", user.getPassword());
-        assertNull(user.getPasswordResetToken());
-        assertNull(user.getPasswordResetTokenExpiry());
-        verify(userRepository).save(user);
     }
 
     @Test

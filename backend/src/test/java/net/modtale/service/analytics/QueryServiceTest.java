@@ -32,12 +32,9 @@ class QueryServiceTest {
 
     @BeforeEach
     void setUp() {
-        queryService = new QueryService();
         mongoTemplate = mock(MongoTemplate.class);
         projectRepository = mock(ProjectRepository.class);
-
-        ReflectionTestUtils.setField(queryService, "mongoTemplate", mongoTemplate);
-        ReflectionTestUtils.setField(queryService, "projectRepository", projectRepository);
+        queryService = new QueryService(mongoTemplate, projectRepository);
     }
 
     @Test

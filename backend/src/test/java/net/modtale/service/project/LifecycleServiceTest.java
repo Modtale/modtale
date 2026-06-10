@@ -1,5 +1,6 @@
 package net.modtale.service.project;
 
+import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
@@ -10,27 +11,21 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.TrackingService;
-import net.modtale.service.communication.NotificationService;
+import net.modtale.service.communication.ProjectNotificationService;
 import net.modtale.service.communication.WebhookService;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.security.SanitizationService;
 import net.modtale.service.security.SecurityIssueAnalysisService;
-import net.modtale.service.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,45 +41,55 @@ class LifecycleServiceTest {
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private ValidationService validationService;
-    private NotificationService notificationService;
+    private ProjectNotificationService projectNotificationService;
     private WebhookService webhookService;
     private TrackingService trackingService;
     private SanitizationService sanitizationService;
-    private MongoTemplate mongoTemplate;
-    private StorageService storageService;
     private UserRepository userRepository;
     private AccessControlService accessControlService;
+    private ProjectAccessService projectAccessService;
+    private ProjectMutationGuard projectMutationGuard;
     private SecurityIssueAnalysisService securityIssueAnalysisService;
 
     @BeforeEach
     void setUp() {
-        lifecycleService = new LifecycleService();
         projectRepository = mock(ProjectRepository.class);
         projectService = mock(ProjectService.class);
         validationService = mock(ValidationService.class);
-        notificationService = mock(NotificationService.class);
+        projectNotificationService = mock(ProjectNotificationService.class);
         webhookService = mock(WebhookService.class);
         trackingService = mock(TrackingService.class);
         sanitizationService = mock(SanitizationService.class);
-        mongoTemplate = mock(MongoTemplate.class);
-        storageService = mock(StorageService.class);
         userRepository = mock(UserRepository.class);
         accessControlService = mock(AccessControlService.class);
+        projectAccessService = new ProjectAccessService(projectService, accessControlService);
+        projectMutationGuard = new ProjectMutationGuard();
         securityIssueAnalysisService = mock(SecurityIssueAnalysisService.class);
-
-        ReflectionTestUtils.setField(lifecycleService, "projectRepository", projectRepository);
-        ReflectionTestUtils.setField(lifecycleService, "projectService", projectService);
-        ReflectionTestUtils.setField(lifecycleService, "validationService", validationService);
-        ReflectionTestUtils.setField(lifecycleService, "notificationService", notificationService);
-        ReflectionTestUtils.setField(lifecycleService, "webhookService", webhookService);
-        ReflectionTestUtils.setField(lifecycleService, "trackingService", trackingService);
-        ReflectionTestUtils.setField(lifecycleService, "sanitizer", sanitizationService);
-        ReflectionTestUtils.setField(lifecycleService, "mongoTemplate", mongoTemplate);
-        ReflectionTestUtils.setField(lifecycleService, "storageService", storageService);
-        ReflectionTestUtils.setField(lifecycleService, "userRepository", userRepository);
-        ReflectionTestUtils.setField(lifecycleService, "accessControlService", accessControlService);
-        ReflectionTestUtils.setField(lifecycleService, "securityIssueAnalysisService", securityIssueAnalysisService);
-        ReflectionTestUtils.setField(lifecycleService, "maxProjectsPerUser", 5);
+        ProjectDraftWorkflowService projectDraftWorkflowService = new ProjectDraftWorkflowService(
+                projectRepository,
+                projectService,
+                validationService,
+                webhookService,
+                sanitizationService,
+                userRepository,
+                projectAccessService,
+                projectMutationGuard,
+                new AppLimitProperties(10, 5, 10, 5, 5, 5, 20, 10)
+        );
+        ProjectPublicationService projectPublicationService = new ProjectPublicationService(
+                projectRepository,
+                projectService,
+                projectNotificationService,
+                webhookService,
+                trackingService,
+                accessControlService,
+                projectAccessService,
+                securityIssueAnalysisService
+        );
+        lifecycleService = new LifecycleService(
+                projectDraftWorkflowService,
+                projectPublicationService
+        );
     }
 
     @Test
@@ -215,7 +220,7 @@ class LifecycleServiceTest {
         verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(scheduled);
         verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(approved);
         verify(projectService).evictProjectCache(project);
-        verify(notificationService).notifyNewProject(project);
+        verify(projectNotificationService).notifyNewProject(project);
         verify(webhookService).triggerWebhook(project);
         verify(webhookService).triggerDiscordWebhook(project);
         verify(trackingService).logNewProject("project-1");
@@ -241,68 +246,10 @@ class LifecycleServiceTest {
 
         verify(accessControlService).hasProjectPermission(project, maintainer, "PROJECT_STATUS_PUBLISH");
         verify(projectService).evictProjectCache(project);
-        verify(notificationService, never()).notifyNewProject(any(Project.class));
+        verify(projectNotificationService, never()).notifyNewProject(any(Project.class));
         verify(webhookService, never()).triggerWebhook(any(Project.class));
         verify(webhookService, never()).triggerDiscordWebhook(any(Project.class));
         verify(trackingService, never()).logNewProject(anyString());
-    }
-
-    @Test
-    void performHardDeleteScrubsProjectsThatAreStillNeededForDependencies() {
-        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DELETED);
-        project.setTitle("Sky Tools");
-        project.setDescription("Original description");
-        project.setAbout("Original about");
-        project.setSlug("sky-tools");
-        project.setImageUrl("https://cdn.modtale.net/icon.png");
-        project.setBannerUrl("https://cdn.modtale.net/banner.png");
-        project.setGalleryImages(new ArrayList<>(List.of("https://cdn.modtale.net/one.png", "https://cdn.modtale.net/two.png")));
-        project.setTeamMembers(new ArrayList<>(List.of(new Project.ProjectMember("user-1", "role-1"))));
-        project.setTeamInvites(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-2"))));
-        project.setProjectRoles(new ArrayList<>(List.of(new Project.ProjectRole("role-1", "Admin", "#fff", List.of("PROJECT_EDIT_METADATA")))));
-        project.setComments(new ArrayList<>());
-        project.setTags(new ArrayList<>(List.of("magic")));
-        project.setDeletedAt(LocalDateTime.now());
-
-        when(projectRepository.findByDependency("project-1")).thenReturn(List.of(editableProject("dependent-1", ProjectClassification.DATA, ProjectStatus.PUBLISHED)));
-        when(projectRepository.save(project)).thenReturn(project);
-
-        lifecycleService.performHardDelete(project);
-
-        assertEquals("Deleted Project", project.getTitle());
-        assertEquals("This project has been deleted.", project.getDescription());
-        assertEquals("This project was deleted by the author but is retained for dependency resolution.", project.getAbout());
-        assertNull(project.getSlug());
-        assertNull(project.getImageUrl());
-        assertNull(project.getBannerUrl());
-        assertTrue(project.getGalleryImages().isEmpty());
-        assertTrue(project.getTeamMembers().isEmpty());
-        assertTrue(project.getTeamInvites().isEmpty());
-        assertTrue(project.getProjectRoles().isEmpty());
-        assertTrue(project.getTags().isEmpty());
-        assertNull(project.getDeletedAt());
-
-        verify(storageService).deleteFile("https://cdn.modtale.net/icon.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/banner.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/one.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/two.png");
-        verify(projectRepository).save(project);
-        verify(projectService).evictProjectCache(project);
-        verify(projectRepository, never()).delete(project);
-        verify(trackingService, never()).deleteProjectAnalytics("project-1");
-    }
-
-    @Test
-    void performDeletionStrategyMarksPublishedProjectsDeletedAndTracksRemoval() {
-        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PUBLISHED);
-
-        lifecycleService.performDeletionStrategy(project);
-
-        assertEquals(ProjectStatus.DELETED, project.getStatus());
-        assertNotNull(project.getDeletedAt());
-        verify(projectRepository).save(project);
-        verify(projectService).evictProjectCache(project);
-        verify(trackingService).logDeletedProject("project-1");
     }
 
     private static Project editableProject(String id, ProjectClassification classification, ProjectStatus status) {

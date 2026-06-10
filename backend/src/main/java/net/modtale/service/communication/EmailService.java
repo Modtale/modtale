@@ -2,8 +2,7 @@ package net.modtale.service.communication;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import net.modtale.config.properties.AppFrontendProperties;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -12,13 +11,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class EmailService {
 
-    @Autowired
-    private JavaMailSender mailSender;
-
-    @Value("${app.frontend.url}")
-    private String frontendUrl;
+    private final JavaMailSender mailSender;
+    private final String frontendUrl;
 
     private static final String LOGO_URL = "https://modtale.net/assets/favicon.png";
+
+    public EmailService(JavaMailSender mailSender, AppFrontendProperties frontendProperties) {
+        this.mailSender = mailSender;
+        this.frontendUrl = frontendProperties.url();
+    }
 
     @Async
     public void sendVerificationEmail(String to, String username, String token) {
