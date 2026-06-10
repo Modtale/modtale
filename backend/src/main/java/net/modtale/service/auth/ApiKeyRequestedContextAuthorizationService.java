@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -90,8 +91,7 @@ final class ApiKeyRequestedContextAuthorizationService {
         return validatedContexts;
     }
 
-    void syncUserProjectPermissions(String userId, String projectId, List<String> allowedPermsList) {
-        Set<ApiKey.ApiPermission> allowedPerms = parsePermissions(projectId, allowedPermsList);
+    void syncUserProjectPermissions(String userId, String projectId, Set<ApiKey.ApiPermission> allowedPerms) {
         List<ApiKey> keys = apiKeyRepository.findByUserId(userId);
         for (ApiKey key : keys) {
             if (key.getContextPermissions() == null || !key.getContextPermissions().containsKey(projectId)) {
@@ -116,21 +116,5 @@ final class ApiKeyRequestedContextAuthorizationService {
                 apiKeyRepository.save(key);
             }
         }
-    }
-
-    private Set<ApiKey.ApiPermission> parsePermissions(String projectId, List<String> allowedPermsList) {
-        Set<ApiKey.ApiPermission> allowedPerms = new HashSet<>();
-        if (allowedPermsList == null) {
-            return allowedPerms;
-        }
-
-        for (String permission : allowedPermsList) {
-            try {
-                allowedPerms.add(ApiKey.ApiPermission.valueOf(permission));
-            } catch (IllegalArgumentException ex) {
-                logger.warn("Ignoring unknown project API permission '{}' while syncing project={}", permission, projectId);
-            }
-        }
-        return allowedPerms;
     }
 }

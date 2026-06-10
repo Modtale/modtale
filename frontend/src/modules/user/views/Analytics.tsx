@@ -9,6 +9,7 @@ import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW, calculateRollin
 import { formatDateTime } from '@/utils/modHelpers';
 import type { Project, User } from '@/types';
 import { hasOrgPermission } from '@/modules/organization/api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
@@ -80,7 +81,7 @@ export const Analytics: React.FC = () => {
 
                 const orgs = await api.get('/user/orgs');
                 const adminOrgs = orgs.data.filter((o: User) =>
-                    hasOrgPermission(o, me.data.id, 'PROJECT_EDIT_METADATA')
+                    hasOrgPermission(o, me.data.id, Permission.PROJECT_EDIT_METADATA)
                 );
                 setMyOrgs(adminOrgs);
             } catch (e) { console.error("Init failed", e); }

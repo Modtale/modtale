@@ -11,6 +11,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.TrackingService;
+import net.modtale.service.security.AccessControlService;
 import net.modtale.service.storage.DownloadService;
 import net.modtale.service.storage.DownloadTokenService;
 import net.modtale.service.storage.StorageService;
@@ -28,6 +29,7 @@ public class VersionDownloadOrchestrationService {
     private final DownloadTokenService downloadTokenService;
     private final TrackingService trackingService;
     private final StorageService storageService;
+    private final AccessControlService accessControlService;
     private final String frontendUrl;
 
     public VersionDownloadOrchestrationService(
@@ -37,6 +39,7 @@ public class VersionDownloadOrchestrationService {
             DownloadTokenService downloadTokenService,
             TrackingService trackingService,
             StorageService storageService,
+            AccessControlService accessControlService,
             AppFrontendProperties frontendProperties
     ) {
         this.projectVersionAccessService = projectVersionAccessService;
@@ -45,11 +48,12 @@ public class VersionDownloadOrchestrationService {
         this.downloadTokenService = downloadTokenService;
         this.trackingService = trackingService;
         this.storageService = storageService;
+        this.accessControlService = accessControlService;
         this.frontendUrl = frontendProperties.url();
     }
 
-    public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion) {
-        Project project = getProjectOrThrow(projectId,
+    public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, User currentUser) {
+        Project project = getProjectOrThrow(projectId, currentUser,
                 "We couldn't find that project, so no download link could be generated.");
         getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that project.");
@@ -61,9 +65,10 @@ public class VersionDownloadOrchestrationService {
             String projectId,
             String versionNumber,
             String gameVersion,
-            List<String> dependencies
+            List<String> dependencies,
+            User currentUser
     ) {
-        Project project = getProjectOrThrow(projectId,
+        Project project = getProjectOrThrow(projectId, currentUser,
                 "We couldn't find that project, so no bundle download link could be generated.");
         getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that bundle download.");
@@ -84,6 +89,7 @@ public class VersionDownloadOrchestrationService {
                 "This download link is invalid, expired, or has already been used.");
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this download link.");
+        ensureReadable(project, currentUser);
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this download link.");
 
@@ -115,6 +121,7 @@ public class VersionDownloadOrchestrationService {
                 "This bundle download link is invalid, expired, or has already been used.");
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this bundle download link.");
+        ensureReadable(project, currentUser);
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this bundle download link.");
 
@@ -156,8 +163,8 @@ public class VersionDownloadOrchestrationService {
         return downloadToken;
     }
 
-    private Project getProjectOrThrow(String projectId, String failureMessage) {
-        Project project = projectService.getProjectById(projectId);
+    private Project getProjectOrThrow(String projectId, User currentUser, String failureMessage) {
+        Project project = projectService.getProjectById(projectId, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException(failureMessage);
         }
@@ -175,6 +182,12 @@ public class VersionDownloadOrchestrationService {
     private ProjectVersion getVersionOrThrow(Project project, String versionNumber, String gameVersion, String failureMessage) {
         return projectVersionAccessService.requireByVersionNumber(project, versionNumber, gameVersion,
                 () -> new VersionNotFoundException(failureMessage));
+    }
+
+    private void ensureReadable(Project project, User currentUser) {
+        if (!accessControlService.canReadProject(project, currentUser)) {
+            throw new ResourceNotFoundException("We couldn't find the project for this download link.");
+        }
     }
 
     private String buildModpackFilename(Project project, ProjectVersion version) {

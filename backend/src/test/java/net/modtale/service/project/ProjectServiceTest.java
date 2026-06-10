@@ -58,7 +58,7 @@ class ProjectServiceTest {
 
         when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
         when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
-        when(accessControlService.hasProjectPermission(project, viewer, "PROJECT_READ")).thenReturn(false);
+        when(accessControlService.canReadProject(project, viewer)).thenReturn(false);
 
         assertNull(service.getProjectById("project-1", viewer));
     }
@@ -70,7 +70,7 @@ class ProjectServiceTest {
 
         when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
         when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
-        when(accessControlService.hasProjectPermission(project, viewer, "PROJECT_READ")).thenReturn(true);
+        when(accessControlService.canReadProject(project, viewer)).thenReturn(true);
 
         Project resolved = service.getProjectById("project-1", viewer);
 
@@ -99,6 +99,7 @@ class ProjectServiceTest {
         User author = user("author-1", "SkyDev");
         when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
         when(userRepository.findById("author-1")).thenReturn(Optional.of(author));
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
 
         Project resolved = service.getPublicProjectById("project-1");
 

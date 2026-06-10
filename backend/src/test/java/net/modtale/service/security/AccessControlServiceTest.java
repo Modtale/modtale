@@ -95,6 +95,14 @@ class AccessControlServiceTest {
     }
 
     @Test
+    void hasAnyPermTreatsPublicReadScopesAsAnonymousSafe() {
+        assertTrue(accessControlService.hasAnyPerm("PROJECT_READ", null));
+        assertTrue(accessControlService.hasAnyPerm("PROFILE_READ", null));
+        assertTrue(accessControlService.hasAnyPerm("ORG_READ", null));
+        assertFalse(accessControlService.hasAnyPerm("PROJECT_DELETE", null));
+    }
+
+    @Test
     void hasProjectPermAllowsPublishedReadsAndTeamRoleEdits() {
         Project project = new Project();
         project.setId("project-1");
@@ -102,11 +110,12 @@ class AccessControlServiceTest {
         when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
 
         assertTrue(accessControlService.hasProjectPerm("project-1", "PROJECT_READ", null));
+        assertTrue(accessControlService.hasProjectPerm("project-1", "VERSION_READ", null));
 
         User currentUser = user("u-editor", "editor", List.of("USER"));
         project.setStatus(ProjectStatus.DRAFT);
         project.setTeamMembers(List.of(new Project.ProjectMember("u-editor", "role-1")));
-        project.setProjectRoles(List.of(new Project.ProjectRole("role-1", "Editor", "#fff", List.of("PROJECT_EDIT_METADATA"))));
+        project.setProjectRoles(List.of(new Project.ProjectRole("role-1", "Editor", "#fff", Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA))));
 
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
 

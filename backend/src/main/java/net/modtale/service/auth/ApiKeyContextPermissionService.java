@@ -8,7 +8,7 @@ import net.modtale.service.security.AccessControlService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.Set;
 
 final class ApiKeyContextPermissionService {
@@ -26,7 +26,7 @@ final class ApiKeyContextPermissionService {
             User.OrganizationMember membership,
             Set<ApiKey.ApiPermission> requestedPermissions
     ) {
-        Set<ApiKey.ApiPermission> allowedPermissions = new HashSet<>();
+        Set<ApiKey.ApiPermission> allowedPermissions = EnumSet.noneOf(ApiKey.ApiPermission.class);
         if (requestedPermissions == null || requestedPermissions.isEmpty()) {
             return allowedPermissions;
         }
@@ -103,7 +103,7 @@ final class ApiKeyContextPermissionService {
             Set<ApiKey.ApiPermission> requestedPermissions,
             boolean requireMembership
     ) {
-        Set<ApiKey.ApiPermission> allowedPermissions = new HashSet<>();
+        Set<ApiKey.ApiPermission> allowedPermissions = EnumSet.noneOf(ApiKey.ApiPermission.class);
         if (requestedPermissions == null || requestedPermissions.isEmpty()) {
             return allowedPermissions;
         }
@@ -128,22 +128,13 @@ final class ApiKeyContextPermissionService {
             Set<ApiKey.ApiPermission> requestedPermissions,
             String projectId
     ) {
-        Set<ApiKey.ApiPermission> allowedPermissions = new HashSet<>();
+        Set<ApiKey.ApiPermission> allowedPermissions = EnumSet.noneOf(ApiKey.ApiPermission.class);
         if (role == null || role.getPermissions() == null) {
             return allowedPermissions;
         }
 
-        Set<ApiKey.ApiPermission> rolePermissions = new HashSet<>();
-        for (String permission : role.getPermissions()) {
-            try {
-                rolePermissions.add(ApiKey.ApiPermission.valueOf(permission));
-            } catch (IllegalArgumentException ex) {
-                logger.warn("Ignoring unknown stored API permission '{}' for project context={}", permission, projectId);
-            }
-        }
-
         for (ApiKey.ApiPermission permission : requestedPermissions) {
-            if (rolePermissions.contains(permission)) {
+            if (role.getPermissions().contains(permission)) {
                 allowedPermissions.add(permission);
             }
         }

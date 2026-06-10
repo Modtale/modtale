@@ -14,6 +14,7 @@ import net.modtale.service.project.VersionApplicationService;
 import net.modtale.service.project.VersionDownloadOrchestrationService;
 import net.modtale.service.project.VersionMutationApplicationService;
 import net.modtale.service.project.VersionService;
+import net.modtale.service.security.AccessControlService;
 import net.modtale.service.storage.DownloadService;
 import net.modtale.service.storage.DownloadTokenService;
 import net.modtale.service.storage.StorageService;
@@ -54,6 +55,7 @@ class VersionControllerTest {
     private DownloadTokenService downloadTokenService;
     private TrackingService trackingService;
     private StorageService storageService;
+    private AccessControlService accessControlService;
     private AccountService accountService;
 
     @BeforeEach
@@ -65,6 +67,7 @@ class VersionControllerTest {
         downloadTokenService = mock(DownloadTokenService.class);
         trackingService = mock(TrackingService.class);
         storageService = mock(StorageService.class);
+        accessControlService = mock(AccessControlService.class);
         accountService = mock(AccountService.class);
 
         VersionMutationApplicationService versionMutationApplicationService = new VersionMutationApplicationService(versionService);
@@ -75,6 +78,7 @@ class VersionControllerTest {
                 downloadTokenService,
                 trackingService,
                 storageService,
+                accessControlService,
                 new AppFrontendProperties("https://modtale.net")
         );
         VersionApplicationService versionApplicationService = new VersionApplicationService(
@@ -133,6 +137,7 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", "1.1.0", null, Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, currentUser)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq("1.1.0"), any())).thenReturn(version);
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
         when(downloadService.generateModpackZip(project, version, currentUser)).thenReturn(new byte[]{9, 8, 7});
@@ -163,6 +168,7 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, null, Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, null)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
         when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3, 4});
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(null);
@@ -198,6 +204,7 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, List.of("dep-b"), Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, currentUser)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
         when(downloadService.generateBundleZip(project, version, List.of("dep-b"), currentUser)).thenReturn(new byte[]{6, 5, 4});

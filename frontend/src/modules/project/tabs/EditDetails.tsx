@@ -3,19 +3,20 @@ import { theme } from '@/styles/theme';
 import { FileText } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import type { MetadataFormData } from '../components/FormShared';
+import { Permission } from '@/modules/permissions/permissions';
 
 interface EditDetailsProps {
     metaData: MetadataFormData;
     setMetaData: React.Dispatch<React.SetStateAction<MetadataFormData>>;
     readOnly: boolean;
-    hasProjectPermission: (perm: string) => boolean;
+    hasProjectPermission: (perm: Permission) => boolean;
     editorMode: 'write' | 'preview';
     setEditorMode: (mode: 'write' | 'preview') => void;
     markDirty: () => void;
 }
 
 export const EditDetails: React.FC<EditDetailsProps> = ({ metaData, setMetaData, readOnly, hasProjectPermission, editorMode, setEditorMode, markDirty }) => {
-    const canEdit = !readOnly && hasProjectPermission('PROJECT_EDIT_METADATA');
+    const canEdit = !readOnly && hasProjectPermission(Permission.PROJECT_EDIT_METADATA);
     return (
         <div className="h-full flex flex-col">
             <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>

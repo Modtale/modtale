@@ -13,6 +13,7 @@ import net.modtale.service.security.AccessControlService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 @Service
@@ -91,10 +92,10 @@ public class TeamTransferService {
             if (oldOwner != null) {
                 if (oldOwner.getAccountType() == User.AccountType.ORGANIZATION && oldOwner.getOrganizationMembers() != null) {
                     oldOwner.getOrganizationMembers().forEach(member ->
-                            apiKeyService.syncUserProjectPermissions(member.getUserId(), project.getId(), new ArrayList<>())
+                            apiKeyService.syncUserProjectPermissions(member.getUserId(), project.getId(), EnumSet.noneOf(ApiKey.ApiPermission.class))
                     );
                 } else {
-                    apiKeyService.syncUserProjectPermissions(oldOwner.getId(), project.getId(), new ArrayList<>());
+                    apiKeyService.syncUserProjectPermissions(oldOwner.getId(), project.getId(), EnumSet.noneOf(ApiKey.ApiPermission.class));
                 }
             }
 

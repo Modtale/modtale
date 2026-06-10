@@ -9,6 +9,7 @@ import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
 import { TransferProjectModal } from '@/components/shared/TransferProjectModal';
 import { SiteRoutes } from '@/utils/routes';
 import { hasOrgPermission } from '@/modules/organization/api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 
 interface ManageProjectsProps {
     user: User;
@@ -161,7 +162,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                             <div className="grid grid-cols-1 gap-4">
                                 {pList.map(project => {
                                     const canManageOrgProject = myOrgs.some(o =>
-                                        o.id === orgId && hasOrgPermission(o, user.id, 'PROJECT_EDIT_METADATA')
+                                        o.id === orgId && hasOrgPermission(o, user.id, Permission.PROJECT_EDIT_METADATA)
                                     );
                                     return (
                                         <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">

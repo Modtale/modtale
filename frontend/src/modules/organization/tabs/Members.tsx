@@ -6,6 +6,7 @@ import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
 
@@ -31,9 +32,9 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
 
-    const canInvite = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_INVITE');
-    const canManageRoles = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_EDIT_ROLE');
-    const canRemove = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_REMOVE');
+    const canInvite = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_INVITE);
+    const canManageRoles = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_EDIT_ROLE);
+    const canRemove = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_REMOVE);
 
     const nonOwnerRoles = org.organizationRoles?.filter(r => !r.isOwner) || [];
     const hasRoles = nonOwnerRoles.length > 0;

@@ -8,7 +8,7 @@ import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.exception.UpstreamServiceException;
 import net.modtale.model.project.Project;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.model.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -23,26 +23,24 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Optional;
-
 @Service
 public class WikiService {
 
     private static final Logger logger = LoggerFactory.getLogger(WikiService.class);
 
-    private final ProjectRepository projectRepository;
+    private final ProjectService projectService;
     private final ObjectMapper objectMapper;
     private final AppWikiProperties wikiProperties;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public WikiService(ProjectRepository projectRepository, ObjectMapper objectMapper, AppWikiProperties wikiProperties) {
-        this.projectRepository = projectRepository;
+    public WikiService(ProjectService projectService, ObjectMapper objectMapper, AppWikiProperties wikiProperties) {
+        this.projectService = projectService;
         this.objectMapper = objectMapper;
         this.wikiProperties = wikiProperties;
     }
 
-    public JsonNode getWikiProject(String projectId) {
-        String targetSlug = resolveProjectWikiSlug(projectId);
+    public JsonNode getWikiProject(String projectId, User currentUser) {
+        String targetSlug = resolveProjectWikiSlug(projectId, currentUser);
         String wikiId = resolveWikiModId(targetSlug);
         if (wikiId == null) {
             throw new ResourceNotFoundException("Wiki not found for project: " + projectId);
@@ -50,8 +48,8 @@ public class WikiService {
         return readJson(fetchProjectPayload(wikiId), "Failed to parse wiki project data.");
     }
 
-    public JsonNode getWikiPage(String projectId, String pagePath) {
-        String targetSlug = resolveProjectWikiSlug(projectId);
+    public JsonNode getWikiPage(String projectId, String pagePath, User currentUser) {
+        String targetSlug = resolveProjectWikiSlug(projectId, currentUser);
         String wikiId = resolveWikiModId(targetSlug);
         if (wikiId == null) {
             throw new ResourceNotFoundException("Wiki not found for project: " + projectId);
@@ -64,13 +62,11 @@ public class WikiService {
         return readJson(fetchPagePayload(wikiId, normalizedPagePath), "Failed to parse wiki page data.");
     }
 
-    private String resolveProjectWikiSlug(String projectId) {
-        Optional<Project> optProject = projectRepository.findById(projectId);
-        if (optProject.isEmpty()) {
+    private String resolveProjectWikiSlug(String projectId, User currentUser) {
+        Project project = projectService.getProjectById(projectId, currentUser);
+        if (project == null) {
             throw new ResourceNotFoundException("Wiki not found for project: " + projectId);
         }
-
-        Project project = optProject.get();
         if (!project.isHmWikiEnabled() || project.getHmWikiSlug() == null || project.getHmWikiSlug().isBlank()) {
             throw new ResourceNotFoundException("Wiki not found for project: " + projectId);
         }

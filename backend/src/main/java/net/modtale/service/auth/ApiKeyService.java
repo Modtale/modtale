@@ -63,8 +63,8 @@ public class ApiKeyService {
         return apiKeyIssuanceService.createApiKey(userId, name, requestedContexts);
     }
 
-    public void syncUserProjectPermissions(String userId, String projectId, List<String> allowedPermsList) {
-        apiKeyIssuanceService.syncUserProjectPermissions(userId, projectId, allowedPermsList);
+    public void syncUserProjectPermissions(String userId, String projectId, Set<ApiKey.ApiPermission> allowedPerms) {
+        apiKeyIssuanceService.syncUserProjectPermissions(userId, projectId, allowedPerms);
     }
 
     public ApiKey resolveKey(String plainKey) {

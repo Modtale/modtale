@@ -14,6 +14,7 @@ import net.modtale.service.user.AccountService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -73,13 +74,15 @@ public class AnalyticsController {
     }
 
     @GetMapping("/projects/{id}/analytics")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<ProjectAnalyticsDetail> getProjectAnalytics(
             @PathVariable String id,
             @RequestParam(defaultValue = "30d")
             @Pattern(regexp = "7d|30d|90d|1y", message = "Analytics ranges must be 7d, 30d, 90d, or 1y.")
-            String range
+            String range,
+            Authentication authentication
     ) {
-        User user = accountService.getCurrentUser();
+        User user = accountService.getCurrentUser(authentication);
         Project project = projectService.getProjectById(id, user);
         analyticsAccessService.assertProjectAnalyticsAccess(project, user);
         String projectId = (project != null) ? project.getId() : id;

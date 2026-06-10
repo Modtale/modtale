@@ -28,6 +28,7 @@ import net.modtale.service.auth.TwoFactorService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -81,6 +82,7 @@ public class AuthController {
     }
 
     @PostMapping("/resend-verification")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MessageResponse> resendVerification() {
         User user = accountService.requireCurrentUser("requesting another verification email");
         authenticationMutationService.resendVerificationEmail(user);
@@ -117,6 +119,7 @@ public class AuthController {
     }
 
     @PutMapping("/credentials")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<Void> updateCredentials(@Valid @RequestBody UpdateCredentialsRequest requestPayload) {
         User user = accountService.requireCurrentUser("updating your email or password");
         authenticationMutationService.addCredentials(user.getId(), requestPayload.getEmail(), requestPayload.getPassword());
@@ -124,6 +127,7 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest requestPayload) {
         User user = accountService.requireCurrentUser("changing your password");
         authenticationMutationService.changePassword(user.getId(), requestPayload.getCurrentPassword(), requestPayload.getNewPassword());
@@ -131,6 +135,7 @@ public class AuthController {
     }
 
     @GetMapping("/mfa/setup")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MfaSetupResponse> setupMfa() {
         User user = accountService.requireCurrentUser("setting up two-factor authentication");
         if (user.isMfaEnabled()) {
@@ -145,6 +150,7 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/verify")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MessageResponse> verifyMfaSetup(@Valid @RequestBody VerifyMfaRequest requestPayload) {
         User user = accountService.requireCurrentUser("verifying two-factor authentication setup");
         if (!twoFactorService.isOtpValid(user.getMfaSecret(), requestPayload.getCode())) {

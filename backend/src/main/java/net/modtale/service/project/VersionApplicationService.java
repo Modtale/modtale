@@ -41,8 +41,8 @@ public class VersionApplicationService {
         this.projectService = projectService;
     }
 
-    public VersionDependenciesView getDependencies(String projectId, String versionNumber, String gameVersion) {
-        Project project = getProjectOrThrow(projectId, "We couldn't find that project.");
+    public VersionDependenciesView getDependencies(String projectId, String versionNumber, String gameVersion, User currentUser) {
+        Project project = getProjectOrThrow(projectId, currentUser, "We couldn't find that project.");
         ProjectVersion version = getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find that version for the requested project.");
         List<ProjectDependencyDTO> dependencies = (version.getDependencies() != null ? version.getDependencies() : List.<ProjectDependency>of())
@@ -68,17 +68,24 @@ public class VersionApplicationService {
         versionMutationApplicationService.deleteVersion(projectId, versionId, currentUser);
     }
 
-    public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion) {
-        return versionDownloadOrchestrationService.createDownloadUrl(projectId, versionNumber, gameVersion);
+    public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, User currentUser) {
+        return versionDownloadOrchestrationService.createDownloadUrl(projectId, versionNumber, gameVersion, currentUser);
     }
 
     public BundleDownloadUrlResponse createBundleDownloadUrl(
             String projectId,
             String versionNumber,
             String gameVersion,
-            List<String> dependencies
+            List<String> dependencies,
+            User currentUser
     ) {
-        return versionDownloadOrchestrationService.createBundleDownloadUrl(projectId, versionNumber, gameVersion, dependencies);
+        return versionDownloadOrchestrationService.createBundleDownloadUrl(
+                projectId,
+                versionNumber,
+                gameVersion,
+                dependencies,
+                currentUser
+        );
     }
 
     public VersionDownloadPayload downloadVersion(
@@ -117,8 +124,8 @@ public class VersionApplicationService {
         );
     }
 
-    private Project getProjectOrThrow(String projectId, String failureMessage) {
-        Project project = projectService.getProjectById(projectId);
+    private Project getProjectOrThrow(String projectId, User currentUser, String failureMessage) {
+        Project project = projectService.getProjectById(projectId, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException(failureMessage);
         }

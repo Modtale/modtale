@@ -5,6 +5,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.user.ApiKey;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.storage.StorageService;
@@ -17,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -81,7 +83,7 @@ class ProjectDeletionServiceTest {
         project.setGalleryImages(new ArrayList<>(List.of("https://cdn.modtale.net/one.png", "https://cdn.modtale.net/two.png")));
         project.setTeamMembers(new ArrayList<>(List.of(new Project.ProjectMember("user-1", "role-1"))));
         project.setTeamInvites(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-2"))));
-        project.setProjectRoles(new ArrayList<>(List.of(new Project.ProjectRole("role-1", "Admin", "#fff", List.of("PROJECT_EDIT_METADATA")))));
+        project.setProjectRoles(new ArrayList<>(List.of(new Project.ProjectRole("role-1", "Admin", "#fff", Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA)))));
         project.setComments(new ArrayList<>());
         project.setTags(new ArrayList<>(List.of("magic")));
         project.setDeletedAt(LocalDateTime.now());

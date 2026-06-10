@@ -1,5 +1,6 @@
 import { api } from '@/utils/api';
 import type { User, OrganizationRole, Project } from '@/types';
+import type { Permission } from '@/modules/permissions/permissions';
 
 export const organizationClient = {
     getUserOrgs: async () => (await api.get<User[]>('/user/orgs')).data,
@@ -37,7 +38,7 @@ export const organizationClient = {
     searchUsers: async (query: string) => (await api.get<User[]>(`/users/search?query=${query}`)).data
 };
 
-export const hasOrgPermission = (org: User | null, userId: string, perm: string): boolean => {
+export const hasOrgPermission = (org: User | null, userId: string, perm: Permission): boolean => {
     if (!org || !org.organizationMembers || !org.organizationRoles) return false;
     const member = org.organizationMembers.find(m => m.userId === userId);
     if (!member || !member.roleId) return false;

@@ -10,6 +10,7 @@ import net.modtale.model.user.User;
 import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.ApiKeyService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class ApiKeyController {
     }
 
     @GetMapping
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<List<ApiKeyDTO>> getMyKeys() {
         User user = accountService.requireCurrentUser("viewing your API keys");
         List<ApiKey> keys = apiKeyService.getMyKeys(user.getId());
@@ -34,6 +36,7 @@ public class ApiKeyController {
     }
 
     @PostMapping
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<ApiKeySecretResponse> createKey(@Valid @RequestBody CreateApiKeyRequest payload) {
         User user = accountService.requireCurrentUser("creating an API key");
         if (!user.isEmailVerified()) {
@@ -44,6 +47,7 @@ public class ApiKeyController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<Void> revokeKey(@PathVariable String id) {
         User user = accountService.requireCurrentUser("revoking an API key");
         apiKeyService.revokeKey(id, user.getId());

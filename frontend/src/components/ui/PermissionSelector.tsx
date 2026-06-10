@@ -1,100 +1,11 @@
 import React from 'react';
 import { Checkbox } from '@/components/ui/Checkbox';
-
-export interface PermissionDef {
-    id: string;
-    label: string;
-}
-
-export interface PermissionGroupDef {
-    group: string;
-    permissions: PermissionDef[];
-}
-
-export const ALL_PERMISSION_GROUPS: PermissionGroupDef[] = [
-    {
-        group: 'Organization Settings',
-        permissions: [
-            { id: 'ORG_READ', label: 'Read Org' },
-            { id: 'ORG_EDIT_METADATA', label: 'Edit Profile' },
-            { id: 'ORG_EDIT_AVATAR', label: 'Edit Avatar' },
-            { id: 'ORG_EDIT_BANNER', label: 'Edit Banner' },
-            { id: 'ORG_DELETE', label: 'Delete Org' },
-            { id: 'ORG_MEMBER_READ', label: 'Read Members' },
-            { id: 'ORG_MEMBER_INVITE', label: 'Invite Members' },
-            { id: 'ORG_MEMBER_REMOVE', label: 'Remove Members' },
-            { id: 'ORG_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
-            { id: 'ORG_CONNECTION_MANAGE', label: 'Manage Connections' }
-        ]
-    },
-    {
-        group: 'Project Management',
-        permissions: [
-            { id: 'PROJECT_READ', label: 'Read Projects' },
-            { id: 'PROJECT_CREATE', label: 'Create Projects' },
-            { id: 'PROJECT_EDIT_METADATA', label: 'Edit Metadata' },
-            { id: 'PROJECT_EDIT_ICON', label: 'Edit Icon' },
-            { id: 'PROJECT_EDIT_BANNER', label: 'Edit Banner' },
-            { id: 'PROJECT_DELETE', label: 'Delete Projects' }
-        ]
-    },
-    {
-        group: 'Versions & Releases',
-        permissions: [
-            { id: 'VERSION_READ', label: 'Read Versions' },
-            { id: 'VERSION_CREATE', label: 'Upload Versions' },
-            { id: 'VERSION_EDIT', label: 'Edit Versions' },
-            { id: 'VERSION_DELETE', label: 'Delete Versions' },
-            { id: 'VERSION_DOWNLOAD', label: 'Download Files' }
-        ]
-    },
-    {
-        group: 'Visibility & Publishing',
-        permissions: [
-            { id: 'PROJECT_STATUS_SUBMIT', label: 'Submit for Review' },
-            { id: 'PROJECT_STATUS_REVERT', label: 'Revert to Draft' },
-            { id: 'PROJECT_STATUS_ARCHIVE', label: 'Archive Project' },
-            { id: 'PROJECT_STATUS_UNLIST', label: 'Unlist Project' },
-            { id: 'PROJECT_STATUS_PUBLISH', label: 'Publish Projects' }
-        ]
-    },
-    {
-        group: 'Community & Media',
-        permissions: [
-            { id: 'PROJECT_GALLERY_ADD', label: 'Add Gallery Images' },
-            { id: 'PROJECT_GALLERY_REMOVE', label: 'Remove Gallery Images' },
-            { id: 'COMMENT_DELETE', label: 'Delete Comments' },
-            { id: 'COMMENT_REPLY', label: 'Reply as Developer' }
-        ]
-    },
-    {
-        group: 'Team Management',
-        permissions: [
-            { id: 'PROJECT_TEAM_INVITE', label: 'Invite Contributors' },
-            { id: 'PROJECT_TEAM_REMOVE', label: 'Remove Contributors' },
-            { id: 'PROJECT_MEMBER_EDIT_ROLE', label: 'Manage Roles' },
-            { id: 'PROJECT_TRANSFER_REQUEST', label: 'Request Transfer' },
-            { id: 'PROJECT_TRANSFER_RESOLVE', label: 'Resolve Transfer' }
-        ]
-    }
-];
-
-export const PROJECT_PERMISSION_GROUPS = ALL_PERMISSION_GROUPS.filter(g => g.group !== 'Organization Settings');
-
-export const TOTAL_PERMISSIONS = ALL_PERMISSION_GROUPS.reduce((acc, group) => acc + group.permissions.length, 0);
-
-export const getPermissionLabel = (id: string) => {
-    for (const group of ALL_PERMISSION_GROUPS) {
-        const p = group.permissions.find(p => p.id === id);
-        if (p) return p.label;
-    }
-    return id;
-};
+import type { Permission, PermissionDef, PermissionGroupDef } from '@/modules/permissions/permissions';
 
 interface PermissionSelectorProps {
     groups: PermissionGroupDef[];
-    selectedPermissions: string[];
-    onChange: (permissions: string[]) => void;
+    selectedPermissions: Permission[];
+    onChange: (permissions: Permission[]) => void;
     disabled?: boolean;
     variant?: 'card' | 'panel';
     className?: string;
@@ -108,7 +19,7 @@ export const PermissionSelector: React.FC<PermissionSelectorProps> = ({
                                                                           variant = 'card',
                                                                           className = ''
                                                                       }) => {
-    const togglePerm = (id: string) => {
+    const togglePerm = (id: Permission) => {
         if (disabled) return;
         if (selectedPermissions.includes(id)) {
             onChange(selectedPermissions.filter(p => p !== id));
