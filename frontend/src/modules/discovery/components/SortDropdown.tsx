@@ -12,8 +12,6 @@ interface SortDropdownProps {
 export const SortDropdown: React.FC<SortDropdownProps> = ({ value, onChange, onOpen, isMobile }) => {
     const options = [
         { id: 'relevance', label: 'Relevance', mobileOnly: false },
-        { id: 'popular', label: 'Popular', mobileOnly: true },
-        { id: 'trending', label: 'Trending', mobileOnly: true },
         { id: 'downloads', label: 'Downloads', mobileOnly: false },
         { id: 'favorites', label: 'Favorites', mobileOnly: false },
         { id: 'newest', label: 'Newest', mobileOnly: true },

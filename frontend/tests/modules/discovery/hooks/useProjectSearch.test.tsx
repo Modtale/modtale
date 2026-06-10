@@ -164,7 +164,7 @@ describe('useProjectSearch', () => {
             classification: undefined,
             tags: 'magic,tech',
             search: 'sky',
-            sort: 'popular',
+            sort: 'relevance',
             gameVersion: '1.20.1',
             minDownloads: 10,
             minFavorites: 3,

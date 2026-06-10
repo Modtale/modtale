@@ -88,7 +88,7 @@ export const Home: React.FC = () => {
             hasRunFallbackRequests = true;
 
             if (shouldFetchFallbackProjects) {
-                api.get('/projects', { params: { size: 16, sort: 'trending' } })
+                api.get('/projects', { params: { size: 16, sort: 'relevance', category: 'trending' } })
                     .then(res => {
                         if (res.data?.content) setProjects(res.data.content);
                     })
