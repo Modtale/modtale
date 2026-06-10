@@ -85,4 +85,25 @@ describe('Files upload rules for drafts', () => {
         expect(container.querySelector('[data-testid="version-fields"]')).not.toBeNull();
         expect(container.textContent).toContain('Upload Version');
     });
+
+    it('keeps the upload form visible for private projects even after a version exists', async () => {
+        await act(async () => {
+            root.render(renderFiles({
+                id: 'project-1',
+                status: 'PRIVATE',
+                versions: [{
+                    id: 'version-1',
+                    versionNumber: '1.0.0',
+                    gameVersions: ['1.21'],
+                    fileUrl: '/download.jar',
+                    downloadCount: 0,
+                    releaseDate: '2026-06-09T12:00:00'
+                }]
+            }));
+        });
+
+        expect(container.querySelector('[data-testid="version-fields"]')).not.toBeNull();
+        expect(container.textContent).toContain('This project is private.');
+        expect(container.textContent).toContain('Upload Version');
+    });
 });

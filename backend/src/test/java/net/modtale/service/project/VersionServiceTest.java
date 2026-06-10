@@ -1,6 +1,7 @@
 package net.modtale.service.project;
 
 import net.modtale.config.properties.AppLimitProperties;
+import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
@@ -22,8 +23,10 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -184,5 +187,51 @@ class VersionServiceTest {
         verify(projectDeletionService).deleteStoredFile("modpacks/sky-pack-1.0.0.zip");
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
+    }
+
+    @Test
+    void deleteVersionAllowsPrivateProjectsToRemoveTheirLastVersion() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setStatus(ProjectStatus.PRIVATE);
+
+        ProjectVersion version = new ProjectVersion();
+        version.setId("version-1");
+        version.setFileUrl("/files/private/bundle.zip");
+        project.setVersions(new ArrayList<>(List.of(version)));
+
+        User user = new User();
+        user.setId("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "VERSION_DELETE")).thenReturn(true);
+
+        service.deleteVersion("project-1", "version-1", user);
+
+        assertEquals(0, project.getVersions().size());
+        verify(projectDeletionService).deleteVersionFile(version);
+        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
+    }
+
+    @Test
+    void deleteVersionStillProtectsTheLastVersionForPublishedProjects() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setStatus(ProjectStatus.PUBLISHED);
+
+        ProjectVersion version = new ProjectVersion();
+        version.setId("version-1");
+        version.setFileUrl("/files/public/bundle.zip");
+        project.setVersions(new ArrayList<>(List.of(version)));
+
+        User user = new User();
+        user.setId("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "VERSION_DELETE")).thenReturn(true);
+
+        assertThrows(InvalidVersionRequestException.class, () -> service.deleteVersion("project-1", "version-1", user));
+        verify(projectDeletionService, never()).deleteVersionFile(version);
     }
 }

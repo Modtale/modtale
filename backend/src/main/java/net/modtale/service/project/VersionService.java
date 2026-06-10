@@ -103,7 +103,9 @@ public class VersionService {
         Project project = projectAccessService.requireVersionPermission(id, user, "VERSION_DELETE",
                 "You do not have permission to delete this version.");
         projectMutationGuard.ensureEditable(project);
-        if (project.getStatus() != ProjectStatus.DRAFT && project.getVersions().size() <= 1) {
+        if (project.getStatus() != ProjectStatus.DRAFT
+                && project.getStatus() != ProjectStatus.PRIVATE
+                && project.getVersions().size() <= 1) {
             throw new InvalidVersionRequestException("Published projects must keep at least one version.");
         }
 

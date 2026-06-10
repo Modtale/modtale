@@ -253,7 +253,7 @@ export interface Project {
     allowComments?: boolean;
     hmWikiEnabled?: boolean;
     hmWikiSlug?: string;
-    status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
+    status?: 'DRAFT' | 'PRIVATE' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;
     isOwner?: boolean;

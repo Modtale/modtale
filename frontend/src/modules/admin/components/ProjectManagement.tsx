@@ -393,6 +393,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                         <select value={restoreTargetStatus} onChange={e => setRestoreTargetStatus(e.target.value)} className="themed-select w-full rounded-xl border border-slate-200 bg-slate-50 p-3 font-bold text-slate-900 outline-none transition-all focus:border-modtale-accent focus:ring-2 focus:ring-modtale-accent dark:border-white/10 dark:bg-black/20 dark:text-white">
                                             <option value="PUBLISHED">Published</option>
                                             <option value="DRAFT">Draft</option>
+                                            <option value="PRIVATE">Private</option>
                                             <option value="UNLISTED">Unlisted</option>
                                             <option value="ARCHIVED">Archived</option>
                                         </select>

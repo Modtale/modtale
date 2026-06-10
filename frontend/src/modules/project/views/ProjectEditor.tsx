@@ -458,12 +458,18 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         });
     };
 
-    const runStatusTransition = async (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
+    const runStatusTransition = async (nextStatus: 'PUBLISHED' | 'PRIVATE' | 'UNLISTED' | 'ARCHIVED') => {
         if (!projectData?.id || isStatusChanging) return;
         setIsStatusChanging(true);
 
         try {
-            const endpoint = nextStatus === 'PUBLISHED' ? 'publish' : nextStatus === 'UNLISTED' ? 'unlist' : 'archive';
+            const endpoint = nextStatus === 'PUBLISHED'
+                ? 'publish'
+                : nextStatus === 'PRIVATE'
+                    ? 'private'
+                    : nextStatus === 'UNLISTED'
+                        ? 'unlist'
+                        : 'archive';
             await api.post(`/projects/${projectData.id}/${endpoint}`);
             setProjectData(prev => prev ? { ...prev, status: nextStatus } : null);
             onShowStatus('success', 'Status Updated', `Project status changed to ${nextStatus.toLowerCase()}.`);
@@ -475,13 +481,19 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
     };
 
-    const confirmStatusTransition = (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
+    const confirmStatusTransition = (nextStatus: 'PUBLISHED' | 'PRIVATE' | 'UNLISTED' | 'ARCHIVED') => {
         const config = {
             PUBLISHED: {
                 type: 'info' as const,
                 title: 'Publish Project?',
                 message: 'This will make your project visible to everyone in discovery.',
                 actionLabel: 'Publish'
+            },
+            PRIVATE: {
+                type: 'info' as const,
+                title: 'Make Project Private?',
+                message: 'This will hide your project from public discovery while keeping it fully editable.',
+                actionLabel: 'Make Private'
             },
             UNLISTED: {
                 type: 'info' as const,
@@ -693,7 +705,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <ExternalLink className="w-5 h-5" />
                         </Link>
 
-                        {projectData.status === 'DRAFT' && (
+                        {(projectData.status === 'DRAFT' || projectData.status === 'PRIVATE') && (
                             <div className="relative group">
                                 <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-4 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-50">
                                     <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-white/5 pb-2">
@@ -971,6 +983,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 readOnly={readOnly}
                                 hasProjectPermission={hasProjectPermission}
                                 handleRestore={() => confirmStatusTransition('PUBLISHED')}
+                                handlePrivate={() => confirmStatusTransition('PRIVATE')}
                                 handleUnlist={() => confirmStatusTransition('UNLISTED')}
                                 handleArchive={() => confirmStatusTransition('ARCHIVED')}
                                 slugError={slugError}

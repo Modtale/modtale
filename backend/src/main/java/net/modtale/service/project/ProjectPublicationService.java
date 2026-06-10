@@ -63,8 +63,10 @@ public class ProjectPublicationService {
     public void archiveProject(String id, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_ARCHIVE",
                 "You do not have permission to archive this project.");
-        if (project.getStatus() != ProjectStatus.PUBLISHED && project.getStatus() != ProjectStatus.UNLISTED) {
-            throw new InvalidProjectRequestException("Only published or unlisted projects can be archived.");
+        if (project.getStatus() != ProjectStatus.PUBLISHED
+                && project.getStatus() != ProjectStatus.UNLISTED
+                && project.getStatus() != ProjectStatus.PRIVATE) {
+            throw new InvalidProjectRequestException("Only published, unlisted, or private projects can be archived.");
         }
         project.setStatus(ProjectStatus.ARCHIVED);
         project.setExpiresAt(null);
@@ -84,21 +86,33 @@ public class ProjectPublicationService {
         projectService.evictProjectCache(project);
     }
 
+    public void privateProject(String id, User user) {
+        Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_UNLIST",
+                "You do not have permission to make this project private.");
+        if (project.getStatus() == ProjectStatus.PENDING || project.getStatus() == ProjectStatus.DELETED) {
+            throw new InvalidProjectRequestException("Pending or deleted projects cannot be made private.");
+        }
+        project.setStatus(ProjectStatus.PRIVATE);
+        project.setExpiresAt(null);
+        projectRepository.save(project);
+        projectService.evictProjectCache(project);
+    }
+
     public void publishProject(String id, User user) {
         Project project = projectAccessService.requireProject(id);
         boolean isAdmin = accessControlService.isAdmin(user);
         boolean isRestoration = project.getStatus() == ProjectStatus.ARCHIVED
-                || project.getStatus() == ProjectStatus.UNLISTED;
+                || project.getStatus() == ProjectStatus.UNLISTED
+                || project.getStatus() == ProjectStatus.PRIVATE;
+        boolean isNew = project.getStatus() == ProjectStatus.PENDING || project.getCreatedAt() == null;
 
-        if (isRestoration) {
+        if (isRestoration && !isNew) {
             if (!accessControlService.hasProjectPermission(project, user, "PROJECT_STATUS_PUBLISH")) {
                 throw new ProjectOperationForbiddenException("You do not have permission to republish this project.");
             }
         } else if (!isAdmin) {
             throw new ProjectOperationForbiddenException("Only administrators can publish a new project.");
         }
-
-        boolean isNew = project.getStatus() == ProjectStatus.PENDING || project.getCreatedAt() == null;
         project.setStatus(ProjectStatus.PUBLISHED);
         project.setExpiresAt(null);
         project.setUpdatedAt(LocalDateTime.now().toString());

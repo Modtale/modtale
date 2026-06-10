@@ -22,6 +22,7 @@ interface FilesProps {
 
 export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersionData, readOnly, hasProjectPermission, classification, handleUploadVersion, handleEditVersion, handleDeleteVersion, isLoading }) => {
     const hasUploadedDraftVersion = projectData?.status === 'DRAFT' && (projectData.versions?.length || 0) > 0;
+    const isPrivateProject = projectData?.status === 'PRIVATE';
 
     return (
         <div className="space-y-8">
@@ -39,6 +40,13 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
                 <div className={`${theme.colors.bgSurface} p-4 rounded-xl border ${theme.colors.border}`}>
                     <p className={`text-sm font-medium ${theme.colors.textSecondary}`}>
                         This draft already has one uploaded version. New version uploads are hidden until the project leaves draft status.
+                    </p>
+                </div>
+            )}
+            {isPrivateProject && (
+                <div className={`${theme.colors.bgSurface} p-4 rounded-xl border ${theme.colors.border}`}>
+                    <p className={`text-sm font-medium ${theme.colors.textSecondary}`}>
+                        This project is private. It stays hidden from public discovery, but you can keep uploading versions while you work.
                     </p>
                 </div>
             )}
