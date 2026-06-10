@@ -22,9 +22,14 @@ vi.mock('@/modules/home/components/HeroMarquee', () => ({
 }));
 
 vi.mock('@/modules/home/components/FeaturePreviews', () => ({
-    InlineDependencyUI: () => <div />,
-    InlineDownloadUI: () => <div />,
-    InlineNotificationUI: () => <div />
+    TrendingProjectsSection: () => <div data-testid="trending-projects-section" />,
+    NewReleasesSection: () => <div data-testid="new-releases-section" />,
+    DirectDownloadsSection: () => <div data-testid="direct-downloads-section" />,
+    SmartDependenciesSection: () => <div data-testid="smart-dependencies-section" />,
+    ProjectAnalyticsSection: () => <div data-testid="project-analytics-section" />,
+    CommunityThreadsSection: () => <div data-testid="community-threads-section" />,
+    RealTimeAlertsSection: () => <div data-testid="real-time-alerts-section" />,
+    AccountPreferencesSection: () => <div data-testid="account-preferences-section" />
 }));
 
 const mockedApi = vi.mocked(api);
@@ -123,6 +128,7 @@ describe('Home fallback requests', () => {
     it('fetches trending home projects via category instead of an invalid sort value', async () => {
         mockedApi.get
             .mockResolvedValueOnce({ data: { content: [] } } as any)
+            .mockResolvedValueOnce({ data: { content: [] } } as any)
             .mockResolvedValueOnce({ data: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } } as any);
 
         await act(async () => {
@@ -143,6 +149,9 @@ describe('Home fallback requests', () => {
 
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
             params: { size: 16, sort: 'relevance', category: 'trending' }
+        });
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
+            params: { size: 12, sort: 'newest' }
         });
         expect(mockedApi.get).toHaveBeenCalledWith('/analytics/platform/stats');
     });

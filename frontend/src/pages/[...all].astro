@@ -150,15 +150,19 @@ if (classification) {
     if (!isComplex || isBot) {
         try {
             if (isHome) {
-                const [trending, stats] = await Promise.all([
+                const [trending, newest, stats] = await Promise.all([
                     fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=24&sort=relevance&category=trending`),
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=newest`),
                     fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`),
                 ]);
 
                 const unique = trending?.content || [];
+                const newestProjects = newest?.content || [];
 
                 initialData = {
                     homeProjects: unique || [],
+                    homeTrendingProjects: unique || [],
+                    homeNewestProjects: newestProjects,
                     stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 },
                 };
 
