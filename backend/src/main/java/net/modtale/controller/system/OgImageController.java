@@ -67,8 +67,9 @@ public class OgImageController {
     private static final int CARD_ARC = 48;
     private static final int PROJECT_PADDING = 70;
     private static final int ICON_SIZE = 210;
-    private static final int STAT_VALUE_FONT_SIZE = 28;
-    private static final int STAT_GAP = 60;
+    private static final int STAT_VALUE_FONT_SIZE = 26;
+    private static final int STAT_GAP = 52;
+    private static final int STAT_BLOCK_X_OFFSET = 28;
     private static final int LOGO_HEIGHT = 28;
     private static final int SVG_FALLBACK_SIZE = 1024;
     private static final int SVG_MAX_RENDER_SIZE = 2048;
@@ -523,7 +524,7 @@ public class OgImageController {
         int downloadWidth = drawStatWithIcon(g2d, -1000, y, "download", downloadVal);
         int heartWidth = drawStatWithIcon(g2d, -1000, y, "heart", heartVal);
 
-        int currentX = leftX;
+        int currentX = leftX + STAT_BLOCK_X_OFFSET;
         drawStatWithIcon(g2d, currentX, y, "download", downloadVal);
         currentX += downloadWidth + STAT_GAP;
         drawStatWithIcon(g2d, currentX, y, "heart", heartVal);
@@ -533,7 +534,7 @@ public class OgImageController {
         FontMetrics fm = g2d.getFontMetrics();
         int textHeight = fm.getAscent() + fm.getDescent();
         int iconSize = textHeight;
-        int iconToTextGap = 12;
+        int iconToTextGap = 10;
         int textXOffset = iconSize + iconToTextGap;
 
         if (x != -1000) {
