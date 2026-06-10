@@ -176,6 +176,48 @@ describe('useProjectSearch', () => {
         expect(latestSnapshot.totalItems).toBe(48);
     });
 
+    it('normalizes legacy browse sort params to a backend-safe sort while preserving the selected view', async () => {
+        mockedDiscoveryClient.searchProjects.mockResolvedValue({
+            content: [{ id: 'project-7' }],
+            totalPages: 1,
+            totalElements: 1
+        } as any);
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter initialEntries={['/mods?view=trending&sort=trending']}>
+                    <Probe
+                        initialClassification="All"
+                        useSSRData={false}
+                        initialItems={[]}
+                        initialTotalPages={0}
+                        initialTotalItems={0}
+                        onRender={snapshot => {
+                            latestSnapshot = snapshot;
+                        }}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledWith({
+            page: 0,
+            size: 12,
+            classification: undefined,
+            tags: '',
+            search: '',
+            sort: 'relevance',
+            gameVersion: undefined,
+            minDownloads: undefined,
+            minFavorites: undefined,
+            dateRange: 'all',
+            category: 'trending'
+        }, expect.any(AbortSignal));
+        expect(latestSnapshot.sortBy).toBe('relevance');
+        expect(latestSnapshot.activeViewId).toBe('trending');
+    });
+
     it('rewrites out-of-range pages back to the last available page', async () => {
         mockedDiscoveryClient.searchProjects.mockResolvedValue({
             content: [{ id: 'project-2' }],
