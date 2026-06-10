@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AlertTriangle, ArrowRight, ShieldAlert, X } from 'lucide-react';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { theme } from '@/styles/theme';
 
 interface ExternalLinkContextType {
@@ -17,6 +18,8 @@ export const useExternalLink = () => {
 export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [targetUrl, setTargetUrl] = useState<string | null>(null);
     const [dontAskAgain, setDontAskAgain] = useState(false);
+
+    useScrollLock(Boolean(targetUrl));
 
     const normalizeUrl = (url: string) => {
         if (!url) return '';
@@ -98,39 +101,37 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             {targetUrl && (
                 <div className={`${theme.components.modalOverlay} z-[9999]`}>
-                    <div className={`relative w-full max-w-xl overflow-hidden rounded-[28px] border border-amber-300/30 bg-white/95 shadow-[0_40px_120px_-40px_rgba(15,23,42,0.65)] backdrop-blur-xl dark:border-amber-500/20 dark:bg-slate-950/95 animate-in zoom-in-95 duration-200`}>
-                        <button
-                            type="button"
-                            onClick={() => setTargetUrl(null)}
-                            className={`absolute right-4 top-4 z-10 ${theme.components.iconButton}`}
-                            aria-label="Close warning"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-
-                        <div className={`relative overflow-hidden border-b border-amber-300/20 px-6 py-6 sm:px-7 ${theme.components.warningPanel}`}>
-                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
-                            <div className="flex items-start gap-4">
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 shadow-inner shadow-amber-500/10 dark:text-amber-400">
-                                    <ShieldAlert className="w-7 h-7" />
+                    <div className={`${theme.components.modalContent} relative w-full max-w-2xl animate-in zoom-in-95 duration-200`}>
+                        <div className={theme.components.modalHeader}>
+                            <div className="flex items-start gap-4 pr-4">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                                    <ShieldAlert className="w-6 h-6" />
                                 </div>
-                                <div className="pr-8">
+                                <div>
                                     <div className="mb-2 flex items-center gap-2">
-                                        <span className="rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700 dark:text-amber-300">
+                                        <span className={`${theme.components.badge} border-amber-300/60 bg-amber-500/10 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300`}>
                                             External Link
                                         </span>
                                     </div>
-                                    <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Leaving Modtale</h2>
-                                    <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                    <h2 className={`text-xl font-black ${theme.colors.textPrimary}`}>Leaving Modtale</h2>
+                                    <p className={`mt-1 text-sm ${theme.colors.textSecondary}`}>
                                         You are about to open a site outside Modtale. Double-check the destination before continuing.
                                     </p>
                                 </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => setTargetUrl(null)}
+                                className={theme.components.iconButton}
+                                aria-label="Close warning"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
 
-                        <div className="space-y-5 p-6 sm:p-7">
-                            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 text-sm font-medium text-slate-600 shadow-inner shadow-slate-900/[0.02] dark:border-white/10 dark:bg-black/30 dark:text-slate-300">
-                                <div className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                        <div className={`${theme.components.modalBody} space-y-5`}>
+                            <div className={`rounded-2xl border ${theme.colors.border} ${theme.colors.bgSurface} p-4 text-sm font-medium ${theme.colors.textSecondary}`}>
+                                <div className={`mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] ${theme.colors.textMuted}`}>
                                     <AlertTriangle className="w-3.5 h-3.5" />
                                     Destination
                                 </div>
@@ -139,7 +140,7 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
                                 </div>
                             </div>
 
-                            <label htmlFor="dont-ask" className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 transition-colors hover:border-modtale-accent/30 hover:bg-slate-100/80 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10">
+                            <label htmlFor="dont-ask" className={`flex cursor-pointer items-center gap-3 rounded-2xl border ${theme.colors.border} ${theme.colors.bgSurface} px-4 py-3 transition-colors hover:border-modtale-accent/30 hover:bg-slate-100 dark:hover:bg-white/10`}>
                                 <input
                                     type="checkbox"
                                     id="dont-ask"
@@ -147,13 +148,13 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
                                     onChange={(e) => setDontAskAgain(e.target.checked)}
                                     className="themed-checkbox shrink-0"
                                 />
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                                <span className={`text-sm font-bold ${theme.colors.textPrimary}`}>
                                     Don&apos;t show this warning again
                                 </span>
                             </label>
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-200/80 bg-slate-50/80 p-4 sm:flex-row sm:items-center sm:justify-end dark:border-white/10 dark:bg-white/5 sm:px-7 sm:py-5">
+                        <div className={`${theme.components.modalFooter} flex-col-reverse gap-3 sm:flex-row sm:justify-end`}>
                             <button
                                 onClick={() => setTargetUrl(null)}
                                 className={`${theme.components.buttonGhost} w-full justify-center sm:w-auto`}
