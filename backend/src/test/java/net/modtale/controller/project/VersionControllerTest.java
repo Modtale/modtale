@@ -7,6 +7,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
+import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.project.ProjectVersionAccessService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.project.ProjectService;
@@ -53,6 +54,7 @@ class VersionControllerTest {
     private ProjectService projectService;
     private DownloadService downloadService;
     private DownloadTokenService downloadTokenService;
+    private AnalyticsEligibilityService analyticsEligibilityService;
     private TrackingService trackingService;
     private StorageService storageService;
     private AccessControlService accessControlService;
@@ -65,6 +67,7 @@ class VersionControllerTest {
         projectService = mock(ProjectService.class);
         downloadService = mock(DownloadService.class);
         downloadTokenService = mock(DownloadTokenService.class);
+        analyticsEligibilityService = mock(AnalyticsEligibilityService.class);
         trackingService = mock(TrackingService.class);
         storageService = mock(StorageService.class);
         accessControlService = mock(AccessControlService.class);
@@ -76,6 +79,7 @@ class VersionControllerTest {
                 projectService,
                 downloadService,
                 downloadTokenService,
+                analyticsEligibilityService,
                 trackingService,
                 storageService,
                 accessControlService,
@@ -137,10 +141,12 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", "1.1.0", null, Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectService.getRawProjectById("dep-1")).thenReturn(null);
         when(accessControlService.canReadProject(project, currentUser)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq("1.1.0"), any())).thenReturn(version);
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
         when(downloadService.generateModpackZip(project, version, currentUser)).thenReturn(new byte[]{9, 8, 7});
+        when(analyticsEligibilityService.shouldCountProjectEngagement(project, currentUser)).thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download/token");
         request.addHeader("Referer", "https://modtale.net/mod/project-1");
@@ -172,6 +178,7 @@ class VersionControllerTest {
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
         when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3, 4});
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(null);
+        when(analyticsEligibilityService.shouldCountProjectEngagement(project, null)).thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download/token");
         request.addHeader("Referer", "https://modtale.net/mod/project-1");
@@ -204,10 +211,14 @@ class VersionControllerTest {
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, List.of("dep-b"), Instant.now().plusSeconds(60))
         );
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        Project dependencyProject = project("dep-b", "Dependency B", ProjectClassification.DATA);
+        when(projectService.getRawProjectById("dep-b")).thenReturn(dependencyProject);
         when(accessControlService.canReadProject(project, currentUser)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
         when(downloadService.generateBundleZip(project, version, List.of("dep-b"), currentUser)).thenReturn(new byte[]{6, 5, 4});
+        when(analyticsEligibilityService.shouldCountProjectEngagement(project, currentUser)).thenReturn(true);
+        when(analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, currentUser)).thenReturn(true);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download-bundle/bundle-token");
         request.setRemoteAddr("192.0.2.11");
@@ -221,9 +232,35 @@ class VersionControllerTest {
         assertArrayEquals(new byte[]{6, 5, 4}, body.getByteArray());
 
         verify(trackingService).logDownload("project-1", "version-1", "Ada", true, "192.0.2.11");
-        verify(trackingService).logDownload("dep-b", null, null, true, "192.0.2.11");
+        verify(trackingService).logDownload("dep-b", null, "Ada", true, "192.0.2.11");
         verify(trackingService, never()).logDownload(eq("dep-a"), isNull(), isNull(), anyBoolean(), anyString());
         verify(trackingService, never()).logDownload(eq("dep-c"), isNull(), isNull(), anyBoolean(), anyString());
+    }
+
+    @Test
+    void downloadWithTokenSkipsAnalyticsForAffiliatedUsers() throws Exception {
+        User currentUser = user("author-1");
+        Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setFileUrl("https://cdn.modtale.net/files/actual.jar");
+
+        when(downloadTokenService.validateAndConsume("token")).thenReturn(
+                new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, null, Instant.now().plusSeconds(60))
+        );
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, currentUser)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
+        when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3});
+        when(analyticsEligibilityService.shouldCountProjectEngagement(project, currentUser)).thenReturn(false);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download/token");
+        request.setRemoteAddr("198.51.100.21");
+
+        var response = controller.downloadWithToken("token", null, request);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(trackingService, never()).logDownload(eq("project-1"), any(), any(), anyBoolean(), anyString());
     }
 
     private static Project project(String id, String title, ProjectClassification classification) {

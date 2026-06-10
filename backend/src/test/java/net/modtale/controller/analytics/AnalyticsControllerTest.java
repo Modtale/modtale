@@ -5,6 +5,7 @@ import net.modtale.model.analytics.ProjectAnalyticsDetail;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.AnalyticsAccessService;
+import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.QueryService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.project.ProjectService;
@@ -24,6 +25,7 @@ class AnalyticsControllerTest {
 
     private AnalyticsController controller;
     private AnalyticsAccessService analyticsAccessService;
+    private AnalyticsEligibilityService analyticsEligibilityService;
     private QueryService queryService;
     private TrackingService trackingService;
     private AccountService accountService;
@@ -32,12 +34,14 @@ class AnalyticsControllerTest {
     @BeforeEach
     void setUp() {
         analyticsAccessService = mock(AnalyticsAccessService.class);
+        analyticsEligibilityService = mock(AnalyticsEligibilityService.class);
         queryService = mock(QueryService.class);
         trackingService = mock(TrackingService.class);
         accountService = mock(AccountService.class);
         projectService = mock(ProjectService.class);
         controller = new AnalyticsController(
                 analyticsAccessService,
+                analyticsEligibilityService,
                 queryService,
                 trackingService,
                 accountService,
@@ -85,9 +89,43 @@ class AnalyticsControllerTest {
     void trackViewReturnsNotFoundWhenProjectDoesNotExist() {
         when(projectService.getProjectById("missing")).thenReturn(null);
 
-        var response = controller.trackView("missing", new org.springframework.mock.web.MockHttpServletRequest());
+        var response = controller.trackView("missing", null, new org.springframework.mock.web.MockHttpServletRequest());
 
         assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    void trackViewSkipsAnalyticsForAffiliatedUsers() {
+        Project project = new Project();
+        project.setId("project-1");
+        User currentUser = user("user-1");
+
+        when(projectService.getProjectById("project-1")).thenReturn(project);
+        when(accountService.getCurrentUser((org.springframework.security.core.Authentication) null)).thenReturn(currentUser);
+        when(analyticsEligibilityService.shouldCountProjectEngagement(project, currentUser)).thenReturn(false);
+
+        var response = controller.trackView("project-1", null, new org.springframework.mock.web.MockHttpServletRequest());
+
+        assertEquals(200, response.getStatusCode().value());
+    }
+
+    @Test
+    void trackViewLogsAnalyticsForEligibleUsers() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("author-1");
+        User currentUser = user("user-2");
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setRemoteAddr("203.0.113.9");
+
+        when(projectService.getProjectById("project-1")).thenReturn(project);
+        when(accountService.getCurrentUser((org.springframework.security.core.Authentication) null)).thenReturn(currentUser);
+        when(analyticsEligibilityService.shouldCountProjectEngagement(project, currentUser)).thenReturn(true);
+
+        var response = controller.trackView("project-1", null, request);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(trackingService).logView("project-1", "author-1", "203.0.113.9");
     }
 
     private static User user(String id) {
