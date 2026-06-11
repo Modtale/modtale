@@ -64,16 +64,16 @@ export const ManagedProjectCard: React.FC<ManagedProjectCardProps> = ({
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2 opacity-100 transition-opacity">
                 {canManage ? (
                     <>
                         {project.status === 'PENDING' && onRevert && (
-                            <button onClick={() => onRevert(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-orange-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Revert to Draft"><Undo2 className="w-4 h-4" /></button>
+                            <button onClick={() => onRevert(project)} className="p-2.5 bg-slate-200/50 text-slate-700 dark:text-slate-200 dark:bg-white/5 hover:bg-orange-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Revert to Draft"><Undo2 className="w-4 h-4" /></button>
                         )}
-                        <Link to={`/dashboard/analytics/project/${project.id}`} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Analytics"><BarChart2 className="w-4 h-4" /></Link>
-                        <Link to={editLink} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Edit"><Edit className="w-4 h-4" /></Link>
-                        <button onClick={() => onTransfer(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 rounded-xl transition-colors shadow-sm" title="Transfer"><ArrowRightLeft className="w-4 h-4" /></button>
-                        <button onClick={() => onDelete(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                        <Link to={`/dashboard/analytics/project/${project.id}`} className="p-2.5 bg-slate-200/50 text-slate-700 dark:text-slate-200 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Analytics"><BarChart2 className="w-4 h-4" /></Link>
+                        <Link to={editLink} className="p-2.5 bg-slate-200/50 text-slate-700 dark:text-slate-200 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Edit"><Edit className="w-4 h-4" /></Link>
+                        <button onClick={() => onTransfer(project)} className="p-2.5 bg-slate-200/50 text-slate-700 dark:text-slate-200 dark:bg-white/5 hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 rounded-xl transition-colors shadow-sm" title="Transfer"><ArrowRightLeft className="w-4 h-4" /></button>
+                        <button onClick={() => onDelete(project)} className="p-2.5 bg-slate-200/50 text-slate-700 dark:text-slate-200 dark:bg-white/5 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Delete"><Trash2 className="w-4 h-4" /></button>
                     </>
                 ) : (
                     <span className="text-xs text-slate-400 italic pr-2 font-medium">Read Only</span>
