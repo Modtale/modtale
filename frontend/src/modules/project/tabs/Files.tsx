@@ -28,7 +28,14 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
         <div className="space-y-8">
             {!readOnly && hasProjectPermission(Permission.VERSION_CREATE) && !hasUploadedDraftVersion && (
                 <div className={`${theme.colors.bgSurface} p-6 rounded-2xl border ${theme.colors.border}`}>
-                    <VersionFields data={versionData} onChange={setVersionData} isModpack={classification === 'MODPACK'} projectType={typeof classification === 'string' ? classification : 'PLUGIN'} currentProjectId={projectData?.id} disabled={readOnly} />
+                    <VersionFields
+                        data={versionData}
+                        onChange={setVersionData}
+                        isModpack={classification === 'MODPACK'}
+                        projectType={typeof classification === 'string' ? classification : 'PLUGIN'}
+                        currentProjectId={projectData?.id}
+                        disabled={readOnly}
+                    />
                     <div className="mt-6 flex justify-end">
                         <button type="button" onClick={handleUploadVersion} disabled={isLoading || readOnly} className={theme.components.buttonPrimary}>
                             {isLoading ? <Spinner className="w-5 h-5"/> : <UploadCloud className="w-5 h-5" />} Upload Version
