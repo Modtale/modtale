@@ -25,7 +25,7 @@ public class Notification {
     private NotificationType type;
     private Map<String, String> metadata = new HashMap<>();
 
-    @Indexed(expireAfterSeconds = 2592000)
+    @Indexed(expireAfter = "30d")
     private LocalDateTime createdAt;
 
     public Notification() {}
