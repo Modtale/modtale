@@ -147,6 +147,46 @@ class VersionServiceTest {
     }
 
     @Test
+    void addVersionDoesNotQueueScanForDraftArtifacts() throws Exception {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setStatus(ProjectStatus.DRAFT);
+        project.setClassification(ProjectClassification.DATA);
+        project.setVersions(new ArrayList<>());
+
+        User user = new User();
+        user.setId("user-1");
+
+        MockMultipartFile file = new MockMultipartFile("file", "bundle.zip", "application/zip", new byte[]{1, 2, 3});
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")).thenReturn(true);
+        when(sanitizationService.sanitizePlainText("Release notes")).thenReturn("Release notes");
+        doNothing().when(validationService).validateVersionNumber("1.0.0");
+        when(validationService.getAllowedGameVersions()).thenReturn(List.of("1.21.0"));
+        when(versionArtifactService.prepareVersionArtifact(project, file))
+                .thenReturn(new VersionArtifactService.PreparedVersionArtifact(ProjectClassification.DATA, "/files/data/bundle.zip", "sha-256"));
+
+        service.addVersion(
+                "project-1",
+                "1.0.0",
+                List.of("1.21.0"),
+                file,
+                "Release notes",
+                null,
+                ProjectVersion.Channel.RELEASE,
+                user
+        );
+
+        ProjectVersion savedVersion = project.getVersions().getFirst();
+        assertNull(savedVersion.getScanResult());
+        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
+        verify(scanService, never()).createQueuedScanResult(1, "Initial scan queued.");
+        verify(scanService, never()).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1);
+    }
+
+    @Test
     void updateVersionClearsCachedModpackArchivesAndRefreshesLatestDependencyIds() {
         Project project = new Project();
         project.setId("project-1");
