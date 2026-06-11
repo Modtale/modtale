@@ -71,7 +71,7 @@ const FeatureShowcaseSection = ({
 
     return (
         <section className="relative isolate overflow-hidden py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0b1220] via-[#08111d] to-[#070e19]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-50 dark:from-[#0b1220] dark:via-[#08111d] dark:to-[#070e19]" />
             <div
                 className="absolute top-[-4rem] h-56 sm:h-72 w-56 sm:w-72 rounded-full blur-3xl opacity-35 pointer-events-none"
                 style={{
@@ -98,13 +98,10 @@ const FeatureShowcaseSection = ({
                 }}
             />
             <div
-                className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/25 to-transparent pointer-events-none"
+                className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-200/40 dark:from-black/25 to-transparent pointer-events-none"
             />
             <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                    background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.12), transparent 12%, transparent 88%, rgba(15, 23, 42, 0.12))'
-                }}
+                className="absolute inset-0 pointer-events-none bg-gradient-to-r from-slate-900/5 via-transparent to-slate-900/5 dark:from-slate-950/12 dark:via-transparent dark:to-slate-950/12"
             />
 
             <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
@@ -846,7 +843,7 @@ export const Home: React.FC<{
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="left">
-                        <ProjectAnalyticsSection />
+                        <ProjectAnalyticsSection showConversionRate={isDesktopHeroLayout && validFeaturedProjects.length > 0} />
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(99, 102, 241, 0.1)" glowTo="rgba(168, 85, 247, 0.08)" align="right">
@@ -864,7 +861,7 @@ export const Home: React.FC<{
 
                 <LazySection minHeight="300px">
                     <section className="relative z-20 overflow-hidden border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="absolute inset-0 bg-gradient-to-b from-[#09101c] via-[#070d17] to-[#060b14]" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100/50 to-slate-50 dark:from-[#09101c] dark:via-[#070d17] dark:to-[#060b14]" />
                         <div className="absolute -top-10 left-[10%] h-56 w-56 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, transparent 72%)' }} />
                         <div className="absolute -bottom-16 right-[8%] h-72 w-72 rounded-full blur-3xl opacity-15 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, transparent 74%)' }} />
                         <div
@@ -877,8 +874,8 @@ export const Home: React.FC<{
                                 backgroundSize: '22px 22px, 100% 100%'
                             }}
                         />
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
-                        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-200/80 dark:via-white/10 to-transparent pointer-events-none" />
+                        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-200/50 dark:from-black/30 to-transparent pointer-events-none" />
 
                         <div className="relative z-20 py-24 sm:py-32 lg:py-40 max-w-5xl mx-auto px-6 text-center">
                             <div className="flex justify-center mb-10 sm:mb-12">

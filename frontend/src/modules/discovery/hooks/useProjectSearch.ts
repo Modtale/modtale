@@ -6,6 +6,7 @@ import type { Project } from '@/types';
 import type { Classification } from '@/data/categories';
 
 export type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'updated';
+const BROWSE_CACHE_PREFIX = 'modtale.browse-cache:';
 
 const normalizeSort = (sort: string | null): SortOption => {
     switch (sort) {
@@ -46,6 +47,32 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     const abortControllerRef = useRef<AbortController | null>(null);
     const isFirstRender = useRef(true);
     const previousQueryKeyRef = useRef<string | null>(null);
+    const cacheKey = useMemo(() => `${BROWSE_CACHE_PREFIX}${JSON.stringify({
+        page,
+        itemsPerPage,
+        selectedClassification,
+        selectedTags,
+        urlSearchTerm,
+        sortBy,
+        selectedVersion,
+        minDownloads,
+        minFavorites,
+        filterDate,
+        activeViewId,
+    })}`, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
+    const queryKey = useMemo(() => JSON.stringify({
+        page,
+        itemsPerPage,
+        selectedClassification,
+        selectedTags,
+        urlSearchTerm,
+        sortBy,
+        selectedVersion,
+        minDownloads,
+        minFavorites,
+        filterDate,
+        activeViewId,
+    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
 
     useEffect(() => {
         if (urlSearchTerm !== searchTerm) {
@@ -56,6 +83,22 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     useEffect(() => {
         setSelectedClassification(initialClassification);
     }, [initialClassification]);
+
+    useLayoutEffect(() => {
+        if (previousQueryKeyRef.current === null) {
+            previousQueryKeyRef.current = queryKey;
+            return;
+        }
+
+        if (previousQueryKeyRef.current !== queryKey) {
+            previousQueryKeyRef.current = queryKey;
+            setItems([]);
+            setTotalPages(0);
+            setTotalItems(0);
+            setLoading(true);
+            setIsPending(true);
+        }
+    }, [queryKey]);
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -73,34 +116,29 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         return () => clearTimeout(handler);
     }, [searchTerm, urlSearchTerm, setSearchParams]);
 
-    const queryKey = useMemo(() => JSON.stringify({
-        page,
-        itemsPerPage,
-        selectedClassification,
-        selectedTags,
-        urlSearchTerm,
-        sortBy,
-        selectedVersion,
-        minDownloads,
-        minFavorites,
-        filterDate,
-        activeViewId,
-    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
+    useEffect(() => {
+        if (useSSRData || typeof window === 'undefined') return;
 
-    useLayoutEffect(() => {
-        if (previousQueryKeyRef.current === null) {
-            previousQueryKeyRef.current = queryKey;
-            return;
+        try {
+            const cached = window.sessionStorage.getItem(cacheKey);
+            if (!cached) return;
+
+            const parsed = JSON.parse(cached) as {
+                content?: Project[];
+                totalPages?: number;
+                totalElements?: number;
+            };
+
+            if (!Array.isArray(parsed.content) || parsed.content.length === 0) return;
+
+            setItems(parsed.content);
+            setTotalPages(parsed.totalPages || 0);
+            setTotalItems(parsed.totalElements || 0);
+            setLoading(false);
+        } catch {
+            // Ignore malformed cache entries and continue with network data.
         }
-        if (previousQueryKeyRef.current !== queryKey) {
-            previousQueryKeyRef.current = queryKey;
-            setItems([]);
-            setTotalPages(0);
-            setTotalItems(0);
-            setLoading(true);
-            setIsPending(true);
-        }
-    }, [queryKey]);
+    }, [cacheKey, useSSRData]);
 
     const fetchData = useCallback(async () => {
         if (isFirstRender.current && useSSRData) {
@@ -156,6 +194,14 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
             setItems(data?.content || []);
             setTotalPages(nextTotalPages);
             setTotalItems(nextTotalItems);
+
+            if (typeof window !== 'undefined') {
+                window.sessionStorage.setItem(cacheKey, JSON.stringify({
+                    content: data?.content || [],
+                    totalPages: nextTotalPages,
+                    totalElements: nextTotalItems,
+                }));
+            }
         } catch (err: any) {
             if (err.name !== 'Canceled') {
                 void captureError(err);
@@ -176,6 +222,10 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     }, [fetchData]);
 
     const updateParams = useCallback((updates: Record<string, string | null>) => {
+        setItems([]);
+        setTotalPages(0);
+        setTotalItems(0);
+        setLoading(true);
         setIsPending(true);
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);

@@ -82,9 +82,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         const scheduleBannerLoad = () => setShouldLoadBanner(true);
 
         if (idleWindow.requestIdleCallback) {
-            idleHandle = idleWindow.requestIdleCallback(scheduleBannerLoad, { timeout: priority ? 900 : 1400 });
+            idleHandle = idleWindow.requestIdleCallback(scheduleBannerLoad, { timeout: priority ? 200 : 400 });
         } else {
-            timeoutHandle = window.setTimeout(scheduleBannerLoad, priority ? 180 : 320);
+            timeoutHandle = window.setTimeout(scheduleBannerLoad, priority ? 50 : 120);
         }
 
         return () => {

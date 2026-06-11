@@ -222,9 +222,9 @@ const PreviewSummaryCard = ({ title, value, subValue, trend, icon: Icon, color, 
             )}
         </div>
         <div className="relative z-10 mt-3">
-            <h3 className="text-slate-550 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest mb-0.5">{title}</h3>
+            <h3 className="text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest mb-0.5">{title}</h3>
             <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-                {value}{isPercent && <span className="text-lg text-slate-450 ml-0.5">%</span>}
+                {value}{isPercent && <span className="text-lg text-slate-400 ml-0.5">%</span>}
             </div>
                                             {subValue && <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium">{subValue}</div>}
         </div>
@@ -233,7 +233,7 @@ const PreviewSummaryCard = ({ title, value, subValue, trend, icon: Icon, color, 
 
 
 
-const InlineAnalyticsUI = () => {
+const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
     const [hiddenDatasets, setHiddenDatasets] = useState<Set<string>>(new Set());
     const mockChartData = [
         { date: 'Jun 4', value: 1200 },
@@ -282,7 +282,7 @@ const InlineAnalyticsUI = () => {
 
     return (
         <div className={`${GLASS_CARD} w-full flex flex-col min-h-[460px] p-5 sm:p-6 transform transition-transform duration-500`}>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-2 ${showConversionRate ? 'md:grid-cols-3' : ''} gap-4`}>
                 <PreviewSummaryCard
                     title="Downloads"
                     value="148,294"
@@ -301,17 +301,19 @@ const InlineAnalyticsUI = () => {
                     trend="8.1"
                     className="p-0.5"
                 />
-                <div className="hidden md:block">
-                    <PreviewSummaryCard
-                        title="Conversion Rate"
-                        value="43.2"
-                        subValue="Downloads per View"
-                        icon={PieChart}
-                        color="text-emerald-500"
-                        isPercent={true}
-                        className="p-0.5"
-                    />
-                </div>
+                {showConversionRate && (
+                    <div className="hidden md:block">
+                        <PreviewSummaryCard
+                            title="Conversion Rate"
+                            value="43.2"
+                            subValue="Downloads per View"
+                            icon={PieChart}
+                            color="text-emerald-500"
+                            isPercent={true}
+                            className="p-0.5"
+                        />
+                    </div>
+                )}
             </div>
             <div className="bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col backdrop-blur-md p-4 sm:p-5 mt-4">
                 <div className="h-[380px] w-full">
@@ -350,7 +352,7 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                     avatar: resolvedAvatar,
                 });
             })
-            .catch(() => { /* silently fail */ });
+            .catch(() => {});
     }, [project?.authorId]);
 
     const commenterName = randomCommenter?.name ?? project?.author ?? '…';
@@ -562,42 +564,9 @@ const CompactFeaturedModCard = ({ project }: { project: Project }) => {
 };
 
 const ScrollContainer = ({ children }: { children: React.ReactNode }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [showLeftFade, setShowLeftFade] = useState(false);
-    const [showRightFade, setShowRightFade] = useState(false);
-
-    const handleScroll = () => {
-        const el = containerRef.current;
-        if (!el) return;
-        
-        const { scrollLeft, scrollWidth, clientWidth } = el;
-        setShowLeftFade(scrollLeft > 1);
-        setShowRightFade(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 1);
-    };
-
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        
-        handleScroll();
-        
-        const resizeObserver = new ResizeObserver(() => handleScroll());
-        resizeObserver.observe(el);
-        
-        return () => resizeObserver.disconnect();
-    }, []);
-
     return (
         <div className="relative w-full overflow-hidden">
-            <div className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0b1220]/92 via-[#0b1220]/76 to-transparent pointer-events-none z-30 transition-opacity duration-300 ${showLeftFade ? 'opacity-100' : 'opacity-0'}`} />
-            
-            <div className={`absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#0b1220]/92 via-[#0b1220]/76 to-transparent pointer-events-none z-30 transition-opacity duration-300 ${showRightFade ? 'opacity-100' : 'opacity-0'}`} />
-            
-            <div 
-                ref={containerRef}
-                onScroll={handleScroll}
-                className="flex gap-4 overflow-x-auto pb-4 pt-2 scrollbar-none snap-x snap-mandatory w-full"
-            >
+            <div className="flex gap-4 overflow-x-auto pb-4 pt-2 scrollbar-none snap-x snap-mandatory w-full">
                 {children}
             </div>
         </div>
@@ -626,7 +595,7 @@ export const TrendingProjectsSection = ({
                 </div>
                 <Link
                     to={`${SiteRoutes.browse()}?view=trending`}
-                    className="text-xs font-bold text-slate-550 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
+                    className="text-xs font-bold text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
                 >
                     Browse All
                     <ArrowUpRight className="w-3.5 h-3.5" />
@@ -672,7 +641,7 @@ export const NewReleasesSection = ({
                 </div>
                 <Link
                     to={`${SiteRoutes.browse()}?sort=newest`}
-                    className="text-xs font-bold text-slate-550 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
+                    className="text-xs font-bold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
                 >
                     Browse All
                     <ArrowUpRight className="w-3.5 h-3.5" />
@@ -740,7 +709,7 @@ export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Pr
     );
 };
 
-export const ProjectAnalyticsSection = () => {
+export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
@@ -756,7 +725,7 @@ export const ProjectAnalyticsSection = () => {
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-indigo-500/10 rounded-3xl blur-2xl pointer-events-none" />
-                <InlineAnalyticsUI />
+                <InlineAnalyticsUI showConversionRate={showConversionRate} />
             </div>
         </div>
     );
