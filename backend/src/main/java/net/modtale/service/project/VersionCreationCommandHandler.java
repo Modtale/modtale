@@ -67,7 +67,7 @@ public class VersionCreationCommandHandler {
                 versionMutationOrchestrationService.prepareVersionArtifact(project, file);
         boolean modpack = preparedArtifact.classification() == ProjectClassification.MODPACK;
 
-        ProjectVersion version = buildVersion(versionNumber, gameVersions, changelog, channel, preparedArtifact, file, modpack);
+        ProjectVersion version = buildVersion(project, versionNumber, gameVersions, changelog, channel, preparedArtifact, file, modpack);
 
         List<String> simpleProjectIds = new ArrayList<>();
         if (projectIds != null) {
@@ -88,6 +88,7 @@ public class VersionCreationCommandHandler {
     }
 
     private ProjectVersion buildVersion(
+            Project project,
             String versionNumber,
             List<String> gameVersions,
             String changelog,
@@ -108,7 +109,7 @@ public class VersionCreationCommandHandler {
         version.setHash(preparedArtifact.fileHash());
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         version.setDependencies(new ArrayList<>());
-        version.setScanResult(versionMutationOrchestrationService.maybeCreateQueuedScanResult(file, modpack));
+        version.setScanResult(versionMutationOrchestrationService.maybeCreateQueuedScanResult(project, file, modpack));
         return version;
     }
 

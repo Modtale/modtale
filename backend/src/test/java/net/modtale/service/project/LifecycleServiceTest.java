@@ -15,6 +15,7 @@ import net.modtale.service.communication.ProjectNotificationService;
 import net.modtale.service.communication.WebhookService;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.service.security.SanitizationService;
+import net.modtale.service.security.ScanService;
 import net.modtale.service.security.SecurityIssueAnalysisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,8 @@ class LifecycleServiceTest {
     private ProjectAccessService projectAccessService;
     private ProjectMutationGuard projectMutationGuard;
     private SecurityIssueAnalysisService securityIssueAnalysisService;
+    private VersionMutationOrchestrationService versionMutationOrchestrationService;
+    private ScanService scanService;
 
     @BeforeEach
     void setUp() {
@@ -65,6 +68,15 @@ class LifecycleServiceTest {
         projectAccessService = new ProjectAccessService(projectService, accessControlService);
         projectMutationGuard = new ProjectMutationGuard();
         securityIssueAnalysisService = mock(SecurityIssueAnalysisService.class);
+        scanService = mock(ScanService.class);
+        versionMutationOrchestrationService = new VersionMutationOrchestrationService(
+                validationService,
+                scanService,
+                sanitizationService,
+                mock(VersionArtifactService.class),
+                mock(VersionDependencyService.class),
+                mock(ProjectDeletionService.class)
+        );
         ProjectDraftWorkflowService projectDraftWorkflowService = new ProjectDraftWorkflowService(
                 projectRepository,
                 projectService,
@@ -74,6 +86,7 @@ class LifecycleServiceTest {
                 userRepository,
                 projectAccessService,
                 projectMutationGuard,
+                versionMutationOrchestrationService,
                 new AppLimitProperties(10, 5, 10, 5, 5, 5, 20, 10)
         );
         ProjectPublicationService projectPublicationService = new ProjectPublicationService(
@@ -164,6 +177,43 @@ class LifecycleServiceTest {
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(webhookService).triggerAdminNewProjectWebhook(project);
+    }
+
+    @Test
+    void submitProjectQueuesInitialScanForDraftArtifactsBeforeReview() {
+        User user = user("user-1", "Ada", User.AccountType.USER, true);
+        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DRAFT);
+        project.setDescription("Detailed description");
+        project.setTags(new ArrayList<>(List.of("magic")));
+        project.setRepositoryUrl("https://github.com/modtale/sky-tools");
+        project.setLicense("MIT");
+
+        ProjectVersion uploadedDraftVersion = version("1.0.0");
+        uploadedDraftVersion.setFileUrl("/files/data/bundle.zip");
+        uploadedDraftVersion.setScanResult(null);
+        project.setVersions(new ArrayList<>(List.of(uploadedDraftVersion)));
+
+        ScanResult queuedScan = new ScanResult(ScanStatus.SCANNING, 0, List.of());
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "PROJECT_STATUS_SUBMIT")).thenReturn(true);
+        when(scanService.createQueuedScanResult(1, "Initial scan queued.")).thenReturn(queuedScan);
+
+        lifecycleService.submitProject("project-1", user);
+
+        assertEquals(ProjectStatus.PENDING, project.getStatus());
+        assertEquals(queuedScan, uploadedDraftVersion.getScanResult());
+        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
+        verify(scanService).enqueueBackgroundScan(
+                "project-1",
+                uploadedDraftVersion.getId(),
+                "/files/data/bundle.zip",
+                "/files/data/bundle.zip",
+                false,
+                1
+        );
+        verify(webhookService, never()).triggerAdminNewProjectWebhook(project);
     }
 
     @Test

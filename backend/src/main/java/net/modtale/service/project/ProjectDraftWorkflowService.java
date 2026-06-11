@@ -32,6 +32,7 @@ public class ProjectDraftWorkflowService {
     private final UserRepository userRepository;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
+    private final VersionMutationOrchestrationService versionMutationOrchestrationService;
     private final int maxProjectsPerUser;
 
     public ProjectDraftWorkflowService(
@@ -43,6 +44,7 @@ public class ProjectDraftWorkflowService {
             UserRepository userRepository,
             ProjectAccessService projectAccessService,
             ProjectMutationGuard projectMutationGuard,
+            VersionMutationOrchestrationService versionMutationOrchestrationService,
             AppLimitProperties limitProperties
     ) {
         this.projectRepository = projectRepository;
@@ -53,6 +55,7 @@ public class ProjectDraftWorkflowService {
         this.userRepository = userRepository;
         this.projectAccessService = projectAccessService;
         this.projectMutationGuard = projectMutationGuard;
+        this.versionMutationOrchestrationService = versionMutationOrchestrationService;
         this.maxProjectsPerUser = limitProperties.maxProjectsPerUser();
     }
 
@@ -162,17 +165,22 @@ public class ProjectDraftWorkflowService {
 
         project.setStatus(ProjectStatus.PENDING);
         project.setExpiresAt(null);
+        List<ProjectVersion> scansQueuedForSubmission = new ArrayList<>();
         if (project.getVersions() != null) {
             project.getVersions().forEach(version -> {
                 if (version.getReviewStatus() == null
                         || version.getReviewStatus() == ProjectVersion.ReviewStatus.REJECTED) {
                     version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
                 }
+                if (versionMutationOrchestrationService.queueSubmissionScanIfNeeded(project, version)) {
+                    scansQueuedForSubmission.add(version);
+                }
             });
         }
 
         projectRepository.save(project);
         projectService.evictProjectCache(project);
+        scansQueuedForSubmission.forEach(version -> versionMutationOrchestrationService.enqueueSubmissionScan(project, version));
         if (project.getVersions() == null
                 || project.getVersions().stream().noneMatch(version -> version.getScanResult() != null
                 && version.getScanResult().getStatus() == ScanStatus.SCANNING)) {

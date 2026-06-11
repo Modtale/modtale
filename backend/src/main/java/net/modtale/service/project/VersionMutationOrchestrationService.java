@@ -2,7 +2,9 @@ package net.modtale.service.project;
 
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.service.security.SanitizationService;
@@ -71,15 +73,15 @@ public class VersionMutationOrchestrationService {
         return versionDependencyService.resolveRequestedDependencies(projectIds, modpack, allowVersionlessDependencies);
     }
 
-    public ScanResult maybeCreateQueuedScanResult(MultipartFile file, boolean modpack) {
-        if (file == null || modpack) {
+    public ScanResult maybeCreateQueuedScanResult(Project project, MultipartFile file, boolean modpack) {
+        if (!shouldScanImmediately(project, file, modpack)) {
             return null;
         }
         return scanService.createQueuedScanResult(1, "Initial scan queued.");
     }
 
     public void enqueueInitialScan(Project project, ProjectVersion version, MultipartFile file, boolean modpack, String filePath) {
-        if (file == null || modpack) {
+        if (!shouldScanImmediately(project, file, modpack)) {
             return;
         }
         scanService.enqueueBackgroundScan(
@@ -90,6 +92,44 @@ public class VersionMutationOrchestrationService {
                 false,
                 1
         );
+    }
+
+    public boolean queueSubmissionScanIfNeeded(Project project, ProjectVersion version) {
+        if (project == null
+                || version == null
+                || project.getClassification() == ProjectClassification.MODPACK
+                || version.getFileUrl() == null
+                || version.getFileUrl().isBlank()
+                || version.getScanResult() != null) {
+            return false;
+        }
+
+        version.setScanResult(scanService.createQueuedScanResult(1, "Initial scan queued."));
+        version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        version.setScheduledPublishDate(null);
+        return true;
+    }
+
+    public void enqueueSubmissionScan(Project project, ProjectVersion version) {
+        if (project == null || version == null || version.getFileUrl() == null || version.getFileUrl().isBlank()) {
+            return;
+        }
+
+        scanService.enqueueBackgroundScan(
+                project.getId(),
+                version.getId(),
+                version.getFileUrl(),
+                version.getFileUrl(),
+                false,
+                1
+        );
+    }
+
+    private boolean shouldScanImmediately(Project project, MultipartFile file, boolean modpack) {
+        return project != null
+                && project.getStatus() != ProjectStatus.DRAFT
+                && file != null
+                && !modpack;
     }
 
     public void invalidateCachedModpackArtifact(ProjectVersion version, List<ProjectDependency> dependencies) {
