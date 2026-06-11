@@ -130,6 +130,7 @@ export const Home: React.FC<{
     const DESKTOP_BREAKPOINT = 1024;
     const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
     const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
+    const DESKTOP_HERO_MIN_HEIGHT = 720;
     const HERO_MARQUEE_PROJECT_LIMIT = 8;
 
     const { initialData: ssrData } = useSSRData();
@@ -192,7 +193,13 @@ export const Home: React.FC<{
 
         const shouldUseDesktopLayout = (currentDesktopLayout: boolean) => {
             const viewportWidth = window.innerWidth;
-            if (viewportWidth < DESKTOP_BREAKPOINT) {
+            const viewportHeight = window.innerHeight;
+            if (viewportWidth < DESKTOP_BREAKPOINT || viewportHeight < DESKTOP_HERO_MIN_HEIGHT) {
+                desktopHeroRetryGridWidthRef.current = null;
+                return false;
+            }
+
+            if (validFeaturedProjects.length === 0) {
                 desktopHeroRetryGridWidthRef.current = null;
                 return false;
             }
@@ -322,6 +329,7 @@ export const Home: React.FC<{
     const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
     const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
+    const isDesktopStackedHeroLayout = isDesktop && !isDesktopHeroLayout;
 
     return (
         <div
@@ -361,6 +369,9 @@ export const Home: React.FC<{
                     .contain-content {
                         contain: content;
                     }
+                    .home-hero-copy p {
+                        text-wrap: balance;
+                    }
                     @media (max-height: 900px) {
                         .home-hero {
                             padding-top: clamp(3.75rem, 4vh, 5rem) !important;
@@ -375,6 +386,7 @@ export const Home: React.FC<{
                         }
                         .home-hero-copy p {
                             margin-bottom: 1rem !important;
+                            text-wrap: balance;
                         }
                         .home-hero-copy nav {
                             margin-bottom: 1rem !important;
@@ -392,9 +404,110 @@ export const Home: React.FC<{
                         .home-hero-copy p {
                             font-size: 0.95rem !important;
                             margin-bottom: 0.75rem !important;
+                            text-wrap: balance;
                         }
                         .home-hero-copy nav {
                             margin-bottom: 0.75rem !important;
+                        }
+                    }
+                    @media (min-width: 1024px) and (max-height: 820px) {
+                        .home-hero.home-hero-desktop-stacked {
+                            min-height: calc(100dvh - 6rem) !important;
+                            justify-content: center !important;
+                            padding-top: clamp(1rem, 1.8vh, 1.75rem) !important;
+                            padding-bottom: clamp(1rem, 1.8vh, 1.5rem) !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-grid {
+                            gap: 1.25rem !important;
+                            align-content: center !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy {
+                            gap: 0.45rem !important;
+                            justify-content: center !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-logo {
+                            margin-bottom: 0.6rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy h1 {
+                            margin-bottom: 0.42rem !important;
+                            font-size: clamp(2.65rem, 5.1vw, 3.75rem) !important;
+                            line-height: 1 !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy p {
+                            margin-bottom: 0.72rem !important;
+                            max-width: 42rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy nav {
+                            margin-bottom: 0.72rem !important;
+                            width: auto !important;
+                            max-width: 100% !important;
+                            justify-content: center !important;
+                            gap: 0.9rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy nav a {
+                            height: 3.05rem !important;
+                            font-size: 0.98rem !important;
+                            border-radius: 1rem !important;
+                            flex: 0 0 auto !important;
+                            width: auto !important;
+                            min-width: 0 !important;
+                            padding-left: 1.35rem !important;
+                            padding-right: 1.35rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-stats {
+                            width: min(100%, 29rem) !important;
+                            max-width: min(100%, 29rem) !important;
+                            padding: 0.95rem 1.35rem !important;
+                            gap: 1rem !important;
+                            justify-content: space-between !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-stat-value {
+                            font-size: 1.58rem !important;
+                            line-height: 1 !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-stat-label {
+                            font-size: 0.64rem !important;
+                            margin-top: 0.36rem !important;
+                            letter-spacing: 0.1em !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-stat-divider {
+                            height: 2.6rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-stat-group {
+                            min-width: 0 !important;
+                        }
+                    }
+                    @media (min-width: 1024px) and (max-height: 740px) {
+                        .home-hero.home-hero-desktop-stacked {
+                            padding-top: clamp(0.85rem, 1.4vh, 1.35rem) !important;
+                            padding-bottom: clamp(0.85rem, 1.4vh, 1.1rem) !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-grid {
+                            gap: 1rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-logo {
+                            margin-bottom: 0.45rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy h1 {
+                            margin-bottom: 0.35rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy p {
+                            margin-bottom: 0.6rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy nav {
+                            margin-bottom: 0.6rem !important;
+                            width: auto !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-copy nav a {
+                            height: 3rem !important;
+                            width: auto !important;
+                            min-width: 0 !important;
+                            padding-left: 1.15rem !important;
+                            padding-right: 1.15rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-stats {
+                            width: min(100%, 27.25rem) !important;
+                            max-width: min(100%, 27.25rem) !important;
                         }
                     }
                     @media (max-width: 640px) and (max-height: 700px) {
@@ -419,6 +532,7 @@ export const Home: React.FC<{
                             font-size: 0.93rem !important;
                             line-height: 1.45 !important;
                             margin-bottom: 0.65rem !important;
+                            text-wrap: balance;
                         }
                         .home-hero-copy nav {
                             gap: 0.6rem !important;
@@ -484,6 +598,7 @@ export const Home: React.FC<{
                         .home-hero-copy p {
                             font-size: 0.92rem !important;
                             margin-bottom: 0.45rem !important;
+                            text-wrap: balance;
                         }
                         .home-hero-copy nav {
                             margin-bottom: 0.4rem !important;
@@ -543,6 +658,7 @@ export const Home: React.FC<{
                             font-size: 1.08rem !important;
                             margin-bottom: 1rem !important;
                             max-width: 38rem !important;
+                            text-wrap: balance;
                         }
                         .home-hero-copy.home-hero-copy-desktop nav {
                             margin-bottom: 1rem !important;
@@ -593,26 +709,26 @@ export const Home: React.FC<{
             </Helmet>
 
             <main className="relative z-10 contain-content">
-                <section className={`home-hero ${isDesktopHeroLayout ? 'home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh]' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>
+                <section className={`home-hero ${isDesktopHeroLayout ? 'home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh]' : ''} ${isDesktopStackedHeroLayout ? 'home-hero-desktop-stacked lg:min-h-[calc(100dvh-6rem)] lg:pt-6 lg:pb-6' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none transform-gpu" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
 
-                    <div ref={heroGridRef} className={`relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 ${isDesktopHeroLayout ? 'home-hero-desktop-grid lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20' : ''} grid grid-cols-1 ${isDesktopHeroLayout ? '' : 'lg:grid-cols-1'} gap-6 sm:gap-12 items-stretch`}>
+                    <div ref={heroGridRef} className={`home-hero-grid relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 ${isDesktopHeroLayout ? 'home-hero-desktop-grid lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20' : ''} grid grid-cols-1 ${isDesktopHeroLayout ? '' : 'lg:grid-cols-1'} gap-6 sm:gap-12 items-stretch`}>
 
                         <div
                             ref={heroTextColumnRef}
-                            className={`home-hero-copy ${isDesktopHeroLayout ? 'home-hero-copy-desktop' : ''} flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start text-center lg:text-left lg:mx-0 lg:max-w-xl' : 'text-center lg:text-left lg:items-start lg:mx-0 lg:max-w-2xl'} w-full max-w-2xl 2xl:max-w-2xl justify-center mx-auto`}
+                            className={`home-hero-copy ${isDesktopHeroLayout ? 'home-hero-copy-desktop' : ''} flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start text-center lg:text-left lg:mx-0 lg:max-w-xl' : 'text-center items-center mx-auto max-w-2xl'} w-full max-w-2xl 2xl:max-w-2xl justify-center`}
                         >
-                            <div className="home-hero-copy-primary w-full flex flex-col items-center lg:items-start">
+                            <div className={`home-hero-copy-primary w-full flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start' : ''}`}>
                                 <div className="shrink-0">
                                     <img
                                         src="/assets/logo.svg"
                                         alt="Modtale Logo"
                                         width={853}
                                         height={128}
-                                        className={`home-hero-logo h-14 sm:h-16 md:h-20 ${isDesktopHeroLayout ? 'lg:h-[6.75rem]' : ''} w-auto mb-4 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:hidden`}
+                                        className={`home-hero-logo h-12 sm:h-14 md:h-16 ${isDesktopHeroLayout ? 'lg:h-[5.25rem] 2xl:h-[6.25rem]' : ''} w-auto mb-4 sm:mb-8 object-contain drop-shadow-sm shrink-0 dark:hidden`}
                                         fetchPriority="high"
                                         decoding="async"
                                     />
@@ -621,24 +737,24 @@ export const Home: React.FC<{
                                         alt="Modtale Logo"
                                         width={853}
                                         height={128}
-                                        className={`home-hero-logo hidden h-14 sm:h-16 md:h-20 ${isDesktopHeroLayout ? 'lg:h-[6.75rem]' : ''} w-auto mb-4 sm:mb-10 object-contain drop-shadow-sm shrink-0 dark:block`}
+                                        className={`home-hero-logo hidden h-12 sm:h-14 md:h-16 ${isDesktopHeroLayout ? 'lg:h-[5.25rem] 2xl:h-[6.25rem]' : ''} w-auto mb-4 sm:mb-8 object-contain drop-shadow-sm shrink-0 dark:block`}
                                         fetchPriority="high"
                                         decoding="async"
                                     />
                                 </div>
 
-                                <h1 className={`text-4xl sm:text-5xl ${isDesktopHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 lg:self-start`}>
+                                <h1 className={`text-4xl sm:text-5xl ${isDesktopHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 ${isDesktopHeroLayout ? 'lg:self-start' : ''}`}>
                                     The Hytale<br />
                                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                         Community<br />Repository
                                     </span>
                                 </h1>
 
-                                <p className={`text-base sm:text-lg ${isDesktopHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-6 sm:mb-10 font-medium leading-relaxed lg:self-start`}>
+                                <p className={`text-base sm:text-lg ${isDesktopHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12 lg:self-start' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-6 sm:mb-10 font-medium leading-relaxed`}>
                                     Discover, download, and seamlessly share Hytale projects, worlds, plugins, asset packs, and modpacks.
                                 </p>
 
-                                <nav ref={heroActionsRef} aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-4 w-full sm:w-auto mb-6 sm:mb-10 2xl:mb-14 lg:self-start">
+                                <nav ref={heroActionsRef} aria-label="Primary Actions" className={`flex flex-col sm:flex-row items-center ${isDesktopHeroLayout ? 'lg:items-start lg:self-start' : ''} gap-3 sm:gap-4 w-full sm:w-auto mb-6 sm:mb-10 2xl:mb-14`}>
                                     <Link
                                         to={SiteRoutes.browse()}
                                         className={`flex items-center justify-center px-6 ${isDesktopHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto ring-1 ring-blue-500 transform-gpu whitespace-nowrap`}

@@ -10,8 +10,8 @@ vi.mock('@/utils/errorTracking', () => ({
 
 const mockedCaptureError = vi.mocked(captureError);
 
-const ThrowingChild = () => {
-    throw new Error('framework render failure');
+const ThrowingReferenceErrorChild = () => {
+    throw new ReferenceError('framework render failure');
 };
 
 const settle = async (times = 4) => {
@@ -27,7 +27,7 @@ describe('ErrorBoundary', () => {
         vi.clearAllMocks();
     });
 
-    it('renders the fallback UI and reports render-time framework errors', async () => {
+    it('renders the fallback UI and reports render-time ReferenceErrors', async () => {
         const container = document.createElement('div');
         document.body.appendChild(container);
         const root: Root = createRoot(container);
@@ -36,7 +36,7 @@ describe('ErrorBoundary', () => {
         await act(async () => {
             root.render(
                 <ErrorBoundary>
-                    <ThrowingChild />
+                    <ThrowingReferenceErrorChild />
                 </ErrorBoundary>
             );
         });
@@ -44,16 +44,16 @@ describe('ErrorBoundary', () => {
         await settle();
 
         expect(container.textContent).toContain('Application Error');
-        expect(container.textContent).toContain('Error: framework render failure');
+        expect(container.textContent).toContain('ReferenceError: framework render failure');
         expect(container.querySelector('button')?.textContent).toContain('Reload Application');
         expect(mockedCaptureError).toHaveBeenCalledTimes(1);
-        expect(mockedCaptureError).toHaveBeenCalledWith(
-            expect.any(Error),
+        expect(mockedCaptureError.mock.calls[0]?.[0]).toBeInstanceOf(ReferenceError);
+        expect(mockedCaptureError.mock.calls[0]?.[1]).toEqual(
             expect.objectContaining({ componentStack: expect.any(String) })
         );
         expect(consoleError).toHaveBeenCalledWith(
             'Uncaught error:',
-            expect.any(Error),
+            expect.any(ReferenceError),
             expect.objectContaining({ componentStack: expect.any(String) })
         );
 
