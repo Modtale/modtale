@@ -439,7 +439,7 @@ const InlineAnalyticsUI = () => {
 
     return (
         <div className={`${GLASS_CARD} w-full flex flex-col min-h-[460px] p-5 sm:p-6 transform transition-transform duration-500`}>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <PreviewSummaryCard
                     title="Downloads"
                     value="148,294"
@@ -458,15 +458,17 @@ const InlineAnalyticsUI = () => {
                     trend="8.1"
                     className="p-0.5"
                 />
-                <PreviewSummaryCard
-                    title="Conversion Rate"
-                    value="43.2"
-                    subValue="Downloads per View"
-                    icon={PieChart}
-                    color="text-emerald-500"
-                    isPercent={true}
-                    className="p-0.5"
-                />
+                <div className="hidden md:block">
+                    <PreviewSummaryCard
+                        title="Conversion Rate"
+                        value="43.2"
+                        subValue="Downloads per View"
+                        icon={PieChart}
+                        color="text-emerald-500"
+                        isPercent={true}
+                        className="p-0.5"
+                    />
+                </div>
             </div>
             <div className="bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col backdrop-blur-md p-4 sm:p-5 mt-4">
                 <div className="h-[380px] w-full">
