@@ -344,6 +344,7 @@ public class OpenApiConfig {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private Object buildExample(Schema schema,
                                 Map<String, Schema> schemaRegistry,
                                 Set<String> visitedRefs,
