@@ -266,7 +266,20 @@ describe('Home fallback requests', () => {
         try {
             await act(async () => {
                 root.render(
-                    <SSRProvider data={{ homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } }} initialPath="/">
+                    <SSRProvider data={{
+                        homeProjects: [
+                            {
+                                id: 'project-1',
+                                title: 'Skyforge Utilities',
+                                authorId: 'user-1',
+                                author: 'Ada',
+                                imageUrl: '/images/skyforge-icon.png',
+                                bannerUrl: '/images/skyforge-banner.png',
+                                downloadCount: 1200
+                            }
+                        ],
+                        stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }
+                    }} initialPath="/">
                         <HelmetProvider>
                             <MemoryRouter initialEntries={['/']}>
                                 <Home />
@@ -323,6 +336,125 @@ describe('Home fallback requests', () => {
 
             const heroActions = container.querySelector('[aria-label="Primary Actions"]');
             expect(heroActions?.className).toContain('lg:items-start');
+        } finally {
+            restoreMeasurements();
+        }
+    });
+
+    it('keeps the hero in the mobile layout on short desktop viewports so it stays inside the viewport', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1180 });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 692 });
+
+        const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+        const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+        const originalScrollWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
+        const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+        const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+
+        const restoreMeasurements = () => {
+            if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+            if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+            if (originalScrollWidth) Object.defineProperty(HTMLElement.prototype, 'scrollWidth', originalScrollWidth);
+            if (originalScrollHeight) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeight);
+            HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+        };
+
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+            configurable: true,
+            get() {
+                if (this instanceof HTMLElement) {
+                    if (this.className.includes('max-w-[112rem]')) return 1100;
+                    if (this.className.includes('home-hero-copy')) return 560;
+                }
+
+                return 400;
+            }
+        });
+
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+            configurable: true,
+            get() {
+                return 56;
+            }
+        });
+
+        Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+            configurable: true,
+            get() {
+                return this.clientWidth;
+            }
+        });
+
+        Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+            configurable: true,
+            get() {
+                return this.clientHeight;
+            }
+        });
+
+        HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+            return {
+                x: 0,
+                y: 0,
+                top: 0,
+                left: 0,
+                bottom: 56,
+                right: 400,
+                width: 400,
+                height: 56,
+                toJSON() {
+                    return {};
+                }
+            } as DOMRect;
+        };
+
+        try {
+            await act(async () => {
+                root.render(
+                    <SSRProvider
+                        data={{
+                            homeProjects: [
+                                {
+                                    id: 'project-1',
+                                    title: 'Skyforge Utilities',
+                                    authorId: 'user-1',
+                                    author: 'Ada',
+                                    imageUrl: '/images/skyforge-icon.png',
+                                    bannerUrl: '/images/skyforge-banner.png',
+                                    downloadCount: 1200
+                                }
+                            ],
+                            stats: { totalProjects: 2842, totalDownloads: 92841653, totalUsers: 49713 }
+                        }}
+                        initialPath="/"
+                    >
+                        <HelmetProvider>
+                            <MemoryRouter initialEntries={['/']}>
+                                <Home />
+                            </MemoryRouter>
+                        </HelmetProvider>
+                    </SSRProvider>
+                );
+            });
+
+            await act(async () => {
+                await vi.runAllTimersAsync();
+            });
+
+            expect(container.querySelector('.home-hero-copy-desktop')).toBeFalsy();
+            expect(container.querySelector('[data-testid="marquee-column"]')).toBeFalsy();
+
+            const heroSection = container.querySelector('section.home-hero');
+            const heroCopy = container.querySelector('.home-hero-copy');
+            const heroPrimary = container.querySelector('.home-hero-copy-primary');
+            const heroActions = container.querySelector('[aria-label="Primary Actions"]');
+
+            expect(heroSection?.className).toContain('home-hero-desktop-stacked');
+            expect(heroSection?.className).toContain('lg:min-h-[calc(100dvh-6rem)]');
+            expect(heroCopy?.className).not.toContain('lg:text-left');
+            expect(heroCopy?.className).not.toContain('lg:items-start');
+            expect(heroPrimary?.className).not.toContain('lg:items-start');
+            expect(heroActions?.className).not.toContain('lg:items-start');
         } finally {
             restoreMeasurements();
         }
