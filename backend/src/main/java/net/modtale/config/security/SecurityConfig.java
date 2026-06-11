@@ -304,11 +304,18 @@ public class SecurityConfig {
                                 "/api/v1/status",
                                 "/api/v1/version/**",
                                 "/api/v1/analytics/platform/stats",
-                                "/api/v1/wiki/**"
+                                "/api/v1/wiki/**",
+                                "/api/v1/finance/public/**",
+                                "/api/v1/finance/projects/*/donation-config",
+                                "/api/v1/finance/projects/*/donations/checkout-url",
+                                "/api/v1/finance/donations/confirm",
+                                "/api/v1/finance/ads/slot/**",
+                                "/api/v1/finance/ads/click/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
-                                "/api/v1/users/batch"
+                                "/api/v1/users/batch",
+                                "/api/v1/finance/ads/impression"
                         ).permitAll()
                         .requestMatchers("/api/v1/analytics/platform/full").access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()

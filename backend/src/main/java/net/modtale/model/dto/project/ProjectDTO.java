@@ -38,6 +38,11 @@ public class ProjectDTO {
     private List<String> modIds;
     private boolean allowModpacks;
     private boolean allowComments;
+    private boolean adsEnabled;
+    private boolean donationsEnabled;
+    private int suggestedDonationCents;
+    private boolean donationRecurringDefault;
+    private int donationPlatformCutBps;
     private boolean hmWikiEnabled;
     private String hmWikiSlug;
     private ProjectStatus status;
@@ -109,6 +114,16 @@ public class ProjectDTO {
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public boolean isAllowComments() { return allowComments; }
     public void setAllowComments(boolean allowComments) { this.allowComments = allowComments; }
+    public boolean isAdsEnabled() { return adsEnabled; }
+    public void setAdsEnabled(boolean adsEnabled) { this.adsEnabled = adsEnabled; }
+    public boolean isDonationsEnabled() { return donationsEnabled; }
+    public void setDonationsEnabled(boolean donationsEnabled) { this.donationsEnabled = donationsEnabled; }
+    public int getSuggestedDonationCents() { return suggestedDonationCents; }
+    public void setSuggestedDonationCents(int suggestedDonationCents) { this.suggestedDonationCents = suggestedDonationCents; }
+    public boolean isDonationRecurringDefault() { return donationRecurringDefault; }
+    public void setDonationRecurringDefault(boolean donationRecurringDefault) { this.donationRecurringDefault = donationRecurringDefault; }
+    public int getDonationPlatformCutBps() { return donationPlatformCutBps; }
+    public void setDonationPlatformCutBps(int donationPlatformCutBps) { this.donationPlatformCutBps = donationPlatformCutBps; }
     public boolean isHmWikiEnabled() { return hmWikiEnabled; }
     public void setHmWikiEnabled(boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
     public String getHmWikiSlug() { return hmWikiSlug; }

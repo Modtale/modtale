@@ -21,6 +21,11 @@ export interface OrganizationMember {
     roleId: string;
 }
 
+export interface OrgPayoutShare {
+    userId: string;
+    percent: number;
+}
+
 export interface User {
     id: string;
     username: string;
@@ -49,6 +54,8 @@ export interface User {
     organizationMembers?: OrganizationMember[];
     organizationRoles?: OrganizationRole[];
     pendingOrgInvites?: OrganizationMember[];
+    orgPayoutMode?: 'DIRECT_TO_ORG_STRIPE' | 'DISTRIBUTE_TO_MEMBERS';
+    orgPayoutShares?: OrgPayoutShare[];
 }
 
 export interface ProjectDependency {
@@ -251,6 +258,11 @@ export interface Project {
     lastTrendingNotification?: string;
     allowModpacks?: boolean;
     allowComments?: boolean;
+    adsEnabled?: boolean;
+    donationsEnabled?: boolean;
+    suggestedDonationCents?: number;
+    donationRecurringDefault?: boolean;
+    donationPlatformCutBps?: number;
     hmWikiEnabled?: boolean;
     hmWikiSlug?: string;
     status?: 'DRAFT' | 'PRIVATE' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';

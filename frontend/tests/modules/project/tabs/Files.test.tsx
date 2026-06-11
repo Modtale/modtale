@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Files } from '@/modules/project/tabs/Files';
 import type { VersionFormData } from '@/modules/project/components/FormShared';
 
-const mockVersionFields = vi.fn(() => <div data-testid="version-fields" />);
+const mockVersionFields = vi.fn((props: any) => <div data-testid="version-fields" data-props={JSON.stringify(props)} />);
 
 vi.mock('@/modules/project/components/VersionFields', () => ({
     VersionFields: (props: any) => mockVersionFields(props)
@@ -132,7 +132,7 @@ describe('Files upload rules for drafts', () => {
         });
 
         expect(mockVersionFields).toHaveBeenCalled();
-        const props = mockVersionFields.mock.calls.at(-1)?.[0];
+        const props = mockVersionFields.mock.calls.at(-1)?.[0] as any;
         expect(props.existingVersions).toEqual(['1.0.0']);
         expect(props.previousDependencies).toEqual([{
             projectId: 'dep-1',
@@ -180,7 +180,7 @@ describe('Files upload rules for drafts', () => {
             );
         });
 
-        const props = mockVersionFields.mock.calls.at(-1)?.[0];
+        const props = mockVersionFields.mock.calls.at(-1)?.[0] as any;
         expect(props.previousDependencies).toBeUndefined();
     });
 

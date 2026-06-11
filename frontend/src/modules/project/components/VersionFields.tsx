@@ -22,9 +22,10 @@ interface VersionFieldsProps {
     disabled?: boolean;
     hideFilePicker?: boolean;
     currentProjectId?: string;
+    previousDependencies?: any[];
 }
 
-export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], disabled, hideFilePicker = false, currentProjectId }) => {
+export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], disabled, hideFilePicker = false, currentProjectId, previousDependencies }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [availableGameVersions, setAvailableGameVersions] = useState<string[]>([]);
     const [loadingVersions, setLoadingVersions] = useState(false);

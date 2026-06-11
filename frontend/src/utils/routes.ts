@@ -52,6 +52,7 @@ export class SiteRoutes {
     static dashboardProjects() { return '/dashboard/projects'; }
     static dashboardOrgs() { return '/dashboard/orgs'; }
     static dashboardAnalytics() { return '/dashboard/analytics'; }
+    static dashboardFinance() { return '/dashboard/finance'; }
     static dashboardNotifications() { return '/dashboard/notifications'; }
     static dashboardDeveloper() { return '/dashboard/developer'; }
     static verify() { return '/verify'; }
