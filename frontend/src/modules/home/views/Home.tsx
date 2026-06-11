@@ -327,6 +327,7 @@ export const Home: React.FC<{
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
     const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
     const isDesktopStackedHeroLayout = isDesktop && !isDesktopHeroLayout;
+    const shouldRenderDesktopHeroMarquee = isDesktopHeroLayout && validFeaturedProjects.length > 0;
 
     return (
         <div
@@ -720,7 +721,10 @@ export const Home: React.FC<{
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
 
-                    <div ref={heroGridRef} className="home-hero-grid home-hero-desktop-grid relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20 grid grid-cols-1 gap-6 sm:gap-12 items-stretch">
+                    <div
+                        ref={heroGridRef}
+                        className={`home-hero-grid home-hero-desktop-grid relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 2xl:gap-20 grid grid-cols-1 gap-6 sm:gap-12 items-stretch ${isDesktopHeroLayout ? 'lg:grid-cols-2' : 'lg:grid-cols-1 lg:justify-items-center'}`}
+                    >
 
                         <div
                             ref={heroTextColumnRef}
@@ -801,8 +805,8 @@ export const Home: React.FC<{
                             </div>
                         </div>
 
-                        <div className="home-hero-desktop-marquee relative hidden lg:block w-full lg:min-h-[520px] 2xl:min-h-[680px]">
-                            {validFeaturedProjects.length > 0 && (
+                        {shouldRenderDesktopHeroMarquee && (
+                            <div className="home-hero-desktop-marquee relative hidden lg:block w-full lg:min-h-[520px] 2xl:min-h-[680px]">
                                 <aside
                                     ref={heroMarqueeDesktopRef}
                                     className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
@@ -815,8 +819,8 @@ export const Home: React.FC<{
                                     <MarqueeColumn projects={col1Projects} duration="35s" />
                                     <MarqueeColumn projects={col2Projects} duration="45s" />
                                 </aside>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="absolute bottom-0 left-0 right-0 h-[150px] bg-gradient-to-t from-slate-100/30 dark:from-[#080d19] to-transparent pointer-events-none z-10" />
