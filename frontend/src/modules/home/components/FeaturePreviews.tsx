@@ -105,11 +105,6 @@ export const InlineDownloadUI = () => {
     const orderedGameVersions = ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.4', '0.5.3', '0.5.2', '0.5.1', '0.5.0', '0.5.0-pre.9.2', '0.5.0-pre.9.1'];
     const preReleaseGameVersions = ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.0-pre.9.2', '0.5.0-pre.9.1'];
     const preReleaseGameVersionSet = useMemo(() => new Set(preReleaseGameVersions), []);
-    const gameVersions = useMemo(() => {
-        if (showPreReleaseGameVersions) return orderedGameVersions;
-        return orderedGameVersions.filter(version => !preReleaseGameVersionSet.has(version));
-    }, [orderedGameVersions, preReleaseGameVersionSet, showPreReleaseGameVersions]);
-    const preferredGameVersion = useMemo(() => gameVersions[0] || '', [gameVersions]);
 
     const allVersions = [
         { id: 'v9', versionNumber: '3.1.0-pre.2', channel: 'BETA', gameVersion: '0.6.0-pre.2', date: '30 minutes ago', changelog: 'Latest Hytale prerelease preview. Stabilized menus, polished world loading, and one more pass on particles.' },
@@ -123,18 +118,53 @@ export const InlineDownloadUI = () => {
         { id: 'v1', versionNumber: '2.9.9', channel: 'RELEASE', gameVersion: '0.5.0-pre.9.2', date: '2 months ago', changelog: 'Final update for the old magic system before the Hytale prerelease branch changed over.' }
     ];
 
+    const onlyExperimentalArePreRelease = useMemo(() => {
+        const experimentalBuilds = allVersions.filter(v => v.channel === 'ALPHA' || v.channel === 'BETA');
+        if (experimentalBuilds.length === 0) return false;
+        return experimentalBuilds.every(v => preReleaseGameVersionSet.has(v.gameVersion));
+    }, [allVersions, preReleaseGameVersionSet]);
+
+    const onlyPreReleaseAreExperimental = useMemo(() => {
+        const latestReleaseVer = orderedGameVersions.find(v => !preReleaseGameVersionSet.has(v));
+        const latestReleaseIdx = latestReleaseVer ? orderedGameVersions.indexOf(latestReleaseVer) : orderedGameVersions.length;
+        const newerPreReleaseVersions = orderedGameVersions.slice(0, latestReleaseIdx).filter(v => preReleaseGameVersionSet.has(v));
+
+        let hasPreReleaseBuilds = false;
+        let hasReleaseInPreRelease = false;
+
+        for (const v of allVersions) {
+            if (newerPreReleaseVersions.includes(v.gameVersion)) {
+                hasPreReleaseBuilds = true;
+                if (!v.channel || v.channel === 'RELEASE') {
+                    hasReleaseInPreRelease = true;
+                }
+            }
+        }
+        return hasPreReleaseBuilds && !hasReleaseInPreRelease;
+    }, [allVersions, orderedGameVersions, preReleaseGameVersionSet]);
+
+    const hasPreReleaseGameVersionEntries = preReleaseGameVersions.some(version => allVersions.some(v => v.gameVersion === version));
+    const hasReleaseGameVersionEntries = orderedGameVersions.some(version => !preReleaseGameVersionSet.has(version) && allVersions.some(v => v.gameVersion === version));
+    const forceShowPreReleaseGameVersions = hasPreReleaseGameVersionEntries && !hasReleaseGameVersionEntries;
+
+    const effectiveShowPreReleaseGameVersions = showPreReleaseGameVersions || forceShowPreReleaseGameVersions || (showExperimental && onlyExperimentalArePreRelease);
+    const effectiveShowExperimental = showExperimental || (effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental);
+
+    const gameVersions = useMemo(() => {
+        if (effectiveShowPreReleaseGameVersions) return orderedGameVersions;
+        return orderedGameVersions.filter(version => !preReleaseGameVersionSet.has(version));
+    }, [orderedGameVersions, preReleaseGameVersionSet, effectiveShowPreReleaseGameVersions]);
+    const preferredGameVersion = useMemo(() => gameVersions[0] || '', [gameVersions]);
+
     useEffect(() => {
         if (!preferredGameVersion) return;
         setSelectedVersion(preferredGameVersion);
         setIsDropdownOpen(false);
-    }, [preferredGameVersion, showPreReleaseGameVersions, showExperimental]);
+    }, [preferredGameVersion, effectiveShowPreReleaseGameVersions, effectiveShowExperimental]);
 
     const currentVersions = allVersions.filter(v => v.gameVersion === selectedVersion);
-    const visibleVersions = currentVersions.filter(v => showExperimental || v.channel === 'RELEASE');
+    const visibleVersions = currentVersions.filter(v => effectiveShowExperimental || v.channel === 'RELEASE');
     const latestVer = visibleVersions[0];
-    const hasPreReleaseGameVersionEntries = preReleaseGameVersions.some(version => allVersions.some(v => v.gameVersion === version));
-    const hasReleaseGameVersionEntries = orderedGameVersions.some(version => !preReleaseGameVersionSet.has(version) && allVersions.some(v => v.gameVersion === version));
-    const forceShowPreReleaseGameVersions = hasPreReleaseGameVersionEntries && !hasReleaseGameVersionEntries;
 
     useEffect(() => {
         if (forceShowPreReleaseGameVersions && !showPreReleaseGameVersions) {
@@ -162,12 +192,14 @@ export const InlineDownloadUI = () => {
                 <div className={`${theme.components.modalHeader} p-4 sm:p-5`}>
                     <div>
                         <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2"><List className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Changelog</h3>
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowExperimental(!showExperimental)}>
-                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
+                        {!(effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental) && (
+                            <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowExperimental(!showExperimental)}>
+                                <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${effectiveShowExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
+                                    <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${effectiveShowExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
+                                </div>
+                                <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
                             </div>
-                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
-                        </div>
+                        )}
                     </div>
                     <button onClick={() => setView('download')} aria-label="Close Changelog" className={`p-2 rounded-full ${theme.colors.bgSurfaceHover} ${theme.colors.textMuted} transition-colors`}><X className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                 </div>
@@ -215,20 +247,22 @@ export const InlineDownloadUI = () => {
                     <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                         <Download className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Download
                     </h3>
-                    {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && (
+                    {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && !(showExperimental && onlyExperimentalArePreRelease) && (
                         <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
-                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showPreReleaseGameVersions ? 'translate-x-3 sm:translate-x-4' : ''}`} />
+                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${effectiveShowPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
+                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${effectiveShowPreReleaseGameVersions ? 'translate-x-3 sm:translate-x-4' : ''}`} />
                             </div>
                             <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Pre-Release Game Versions</span>
                         </div>
                     )}
-                    <div className="mt-1 flex items-center gap-2 group cursor-pointer" onClick={() => setShowExperimental(!showExperimental)}>
-                        <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                            <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
+                    {!(effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental) && (
+                        <div className="mt-1 flex items-center gap-2 group cursor-pointer" onClick={() => setShowExperimental(!showExperimental)}>
+                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${effectiveShowExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
+                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${effectiveShowExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
                         </div>
-                        <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
-                    </div>
+                    )}
                 </div>
             </div>
 
@@ -273,7 +307,7 @@ export const InlineDownloadUI = () => {
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
                         <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-50 mb-2" aria-hidden="true" />
                         <p className="font-medium text-xs sm:text-sm text-center">No compatible versions.</p>
-                        {!showExperimental && currentVersions.length > 0 && (
+                        {!effectiveShowExperimental && currentVersions.length > 0 && (
                             <button onClick={() => setShowExperimental(true)} className="mt-2 text-[10px] sm:text-[11px] font-bold text-modtale-accent hover:underline">
                                 Show experimental
                             </button>
