@@ -72,8 +72,8 @@ export const Home: React.FC<{
     const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
     const initialNewestProjects = ssrData?.homeNewestProjects || [];
 
-    const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_BREAKPOINT : true);
-    const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(typeof window !== 'undefined' ? window.innerWidth >= DESKTOP_HERO_MIN_WIDTH_ENTER : true);
+    const [isDesktop, setIsDesktop] = useState(false);
+    const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(false);
     const [projects, setProjects] = useState<Project[]>(initialTrendingProjects);
     const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
@@ -87,6 +87,7 @@ export const Home: React.FC<{
 
     useEffect(() => {
         const handleResize = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
+        handleResize();
         window.addEventListener('resize', handleResize, { passive: true });
 
         const shouldFetchFallbackProjects = !initialTrendingProjects.length;
