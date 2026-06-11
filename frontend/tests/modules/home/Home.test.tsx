@@ -124,6 +124,30 @@ describe('Home fallback requests', () => {
         expect(container.textContent).toContain('The Hytale');
     });
 
+    it('uses a dynamic viewport height for the mobile hero container', async () => {
+        await act(async () => {
+            root.render(
+                <SSRProvider
+                    data={{
+                        homeProjects: [],
+                        stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }
+                    }}
+                    initialPath="/"
+                >
+                    <HelmetProvider>
+                        <MemoryRouter initialEntries={['/']}>
+                            <Home />
+                        </MemoryRouter>
+                    </HelmetProvider>
+                </SSRProvider>
+            );
+        });
+
+        const heroSection = container.querySelector('section.home-hero');
+        expect(heroSection?.className).toContain('min-h-[100dvh]');
+        expect(heroSection?.className).not.toContain('min-h-[100vh]');
+    });
+
     it('fetches trending home projects via category instead of an invalid sort value', async () => {
         mockedApi.get
             .mockResolvedValueOnce({ data: { content: [] } } as any)
