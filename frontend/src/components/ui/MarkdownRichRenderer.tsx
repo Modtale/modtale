@@ -8,6 +8,50 @@ import { Check, Copy } from 'lucide-react';
 const HighlightedCode = lazy(() => import('./MarkdownSyntaxHighlighter').then((module) => ({ default: module.HighlightedCode })));
 const MermaidChart = lazy(() => import('./MarkdownMermaidChart').then((module) => ({ default: module.MermaidChart })));
 
+const allowedTextAlignments = new Set(['left', 'center', 'right', 'justify']);
+
+const extractTextAlign = (value: unknown): React.CSSProperties['textAlign'] | undefined => {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const match = value.match(/(?:^|;)\s*text-align\s*:\s*(left|center|right|justify)\s*(?:;|$)/i);
+    if (!match) {
+        return undefined;
+    }
+
+    const alignment = match[1].toLowerCase();
+    return allowedTextAlignments.has(alignment) ? (alignment as React.CSSProperties['textAlign']) : undefined;
+};
+
+const createAlignedProps = (props: Record<string, unknown>) => {
+    const align = typeof props.align === 'string' ? props.align.toLowerCase() : '';
+    const textAlign = allowedTextAlignments.has(align) ? (align as React.CSSProperties['textAlign']) : undefined;
+
+    return textAlign
+        ? { ...props, style: { ...(props.style as React.CSSProperties | undefined), textAlign } }
+        : props;
+};
+
+const rehypePreserveTextAlign = () => (tree: any) => {
+    const visit = (node: any) => {
+        if (node?.type === 'element' && node.properties) {
+            const textAlign = extractTextAlign(node.properties.style);
+            if (textAlign) {
+                node.properties.align = textAlign;
+            }
+
+            delete node.properties.style;
+        }
+
+        if (Array.isArray(node?.children)) {
+            node.children.forEach(visit);
+        }
+    };
+
+    visit(tree);
+};
+
 const CodeFallback = ({ content }: { content: string }) => (
     <pre className="!bg-transparent !m-0 !p-4 text-[13px] leading-relaxed overflow-x-auto">
         <code>{content}</code>
@@ -78,16 +122,28 @@ const markdownComponents = {
         return <>{children}</>;
     },
     p({ node: _node, children, ...props }: any) {
-        return <p className="my-3 leading-relaxed break-words text-base" {...props}>{children}</p>;
+        return <p className="my-3 leading-relaxed break-words text-base" {...createAlignedProps(props)}>{children}</p>;
     },
     li({ node: _node, children, ...props }: any) {
-        return <li className="my-1.5 [&>p]:my-0 break-words text-base" {...props}>{children}</li>;
+        return <li className="my-1.5 [&>p]:my-0 break-words text-base" {...createAlignedProps(props)}>{children}</li>;
     },
     ul({ node: _node, children, ...props }: any) {
-        return <ul className="list-disc pl-6 my-3 space-y-1.5" {...props}>{children}</ul>;
+        return <ul className="list-disc pl-6 my-3 space-y-1.5" {...createAlignedProps(props)}>{children}</ul>;
     },
     ol({ node: _node, children, ...props }: any) {
-        return <ol className="list-decimal pl-6 my-3 space-y-1.5" {...props}>{children}</ol>;
+        return <ol className="list-decimal pl-6 my-3 space-y-1.5" {...createAlignedProps(props)}>{children}</ol>;
+    },
+    div({ node: _node, children, ...props }: any) {
+        return <div {...createAlignedProps(props)}>{children}</div>;
+    },
+    h1({ node: _node, children, ...props }: any) {
+        return <h1 className="text-4xl font-black mb-6" {...createAlignedProps(props)}>{children}</h1>;
+    },
+    h2({ node: _node, children, ...props }: any) {
+        return <h2 className="text-2xl font-black mt-8 mb-4" {...createAlignedProps(props)}>{children}</h2>;
+    },
+    h3({ node: _node, children, ...props }: any) {
+        return <h3 className="text-xl font-black mt-6 mb-3" {...createAlignedProps(props)}>{children}</h3>;
     },
     img({ node: _node, ...props }: any) {
         return <img className="inline-block align-middle max-w-full h-auto my-0" {...props} />;
@@ -100,6 +156,7 @@ export const MarkdownRichRenderer: React.FC<{ content: string }> = ({ content })
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[
                 rehypeRaw,
+                rehypePreserveTextAlign,
                 [
                     rehypeSanitize,
                     {
