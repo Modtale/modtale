@@ -223,11 +223,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                         alt=""
                         priority={false}
                         baseWidth={640}
-                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
+                        className="w-full h-full group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
                     />
                 ) : null}
 
-                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent pointer-events-none" />
+                {!resolvedBanner && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent pointer-events-none" />
+                )}
 
                 <div className="absolute top-3 right-3 z-40">
                     <div className="bg-white/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-800 dark:text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center border border-slate-200 dark:border-white/10 shadow-sm relative pointer-events-none">
