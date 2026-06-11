@@ -1463,6 +1463,22 @@ export const ApiDocs: React.FC = () => {
                             </section>
                         )}
 
+                        {Array.from(grouped.entries()).map(([section, endpoints]) => (
+                            <section key={section} className="w-full">
+                                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-5 flex items-center gap-2">
+                                    {sectionIcon(section)} {section}
+                                </h2>
+                                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl w-full overflow-hidden">
+                                    {endpoints.map((endpoint) => (
+                                        <EndpointCard
+                                            key={`${endpoint.method}:${endpoint.path}`}
+                                            endpoint={endpoint}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        ))}
+
                         {data.schemas.length > 0 && (
                             <section className="w-full">
                                 <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
@@ -1501,22 +1517,6 @@ export const ApiDocs: React.FC = () => {
                                 </div>
                             </section>
                         )}
-
-                        {Array.from(grouped.entries()).map(([section, endpoints]) => (
-                            <section key={section} className="w-full">
-                                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-5 flex items-center gap-2">
-                                    {sectionIcon(section)} {section}
-                                </h2>
-                                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl w-full overflow-hidden">
-                                    {endpoints.map((endpoint) => (
-                                        <EndpointCard
-                                            key={`${endpoint.method}:${endpoint.path}`}
-                                            endpoint={endpoint}
-                                        />
-                                    ))}
-                                </div>
-                            </section>
-                        ))}
                     </div>
                 )}
             </div>
