@@ -1,10 +1,13 @@
 FROM gradle:jdk21-jammy AS builder
 WORKDIR /app
+COPY gradlew settings.gradle build.gradle ./
+COPY gradle ./gradle
+
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
+
+RUN ./gradlew dependencies --no-daemon || true
+
 COPY . .
-
-RUN sed -i 's/\r$//' gradlew
-
-RUN chmod +x ./gradlew
 
 RUN ./gradlew bootJar --no-daemon
 

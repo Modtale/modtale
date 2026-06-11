@@ -21,6 +21,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Filter changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci-cd.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci-cd.yml'
+
       - name: Configure Environment
         id: config
         run: |
@@ -73,10 +85,38 @@ jobs:
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
 
+      - name: Check Existing Services
+        id: check_services
+        run: |
+          # Check backend service
+          if gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "BACKEND_EXISTS=true" >> $GITHUB_ENV
+            B_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.REGION }} --format="value(status.url)")
+            echo "EXISTING_BACKEND_URL=$B_URL" >> $GITHUB_ENV
+            echo "Backend service already exists: $B_URL"
+          else
+            echo "BACKEND_EXISTS=false" >> $GITHUB_ENV
+            echo "Backend service does not exist."
+          fi
+
+          # Check frontend service
+          if gcloud run services describe ${{ env.FRONTEND_SERVICE }} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "FRONTEND_EXISTS=true" >> $GITHUB_ENV
+            F_URL=$(gcloud run services describe ${{ env.FRONTEND_SERVICE }} --region ${{ env.REGION }} --format="value(status.url)")
+            echo "EXISTING_FRONTEND_URL=$F_URL" >> $GITHUB_ENV
+            echo "Frontend service already exists: $F_URL"
+          else
+            echo "FRONTEND_EXISTS=false" >> $GITHUB_ENV
+            echo "Frontend service does not exist."
+          fi
+
       - name: Build and Deploy Backend
+        if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false'
         run: |
           cd backend
-          gcloud builds submit --tag gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} .
+          gcloud builds submit \
+            --config=cloudbuild.yml \
+            --substitutions=_TAG=${{ env.TAG }} .
           
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
@@ -132,10 +172,15 @@ jobs:
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             echo "API_URL=${{ env.FIXED_BACKEND_URL }}" >> $GITHUB_ENV
           else
-            echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
+            if [ -f backend/backend_url.txt ]; then
+              echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
+            else
+              echo "API_URL=${{ env.EXISTING_BACKEND_URL }}/api/v1" >> $GITHUB_ENV
+            fi
           fi
 
       - name: Build and Deploy Frontend
+        if: steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false'
         run: |
           cd frontend
           gcloud builds submit \
@@ -152,13 +197,88 @@ jobs:
       - name: Determine Frontend URL
         run: |
           if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
-            echo "FINAL_FRONTEND_URL=$(cat frontend/frontend_url.txt)" >> $GITHUB_ENV
+            if [ -f frontend/frontend_url.txt ]; then
+              echo "FINAL_FRONTEND_URL=$(cat frontend/frontend_url.txt)" >> $GITHUB_ENV
+            else
+              echo "FINAL_FRONTEND_URL=${{ env.EXISTING_FRONTEND_URL }}" >> $GITHUB_ENV
+            fi
           else
             echo "FINAL_FRONTEND_URL=${{ env.FRONTEND_DOMAIN }}" >> $GITHUB_ENV
           fi
 
       - name: Update Backend CORS and Self-Awareness
+        if: (steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
         run: |
+          if [ -f backend/backend_url.txt ]; then
+            B_URL=$(cat backend/backend_url.txt)
+          else
+            B_URL=${{ env.EXISTING_BACKEND_URL }}
+          fi
+          
           gcloud run services update ${{ env.BACKEND_SERVICE }} \
             --region $REGION \
-            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }},BACKEND_URL=$(cat backend/backend_url.txt)
+            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }},BACKEND_URL=$B_URL
+
+      - name: Generate Deployment Summary
+        if: always()
+        run: |
+          # Define status emojis and labels
+          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ env.BACKEND_EXISTS }}" = "false" ]; then
+            if [ "${{ steps.filter.outcome }}" = "success" ]; then
+              BACKEND_STATUS="Deployed (Fresh Build)"
+            else
+              BACKEND_STATUS="Deployment Failed"
+            fi
+            if [ -f backend/backend_url.txt ]; then
+              B_URL=$(cat backend/backend_url.txt)
+            else
+              B_URL="${{ env.EXISTING_BACKEND_URL }}"
+            fi
+          else
+            BACKEND_STATUS="✨ Cached (No Changes / Reused)"
+            B_URL="${{ env.EXISTING_BACKEND_URL }}"
+          fi
+
+          if [ "${{ steps.filter.outputs.frontend }}" = "true" ] || [ "${{ env.FRONTEND_EXISTS }}" = "false" ]; then
+            if [ "${{ steps.filter.outcome }}" = "success" ]; then
+              FRONTEND_STATUS="Deployed (Fresh Build)"
+            else
+              FRONTEND_STATUS="Deployment Failed"
+            fi
+            if [ -f frontend/frontend_url.txt ]; then
+              F_URL=$(cat frontend/frontend_url.txt)
+            else
+              F_URL="${{ env.EXISTING_FRONTEND_URL }}"
+            fi
+          else
+            FRONTEND_STATUS="✨ Cached (No Changes / Reused)"
+            F_URL="${{ env.EXISTING_FRONTEND_URL }}"
+          fi
+
+          # Output to GitHub Step Summary
+          echo "## Modtale Deployment Dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Environment Context" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered By:** \`${{ github.actor }}\` via \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** \`${{ env.ENV_TYPE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status | Target Service | Service URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "$B_URL" ]; then
+            echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($B_URL/api/v1) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -n "$F_URL" ]; then
+            echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | [App URL]($F_URL) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*View deployment details in [Google Cloud Console](https://console.cloud.google.com/run?project=${{ env.PROJECT_ID }}).* " >> $GITHUB_STEP_SUMMARY
+
