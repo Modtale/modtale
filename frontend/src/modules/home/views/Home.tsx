@@ -415,8 +415,12 @@ export const Home: React.FC<{
                             padding-bottom: clamp(1rem, 1.8vh, 1.5rem) !important;
                         }
                         .home-hero.home-hero-desktop-stacked .home-hero-grid {
+                            grid-template-columns: 1fr !important;
                             gap: 1.25rem !important;
                             align-content: center !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-desktop-marquee {
+                            display: none !important;
                         }
                         .home-hero.home-hero-desktop-stacked .home-hero-copy {
                             gap: 0.45rem !important;
@@ -480,7 +484,11 @@ export const Home: React.FC<{
                             padding-bottom: clamp(0.85rem, 1.4vh, 1.1rem) !important;
                         }
                         .home-hero.home-hero-desktop-stacked .home-hero-grid {
+                            grid-template-columns: 1fr !important;
                             gap: 1rem !important;
+                        }
+                        .home-hero.home-hero-desktop-stacked .home-hero-desktop-marquee {
+                            display: none !important;
                         }
                         .home-hero.home-hero-desktop-stacked .home-hero-logo {
                             margin-bottom: 0.45rem !important;
@@ -706,13 +714,13 @@ export const Home: React.FC<{
             </Helmet>
 
             <main className="relative z-10 contain-content">
-                <section className={`home-hero ${isDesktopHeroLayout ? 'home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh]' : ''} ${isDesktopStackedHeroLayout ? 'home-hero-desktop-stacked lg:min-h-[calc(100dvh-6rem)] lg:pt-6 lg:pb-6' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>
+                <section className={`home-hero home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh] ${isDesktopStackedHeroLayout ? 'home-hero-desktop-stacked lg:min-h-[calc(100dvh-6rem)] lg:pt-6 lg:pb-6' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none transform-gpu" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
                     <div className="absolute bottom-1/4 -right-1/4 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
 
-                    <div ref={heroGridRef} className={`home-hero-grid relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 ${isDesktopHeroLayout ? 'home-hero-desktop-grid lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20' : ''} grid grid-cols-1 ${isDesktopHeroLayout ? '' : 'lg:grid-cols-1'} gap-6 sm:gap-12 items-stretch`}>
+                    <div ref={heroGridRef} className="home-hero-grid home-hero-desktop-grid relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 lg:grid-cols-2 2xl:gap-20 grid grid-cols-1 gap-6 sm:gap-12 items-stretch">
 
                         <div
                             ref={heroTextColumnRef}
@@ -793,24 +801,22 @@ export const Home: React.FC<{
                             </div>
                         </div>
 
-                        {isDesktopHeroLayout ? (
-                            <div className="home-hero-desktop-marquee relative w-full lg:min-h-[520px] 2xl:min-h-[680px]">
-                                {validFeaturedProjects.length > 0 && (
-                                    <aside
-                                        ref={heroMarqueeDesktopRef}
-                                        className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
-                                        style={{
-                                            maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
-                                            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
-                                        }}
-                                        aria-label="Trending Hytale Projects Showcase"
-                                    >
-                                        <MarqueeColumn projects={col1Projects} duration="35s" />
-                                        <MarqueeColumn projects={col2Projects} duration="45s" />
-                                    </aside>
-                                )}
-                            </div>
-                        ) : null}
+                        <div className="home-hero-desktop-marquee relative hidden lg:block w-full lg:min-h-[520px] 2xl:min-h-[680px]">
+                            {validFeaturedProjects.length > 0 && (
+                                <aside
+                                    ref={heroMarqueeDesktopRef}
+                                    className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
+                                    style={{
+                                        maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
+                                        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
+                                    }}
+                                    aria-label="Trending Hytale Projects Showcase"
+                                >
+                                    <MarqueeColumn projects={col1Projects} duration="35s" />
+                                    <MarqueeColumn projects={col2Projects} duration="45s" />
+                                </aside>
+                            )}
+                        </div>
                     </div>
 
                     <div className="absolute bottom-0 left-0 right-0 h-[150px] bg-gradient-to-t from-slate-100/30 dark:from-[#080d19] to-transparent pointer-events-none z-10" />

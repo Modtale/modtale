@@ -122,6 +122,8 @@ describe('Home fallback requests', () => {
         });
 
         expect(container.textContent).toContain('The Hytale');
+        expect(container.querySelector('.home-hero-desktop-marquee')).toBeTruthy();
+        expect(container.querySelector('[data-testid="marquee-column"]')).toBeTruthy();
     });
 
     it('uses a dynamic viewport height for the mobile hero container', async () => {
@@ -442,7 +444,7 @@ describe('Home fallback requests', () => {
             });
 
             expect(container.querySelector('.home-hero-copy-desktop')).toBeFalsy();
-            expect(container.querySelector('[data-testid="marquee-column"]')).toBeFalsy();
+            expect(container.querySelector('.home-hero-desktop-marquee')).toBeTruthy();
 
             const heroSection = container.querySelector('section.home-hero');
             const heroCopy = container.querySelector('.home-hero-copy');
