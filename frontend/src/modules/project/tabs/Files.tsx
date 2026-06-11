@@ -27,7 +27,7 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
     return (
         <div className="space-y-8">
             {!readOnly && hasProjectPermission(Permission.VERSION_CREATE) && !hasUploadedDraftVersion && (
-                <div className={`${theme.colors.bgSurface} p-6 rounded-2xl border ${theme.colors.border}`}>
+                <div className="p-6 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-100/80 dark:bg-slate-950/40 shadow-inner">
                     <VersionFields
                         data={versionData}
                         onChange={setVersionData}
