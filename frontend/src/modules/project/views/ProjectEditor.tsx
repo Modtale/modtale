@@ -21,21 +21,20 @@ import { WikiPreview } from '../tabs/WikiPreview';
 import { projectClient } from '../api/projectClient';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { serializeProjectDependency } from '../utils/dependencyEntries';
-
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
-const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
-
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { PermissionSelector } from '@/components/ui/PermissionSelector';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { ThemedInput } from '../components/FormShared';
-import { VersionFields } from '../components/VersionFields';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
 import type { ProjectRole } from '@/types';
 import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
+import { VersionFields } from '../components/VersionFields';
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
 interface ProjectEditorViewProps {
     currentUser: User | null;
@@ -848,9 +847,16 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} />
                         )}
                         <SidebarSection title="Card Preview" icon={Eye}>
-                            <button
-                                type="button"
+                            <div
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => setShowCardPreview(true)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        setShowCardPreview(true);
+                                    }
+                                }}
                                 className={`w-full max-w-[340px] mx-auto relative group overflow-hidden rounded-2xl border ${theme.colors.border} text-left transition-all hover:shadow-lg hover:shadow-modtale-accent/10 focus:outline-none focus:ring-2 focus:ring-modtale-accent focus:ring-offset-2 dark:focus:ring-offset-slate-950`}
                                 aria-label="Expand project card preview"
                             >
@@ -861,7 +867,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                     <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Click to expand</span>
                                     <ExternalLink className="w-4 h-4" />
                                 </div>
-                            </button>
+                            </div>
                         </SidebarSection>
                         {!isModpack && (
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
