@@ -114,31 +114,38 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
         return sorted[0].dependencies || [];
     }, [project?.versions]);
 
+    const latestIncompatibleProjectIds = useMemo(() => {
+        if (!project?.versions?.length) return [];
+        const sorted = [...project.versions].sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+        return sorted[0].incompatibleProjectIds || [];
+    }, [project?.versions]);
+
     useEffect(() => {
-        if (!latestDependencies.length) return;
+        const latestProjectIds = [...latestDependencies.map(dep => dep.projectId), ...latestIncompatibleProjectIds];
+        if (!latestProjectIds.length) return;
         const fetchMeta = async () => {
-            const missing = latestDependencies.filter(d => d && d.projectId && !depMeta[d.projectId] && !fetchedDepMeta.current.has(d.projectId));
+            const missing = latestProjectIds.filter((projectId) => projectId && !depMeta[projectId] && !fetchedDepMeta.current.has(projectId));
             if (!missing.length) return;
 
-            missing.forEach(d => fetchedDepMeta.current.add(d.projectId));
+            missing.forEach(projectId => fetchedDepMeta.current.add(projectId));
             const newMeta = { ...depMeta };
-            await Promise.all(missing.map(async (d) => {
+            await Promise.all(missing.map(async (projectId) => {
                 try {
-                    const data = await projectClient.getDependencyMeta(d.projectId);
-                    newMeta[d.projectId] = {
+                    const data = await projectClient.getDependencyMeta(projectId);
+                    newMeta[projectId] = {
                         icon: data.icon,
                         title: data.title,
                         classification: data.classification,
                         slug: data.slug
                     };
                 } catch (e) {
-                    newMeta[d.projectId] = { icon: '', title: d.projectTitle || d.projectId };
+                    newMeta[projectId] = { icon: '', title: projectId };
                 }
             }));
             setDepMeta(prev => ({...prev, ...newMeta}));
         };
         fetchMeta();
-    }, [latestDependencies]);
+    }, [latestDependencies, latestIncompatibleProjectIds, depMeta]);
 
     useEffect(() => {
         const authorId = (project as any)?.authorId || authorProfile?.id;
@@ -162,5 +169,5 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
         }
     };
 
-    return { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, isFollowing, handleFollowToggle };
+    return { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, latestIncompatibleProjectIds, isFollowing, handleFollowToggle };
 };

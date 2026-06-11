@@ -125,6 +125,7 @@ class VersionControllerTest {
                 file,
                 "Release notes",
                 List.of("dep-a", "dep-b", "dep-c"),
+                List.of(),
                 ProjectVersion.Channel.BETA,
                 currentUser
         );

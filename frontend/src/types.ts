@@ -1,5 +1,10 @@
 import type { Permission } from '@/modules/permissions/permissions';
 
+export enum VersionRelationKind {
+    DEPENDENCY = 'DEPENDENCY',
+    INCOMPATIBILITY = 'INCOMPATIBILITY'
+}
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;
@@ -174,6 +179,7 @@ export interface ProjectVersion {
     releaseDate: string;
     changelog?: string;
     dependencies?: ProjectDependency[];
+    incompatibleProjectIds?: string[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     scanResult?: ScanResult;
     reviewStatus?: 'PENDING' | 'SCHEDULED' | 'APPROVED' | 'REJECTED';

@@ -31,6 +31,7 @@ public class VersionMutationApplicationService {
                 requestPayload.getFile(),
                 requestPayload.getChangelog(),
                 normalizeDependencyEntries(requestPayload.getModIds()),
+                normalizeProjectIds(requestPayload.getIncompatibleProjectIds()),
                 resolveChannel(requestPayload.getChannel()),
                 currentUser
         );
@@ -45,6 +46,7 @@ public class VersionMutationApplicationService {
                 projectId,
                 versionId,
                 normalizeDependencyEntries(requestPayload.getModIds()),
+                normalizeProjectIds(requestPayload.getIncompatibleProjectIds()),
                 requestPayload.getGameVersions(),
                 requestPayload.getChangelog(),
                 resolveChannelOrNull(requestPayload.getChannel()),
@@ -57,6 +59,17 @@ public class VersionMutationApplicationService {
     }
 
     private List<String> normalizeDependencyEntries(List<String> rawEntries) {
+        if (rawEntries == null || rawEntries.isEmpty()) {
+            return rawEntries;
+        }
+        return rawEntries.stream()
+                .flatMap(entry -> Arrays.stream(entry.split(",")))
+                .map(String::trim)
+                .filter(entry -> !entry.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    private List<String> normalizeProjectIds(List<String> rawEntries) {
         if (rawEntries == null || rawEntries.isEmpty()) {
             return rawEntries;
         }

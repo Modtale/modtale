@@ -133,6 +133,7 @@ class VersionServiceTest {
                 file,
                 "Release notes",
                 List.of("dep-1:2.0.0"),
+                List.of(),
                 ProjectVersion.Channel.RELEASE,
                 user
         );
@@ -173,6 +174,7 @@ class VersionServiceTest {
                 List.of("1.21.0"),
                 file,
                 "Release notes",
+                null,
                 null,
                 ProjectVersion.Channel.RELEASE,
                 user
@@ -215,6 +217,7 @@ class VersionServiceTest {
                 "project-1",
                 "version-1",
                 List.of("new-dep:2.0.0"),
+                List.of(),
                 null,
                 null,
                 null,

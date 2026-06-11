@@ -42,12 +42,16 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
         const nextDependencyEntries = (latestVersion.dependencies || []).map(serializeProjectDependency);
         const dependencyIds = new Set(nextDependencyEntries.map((entry) => parseDependencyEntry(entry).projectId));
         const preservedEntries = (versionData.projectIds || []).filter((entry) => !dependencyIds.has(parseDependencyEntry(entry).projectId));
+        const nextIncompatibleIds = latestVersion.incompatibleProjectIds || [];
+        const incompatibleIds = new Set(nextIncompatibleIds);
+        const preservedIncompatibles = (versionData.incompatibleProjectIds || []).filter((projectId) => !incompatibleIds.has(projectId));
 
         setVersionData((prev) => ({
             ...prev,
             gameVersions: latestVersion.gameVersions || (latestVersion.gameVersion ? [latestVersion.gameVersion] : prev.gameVersions),
             channel: latestVersion.channel || prev.channel || 'RELEASE',
-            projectIds: [...nextDependencyEntries, ...preservedEntries]
+            projectIds: [...nextDependencyEntries, ...preservedEntries],
+            incompatibleProjectIds: [...nextIncompatibleIds, ...preservedIncompatibles]
         }));
         setReuseLatestSetupDismissed(true);
     };

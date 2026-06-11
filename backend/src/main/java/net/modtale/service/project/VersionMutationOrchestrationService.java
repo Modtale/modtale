@@ -73,6 +73,10 @@ public class VersionMutationOrchestrationService {
         return versionDependencyService.resolveRequestedDependencies(projectIds, modpack, allowVersionlessDependencies);
     }
 
+    public List<String> resolveRequestedProjectIds(List<String> projectIds, boolean allowDraftProjects) {
+        return versionDependencyService.resolveRequestedProjectIds(projectIds, allowDraftProjects);
+    }
+
     public ScanResult maybeCreateQueuedScanResult(Project project, MultipartFile file, boolean modpack) {
         if (!shouldScanImmediately(project, file, modpack)) {
             return null;

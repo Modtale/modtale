@@ -41,6 +41,7 @@ public class VersionUpdateCommandHandler {
             String projectId,
             String versionId,
             List<String> projectIds,
+            List<String> incompatibleProjectIds,
             List<String> gameVersions,
             String changelog,
             ProjectVersion.Channel channel,
@@ -76,6 +77,11 @@ public class VersionUpdateCommandHandler {
             if (modpack && project.getVersions().get(0).getId().equals(versionId)) {
                 project.setModIds(resolvedDependencies.simpleProjectIds());
             }
+        }
+        if (incompatibleProjectIds != null) {
+            version.setIncompatibleProjectIds(new java.util.ArrayList<>(
+                    versionMutationOrchestrationService.resolveRequestedProjectIds(incompatibleProjectIds, true)
+            ));
         }
 
         projectRepository.save(project);

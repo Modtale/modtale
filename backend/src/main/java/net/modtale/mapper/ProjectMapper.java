@@ -212,6 +212,7 @@ public class ProjectMapper {
         dto.setReleaseDate(version.getReleaseDate());
         dto.setChangelog(version.getChangelog());
         dto.setDependencies(version.getDependencies());
+        dto.setIncompatibleProjectIds(version.getIncompatibleProjectIds());
         dto.setChannel(version.getChannel());
         return dto;
     }

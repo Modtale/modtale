@@ -67,6 +67,31 @@ public class VersionDependencyService {
         return new ResolvedDependencies(dependencies, simpleProjectIds);
     }
 
+    public List<String> resolveRequestedProjectIds(
+            List<String> projectIds,
+            boolean allowDraftProjects
+    ) {
+        if (projectIds == null) {
+            return List.of();
+        }
+
+        List<String> resolvedProjectIds = new ArrayList<>();
+        for (String entry : projectIds) {
+            if (entry == null || entry.isBlank()) {
+                continue;
+            }
+
+            String projectId = entry.trim();
+            Project project = projectService.getRawProjectById(projectId);
+            if (project == null || (!allowDraftProjects && project.getStatus() == ProjectStatus.DRAFT)) {
+                throw new InvalidVersionRequestException("One or more selected incompatible mods could not be found.");
+            }
+            resolvedProjectIds.add(project.getId());
+        }
+
+        return resolvedProjectIds;
+    }
+
     private boolean hasDependencyFlag(String[] parts, String flag) {
         for (int i = 2; i < parts.length; i++) {
             if (flag.equalsIgnoreCase(parts[i].trim())) {

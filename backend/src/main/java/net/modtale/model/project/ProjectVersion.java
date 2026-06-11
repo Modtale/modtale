@@ -12,6 +12,7 @@ public class ProjectVersion {
     private String releaseDate;
     private String changelog;
     private List<ProjectDependency> dependencies;
+    private List<String> incompatibleProjectIds;
     private Channel channel;
 
     private ScanResult scanResult;
@@ -50,6 +51,9 @@ public class ProjectVersion {
 
     public List<ProjectDependency> getDependencies() { return dependencies; }
     public void setDependencies(List<ProjectDependency> dependencies) { this.dependencies = dependencies; }
+
+    public List<String> getIncompatibleProjectIds() { return incompatibleProjectIds; }
+    public void setIncompatibleProjectIds(List<String> incompatibleProjectIds) { this.incompatibleProjectIds = incompatibleProjectIds; }
 
     public Channel getChannel() { return channel; }
     public void setChannel(Channel channel) { this.channel = channel; }

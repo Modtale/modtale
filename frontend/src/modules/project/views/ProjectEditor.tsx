@@ -55,7 +55,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
     });
     const [versionData, setVersionData] = useState<VersionFormData>({
-        projectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
+        projectIds: [], incompatibleProjectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
     });
 
     const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -362,6 +362,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             versionData.gameVersions.forEach(version => formData.append('gameVersions', version));
             if (versionData.file) formData.append('file', versionData.file);
             (versionData.projectIds || []).forEach(dep => formData.append('modIds', dep));
+            (versionData.incompatibleProjectIds || []).forEach(projectId => formData.append('incompatibleProjectIds', projectId));
             if (versionData.changelog) formData.append('changelog', versionData.changelog);
             formData.append('channel', versionData.channel || 'RELEASE');
 
@@ -373,6 +374,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             setProjectData(refreshed);
             setVersionData({
                 projectIds: versionData.projectIds || [],
+                incompatibleProjectIds: versionData.incompatibleProjectIds || [],
                 versionNumber: '',
                 gameVersions: versionData.gameVersions,
                 changelog: '',
@@ -393,6 +395,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setEditingVersion(version);
         setEditVersionData({
             projectIds: (version.dependencies || []).map(serializeProjectDependency),
+            incompatibleProjectIds: version.incompatibleProjectIds || [],
             versionNumber: version.versionNumber || '',
             gameVersions: version.gameVersions || (version.gameVersion ? [version.gameVersion] : []),
             changelog: version.changelog || '',
@@ -413,6 +416,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         try {
             await projectClient.updateVersion(projectData.id, editingVersion.id, {
                 modIds: editVersionData.projectIds || [],
+                incompatibleProjectIds: editVersionData.incompatibleProjectIds || [],
                 gameVersions: editVersionData.gameVersions,
                 changelog: editVersionData.changelog || '',
                 channel: editVersionData.channel || 'RELEASE'

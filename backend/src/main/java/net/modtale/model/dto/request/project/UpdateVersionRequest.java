@@ -8,6 +8,7 @@ import java.util.List;
 
 public class UpdateVersionRequest {
     private List<@NotBlank(message = "Dependency entries cannot be blank.") String> modIds;
+    private List<@NotBlank(message = "Incompatible project entries cannot be blank.") String> incompatibleProjectIds;
     private List<@NotBlank(message = "Game version entries cannot be blank.") String> gameVersions;
 
     @Size(max = 50000, message = "Version changelogs cannot exceed 50,000 characters.")
@@ -25,6 +26,14 @@ public class UpdateVersionRequest {
 
     public void setModIds(List<String> modIds) {
         this.modIds = modIds;
+    }
+
+    public List<String> getIncompatibleProjectIds() {
+        return incompatibleProjectIds;
+    }
+
+    public void setIncompatibleProjectIds(List<String> incompatibleProjectIds) {
+        this.incompatibleProjectIds = incompatibleProjectIds;
     }
 
     public List<String> getGameVersions() {

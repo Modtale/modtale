@@ -15,6 +15,7 @@ public class CreateVersionRequest {
     private List<@NotBlank(message = "Game version entries cannot be blank.") String> gameVersions;
     private MultipartFile file;
     private List<@NotBlank(message = "Dependency entries cannot be blank.") String> modIds;
+    private List<@NotBlank(message = "Incompatible project entries cannot be blank.") String> incompatibleProjectIds;
 
     @Size(max = 50000, message = "Version changelogs cannot exceed 50,000 characters.")
     private String changelog;
@@ -55,6 +56,14 @@ public class CreateVersionRequest {
 
     public void setModIds(List<String> modIds) {
         this.modIds = modIds;
+    }
+
+    public List<String> getIncompatibleProjectIds() {
+        return incompatibleProjectIds;
+    }
+
+    public void setIncompatibleProjectIds(List<String> incompatibleProjectIds) {
+        this.incompatibleProjectIds = incompatibleProjectIds;
     }
 
     public String getChangelog() {

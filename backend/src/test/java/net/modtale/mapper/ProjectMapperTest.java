@@ -124,6 +124,7 @@ class ProjectMapperTest {
         assertEquals("modtale:core", ProjectMapper.toDependencyDTO(dependency).projectId());
         assertTrue(ProjectMapper.toDependencyDTO(dependency).isOptional());
         assertTrue(ProjectMapper.toDependencyDTO(dependency).isEmbedded());
+        assertEquals(List.of("modtale:legacy"), ProjectMapper.toVersionDTO(version).getIncompatibleProjectIds());
     }
 
     private static Project baseProject() {
@@ -191,6 +192,7 @@ class ProjectMapperTest {
         version.setReleaseDate("2026-01-01T10:00:00");
         version.setChangelog("Added features");
         version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0", false, false)));
+        version.setIncompatibleProjectIds(List.of("modtale:legacy"));
         version.setChannel(ProjectVersion.Channel.RELEASE);
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         version.setRejectionReason("Security review cleared");

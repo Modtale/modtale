@@ -5,6 +5,7 @@ import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project, ProjectVersion, ProjectDependency } from '@/types';
+import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { parseDependencyEntry, serializeDependencyEntry } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
@@ -225,13 +226,24 @@ interface DependencySelectorProps {
     onChange: (deps: string[]) => void;
     targetGameVersion?: string;
     label?: string;
+    mode?: VersionRelationKind;
     previousDependencies?: ProjectDependency[];
     currentProjectId?: string;
     isModpack?: boolean;
     disabled?: boolean;
 }
 
-export const DependencySelector: React.FC<DependencySelectorProps> = ({ selectedDeps, onChange, targetGameVersion, label = "Dependencies", previousDependencies, currentProjectId, isModpack = false, disabled }) => {
+export const DependencySelector: React.FC<DependencySelectorProps> = ({
+    selectedDeps,
+    onChange,
+    targetGameVersion,
+    label,
+    mode = 'dependency',
+    previousDependencies,
+    currentProjectId,
+    isModpack = false,
+    disabled
+}) => {
     const [search, setSearch] = useState('');
     const [results, setResults] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
@@ -243,6 +255,8 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     const [isEmbedded, setIsEmbedded] = useState(false);
     const [showWizard, setShowWizard] = useState(false);
     const { showToast } = useToast();
+    const isIncompatibilityMode = mode === VersionRelationKind.INCOMPATIBILITY;
+    const effectiveLabel = label ?? (isIncompatibilityMode ? 'Incompatible Mods' : 'Dependencies');
 
     const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>({});
 
@@ -265,13 +279,13 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     useScrollLock(selectedModForVersion !== null);
 
     useEffect(() => {
-        if (selectedModForVersion) {
+        if (selectedModForVersion && !isIncompatibilityMode) {
             const compatible = (selectedModForVersion.versions || []).filter(v => !targetGameVersion || v.gameVersions?.includes(targetGameVersion));
             const hasRelease = compatible.some(v => !v.channel || v.channel === 'RELEASE');
             const hasAny = compatible.length > 0;
             setShowAlphaBeta(hasAny && !hasRelease);
         }
-    }, [selectedModForVersion, targetGameVersion]);
+    }, [selectedModForVersion, targetGameVersion, isIncompatibilityMode]);
 
     useEffect(() => {
         const timer = setTimeout(async () => {
@@ -286,22 +300,37 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
         return () => clearTimeout(timer);
     }, [search, currentProjectId, disabled]);
 
-    const confirmVersion = (versionNumber: string) => {
-        if (!selectedModForVersion || disabled) return;
-        if (selectedDeps.some(d => d.startsWith(`${selectedModForVersion.id}:`))) {
+    const selectedProjectIds = useMemo(() => new Set(
+        selectedDeps
+            .map((dep) => {
+                if (isIncompatibilityMode) return dep.trim();
+                return parseDependencyEntry(dep).projectId;
+            })
+            .filter((id): id is string => Boolean(id))
+    ), [selectedDeps, isIncompatibilityMode]);
+
+    const addProjectSelection = (project: Project, versionNumber?: string) => {
+        if (disabled) return;
+        if (selectedProjectIds.has(project.id)) {
             showToast("Project already added.", 'info');
             return;
         }
-        setMetaCache(prev => ({ ...prev, [selectedModForVersion.id]: { title: selectedModForVersion.title, author: selectedModForVersion.author, icon: selectedModForVersion.imageUrl } }));
 
-        const finalOptional = isModpack ? false : isOptional;
-        const entry = serializeDependencyEntry({
-            projectId: selectedModForVersion.id,
-            versionNumber,
-            isOptional: finalOptional,
-            isEmbedded
-        });
-        onChange([...selectedDeps, entry]);
+        setMetaCache(prev => ({ ...prev, [project.id]: { title: project.title, author: project.author, icon: project.imageUrl } }));
+
+        if (isIncompatibilityMode) {
+            onChange([...selectedDeps, project.id]);
+        } else if (versionNumber) {
+            const finalOptional = isModpack ? false : isOptional;
+            const entry = serializeDependencyEntry({
+                projectId: project.id,
+                versionNumber,
+                isOptional: finalOptional,
+                isEmbedded
+            });
+            onChange([...selectedDeps, entry]);
+        }
+
         setSelectedModForVersion(null);
         setIsOptional(false);
         setIsEmbedded(false);
@@ -309,8 +338,17 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
         setResults([]);
     };
 
+    const confirmVersion = (versionNumber: string) => {
+        if (!selectedModForVersion || disabled) return;
+        addProjectSelection(selectedModForVersion, versionNumber);
+    };
+
     const openVersionPicker = async (mod: Project) => {
         if (disabled) return;
+        if (isIncompatibilityMode) {
+            addProjectSelection(mod);
+            return;
+        }
         setLoadingProjectVersions(true);
         try {
             const fullProject = mod.versions ? mod : await projectClient.getProject(mod.id);
@@ -364,7 +402,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     return (
         <div className={`space-y-4 border ${theme.colors.border} rounded-2xl p-6 ${theme.colors.bgSurface} ${disabled ? 'opacity-70' : ''}`}>
-            {showWizard && previousDependencies && !disabled && (
+            {showWizard && previousDependencies && !disabled && !isIncompatibilityMode && (
                 <DependencyUpdateWizard
                     previousDeps={previousDependencies}
                     targetGameVersion={targetGameVersion}
@@ -378,7 +416,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                 />
             )}
 
-            {selectedModForVersion && !disabled && (
+            {selectedModForVersion && !disabled && !isIncompatibilityMode && (
                 <div className={theme.components.modalOverlay}>
                     <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-md max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]`} onClick={e => e.stopPropagation()}>
                         <div className={`p-4 sm:p-5 flex justify-between items-start shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
@@ -446,10 +484,10 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
             )}
 
             <div className="flex justify-between items-center">
-                <h3 className={`font-bold ${theme.colors.textPrimary} flex items-center gap-2 text-sm uppercase tracking-wide`}><Search className="w-4 h-4" /> {label}</h3>
+                <h3 className={`font-bold ${theme.colors.textPrimary} flex items-center gap-2 text-sm uppercase tracking-wide`}><Search className="w-4 h-4" /> {effectiveLabel}</h3>
             </div>
 
-            {previousDependencies && previousDependencies.length > 0 && selectedDeps.length === 0 && !disabled && (
+            {previousDependencies && previousDependencies.length > 0 && selectedDeps.length === 0 && !disabled && !isIncompatibilityMode && (
                 <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 p-4 rounded-xl flex items-center justify-between animate-in fade-in">
                     <div className="flex items-center gap-3">
                         <RefreshCw className="w-5 h-5 text-blue-500" />
@@ -493,38 +531,50 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                 </div>
                 {selectedDeps.length === 0 ? (
                     <div className={`text-center p-8 border-2 border-dashed ${theme.colors.border} rounded-xl ${theme.colors.textMuted} text-sm italic`}>
-                        No dependencies added.
+                        {isIncompatibilityMode ? 'No incompatible mods added.' : 'No dependencies added.'}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-2">
                         {selectedDeps.map((entry, idx) => {
-                            const { projectId: id, versionNumber: ver, isOptional: isOpt, isEmbedded: embedded } = parseDependencyEntry(entry);
+                            const parsed = isIncompatibilityMode ? null : parseDependencyEntry(entry);
+                            const id = isIncompatibilityMode ? entry : (parsed?.projectId || '');
+                            const ver = isIncompatibilityMode ? '' : (parsed?.versionNumber || '');
+                            const isOpt = isIncompatibilityMode ? false : Boolean(parsed?.isOptional);
+                            const embedded = isIncompatibilityMode ? false : Boolean(parsed?.isEmbedded);
                             const meta = metaCache[id];
                             return (
                                 <div key={idx} className={`flex items-center justify-between ${theme.colors.bgBase} p-3 rounded-xl border ${theme.colors.border} text-sm shadow-sm group`}>
                                     <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className={`p-1 flex-shrink-0 rounded-lg ${isOpt ? `${theme.colors.bgSurfaceAlt} ${theme.colors.textMuted}` : 'bg-amber-100 text-amber-600 dark:bg-amber-900/20'}`}>
-                                            {isOpt ? <FileText className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                                        </div>
+                                        {!isIncompatibilityMode && (
+                                            <div className={`p-1 flex-shrink-0 rounded-lg ${isOpt ? `${theme.colors.bgSurfaceAlt} ${theme.colors.textMuted}` : 'bg-amber-100 text-amber-600 dark:bg-amber-900/20'}`}>
+                                                {isOpt ? <FileText className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                                            </div>
+                                        )}
                                         <img src={getIconUrl(meta?.icon)} alt="" className={`w-8 h-8 rounded ${theme.colors.bgSurfaceAlt} object-cover flex-shrink-0`} onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
                                         <div className="min-w-0">
                                             <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{meta?.title || id}</div>
-                                            <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-1.5`}>
-                                                <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20"></span>
-                                                <span className={`font-mono ${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded`}>v{ver}</span>
-                                            </div>
+                                            {isIncompatibilityMode ? (
+                                                <div className={`text-xs ${theme.colors.textMuted}`}>Marked as incompatible</div>
+                                            ) : (
+                                                <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-1.5`}>
+                                                    <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
+                                                    <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20"></span>
+                                                    <span className={`font-mono ${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded`}>v{ver}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                                        {!isModpack && (
+                                        {!isIncompatibilityMode && !isModpack && (
                                             <button type="button" disabled={disabled} onClick={() => toggleOptionalExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${isOpt ? `border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50` : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400'} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
                                                 {isOpt ? 'Optional' : 'Required'}
                                             </button>
                                         )}
-                                        <button type="button" disabled={disabled} onClick={() => toggleEmbeddedExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${embedded ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/30 dark:text-emerald-400' : `border-slate-200 ${theme.colors.textMuted} hover:${theme.colors.textPrimary} hover:bg-slate-50`} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
-                                            {embedded ? 'Embedded' : 'Standalone'}
-                                        </button>
+                                        {!isIncompatibilityMode && (
+                                            <button type="button" disabled={disabled} onClick={() => toggleEmbeddedExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${embedded ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/30 dark:text-emerald-400' : `border-slate-200 ${theme.colors.textMuted} hover:${theme.colors.textPrimary} hover:bg-slate-50`} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
+                                                {embedded ? 'Embedded' : 'Standalone'}
+                                            </button>
+                                        )}
                                         <button type="button" disabled={disabled} onClick={() => removeDep(idx)} className={`${theme.colors.textMuted} p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : `hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`}><X className="w-4 h-4" /></button>
                                     </div>
                                 </div>

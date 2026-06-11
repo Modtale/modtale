@@ -50,6 +50,7 @@ public class VersionCreationCommandHandler {
             MultipartFile file,
             String changelog,
             List<String> projectIds,
+            List<String> incompatibleProjectIds,
             ProjectVersion.Channel channel,
             User user
     ) {
@@ -75,6 +76,12 @@ public class VersionCreationCommandHandler {
                     versionMutationOrchestrationService.resolveRequestedDependencies(projectIds, modpack, false);
             version.setDependencies(new ArrayList<>(resolvedDependencies.dependencies()));
             simpleProjectIds.addAll(resolvedDependencies.simpleProjectIds());
+        }
+
+        if (incompatibleProjectIds != null) {
+            version.setIncompatibleProjectIds(new ArrayList<>(
+                    versionMutationOrchestrationService.resolveRequestedProjectIds(incompatibleProjectIds, false)
+            ));
         }
 
         if (modpack) {
@@ -109,6 +116,7 @@ public class VersionCreationCommandHandler {
         version.setHash(preparedArtifact.fileHash());
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         version.setDependencies(new ArrayList<>());
+        version.setIncompatibleProjectIds(new ArrayList<>());
         version.setScanResult(versionMutationOrchestrationService.maybeCreateQueuedScanResult(project, file, modpack));
         return version;
     }
