@@ -29,13 +29,9 @@ const Confetti: React.FC = () => {
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
-        const resize = () => {
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        };
-
-        resize();
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        ctx.scale(dpr, dpr);
 
         const particles: Particle[] = [];
         const particleCount = 400;
@@ -62,34 +58,33 @@ const Confetti: React.FC = () => {
             });
         }
 
-        let animationFrameId = 0;
+        let animationFrameId: number;
         const animate = () => {
             ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
             let activeCount = 0;
 
-            particles.forEach((particle) => {
-                if (!particle.active) return;
+            particles.forEach(p => {
+                if (!p.active) return;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.vx *= p.drag;
+                p.vy *= p.drag;
+                p.tilt += p.tiltAngleIncrement;
+                p.angle += p.rotationSpeed;
 
-                particle.x += particle.vx;
-                particle.y += particle.vy;
-                particle.vy += particle.gravity;
-                particle.vx *= particle.drag;
-                particle.vy *= particle.drag;
-                particle.tilt += particle.tiltAngleIncrement;
-                particle.angle += particle.rotationSpeed;
-
-                if (particle.y > window.innerHeight + 100) {
-                    particle.active = false;
-                    return;
+                if (p.y > window.innerHeight + 100) {
+                    p.active = false;
+                } else {
+                    activeCount++;
                 }
 
-                activeCount += 1;
                 ctx.save();
-                ctx.translate(particle.x, particle.y);
-                ctx.rotate(particle.angle);
-                ctx.scale(1, Math.cos(particle.tilt));
-                ctx.fillStyle = particle.color;
-                ctx.fillRect(-particle.w / 2, -particle.h / 2, particle.w, particle.h);
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                ctx.scale(1, Math.cos(p.tilt));
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
                 ctx.restore();
             });
 
@@ -99,21 +94,17 @@ const Confetti: React.FC = () => {
         };
 
         animate();
-        window.addEventListener('resize', resize);
 
-        return () => {
-            window.removeEventListener('resize', resize);
-            cancelAnimationFrame(animationFrameId);
-        };
+        return () => cancelAnimationFrame(animationFrameId);
     }, []);
 
-    return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[60] h-full w-full" />;
+    return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[60] w-full h-full" />;
 };
 
 interface StatusModalProps {
     type: 'success' | 'error' | 'warning' | 'info';
     title: string;
-    message: React.ReactNode;
+    message: string;
     onClose: () => void;
     actionLabel?: string;
     onAction?: () => void;
@@ -129,92 +120,61 @@ export const StatusModal: React.FC<StatusModalProps> = ({
     onAction,
     secondaryLabel,
 }) => {
-    const config = {
-        success: {
-            icon: <Check className="h-8 w-8" />,
-            shell: 'border-modtale-accent/30 shadow-[0_40px_120px_-45px_rgba(37,99,235,0.6)]',
-            hero: 'from-modtale-accent/18 via-sky-500/10 to-transparent dark:from-modtale-accent/18 dark:via-sky-500/10 dark:to-transparent',
-            badge: 'bg-modtale-accent text-white',
-            button: 'bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
-        },
-        error: {
-            icon: <AlertTriangle className="h-8 w-8" />,
-            shell: 'border-red-500/25 shadow-[0_40px_120px_-45px_rgba(239,68,68,0.55)]',
-            hero: 'from-red-500/16 via-rose-500/10 to-transparent dark:from-red-500/20 dark:via-rose-500/10 dark:to-transparent',
-            badge: 'bg-red-500 text-white',
-            button: 'bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
-        },
-        warning: {
-            icon: <Trash2 className="h-8 w-8" />,
-            shell: 'border-amber-400/30 shadow-[0_40px_120px_-45px_rgba(245,158,11,0.55)]',
-            hero: 'from-amber-400/20 via-orange-400/10 to-transparent dark:from-amber-500/20 dark:via-orange-500/10 dark:to-transparent',
-            badge: 'bg-amber-500 text-white',
-            button: 'bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
-        },
-        info: {
-            icon: <Info className="h-8 w-8" />,
-            shell: 'border-sky-500/25 shadow-[0_40px_120px_-45px_rgba(14,165,233,0.5)]',
-            hero: 'from-sky-500/16 via-blue-500/10 to-transparent dark:from-sky-500/18 dark:via-blue-500/10 dark:to-transparent',
-            badge: 'bg-sky-500 text-white',
-            button: 'bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
-        },
-    }[type];
+    let icon = <Check className="w-8 h-8" />;
+    let colorClass = 'bg-modtale-accent text-white';
+    let bgClass = 'bg-modtale-accent/10';
+    let borderClass = 'border-modtale-accent';
+    let buttonClass = 'bg-modtale-accent hover:bg-modtale-accentHover';
+
+    if (type === 'error') {
+        icon = <AlertTriangle className="w-8 h-8" />;
+        colorClass = 'bg-red-500 text-white';
+        bgClass = 'bg-red-500/10';
+        borderClass = 'border-red-500';
+        buttonClass = 'bg-red-500 hover:bg-red-600';
+    } else if (type === 'warning') {
+        icon = <Trash2 className="w-8 h-8" />;
+        colorClass = 'bg-orange-500 text-white';
+        bgClass = 'bg-orange-500/10';
+        borderClass = 'border-orange-500';
+        buttonClass = 'bg-red-500 hover:bg-red-600';
+    } else if (type === 'info') {
+        icon = <Info className="w-8 h-8" />;
+        colorClass = 'bg-blue-500 text-white';
+        bgClass = 'bg-blue-500/10';
+        borderClass = 'border-blue-500';
+        buttonClass = 'bg-blue-600 hover:bg-blue-700';
+    }
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             {type === 'success' && <Confetti />}
-
-            <div className={`relative z-[110] w-full max-w-xl overflow-hidden rounded-[28px] border bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl ${config.shell}`}>
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="absolute right-4 top-4 z-10 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
-                    aria-label="Close dialog"
-                >
-                    <X className="h-5 w-5" />
+            <div className={`bg-white dark:bg-modtale-card border ${borderClass} rounded-xl w-full max-w-md shadow-2xl overflow-hidden relative z-[110]`}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                    <X className="w-5 h-5" />
                 </button>
-
-                <div className={`bg-gradient-to-br px-6 pb-6 pt-8 text-center ${config.hero}`}>
-                    <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.35rem] shadow-lg ${config.badge}`}>
-                        {config.icon}
+                <div className={`p-6 text-center ${bgClass}`}>
+                    <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${colorClass}`}>
+                        {icon}
                     </div>
-
-                    <h2 className="mb-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                        {title}
-                    </h2>
-
-                    {typeof message === 'string' ? (
-                        <p className="mx-auto max-w-md whitespace-pre-line text-left leading-relaxed text-slate-600 dark:text-slate-300">
-                            {message}
-                        </p>
-                    ) : (
-                        <div className="mx-auto max-w-md text-left leading-relaxed text-slate-600 dark:text-slate-300">
-                            {message}
-                        </div>
-                    )}
+                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{title}</h2>
+                    <p className="text-slate-600 dark:text-slate-300">{message}</p>
                 </div>
-
-                <div className="flex flex-col-reverse justify-center gap-3 border-t border-slate-200/70 bg-slate-50/85 p-4 dark:border-white/10 dark:bg-white/5 sm:flex-row">
+                <div className="p-4 flex justify-center gap-3">
                     {(type === 'warning' || type === 'info') && (
                         <button
-                            type="button"
                             onClick={onClose}
-                            className="rounded-xl px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+                            className="px-6 py-3 rounded-lg font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
                         >
-                            {secondaryLabel || 'Cancel'}
+                            {secondaryLabel || "Cancel"}
                         </button>
                     )}
-
                     <button
-                        type="button"
-                        onClick={() => {
-                            if (onAction) onAction();
-                            else onClose();
-                        }}
-                        className={config.button}
+                        onClick={() => { if (onAction) onAction(); else onClose(); }}
+                        className={`flex items-center gap-2 px-8 py-3 rounded-lg font-bold text-white transition-transform active:scale-95 ${buttonClass}`}
                     >
-                        {actionLabel || 'Close'}
-                        {type === 'success' && <ArrowRight className="h-5 w-5" />}
+                        {actionLabel || "Close"}
+                        {type === 'success' && <ArrowRight className="w-5 h-5" />}
                     </button>
                 </div>
             </div>
