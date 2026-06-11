@@ -844,7 +844,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 sidebarContent={
                     <>
                         {activeTab === 'wiki' && wikiData && !wikiLoading && !wikiError && (
-                            <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} />
+                            <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} pageCache={wikiData.pageCache} />
                         )}
                         <SidebarSection title="Card Preview" icon={Eye}>
                             <div

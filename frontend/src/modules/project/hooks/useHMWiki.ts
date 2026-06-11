@@ -92,7 +92,7 @@ export const useHMWiki = (projectId?: string, pageSlug?: string, enabled: boolea
     }, [modData, pageSlug, pageCache]);
 
     return {
-        data: modData ? { mod: modData, content } : null,
+        data: modData ? { mod: modData, content, pageCache } : null,
         loading,
         error
     };

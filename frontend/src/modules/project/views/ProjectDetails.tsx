@@ -530,7 +530,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     isWikiRoute ? (
                         <>
                             <Suspense fallback={null}>
-                                <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} />
+                                <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} pageCache={displayWikiData?.pageCache} />
                             </Suspense>
                             <div className="mt-4">
                                 <Link to={projectUrl} className={`block text-sm font-bold ${theme.colors.accent} hover:underline flex items-center gap-2`}>
