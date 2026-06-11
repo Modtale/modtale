@@ -93,6 +93,74 @@ describe('Home fallback requests', () => {
     });
 
     it('renders the hero immediately when SSR projects are already available', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1450 });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 900 });
+
+        const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+        const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+        const originalScrollWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
+        const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+        const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+
+        const restoreMeasurements = () => {
+            if (originalClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+            if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+            if (originalScrollWidth) Object.defineProperty(HTMLElement.prototype, 'scrollWidth', originalScrollWidth);
+            if (originalScrollHeight) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeight);
+            HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+        };
+
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+            configurable: true,
+            get() {
+                if (this instanceof HTMLElement) {
+                    if (this.className.includes('max-w-[112rem]')) return 1330;
+                    if (this.getAttribute('aria-label') === 'Primary Actions') return 520;
+                    if (this.className.includes('home-hero-copy')) return 640;
+                }
+
+                return 400;
+            }
+        });
+
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+            configurable: true,
+            get() {
+                return 56;
+            }
+        });
+
+        Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+            configurable: true,
+            get() {
+                return this.clientWidth;
+            }
+        });
+
+        Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+            configurable: true,
+            get() {
+                return this.clientHeight;
+            }
+        });
+
+        HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+            return {
+                x: 0,
+                y: 0,
+                top: 0,
+                left: 0,
+                bottom: 56,
+                right: 400,
+                width: 400,
+                height: 56,
+                toJSON() {
+                    return {};
+                }
+            } as DOMRect;
+        };
+
+        try {
         await act(async () => {
             root.render(
                 <SSRProvider
@@ -124,6 +192,9 @@ describe('Home fallback requests', () => {
         expect(container.textContent).toContain('The Hytale');
         expect(container.querySelector('.home-hero-desktop-marquee')).toBeTruthy();
         expect(container.querySelector('[data-testid="marquee-column"]')).toBeTruthy();
+        } finally {
+            restoreMeasurements();
+        }
     });
 
     it('uses a dynamic viewport height for the mobile hero container', async () => {
@@ -444,7 +515,8 @@ describe('Home fallback requests', () => {
             });
 
             expect(container.querySelector('.home-hero-copy-desktop')).toBeFalsy();
-            expect(container.querySelector('.home-hero-desktop-marquee')).toBeTruthy();
+            expect(container.querySelector('.home-hero-desktop-marquee')).toBeFalsy();
+            expect(container.querySelector('[data-testid="marquee-column"]')).toBeFalsy();
 
             const heroSection = container.querySelector('section.home-hero');
             const heroCopy = container.querySelector('.home-hero-copy');
