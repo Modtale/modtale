@@ -7,7 +7,7 @@ export const PrivacyPolicy: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
-            <div className="max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto py-12">
+            <div className="max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto py-12">
                 <button onClick={() => navigate(-1)} className="mb-6 flex items-center text-slate-500 hover:text-modtale-accent font-bold transition-colors">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </button>

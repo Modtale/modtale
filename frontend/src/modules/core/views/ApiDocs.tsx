@@ -1334,7 +1334,7 @@ export const ApiDocs: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
-            <div className="w-full max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto py-16 overflow-x-hidden">
+            <div className="w-full max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto py-16 overflow-x-hidden">
                 <div className="text-center mb-12 w-full">
                     <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
                         Modtale <span className="text-modtale-accent">API v1</span>
