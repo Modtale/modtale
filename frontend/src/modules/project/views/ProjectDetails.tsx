@@ -64,7 +64,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
-    const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser);
+    const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, latestIncompatibleProjectIds, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser);
 
     const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
@@ -539,7 +539,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             </div>
                         </>
                     ) : (
-                        <Sidebar project={project} dependencies={latestDependencies} depMeta={depMeta} showMetaSections={!isMobile} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
+                        <Sidebar project={project} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={!isMobile} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
                     )
                 }
                 mainContent={
@@ -548,7 +548,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
                         </Suspense>
                     ) : (
-                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} depMeta={depMeta} showMetaSections={isMobile} />
+                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} />
                     )
                 }
             />

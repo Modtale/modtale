@@ -6,7 +6,7 @@ import type { VersionFormData } from './FormShared';
 import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
-import type { ManifestDependencySuggestion } from '@/types';
+import { VersionRelationKind, type ManifestDependencySuggestion } from '@/types';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -336,6 +336,21 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Projects"
                         isModpack={true}
+                        disabled={disabled}
+                    />
+                </div>
+            )}
+
+            {projectType !== 'SAVE' && (
+                <div className="mt-4">
+                    <Label>Incompatible Mods</Label>
+                    <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Mark mods that should not be used alongside this version.</p>
+                    <DependencySelector
+                        selectedDeps={data.incompatibleProjectIds || []}
+                        onChange={(deps) => onChange({ ...data, incompatibleProjectIds: deps })}
+                        label="Add Incompatible Mod"
+                        mode={VersionRelationKind.INCOMPATIBILITY}
+                        currentProjectId={currentProjectId}
                         disabled={disabled}
                     />
                 </div>

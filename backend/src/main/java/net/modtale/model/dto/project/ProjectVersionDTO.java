@@ -13,6 +13,7 @@ public class ProjectVersionDTO {
     private String releaseDate;
     private String changelog;
     private List<ProjectDependency> dependencies;
+    private List<String> incompatibleProjectIds;
     private ProjectVersion.Channel channel;
 
     public String getId() { return id; }
@@ -31,6 +32,8 @@ public class ProjectVersionDTO {
     public void setChangelog(String changelog) { this.changelog = changelog; }
     public List<ProjectDependency> getDependencies() { return dependencies; }
     public void setDependencies(List<ProjectDependency> dependencies) { this.dependencies = dependencies; }
+    public List<String> getIncompatibleProjectIds() { return incompatibleProjectIds; }
+    public void setIncompatibleProjectIds(List<String> incompatibleProjectIds) { this.incompatibleProjectIds = incompatibleProjectIds; }
     public ProjectVersion.Channel getChannel() { return channel; }
     public void setChannel(ProjectVersion.Channel channel) { this.channel = channel; }
 }

@@ -76,8 +76,17 @@ public class VersionService {
         return project != null && !project.getVersions().isEmpty() ? Optional.of(project.getVersions().get(0)) : Optional.empty();
     }
 
-    public void updateVersion(String id, String versionId, List<String> projectIds, List<String> gameVersions, String changelog, ProjectVersion.Channel channel, User user) {
-        versionUpdateCommandHandler.updateVersion(id, versionId, projectIds, gameVersions, changelog, channel, user);
+    public void updateVersion(
+            String id,
+            String versionId,
+            List<String> projectIds,
+            List<String> incompatibleProjectIds,
+            List<String> gameVersions,
+            String changelog,
+            ProjectVersion.Channel channel,
+            User user
+    ) {
+        versionUpdateCommandHandler.updateVersion(id, versionId, projectIds, incompatibleProjectIds, gameVersions, changelog, channel, user);
     }
 
     public void addVersion(
@@ -87,10 +96,11 @@ public class VersionService {
             MultipartFile file,
             String changelog,
             List<String> projectIds,
+            List<String> incompatibleProjectIds,
             ProjectVersion.Channel channel,
             User user
     ) {
-        versionCreationCommandHandler.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, channel, user);
+        versionCreationCommandHandler.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, incompatibleProjectIds, channel, user);
     }
 
     public ManifestInspectionResult inspectManifest(String id, MultipartFile file, User user) {

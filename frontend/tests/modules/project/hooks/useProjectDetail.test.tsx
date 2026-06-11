@@ -55,6 +55,7 @@ const Probe = ({
             data-contributors={String(snapshot.contributors.length)}
             data-following={String(snapshot.isFollowing)}
             data-dependency-title={snapshot.depMeta['dep-1']?.title ?? ''}
+            data-incompatible-title={snapshot.depMeta['bad-1']?.title ?? ''}
         />
     );
 };
@@ -141,7 +142,8 @@ describe('useProjectDetail', () => {
                     id: 'v2',
                     versionNumber: '1.1.0',
                     releaseDate: '2024-05-01T00:00:00Z',
-                    dependencies: [{ projectId: 'dep-1', projectTitle: 'Dependency One', versionNumber: '2.0.0' }]
+                    dependencies: [{ projectId: 'dep-1', projectTitle: 'Dependency One', versionNumber: '2.0.0' }],
+                    incompatibleProjectIds: ['bad-1']
                 }
             ]
         } as any satisfies Project;
@@ -163,12 +165,12 @@ describe('useProjectDetail', () => {
         } as User);
         mockedProjectClient.getOrgMembers.mockResolvedValue([{ id: 'member-1', username: 'Builder', avatarUrl: '', likedProjectIds: [] } as User]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([{ id: 'contrib-1', username: 'Contributor', avatarUrl: '', likedProjectIds: [] } as User]);
-        mockedProjectClient.getDependencyMeta.mockResolvedValue({
-            icon: '/dep.png',
-            title: 'Dependency One',
-            classification: 'MOD',
-            slug: 'dependency-one'
-        } as any);
+        mockedProjectClient.getDependencyMeta.mockImplementation(async (projectId: string) => {
+            if (projectId === 'bad-1') {
+                return { icon: '/bad.png', title: 'Bad Mod', classification: 'MOD', slug: 'bad-mod' } as any;
+            }
+            return { icon: '/dep.png', title: 'Dependency One', classification: 'MOD', slug: 'dependency-one' } as any;
+        });
 
         await act(async () => {
             root.render(
@@ -193,6 +195,7 @@ describe('useProjectDetail', () => {
         expect(probe.dataset.contributors).toBe('1');
         expect(probe.dataset.following).toBe('true');
         expect(probe.dataset.dependencyTitle).toBe('Dependency One');
+        expect(probe.dataset.incompatibleTitle).toBe('Bad Mod');
 
         expect(mockedProjectClient.getProject).toHaveBeenCalledWith(projectId);
         expect(mockedProjectClient.trackView).toHaveBeenCalledTimes(1);
@@ -201,9 +204,11 @@ describe('useProjectDetail', () => {
         expect(mockedProjectClient.getOrgMembers).toHaveBeenCalledWith('org-1');
         expect(mockedProjectClient.getUsersBatch).toHaveBeenCalledWith(['contrib-1']);
         expect(mockedProjectClient.getDependencyMeta).toHaveBeenCalledWith('dep-1');
+        expect(mockedProjectClient.getDependencyMeta).toHaveBeenCalledWith('bad-1');
         expect(latestSnapshot.latestDependencies).toEqual([
             { projectId: 'dep-1', projectTitle: 'Dependency One', versionNumber: '2.0.0' }
         ]);
+        expect(latestSnapshot.latestIncompatibleProjectIds).toEqual(['bad-1']);
     });
 
     it('marks the project as not found when the primary fetch fails', async () => {

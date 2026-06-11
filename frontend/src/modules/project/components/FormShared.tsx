@@ -16,6 +16,7 @@ export type MetadataFormData = {
 
 export type VersionFormData = {
     projectIds: string[];
+    incompatibleProjectIds: string[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     versionNumber: string;
     gameVersions: string[];
