@@ -1,8 +1,8 @@
 package net.modtale.model.dto.request.project;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import net.modtale.model.project.ProjectVersion;
 
 import java.util.List;
 
@@ -14,11 +14,7 @@ public class UpdateVersionRequest {
     @Size(max = 50000, message = "Version changelogs cannot exceed 50,000 characters.")
     private String changelog;
 
-    @Pattern(
-            regexp = "(?i)RELEASE|BETA|ALPHA",
-            message = "Version channels must be RELEASE, BETA, or ALPHA."
-    )
-    private String channel;
+    private ProjectVersion.Channel channel;
 
     public List<String> getModIds() {
         return modIds;
@@ -52,11 +48,11 @@ public class UpdateVersionRequest {
         this.changelog = changelog;
     }
 
-    public String getChannel() {
+    public ProjectVersion.Channel getChannel() {
         return channel;
     }
 
-    public void setChannel(String channel) {
+    public void setChannel(ProjectVersion.Channel channel) {
         this.channel = channel;
     }
 }

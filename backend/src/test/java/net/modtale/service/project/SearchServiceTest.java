@@ -1,7 +1,10 @@
 package net.modtale.service.project;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.project.ScanStatus;
@@ -70,7 +73,7 @@ class SearchServiceTest {
                 .thenReturn(favorites);
 
         Page<Project> result = searchService.searchProjects(
-                null, null, 0, 12, null, null, null, null, null, "Favorites", null, null, currentUser
+                null, null, 0, 12, null, null, null, null, null, ProjectViewCategory.FAVORITES, null, null, currentUser
         );
 
         assertEquals(favorites, result);
@@ -94,13 +97,13 @@ class SearchServiceTest {
                 eq("sky"),
                 eq(List.of("magic")),
                 eq("1.20.1"),
-                eq("MOD"),
+                eq(ProjectClassification.MODPACK),
                 eq(10),
                 eq(5),
                 any(Pageable.class),
                 eq("viewer-1"),
-                eq("downloads"),
-                eq("Browse"),
+                eq(ProjectSort.DOWNLOADS),
+                eq(ProjectViewCategory.ALL),
                 any(LocalDate.class),
                 eq("author-1")
         )).thenReturn(page);
@@ -111,12 +114,12 @@ class SearchServiceTest {
                 "sky",
                 1,
                 25,
-                "downloads",
+                ProjectSort.DOWNLOADS,
                 "1.20.1",
-                "MOD",
+                ProjectClassification.MODPACK,
                 10,
                 5,
-                "Browse",
+                ProjectViewCategory.ALL,
                 "30d",
                 "author-1",
                 currentUser
@@ -128,13 +131,13 @@ class SearchServiceTest {
                 eq("sky"),
                 eq(List.of("magic")),
                 eq("1.20.1"),
-                eq("MOD"),
+                eq(ProjectClassification.MODPACK),
                 eq(10),
                 eq(5),
                 pageableCaptor.capture(),
                 eq("viewer-1"),
-                eq("downloads"),
-                eq("Browse"),
+                eq(ProjectSort.DOWNLOADS),
+                eq(ProjectViewCategory.ALL),
                 cutoffCaptor.capture(),
                 eq("author-1")
         );
@@ -154,12 +157,12 @@ class SearchServiceTest {
                         null,
                         0,
                         10,
-                        "relevance",
+                        ProjectSort.RELEVANCE,
                         null,
                         null,
                         null,
                         null,
-                        null,
+                        ProjectViewCategory.ALL,
                         "not-a-date",
                         null,
                         null

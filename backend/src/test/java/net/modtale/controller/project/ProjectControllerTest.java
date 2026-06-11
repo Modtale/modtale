@@ -7,6 +7,8 @@ import net.modtale.model.dto.request.project.UpdateProjectRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.model.user.User;
 import net.modtale.service.project.GameVersionService;
 import net.modtale.service.project.LifecycleService;
@@ -89,12 +91,12 @@ class ProjectControllerTest {
                 eq("sky"),
                 eq(2),
                 eq(25),
-                eq("popular"),
+                eq(ProjectSort.POPULAR),
                 eq("1.0.0"),
-                eq("MODPACK"),
+                eq(ProjectClassification.MODPACK),
                 eq(10),
                 eq(5),
-                eq("Favorites"),
+                eq(ProjectViewCategory.FAVORITES),
                 eq("30d"),
                 eq("Ada"),
                 eq(currentUser)
@@ -138,12 +140,12 @@ class ProjectControllerTest {
                 isNull(),
                 eq(0),
                 eq(10),
-                eq("relevance"),
+                eq(ProjectSort.RELEVANCE),
                 isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
-                isNull(),
+                eq(ProjectViewCategory.ALL),
                 isNull(),
                 eq("creator-name"),
                 isNull()
@@ -172,12 +174,12 @@ class ProjectControllerTest {
                 isNull(),
                 eq(0),
                 eq(10),
-                eq("relevance"),
+                eq(ProjectSort.RELEVANCE),
                 isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
-                isNull(),
+                eq(ProjectViewCategory.ALL),
                 isNull(),
                 eq("creator-name"),
                 isNull()

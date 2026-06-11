@@ -5,6 +5,8 @@ import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
@@ -54,7 +56,7 @@ public class ProjectAdminQueryService {
                     .map(project -> ProjectMapper.toSummaryDTO(project, true))
                     .toList();
         }
-        return searchService.searchProjects(null, query, 0, 10, "relevance", null, null, null, null, null, null, null, null)
+        return searchService.searchProjects(null, query, 0, 10, ProjectSort.RELEVANCE, null, null, null, null, ProjectViewCategory.ALL, null, null, null)
                 .getContent().stream()
                 .map(project -> ProjectMapper.toSummaryDTO(project, true))
                 .toList();

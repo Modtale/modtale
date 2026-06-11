@@ -3,6 +3,8 @@ package net.modtale.repository.project;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.ScoringService;
 import org.slf4j.Logger;
@@ -43,14 +45,14 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
     @Override
     public Page<Project> searchProjects(
-            String search, List<String> tags, String gameVersion, String classification,
+            String search, List<String> tags, String gameVersion, ProjectClassification classification,
             Integer minDownloads, Integer minFavorites, Pageable pageable,
-            String currentUserId, String sortBy,
-            String viewCategory, LocalDate dateCutoff, String authorId
+            String currentUserId, ProjectSort sortBy,
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
 
-        if ("Your Projects".equals(viewCategory) && currentUserId != null) {
+        if (viewCategory == ProjectViewCategory.YOUR_PROJECTS && currentUserId != null) {
             criteriaList.add(new Criteria().orOperator(
                     Criteria.where("authorId").is(currentUserId),
                     Criteria.where("teamMembers.userId").is(currentUserId)
@@ -74,11 +76,8 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
         if (tags != null && !tags.isEmpty()) criteriaList.add(Criteria.where("tags").in(tags));
 
-        if (classification != null && !classification.isEmpty() && !"All".equals(classification)) {
-            try {
-                ProjectClassification classEnum = ProjectClassification.valueOf(classification.toUpperCase());
-                criteriaList.add(Criteria.where("classification").is(classEnum));
-            } catch (IllegalArgumentException ignored) {}
+        if (classification != null) {
+            criteriaList.add(Criteria.where("classification").is(classification));
         }
 
         if (gameVersion != null && !gameVersion.isEmpty())
@@ -86,11 +85,11 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
 
-        if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
+        if (sortBy == ProjectSort.TRENDING || viewCategory == ProjectViewCategory.TRENDING) {
             criteriaList.add(Criteria.where("downloadCount").gte(10));
         }
 
-        boolean isTimeBasedDownloadSort = "downloads".equals(sortBy) && dateCutoff != null;
+        boolean isTimeBasedDownloadSort = sortBy == ProjectSort.DOWNLOADS && dateCutoff != null;
         if (dateCutoff != null && !isTimeBasedDownloadSort) {
             criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
         }
@@ -116,7 +115,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
         pipeline.add(Aggregation.project().andExclude("authorInfo"));
 
-        if ("hidden_gems".equals(viewCategory)) {
+        if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {
             Query statsQuery = new Query(baseCriteria);
             statsQuery.addCriteria(Criteria.where("downloads30d").gte(10));
 
@@ -153,15 +152,15 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
                     .build());
         }
 
-        if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
+        if (sortBy == ProjectSort.TRENDING || viewCategory == ProjectViewCategory.TRENDING) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "trendScore"));
-        } else if ("popular".equals(sortBy) || "popular".equals(viewCategory)) {
+        } else if (sortBy == ProjectSort.POPULAR || viewCategory == ProjectViewCategory.POPULAR) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
-        } else if ("relevance".equals(sortBy)) {
+        } else if (sortBy == ProjectSort.RELEVANCE) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
-        } else if ("hidden_gems".equals(viewCategory)) {
+        } else if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "gemRatio"));
-        } else if ("downloads".equals(sortBy) && dateCutoff != null) {
+        } else if (sortBy == ProjectSort.DOWNLOADS && dateCutoff != null) {
             long daysDiff = ChronoUnit.DAYS.between(dateCutoff, LocalDate.now());
             if (daysDiff <= 7) {
                 pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloads7d"));
@@ -188,7 +187,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         scoringService.ensureScores(results);
 
         long total;
-        if ("hidden_gems".equals(viewCategory)) {
+        if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {
             List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
             countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation || op instanceof AddFieldsOperation || op instanceof LookupOperation);
             countPipeline.add(Aggregation.count().as("total"));

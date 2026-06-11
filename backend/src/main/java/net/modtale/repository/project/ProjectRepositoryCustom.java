@@ -1,6 +1,9 @@
 package net.modtale.repository.project;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -12,13 +15,13 @@ public interface ProjectRepositoryCustom {
             String search,
             List<String> tags,
             String gameVersion,
-            String classification,
+            ProjectClassification classification,
             Integer minDownloads,
             Integer minFavorites,
             Pageable pageable,
             String currentUserId,
-            String sortBy,
-            String viewCategory,
+            ProjectSort sortBy,
+            ProjectViewCategory viewCategory,
             LocalDate dateCutoff,
             String authorId
     );

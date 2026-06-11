@@ -1,6 +1,9 @@
 package net.modtale.service.project;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.model.user.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,12 +30,12 @@ public class SearchService {
             String search,
             int page,
             int size,
-            String sortBy,
+            ProjectSort sortBy,
             String gameVersion,
-            String contentType,
+            ProjectClassification contentType,
             Integer minDownloads,
             Integer minFavorites,
-            String viewCategory,
+            ProjectViewCategory viewCategory,
             String dateRange,
             String authorId,
             User currentUser

@@ -3,6 +3,7 @@ package net.modtale.service.admin;
 import net.modtale.model.dto.admin.BannedEmailDTO;
 import net.modtale.model.dto.response.admin.UserTierUpdateResponse;
 import net.modtale.model.dto.user.UserDTO;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import org.springframework.stereotype.Service;
 
@@ -50,7 +51,7 @@ public class UserManagementService {
         userAccountEnforcementService.deleteUser(adminUser, userId, reason);
     }
 
-    public UserTierUpdateResponse setUserTier(String adminId, String userId, String tier) {
+    public UserTierUpdateResponse setUserTier(String adminId, String userId, ApiKey.Tier tier) {
         return userPrivilegeAdministrationService.setUserTier(adminId, userId, tier);
     }
 

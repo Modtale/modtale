@@ -5,6 +5,7 @@ import net.modtale.model.dto.admin.BannedEmailDTO;
 import net.modtale.model.dto.request.admin.BanEmailRequest;
 import net.modtale.model.dto.response.admin.UserTierUpdateResponse;
 import net.modtale.model.dto.user.UserDTO;
+import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.service.admin.UserManagementService;
 import net.modtale.service.user.AccountService;
@@ -89,7 +90,7 @@ public class UserManagementController {
 
     @PostMapping("/users/{userId}/tier")
     @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
-    public ResponseEntity<UserTierUpdateResponse> setUserTier(@PathVariable String userId, @RequestParam String tier) {
+    public ResponseEntity<UserTierUpdateResponse> setUserTier(@PathVariable String userId, @RequestParam ApiKey.Tier tier) {
         User currentUser = accountService.requireCurrentUser("managing user tiers");
         return ResponseEntity.ok(userManagementService.setUserTier(currentUser.getId(), userId, tier));
     }

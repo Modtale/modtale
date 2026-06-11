@@ -111,7 +111,7 @@ class VersionControllerTest {
         requestPayload.setFile(file);
         requestPayload.setModIds(List.of("dep-a, dep-b, , dep-c"));
         requestPayload.setChangelog("Release notes");
-        requestPayload.setChannel("beta");
+        requestPayload.setChannel(ProjectVersion.Channel.BETA);
 
         when(accountService.requireCurrentUser(authentication, "uploading a project version")).thenReturn(currentUser);
 
@@ -119,15 +119,15 @@ class VersionControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         verify(versionService).addVersion(
-                "project-1",
-                "1.0.0",
-                List.of("1.0.0"),
-                file,
-                "Release notes",
-                List.of("dep-a", "dep-b", "dep-c"),
-                List.of(),
-                ProjectVersion.Channel.BETA,
-                currentUser
+                eq("project-1"),
+                eq("1.0.0"),
+                eq(List.of("1.0.0")),
+                eq(file),
+                eq("Release notes"),
+                eq(List.of("dep-a", "dep-b", "dep-c")),
+                isNull(),
+                eq(ProjectVersion.Channel.BETA),
+                eq(currentUser)
         );
     }
 

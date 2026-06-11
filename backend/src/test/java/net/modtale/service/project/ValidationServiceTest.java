@@ -84,6 +84,15 @@ class ValidationServiceTest {
         assertIterableEquals(List.of("1.2.0-pre.1", "1.1.0"), validationService.getAllowedGameVersions());
         assertIterableEquals(List.of("1.1.0"), validationService.getAllowedReleaseGameVersions());
         assertIterableEquals(List.of("1.2.0-pre.1"), validationService.getAllowedPreReleaseGameVersions());
-        assertIterableEquals(List.of("PLUGIN", "DATA", "ART", "SAVE", "MODPACK"), validationService.getAllowedClassifications());
+        assertIterableEquals(
+                List.of(
+                        net.modtale.model.project.ProjectClassification.PLUGIN,
+                        net.modtale.model.project.ProjectClassification.DATA,
+                        net.modtale.model.project.ProjectClassification.ART,
+                        net.modtale.model.project.ProjectClassification.SAVE,
+                        net.modtale.model.project.ProjectClassification.MODPACK
+                ),
+                validationService.getAllowedClassifications()
+        );
     }
 }

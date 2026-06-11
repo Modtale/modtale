@@ -3,6 +3,7 @@ package net.modtale.service.admin;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -37,7 +38,7 @@ public class ProjectAdminOperationsService {
         projectModerationService.hardDeleteProject(adminUser, id, reason);
     }
 
-    public void restoreProject(net.modtale.model.user.User adminUser, String id, String targetStatus) {
+    public void restoreProject(net.modtale.model.user.User adminUser, String id, ProjectStatus targetStatus) {
         projectModerationService.restoreProject(adminUser, id, targetStatus);
     }
 

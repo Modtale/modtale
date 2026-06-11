@@ -2,6 +2,9 @@ package net.modtale.service.project;
 
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import org.springframework.data.domain.Page;
@@ -33,17 +36,17 @@ public class ProjectCatalogSearchService {
             String search,
             int page,
             int size,
-            String sortBy,
+            ProjectSort sortBy,
             String gameVersion,
-            String contentType,
+            ProjectClassification contentType,
             Integer minDownloads,
             Integer minFavorites,
-            String viewCategory,
+            ProjectViewCategory viewCategory,
             String dateRange,
             String authorId,
             User currentUser
     ) {
-        if ("Favorites".equals(viewCategory)) {
+        if (viewCategory == ProjectViewCategory.FAVORITES) {
             List<String> likedIds = (currentUser != null && currentUser.getLikedModIds() != null)
                     ? currentUser.getLikedModIds()
                     : new ArrayList<>();
@@ -83,12 +86,15 @@ public class ProjectCatalogSearchService {
         return projectRepository.findAllPublished();
     }
 
-    private Sort resolveSort(String sortBy) {
-        return switch (sortBy != null ? sortBy : "relevance") {
-            case "downloads" -> Sort.by("downloadCount").descending();
-            case "updated" -> Sort.by("updatedAt").descending();
-            case "new", "newest" -> Sort.by("createdAt").descending();
-            case "favorites" -> Sort.by("favoriteCount").descending();
+    private Sort resolveSort(ProjectSort sortBy) {
+        ProjectSort effectiveSort = sortBy != null ? sortBy : ProjectSort.RELEVANCE;
+        return switch (effectiveSort) {
+            case DOWNLOADS -> Sort.by("downloadCount").descending();
+            case UPDATED -> Sort.by("updatedAt").descending();
+            case NEWEST -> Sort.by("createdAt").descending();
+            case FAVORITES -> Sort.by("favoriteCount").descending();
+            case POPULAR -> Sort.by("popularScore").descending();
+            case TRENDING -> Sort.by("trendScore").descending();
             default -> Sort.unsorted();
         };
     }

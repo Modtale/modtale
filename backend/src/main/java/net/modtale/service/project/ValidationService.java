@@ -85,9 +85,7 @@ public class ValidationService {
         return gameVersionService.getCatalog().preReleaseVersions();
     }
 
-    public List<String> getAllowedClassifications() {
-        return Arrays.stream(ProjectClassification.values())
-                .map(Enum::name)
-                .collect(Collectors.toList());
+    public List<ProjectClassification> getAllowedClassifications() {
+        return Arrays.asList(ProjectClassification.values());
     }
 }

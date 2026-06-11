@@ -73,7 +73,7 @@ public class ProjectModerationService {
         adminAuditLogger.logAction(adminUser.getId(), "HARD_DELETE_PROJECT", id, "PROJECT", "Reason: " + reason);
     }
 
-    public void restoreProject(net.modtale.model.user.User adminUser, String id, String targetStatus) {
+    public void restoreProject(net.modtale.model.user.User adminUser, String id, ProjectStatus targetStatus) {
         Project project = requireProject(id);
         projectRetentionService.restore(project, targetStatus);
         adminAuditLogger.logAction(adminUser.getId(), "RESTORE_PROJECT", id, "PROJECT", "To Status: " + targetStatus);
