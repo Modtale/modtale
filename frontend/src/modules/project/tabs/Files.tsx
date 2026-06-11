@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { UploadCloud, Edit2, Trash2 } from 'lucide-react';
 import { VersionFields } from '../components/VersionFields';
 import { Spinner } from '../../../components/ui/Spinner';
@@ -23,13 +23,18 @@ interface FilesProps {
 }
 
 export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersionData, readOnly, hasProjectPermission, classification, handleUploadVersion, handleEditVersion, handleDeleteVersion, isLoading }) => {
+    const [reuseLatestSetupDismissed, setReuseLatestSetupDismissed] = useState(false);
     const hasUploadedDraftVersion = projectData?.status === 'DRAFT' && (projectData.versions?.length || 0) > 0;
     const isPrivateProject = projectData?.status === 'PRIVATE';
     const latestVersion = projectData?.versions?.length
         ? [...projectData.versions].sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber))[0]
         : null;
-    const canReuseLatestSetup = Boolean(latestVersion) && !readOnly && hasProjectPermission(Permission.VERSION_CREATE);
+    const canReuseLatestSetup = Boolean(latestVersion) && !readOnly && hasProjectPermission(Permission.VERSION_CREATE) && !reuseLatestSetupDismissed;
     const hasSelectedDependencies = (versionData.projectIds || []).length > 0;
+
+    useEffect(() => {
+        setReuseLatestSetupDismissed(false);
+    }, [projectData?.id, latestVersion?.id]);
 
     const handleReuseLatestSetup = () => {
         if (!latestVersion) return;
@@ -44,6 +49,7 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
             channel: latestVersion.channel || prev.channel || 'RELEASE',
             projectIds: [...nextDependencyEntries, ...preservedEntries]
         }));
+        setReuseLatestSetupDismissed(true);
     };
 
     return (
