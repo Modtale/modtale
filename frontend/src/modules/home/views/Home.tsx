@@ -51,6 +51,71 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
 
 const dedupeProjects = (items: Project[]) => Array.from(new Map(items.map((project) => [project.id, project])).values());
 
+const FeatureShowcaseSection = ({
+    children,
+    glowFrom,
+    glowTo,
+    align = 'left',
+}: {
+    children: React.ReactNode;
+    glowFrom: string;
+    glowTo: string;
+    align?: 'left' | 'right';
+}) => {
+    const primaryGlowPosition = align === 'left'
+        ? { left: '-8rem', right: 'auto' }
+        : { right: '-8rem', left: 'auto' };
+    const secondaryGlowPosition = align === 'left'
+        ? { right: '-6rem', left: 'auto' }
+        : { left: '-6rem', right: 'auto' };
+
+    return (
+        <section className="relative isolate overflow-hidden py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0b1220] via-[#08111d] to-[#070e19]" />
+            <div
+                className="absolute top-[-4rem] h-56 sm:h-72 w-56 sm:w-72 rounded-full blur-3xl opacity-35 pointer-events-none"
+                style={{
+                    ...primaryGlowPosition,
+                    background: `radial-gradient(circle, ${glowFrom} 0%, transparent 72%)`
+                }}
+            />
+            <div
+                className="absolute bottom-[-5rem] h-64 sm:h-80 w-64 sm:w-80 rounded-full blur-3xl opacity-25 pointer-events-none"
+                style={{
+                    ...secondaryGlowPosition,
+                    background: `radial-gradient(circle, ${glowTo} 0%, transparent 74%)`
+                }}
+            />
+            <div
+                className="absolute inset-0 opacity-100 pointer-events-none"
+                style={{
+                    backgroundImage: `
+                        radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.09) 1px, transparent 0),
+                        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%, transparent 78%, rgba(255, 255, 255, 0.015)),
+                        linear-gradient(120deg, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.045) 48%, rgba(59, 130, 246, 0) 100%)
+                    `,
+                    backgroundSize: '20px 20px, 100% 100%, 100% 100%'
+                }}
+            />
+            <div
+                className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/25 to-transparent pointer-events-none"
+            />
+            <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                    background: 'linear-gradient(90deg, rgba(15, 23, 42, 0.12), transparent 12%, transparent 88%, rgba(15, 23, 42, 0.12))'
+                }}
+            />
+
+            <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
+                <LazySection minHeight="450px">
+                    {children}
+                </LazySection>
+            </div>
+        </section>
+    );
+};
+
 export const Home: React.FC<{
     likedProjectIds?: string[];
     onToggleFavorite?: (projectId: string) => void;
@@ -522,83 +587,66 @@ export const Home: React.FC<{
                     <div className="absolute bottom-0 left-0 right-0 h-[150px] bg-gradient-to-t from-slate-100/30 dark:from-[#080d19] to-transparent pointer-events-none z-10" />
                 </section>
 
-                <section className="w-full bg-slate-50 dark:bg-[#0B1120] pt-14 sm:pt-20 pb-20 sm:pb-28 relative overflow-hidden z-20">
-
-                    <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
-
-                        <LazySection minHeight="400px">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 items-start">
-                                <TrendingProjectsSection
-                                    projects={trendingSpotlightProjects}
-                                    likedProjectIds={likedProjectIds}
-                                    onToggleFavorite={onToggleFavorite}
-                                    isLoggedIn={isLoggedIn}
-                                />
-                                <NewReleasesSection
-                                    projects={newestSpotlightProjects}
-                                    likedProjectIds={likedProjectIds}
-                                    onToggleFavorite={onToggleFavorite}
-                                    isLoggedIn={isLoggedIn}
-                                />
-                            </div>
-                        </LazySection>
-                    </div>
-                </section>
-
                 <div className="w-full bg-slate-50 dark:bg-[#080d19] relative overflow-hidden z-20">
-
-                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
-                            <LazySection minHeight="450px">
-                                <DirectDownloadsSection />
-                            </LazySection>
+                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.08)" glowTo="rgba(148, 163, 184, 0.07)" align="left">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 items-start">
+                            <TrendingProjectsSection
+                                projects={trendingSpotlightProjects}
+                                likedProjectIds={likedProjectIds}
+                                onToggleFavorite={onToggleFavorite}
+                                isLoggedIn={isLoggedIn}
+                            />
+                            <NewReleasesSection
+                                projects={newestSpotlightProjects}
+                                likedProjectIds={likedProjectIds}
+                                onToggleFavorite={onToggleFavorite}
+                                isLoggedIn={isLoggedIn}
+                            />
                         </div>
-                    </section>
+                    </FeatureShowcaseSection>
 
-                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
-                            <LazySection minHeight="450px">
-                                <SmartDependenciesSection randomProject={previewProject} />
-                            </LazySection>
-                        </div>
-                    </section>
+                    <FeatureShowcaseSection glowFrom="rgba(168, 85, 247, 0.1)" glowTo="rgba(236, 72, 153, 0.08)" align="left">
+                        <DirectDownloadsSection />
+                    </FeatureShowcaseSection>
 
-                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
-                            <LazySection minHeight="450px">
-                                <ProjectAnalyticsSection />
-                            </LazySection>
-                        </div>
-                    </section>
+                    <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">
+                        <SmartDependenciesSection randomProject={previewProject} />
+                    </FeatureShowcaseSection>
 
-                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
-                            <LazySection minHeight="450px">
-                                <CommunityThreadsSection project={previewProject} currentUser={currentUser} />
-                            </LazySection>
-                        </div>
-                    </section>
+                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="left">
+                        <ProjectAnalyticsSection />
+                    </FeatureShowcaseSection>
 
-                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
-                            <LazySection minHeight="450px">
-                                <RealTimeAlertsSection />
-                            </LazySection>
-                        </div>
-                    </section>
+                    <FeatureShowcaseSection glowFrom="rgba(99, 102, 241, 0.1)" glowTo="rgba(168, 85, 247, 0.08)" align="right">
+                        <CommunityThreadsSection project={previewProject} currentUser={currentUser} />
+                    </FeatureShowcaseSection>
 
-                    <section className="relative py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 relative z-20">
-                            <LazySection minHeight="450px">
-                                <AccountPreferencesSection />
-                            </LazySection>
-                        </div>
-                    </section>
+                    <FeatureShowcaseSection glowFrom="rgba(245, 158, 11, 0.1)" glowTo="rgba(249, 115, 22, 0.08)" align="left">
+                        <RealTimeAlertsSection />
+                    </FeatureShowcaseSection>
+
+                    <FeatureShowcaseSection glowFrom="rgba(148, 163, 184, 0.12)" glowTo="rgba(100, 116, 139, 0.08)" align="right">
+                        <AccountPreferencesSection />
+                    </FeatureShowcaseSection>
                 </div>
 
                 <LazySection minHeight="300px">
                     <section className="relative z-20 overflow-hidden border-t border-slate-200/60 dark:border-white/[0.04]">
-                        <div className="absolute inset-0 bg-slate-50 dark:bg-[#080d19]" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-[#09101c] via-[#070d17] to-[#060b14]" />
+                        <div className="absolute -top-10 left-[10%] h-56 w-56 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, transparent 72%)' }} />
+                        <div className="absolute -bottom-16 right-[8%] h-72 w-72 rounded-full blur-3xl opacity-15 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, transparent 74%)' }} />
+                        <div
+                            className="absolute inset-0 opacity-100 pointer-events-none"
+                            style={{
+                                backgroundImage: `
+                                    radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.08) 1px, transparent 0),
+                                    linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(59, 130, 246, 0.05) 45%, rgba(255, 255, 255, 0) 100%)
+                                `,
+                                backgroundSize: '22px 22px, 100% 100%'
+                            }}
+                        />
+                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
+                        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
 
                         <div className="relative z-20 py-24 sm:py-32 lg:py-40 max-w-5xl mx-auto px-6 text-center">
                             <div className="flex justify-center mb-10 sm:mb-12">

@@ -712,9 +712,9 @@ const ScrollContainer = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-50/80 via-slate-50/80 to-transparent dark:from-[#0B1120]/80 dark:via-[#0B1120]/80 pointer-events-none z-30 transition-opacity duration-300 ${showLeftFade ? 'opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0b1220]/92 via-[#0b1220]/76 to-transparent pointer-events-none z-30 transition-opacity duration-300 ${showLeftFade ? 'opacity-100' : 'opacity-0'}`} />
             
-            <div className={`absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-50/80 via-slate-50/80 to-transparent dark:from-[#0B1120]/80 dark:via-[#0B1120]/80 pointer-events-none z-30 transition-opacity duration-300 ${showRightFade ? 'opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#0b1220]/92 via-[#0b1220]/76 to-transparent pointer-events-none z-30 transition-opacity duration-300 ${showRightFade ? 'opacity-100' : 'opacity-0'}`} />
             
             <div 
                 ref={containerRef}
