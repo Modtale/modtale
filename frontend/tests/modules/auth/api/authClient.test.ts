@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/utils/api';
-import { authClient } from '@/modules/auth/api/authClient';
+import { authClient, normalizeSignInResponse } from '@/modules/auth/api/authClient';
 
 vi.mock('@/utils/api', () => ({
     api: {
@@ -43,5 +43,27 @@ describe('authClient', () => {
         await authClient.validateMfaLogin(payload);
 
         expect(mockedApi.post).toHaveBeenCalledWith('/auth/mfa/validate-login', payload);
+    });
+
+    it('normalizes signin payloads from both camelCase and snake_case responses', () => {
+        expect(normalizeSignInResponse({
+            status: 'mfa_required',
+            mfaRequired: true,
+            preAuthToken: 'camel-token'
+        })).toEqual({
+            status: 'mfa_required',
+            mfaRequired: true,
+            preAuthToken: 'camel-token'
+        });
+
+        expect(normalizeSignInResponse({
+            status: 'mfa_required',
+            mfa_required: true,
+            pre_auth_token: 'snake-token'
+        })).toEqual({
+            status: 'mfa_required',
+            mfaRequired: true,
+            preAuthToken: 'snake-token'
+        });
     });
 });

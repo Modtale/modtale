@@ -643,7 +643,7 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
     }
     if (path === '/api/v1/auth/signin') {
         if (code === '200') return { status: 'success' };
-        if (code === '202') return { mfa_required: true, pre_auth_token: 'b8af319e-09a3-4f5a-9d87-9695dcab4711' };
+        if (code === '202') return { mfaRequired: true, preAuthToken: 'b8af319e-09a3-4f5a-9d87-9695dcab4711' };
         if (code === '401') return { error: 'Invalid credentials' };
     }
     if (path === '/api/v1/auth/mfa/validate-login') {
