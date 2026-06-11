@@ -478,7 +478,6 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
 
     const commenterName = randomCommenter?.name ?? project?.author ?? '…';
     const commenterAvatar = randomCommenter?.avatar;
-    const commenterRoleBadge = getCommentRoleBadge(project?.authorId, project, authorProfile);
     const previewReplyUserId = project?.teamMembers?.[0]?.userId ?? project?.authorId;
     const previewReplyRoleBadge = getCommentRoleBadge(previewReplyUserId, project, authorProfile);
 
@@ -529,18 +528,6 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                         </div>
                         <div className="flex flex-col">
                             <span className="font-bold text-sm text-slate-900 dark:text-white">{commenterName}</span>
-                            {commenterRoleBadge && (
-                                <span
-                                    className="w-fit text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border"
-                                    style={{
-                                        color: commenterRoleBadge.color,
-                                        backgroundColor: `${commenterRoleBadge.color}1A`,
-                                        borderColor: `${commenterRoleBadge.color}33`
-                                    }}
-                                >
-                                    {commenterRoleBadge.label}
-                                </span>
-                            )}
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">2 hours ago</span>
                         </div>
                     </div>
