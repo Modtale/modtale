@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Flag, X, AlertTriangle, ChevronDown, Check, ShieldCheck } from 'lucide-react';
 import { projectClient } from '../../api/projectClient';
 import { theme } from '@/styles/theme';
+import { extractApiErrorMessage } from '@/utils/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface ReportModalProps {
@@ -71,14 +72,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!effectiveTargetId) {
+            setError('We could not determine what you were trying to report. Please close this window and try again.');
+            return;
+        }
         setLoading(true);
         setError('');
         try {
             const data = await projectClient.submitReport(effectiveTargetId, targetType, reason, description);
             setReportId(data.id);
             setSubmitted(true);
-        } catch (e) {
-            setError('Failed to submit report. Please try again.');
+        } catch (e: unknown) {
+            setError(extractApiErrorMessage(e, 'We could not submit your report.'));
         } finally {
             setLoading(false);
         }

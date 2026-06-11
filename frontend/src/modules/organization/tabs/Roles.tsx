@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Settings as SettingsIcon, Trash2, X, ShieldCheck, Palette } from 'lucide-react';
 import { theme } from '@/styles/theme';
-import { PermissionSelector, ALL_PERMISSION_GROUPS } from '@/components/ui/PermissionSelector';
+import { PermissionSelector } from '@/components/ui/PermissionSelector';
+import { ALL_PERMISSION_GROUPS, Permission } from '@/modules/permissions/permissions';
+import { StatusModal } from '@/components/ui/StatusModal';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { User, OrganizationRole } from '@/types';
 
 interface RolesProps {
@@ -16,8 +19,9 @@ interface RolesProps {
 export const Roles: React.FC<RolesProps> = ({ org, currentUser, onUpdateOrg, showStatus }) => {
     const [editingRole, setEditingRole] = useState<Partial<OrganizationRole> | null>(null);
     const [roleModalOpen, setRoleModalOpen] = useState(false);
+    const [roleToDelete, setRoleToDelete] = useState<OrganizationRole | null>(null);
 
-    const canManageRoles = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_EDIT_ROLE');
+    const canManageRoles = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_EDIT_ROLE);
 
     const handleSaveRole = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,24 +38,38 @@ export const Roles: React.FC<RolesProps> = ({ org, currentUser, onUpdateOrg, sho
             setRoleModalOpen(false);
             setEditingRole(null);
             showStatus('success', 'Saved', 'Role saved successfully.');
-        } catch (err: any) {
-            showStatus('error', 'Error', err.response?.data || "Failed to save role.");
+        } catch (err: unknown) {
+            showStatus('error', 'Role Save Failed', extractApiErrorMessage(err, 'We could not save that organization role.'));
         }
     };
 
-    const handleDeleteRole = async (roleId: string) => {
-        if (!confirm("Are you sure you want to delete this role?")) return;
+    const handleDeleteRole = async () => {
+        if (!roleToDelete) return;
         try {
-            const updatedOrg = await organizationClient.deleteRole(org.id, roleId);
+            const updatedOrg = await organizationClient.deleteRole(org.id, roleToDelete.id);
             onUpdateOrg(updatedOrg);
             showStatus('success', 'Deleted', 'Role deleted successfully.');
-        } catch (err: any) {
-            showStatus('error', 'Delete Failed', err.response?.data || "Cannot delete role.");
+        } catch (err: unknown) {
+            showStatus('error', 'Role Delete Failed', extractApiErrorMessage(err, 'We could not delete that organization role.'));
+        } finally {
+            setRoleToDelete(null);
         }
     };
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            {roleToDelete && createPortal(
+                <StatusModal
+                    type="warning"
+                    title="Delete Role?"
+                    message={`Are you sure you want to delete "${roleToDelete.name}"? Members currently assigned to this role will need to be reassigned before this action can succeed.`}
+                    actionLabel="Delete Role"
+                    secondaryLabel="Cancel"
+                    onAction={handleDeleteRole}
+                    onClose={() => setRoleToDelete(null)}
+                />,
+                document.body
+            )}
             <div className={`flex justify-between items-center ${theme.colors.bgSurface} border ${theme.colors.border} p-6 rounded-2xl shadow-sm`}>
                 <div>
                     <h3 className={`font-bold text-lg ${theme.colors.textPrimary}`}>Organization Roles</h3>
@@ -86,7 +104,7 @@ export const Roles: React.FC<RolesProps> = ({ org, currentUser, onUpdateOrg, sho
                                         <button onClick={() => { setEditingRole(role); setRoleModalOpen(true); }} className={`p-1.5 ${theme.colors.textMuted} hover:${theme.colors.accent} ${theme.colors.accentAlpha} rounded-lg transition-colors`}>
                                             <SettingsIcon className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => handleDeleteRole(role.id)} className={`p-1.5 ${theme.colors.textMuted} hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg} rounded-lg transition-colors`}>
+                                        <button onClick={() => setRoleToDelete(role)} className={`p-1.5 ${theme.colors.textMuted} hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg} rounded-lg transition-colors`}>
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>

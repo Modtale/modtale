@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Share2, Flag, Edit, Calendar } from 'lucide-react';
 import { getClassificationIcon, toTitleCase, formatTimeAgo } from '@/utils/modHelpers';
+import { SiteRoutes } from '@/utils/routes';
 import { theme } from '@/styles/theme';
 import type { Project, User } from '@/types';
 
@@ -39,7 +40,10 @@ export const HeaderActions: React.FC<HeaderProps> = ({ project, currentUser, isL
     </>
 );
 
-export const HeaderContent: React.FC<HeaderProps> = ({ project, currentUser, isFollowing, onFollowToggle }) => (
+export const HeaderContent: React.FC<HeaderProps> = ({ project, currentUser, isFollowing, onFollowToggle }) => {
+    const authorPath = project.authorId ? SiteRoutes.creator(project.authorId, project.author) : null;
+
+    return (
     <>
         <div className="flex flex-wrap items-center gap-3 mb-3">
             <h1 className={`text-3xl md:text-5xl font-black ${theme.colors.textPrimary} tracking-tighter drop-shadow-sm leading-tight break-words`}>{project.title}</h1>
@@ -49,7 +53,7 @@ export const HeaderContent: React.FC<HeaderProps> = ({ project, currentUser, isF
         </div>
         <div className={`flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium ${theme.colors.textSecondary} mb-4`}>
             <div className="flex items-center gap-2">
-                <span>by <Link to={`/creator/${project.author}`} className={`font-bold text-slate-800 dark:text-white hover:${theme.colors.accent} hover:underline decoration-2 underline-offset-4 transition-all`}>{project.author}</Link></span>
+                <span>by {authorPath ? <Link to={authorPath} className={`font-bold text-slate-800 dark:text-white hover:${theme.colors.accent} hover:underline decoration-2 underline-offset-4 transition-all`}>{project.author}</Link> : <span className="font-bold text-slate-800 dark:text-white">{project.author}</span>}</span>
                 {currentUser && currentUser.id !== (project as any).authorId && (
                     <button onClick={onFollowToggle} className={`h-6 px-2.5 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${isFollowing ? `${theme.colors.bgSurfaceAlt} ${theme.colors.textSecondary} hover:bg-red-500/20 hover:${theme.colors.dangerText}` : `${theme.colors.accentBg} text-white hover:bg-modtale-accentHover shadow-lg shadow-modtale-accent/20`}`}>
                         {isFollowing ? 'Unfollow' : 'Follow'}
@@ -67,4 +71,5 @@ export const HeaderContent: React.FC<HeaderProps> = ({ project, currentUser, isF
             </p>
         )}
     </>
-);
+    );
+};

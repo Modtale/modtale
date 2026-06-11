@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.io.Serializable;
 
 @Document(collection = "users")
@@ -87,6 +88,7 @@ public class User implements Serializable {
     private List<OrgPayoutShare> orgPayoutShares = new ArrayList<>();
 
     public User() {
+        this.id = UUID.randomUUID().toString();
         this.tier = ApiKey.Tier.USER;
         this.createdAt = LocalDate.now().toString();
         this.roles = new ArrayList<>();
@@ -323,7 +325,6 @@ public class User implements Serializable {
 
     public LocalDateTime getGitlabTokenExpiresAt() { return gitlabTokenExpiresAt; }
     public void setGitlabTokenExpiresAt(LocalDateTime gitlabTokenExpiresAt) { this.gitlabTokenExpiresAt = gitlabTokenExpiresAt; }
-
     public String getStripeConnectAccountId() { return stripeConnectAccountId; }
     public void setStripeConnectAccountId(String stripeConnectAccountId) { this.stripeConnectAccountId = stripeConnectAccountId; }
 

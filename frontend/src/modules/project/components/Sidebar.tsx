@@ -104,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             return (
                                 <Link
                                     key={member.id}
-                                    to={SiteRoutes.creator(member.username)}
+                                    to={SiteRoutes.creator(member.id, member.username)}
                                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <OptimizedImage
@@ -136,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             return (
                                 <Link
                                     key={contributor.id}
-                                    to={SiteRoutes.creator(contributor.username)}
+                                    to={SiteRoutes.creator(contributor.id, contributor.username)}
                                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors group"
                                 >
                                     <OptimizedImage
@@ -202,6 +202,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{title}</div>
                                         <div className="text-[10px] text-slate-600 dark:text-slate-400 flex items-center gap-2">
                                             {!isModpack && <span className={dep.isOptional ? '' : 'text-amber-600 dark:text-amber-500 font-bold'}>{dep.isOptional ? 'Optional' : 'Required'}</span>}
+                                            {dep.isEmbedded && <span className="text-emerald-600 dark:text-emerald-400 font-bold">Embedded</span>}
                                             <span className="font-mono opacity-75">v{dep.versionNumber}</span>
                                         </div>
                                     </div>

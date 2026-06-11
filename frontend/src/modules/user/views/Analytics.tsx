@@ -1,12 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BarChart2, Star, PieChart, ChevronDown, Check, User as UserIcon, Building2, Download, Eye, TrendingUp, TrendingDown, Layers } from 'lucide-react';
+import { BarChart2, PieChart, ChevronDown, Check, User as UserIcon, Building2, Download, Eye, TrendingUp, TrendingDown, Layers, CalendarClock } from 'lucide-react';
 import { api } from '@/utils/api';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { BarChart } from '@/components/ui/charts/BarChart';
-import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW } from '@/utils/analytics';
+import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
+import { formatDateTime } from '@/utils/modHelpers';
 import type { Project, User } from '@/types';
+import { hasOrgPermission } from '@/modules/organization/api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
@@ -58,6 +61,15 @@ export const Analytics: React.FC = () => {
     const [itemMeta, setItemMeta] = useState<Record<string, any>>({});
     const [fourthChart, setFourthChart] = useState<any>(null);
     const [tableConfig, setTableConfig] = useState<{ headers: string[], rowRenderer: (id: string, stats: any) => React.ReactNode } | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    const normalizePointSeries = (value: any): any[] => Array.isArray(value) ? value : [];
+    const normalizeSeriesMap = (value: any): Record<string, any[]> => {
+        if (!value || typeof value !== 'object') return {};
+        return Object.fromEntries(
+            Object.entries(value).map(([key, series]) => [key, normalizePointSeries(series)])
+        );
+    };
 
     useEffect(() => {
         const init = async () => {
@@ -69,7 +81,7 @@ export const Analytics: React.FC = () => {
 
                 const orgs = await api.get('/user/orgs');
                 const adminOrgs = orgs.data.filter((o: User) =>
-                    o.organizationMembers?.some(m => m.userId === me.data.id && m.roleId === 'ADMIN')
+                    hasOrgPermission(o, me.data.id, Permission.PROJECT_EDIT_METADATA)
                 );
                 setMyOrgs(adminOrgs);
             } catch (e) { console.error("Init failed", e); }
@@ -95,6 +107,7 @@ export const Analytics: React.FC = () => {
             setViewsData({});
             setItems([]);
             setFourthChart(null);
+            setLoadError(null);
             setHasProjects(true);
 
             try {
@@ -111,23 +124,31 @@ export const Analytics: React.FC = () => {
                         setHasProjects(false); setLoading(false); return;
                     }
 
-                    const res = await api.get(`/user/analytics?range=${range}&userId=${selectedContext}`);
+                    const isOrgContext = selectedContext !== currentUser?.id;
+                    const selectedOrg = myOrgs.find(o => o.id === selectedContext);
+                    const analyticsPath = isOrgContext && selectedOrg?.id
+                        ? `/user/analytics?range=${range}&userId=${encodeURIComponent(selectedOrg.id)}`
+                        : `/user/analytics?range=${range}`;
+                    const res = await api.get(analyticsPath);
                     const data = res.data;
+                    const projectMeta = data?.projectMeta || {};
+                    const projectDownloads = normalizeSeriesMap(data?.projectDownloads);
+                    const projectViews = normalizeSeriesMap(data?.projectViews);
 
                     setMeta({
                         title: '',
                         subtitle: "Overall Performance & Reach"
                     });
 
-                    setItems(Object.keys(data.projectMeta || {}).sort((a, b) => data.projectMeta[b].totalDownloads - data.projectMeta[a].totalDownloads));
-                    setSeriesData(data.projectDownloads);
-                    setViewsData(data.projectViews);
-                    setItemMeta(data.projectMeta);
+                    setItems(Object.keys(projectMeta).sort((a, b) => (projectMeta[b]?.totalDownloads || 0) - (projectMeta[a]?.totalDownloads || 0)));
+                    setSeriesData(projectDownloads);
+                    setViewsData(projectViews);
+                    setItemMeta(projectMeta);
 
-                    const conversionData = Object.keys(data.projectMeta).map(pid => {
-                        const dl = (data.projectDownloads[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
-                        const vw = (data.projectViews[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
-                        return { id: pid, label: data.projectMeta[pid].title, value: vw > 0 ? (dl / vw) * 100 : 0 };
+                    const conversionData = Object.keys(projectMeta).map(pid => {
+                        const dl = (projectDownloads[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
+                        const vw = (projectViews[pid] || []).slice(BUFFER).reduce((acc: number, d: any) => acc + d.count, 0);
+                        return { id: pid, label: projectMeta[pid]?.title || pid, value: vw > 0 ? (dl / vw) * 100 : 0 };
                     }).sort((a, b) => b.value - a.value);
 
                     setFourthChart({ title: "Conversion Rate (%)", icon: <PieChart className="w-5 h-5 text-orange-500" />, type: 'bar', data: conversionData, formatter: (v: number) => `${v.toFixed(1)}%` });
@@ -136,17 +157,17 @@ export const Analytics: React.FC = () => {
                         downloads: { value: data.periodDownloads, total: data.totalDownloads, trend: ((data.periodDownloads - data.previousPeriodDownloads) / (data.previousPeriodDownloads || 1)) * 100 },
                         views: { value: data.periodViews, total: data.totalViews, trend: ((data.periodViews - data.previousPeriodViews) / (data.previousPeriodViews || 1)) * 100 },
                         conversion: data.periodViews > 0 ? (data.periodDownloads / data.periodViews) * 100 : 0,
-                        contentCount: { value: Object.keys(data.projectMeta).length, label: "Projects" }
+                        contentCount: { value: Object.keys(projectMeta).length, label: "Projects" }
                     });
 
                     setTableConfig({
-                        headers: ["Project Name", "Period Downloads", "Total Downloads", "Rating", "Action"],
+                        headers: ["Project Name", "Period Downloads", "Total Downloads", "Updated", "Action"],
                         rowRenderer: (pid, sum) => (
                             <>
-                                <td className="p-4 pl-6 font-bold text-slate-900 dark:text-white">{data.projectMeta[pid].title}</td>
+                                <td className="p-4 pl-6 font-bold text-slate-900 dark:text-white">{projectMeta[pid]?.title || pid}</td>
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">+{sum.toLocaleString()}</td>
-                                <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{data.projectMeta[pid].totalDownloads.toLocaleString()}</td>
-                                <td className="p-4"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 font-bold text-xs"><Star className="w-3 h-3 fill-current" /> {data.projectMeta[pid].currentRating}</span></td>
+                                <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{(projectMeta[pid]?.totalDownloads || 0).toLocaleString()}</td>
+                                <td className="p-4"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-300 font-bold text-xs"><CalendarClock className="w-3 h-3" /> {projectMeta[pid]?.updatedAt || 'Unknown'}</span></td>
                                 <td className="p-4 text-right pr-6"><button onClick={() => navigate(`/dashboard/analytics/project/${pid}`)} className="text-slate-500 hover:text-modtale-accent font-bold text-xs border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl hover:border-modtale-accent transition-all bg-white/50 dark:bg-white/5 shadow-sm">Details</button></td>
                             </>
                         )
@@ -157,15 +178,16 @@ export const Analytics: React.FC = () => {
                         api.get(`/projects/${id}/analytics?range=${range}`),
                         api.get(`/projects/${id}`)
                     ]).then(r => [r[0].data, r[1].data as Project]);
-
+                    const versionDownloads = normalizeSeriesMap(analytics?.versionDownloads);
+                    const views = normalizePointSeries(analytics?.views);
                     setMeta({ title: info.title, subtitle: "Project Performance & Reach" });
 
                     const vMap = new Map(info.versions.map((v: { id: any; }) => [v.id, v]));
-                    setSeriesData(analytics.versionDownloads);
-                    setViewsData({ 'overall': analytics.views });
-                    setItems(Object.keys(analytics.versionDownloads).sort((a, b) => {
-                        const sumA = analytics.versionDownloads[a].reduce((ac: number, x: any) => ac + x.count, 0);
-                        const sumB = analytics.versionDownloads[b].reduce((ac: number, x: any) => ac + x.count, 0);
+                    setSeriesData(versionDownloads);
+                    setViewsData({ 'overall': views });
+                    setItems(Object.keys(versionDownloads).sort((a, b) => {
+                        const sumA = versionDownloads[a].reduce((ac: number, x: any) => ac + x.count, 0);
+                        const sumB = versionDownloads[b].reduce((ac: number, x: any) => ac + x.count, 0);
                         return sumB - sumA;
                     }));
 
@@ -178,7 +200,7 @@ export const Analytics: React.FC = () => {
                     });
                     setItemMeta(vMeta);
 
-                    setFourthChart({ title: "Rating History", icon: <Star className="w-5 h-5 text-yellow-500" />, type: 'line', data: [{ id: 'avg_rating', label: 'Rating', color: '#f59e0b', data: analytics.ratingHistory }] });
+                    setFourthChart(null);
 
                     setSummary({
                         downloads: { value: analytics.totalDownloads, total: info.downloadCount, trend: 0 },
@@ -198,7 +220,14 @@ export const Analytics: React.FC = () => {
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">+{sum.toLocaleString()}</td>
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{(vMeta[vid]?.total || 0).toLocaleString()}</td>
                                 <td className="p-4 text-xs font-mono text-slate-500">{vMeta[vid]?.gameVer}</td>
-                                <td className="p-4 text-right pr-6"><span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2.5 py-1 rounded-md text-slate-500 border border-slate-200 dark:border-white/5">{vMeta[vid]?.date}</span></td>
+                                <td className="p-4 text-right pr-6">
+                                    <span
+                                        className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2.5 py-1 rounded-md text-slate-500 border border-slate-200 dark:border-white/5"
+                                        title={vMeta[vid]?.date || 'Unknown'}
+                                    >
+                                        {formatDateTime(vMeta[vid]?.date)}
+                                    </span>
+                                </td>
                             </>
                         )
                     });
@@ -206,10 +235,20 @@ export const Analytics: React.FC = () => {
 
                 setHiddenSeries(prev => { const next = { ...prev, 'overall': false }; return next; });
 
-            } catch (e) { console.error(e); } finally { setLoading(false); }
+            } catch (e) {
+                console.error(e);
+                setLoadError("Unable to load analytics right now.");
+                setSummary(null);
+                setSeriesData({});
+                setViewsData({});
+                setItems([]);
+                setItemMeta({});
+                setFourthChart(null);
+                setTableConfig(null);
+            } finally { setLoading(false); }
         };
         fetchData();
-    }, [id, range, selectedContext]);
+    }, [id, range, selectedContext, currentUser?.id, myOrgs]);
 
     const calculateOverall = (source: Record<string, any[]>) => {
         const firstKey = Object.keys(source)[0];
@@ -302,12 +341,24 @@ export const Analytics: React.FC = () => {
         </div>
     );
 
+    if (loadError) return (
+        <div className="mt-8 animate-in fade-in duration-500">
+            <EmptyState icon={BarChart2} title="Analytics Unavailable" message={loadError} />
+        </div>
+    );
+
     const overallDownloads = calculateOverall(seriesData);
     const overallViews = id ? (viewsData['overall'] || []).map((v: any) => ({ date: v.date, value: v.count })) : calculateOverall(viewsData);
+    const overallDownloadsAvg7 = calculateRollingAverage(overallDownloads, 7);
+    const overallDownloadsAvg30 = calculateRollingAverage(overallDownloads, 30);
+    const overallViewsAvg7 = calculateRollingAverage(overallViews, 7);
+    const overallViewsAvg30 = calculateRollingAverage(overallViews, 30);
 
     const chartDatasets = {
         downloads: [
             { id: 'overall', label: 'Overall', color: OVERALL_COLOR, data: sliceData(overallDownloads), hidden: !!hiddenSeries['overall'] },
+            { id: 'overallAvg7', label: 'Overall 7d Avg', color: '#14b8a6', data: sliceData(overallDownloadsAvg7), hidden: hiddenSeries['overallAvg7'] ?? true },
+            { id: 'overallAvg30', label: 'Overall 30d Avg', color: '#f97316', data: sliceData(overallDownloadsAvg30), hidden: hiddenSeries['overallAvg30'] ?? true },
             ...items.map((key, i) => ({
                 id: key, label: itemMeta[key]?.title || itemMeta[key]?.label || key, color: COLORS[i % COLORS.length],
                 data: sliceData(seriesData[key]?.map((d: any) => ({ date: d.date, value: d.count })) || []),
@@ -316,6 +367,8 @@ export const Analytics: React.FC = () => {
         ],
         views: [
             { id: 'overall', label: 'Total Views', color: '#3b82f6', data: sliceData(overallViews), hidden: !!hiddenSeries['overall'] },
+            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(overallViewsAvg7), hidden: hiddenSeries['viewsAvg7'] ?? true },
+            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(overallViewsAvg30), hidden: hiddenSeries['viewsAvg30'] ?? true },
             ...items.map((key, i) => ({
                 id: key,
                 label: itemMeta[key]?.title || itemMeta[key]?.label || key,
@@ -332,7 +385,16 @@ export const Analytics: React.FC = () => {
                 hidden: !!hiddenGrowth[key] || true
             }))
         ],
-        fourthMetric: { ...fourthChart, data: fourthChart?.type === 'bar' ? fourthChart.data.map((d:any) => ({...d, color: d.id === 'overall' ? OVERALL_COLOR : COLORS[items.indexOf(d.id) % COLORS.length], hidden: !!hiddenSeries[d.id] })) : fourthChart?.data }
+        fourthMetric: fourthChart ? {
+            ...fourthChart,
+            data: fourthChart.type === 'bar'
+                ? (fourthChart.data || []).map((d: any) => ({
+                    ...d,
+                    color: d.id === 'overall' ? OVERALL_COLOR : COLORS[items.indexOf(d.id) % COLORS.length],
+                    hidden: !!hiddenSeries[d.id]
+                }))
+                : fourthChart.data
+        } : null
     };
 
     const ranges = ['7d', '30d', '90d'];
@@ -386,7 +448,9 @@ export const Analytics: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <SummaryCard title="Downloads" value={summary.downloads.value.toLocaleString()} subValue={`Total: ${summary.downloads.total.toLocaleString()}`} trend={summary.downloads.trend} icon={Download} color="text-blue-500" />
                         <SummaryCard title="Views" value={summary.views.value.toLocaleString()} subValue={`Total: ${summary.views.total.toLocaleString()}`} trend={summary.views.trend} icon={Eye} color="text-purple-500" />
-                        <SummaryCard title="Conversion Rate" value={summary.conversion.toFixed(1)} subValue="Downloads per View" icon={PieChart} color="text-emerald-500" isPercent />
+                        <div className="hidden md:block">
+                            <SummaryCard title="Conversion Rate" value={summary.conversion.toFixed(1)} subValue="Downloads per View" icon={PieChart} color="text-emerald-500" isPercent />
+                        </div>
                         <SummaryCard title={summary.contentCount.label} value={summary.contentCount.value.toLocaleString()} subValue="Active Items" icon={Layers} color="text-yellow-500" />
                     </div>
                 )}

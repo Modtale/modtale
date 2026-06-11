@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson, Lock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
-import { API_BASE_URL } from '@/utils/api';
+import { API_BASE_URL, extractApiErrorMessage } from '@/utils/api';
+import { isSuperAdminUser } from '../utils/access';
 import type { Project, ScanIssue } from '@/types';
 
 export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }) {
@@ -33,7 +34,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
         adminClient.getCurrentAdmin().then(res => setCurrentAdmin(res)).catch(() => {});
     }, []);
 
-    const isSuperAdmin = currentAdmin?.id === '692620f7c2f3266e23ac0ded';
+    const isSuperAdmin = isSuperAdminUser(currentAdmin);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -87,7 +88,11 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             setQuery(data.title);
             setShowResults(false);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Not Found', msg: `No project found with ID or Slug: ${idQuery}` });
+            setStatus({
+                type: 'error',
+                title: 'Lookup Failed',
+                msg: extractApiErrorMessage(e, `No project found with ID or slug "${idQuery.trim()}".`)
+            });
         } finally {
             setLoading(false);
         }
@@ -106,7 +111,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             const data = await adminClient.getProjectById(mod.id);
             setFoundProject(data);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch full project details.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not load the full project details.') });
         } finally {
             setLoading(false);
         }
@@ -161,7 +166,13 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             setShowRawModal(false);
             setFoundProject(parsed);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : (e.response?.data || 'Server error saving raw data.') });
+            setStatus({
+                type: 'error',
+                title: 'Error',
+                msg: e instanceof SyntaxError
+                    ? 'Invalid JSON format.'
+                    : extractApiErrorMessage(e, 'We could not save the raw project data.')
+            });
         } finally {
             setLoading(false);
         }
@@ -202,14 +213,23 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             setActionReason('');
             setTargetVersionId(null);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Action Failed', msg: e.response?.data || 'An error occurred.' });
+            const fallback = confirmAction === 'DELETE'
+                ? 'We could not delete this project.'
+                : confirmAction === 'HARD_DELETE'
+                    ? 'We could not permanently delete this project.'
+                    : confirmAction === 'RESTORE'
+                        ? 'We could not restore this project.'
+                        : confirmAction === 'UNLIST'
+                            ? 'We could not unlist this project.'
+                            : 'We could not delete this version.';
+            setStatus({ type: 'error', title: 'Action Failed', msg: extractApiErrorMessage(e, fallback) });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
+        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-md">
             <div className="flex flex-col md:flex-row gap-4 mb-10 relative z-50 items-start">
                 <div className="relative flex-1 group w-full" ref={wrapperRef}>
                     <div className="relative">
@@ -235,7 +255,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                     </div>
 
                     {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
                             {searchResults.map(mod => (
                                 <button key={mod.id} onClick={() => selectProject(mod)} className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0">
                                     <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0"><img src={mod.imageUrl || 'https://modtale.net/assets/favicon.svg'} alt="" className="w-full h-full object-cover" /></div>
@@ -311,7 +331,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                     {showVersions && foundProject.versions && (
                         <div className="space-y-2 mb-8 animate-in fade-in slide-in-from-top-2">
                             {foundProject.versions.map(ver => (
-                                <div key={ver.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl">
+                                <div key={ver.id} className="flex items-center justify-between p-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-sm">
                                     <div className="flex items-center gap-4">
                                         <div className="p-2 bg-slate-100 dark:bg-white/5 rounded-lg"><Package className="w-4 h-4 text-slate-400" /></div>
                                         <div>
@@ -341,7 +361,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                         <button onClick={formatJson} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold rounded-lg border border-white/10 transition-colors">Format JSON</button>
                                     </div>
                                     <div className="relative flex-1 rounded-xl border border-white/10 overflow-hidden bg-black/20 flex flex-col">
-                                        <textarea ref={textareaRef} value={rawJsonStr} onChange={handleJsonChange} onKeyDown={handleJsonKeyDown} className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto custom-scrollbar transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`} spellCheck={false} />
+                                        <textarea ref={textareaRef} value={rawJsonStr} onChange={handleJsonChange} onKeyDown={handleJsonKeyDown} className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`} spellCheck={false} />
                                         {jsonError && <div className="absolute bottom-0 left-0 right-0 bg-red-500/90 text-white text-xs font-bold px-4 py-2 truncate shadow-lg backdrop-blur-sm">Parse Error: {jsonError}</div>}
                                     </div>
                                 </div>
@@ -370,9 +390,10 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                 {confirmAction === 'RESTORE' && (
                                     <div className="mb-6">
                                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Restore To Status</label>
-                                        <select value={restoreTargetStatus} onChange={e => setRestoreTargetStatus(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold outline-none">
+                                        <select value={restoreTargetStatus} onChange={e => setRestoreTargetStatus(e.target.value)} className="themed-select w-full rounded-xl border border-slate-200 bg-slate-50 p-3 font-bold text-slate-900 outline-none transition-all focus:border-modtale-accent focus:ring-2 focus:ring-modtale-accent dark:border-white/10 dark:bg-black/20 dark:text-white">
                                             <option value="PUBLISHED">Published</option>
                                             <option value="DRAFT">Draft</option>
+                                            <option value="PRIVATE">Private</option>
                                             <option value="UNLISTED">Unlisted</option>
                                             <option value="ARCHIVED">Archived</option>
                                         </select>

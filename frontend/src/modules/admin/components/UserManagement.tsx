@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, Lock, X, AlertTriangle, FileJson } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { extractApiErrorMessage } from '@/utils/api';
+import { isSuperAdminUser } from '../utils/access';
 
 export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const [viewMode, setViewMode] = useState<'users' | 'bans'>('users');
@@ -49,7 +51,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const isSuperAdmin = currentAdmin?.id === '692620f7c2f3266e23ac0ded';
+    const isSuperAdmin = isSuperAdminUser(currentAdmin);
     const isTargetAdmin = foundUser?.roles?.includes('ADMIN');
     const canManageUser = isSuperAdmin || !isTargetAdmin;
 
@@ -58,7 +60,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         try {
             setBannedEmails(await adminClient.getBannedEmails());
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch banned emails' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not load banned email addresses.') });
         } finally {
             setLoading(false);
         }
@@ -75,7 +77,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setBanReasonInput('');
             fetchBannedEmails();
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e.response?.data || 'Failed to ban email.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not ban this email address.') });
         } finally {
             setLoading(false);
         }
@@ -94,7 +96,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setBanUserReason('');
             setBanConfirmInput('');
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Ban Failed', msg: e.response?.data || 'Could not ban user completely.' });
+            setStatus({ type: 'error', title: 'Ban Failed', msg: extractApiErrorMessage(e, "We could not ban this user's email address.") });
         } finally {
             setLoading(false);
         }
@@ -107,7 +109,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setStatus({ type: 'success', title: 'Unbanned', msg: 'Email unbanned successfully.' });
             fetchBannedEmails();
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to unban email.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not unban this email address.') });
         } finally {
             setLoading(false);
         }
@@ -138,16 +140,16 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         setUsername(user.username);
         setFoundUser(user);
         setShowResults(false);
-        fetchUserProfile(user.username);
+        fetchUserProfile(user.id);
     };
 
-    const fetchUserProfile = async (name: string) => {
+    const fetchUserProfile = async (userId: string) => {
         setLoading(true);
         try {
-            const data = await adminClient.getUserProfile(name);
+            const data = await adminClient.getUserProfile(userId);
             setFoundUser(data);
         } catch (e) {
-            setStatus({ type: 'error', title: 'User Not Found', msg: `Could not load details for "${name}"` });
+            setStatus({ type: 'error', title: 'User Lookup Failed', msg: extractApiErrorMessage(e, 'We could not load the selected user.') });
         } finally {
             setLoading(false);
         }
@@ -156,18 +158,40 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         setFoundUser(null);
-        fetchUserProfile(username);
+        const selectedUserId = searchResults.find(user => user.username === username)?.id || foundUser?.id;
+        if (selectedUserId) {
+            fetchUserProfile(selectedUserId);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const results = await adminClient.searchUsers(username);
+            const exactMatch = results.find((user: any) => user.username.toLowerCase() === username.trim().toLowerCase());
+            if (!exactMatch) {
+                setStatus({ type: 'error', title: 'User Not Found', msg: `Could not find "${username}"` });
+                return;
+            }
+            setSearchResults(results);
+            setFoundUser(exactMatch);
+            setUsername(exactMatch.username);
+            await fetchUserProfile(exactMatch.id);
+        } catch (e) {
+            setStatus({ type: 'error', title: 'Search Failed', msg: extractApiErrorMessage(e, 'We could not search for that user.') });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleUpdateTier = async (newTier: 'USER' | 'ENTERPRISE') => {
         if (!foundUser) return;
         setLoading(true);
         try {
-            await adminClient.updateUserTier(foundUser.username, newTier);
+            await adminClient.updateUserTier(foundUser.id, newTier);
             setStatus({ type: 'success', title: 'Tier Updated', msg: `Successfully changed ${foundUser.username} to ${newTier}.` });
             setFoundUser({ ...foundUser, tier: newTier });
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Update Failed', msg: e.response?.data?.message || 'Server error occurred.' });
+            setStatus({ type: 'error', title: 'Update Failed', msg: extractApiErrorMessage(e, "We could not update this user's tier.") });
         } finally {
             setLoading(false);
         }
@@ -180,19 +204,19 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
 
         try {
             if (hasAdmin) {
-                await adminClient.revokeAdmin(foundUser.username);
+                await adminClient.revokeAdmin(foundUser.id);
                 const roles = foundUser.roles.filter((r: string) => r !== 'ADMIN');
                 setFoundUser({ ...foundUser, roles });
                 setStatus({ type: 'info', title: 'Role Updated', msg: `Admin role revoked from ${foundUser.username}.` });
             } else {
-                await adminClient.grantAdmin(foundUser.username);
+                await adminClient.grantAdmin(foundUser.id);
                 const roles = foundUser.roles || [];
                 roles.push('ADMIN');
                 setFoundUser({ ...foundUser, roles });
                 setStatus({ type: 'success', title: 'Role Updated', msg: `Admin role granted to ${foundUser.username}.` });
             }
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Update Failed', msg: e.response?.data || 'Server error occurred.' });
+            setStatus({ type: 'error', title: 'Update Failed', msg: extractApiErrorMessage(e, "We could not update this user's roles.") });
         } finally {
             setLoading(false);
         }
@@ -202,7 +226,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         if (!foundUser || deleteConfirmUsername !== foundUser.username) return;
         setLoading(true);
         try {
-            await adminClient.deleteUser(foundUser.username, deleteUserReason);
+            await adminClient.deleteUser(foundUser.id, deleteUserReason);
             setStatus({ type: 'success', title: 'User Deleted', msg: `User ${foundUser.username} has been permanently deleted.` });
             setFoundUser(null);
             setUsername('');
@@ -210,7 +234,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             setDeleteConfirmUsername('');
             setDeleteUserReason('');
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Delete Failed', msg: e.response?.data || 'Could not delete user.' });
+            setStatus({ type: 'error', title: 'Delete Failed', msg: extractApiErrorMessage(e, 'We could not delete this user.') });
         } finally {
             setLoading(false);
         }
@@ -219,12 +243,12 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const openRawEdit = async () => {
         setLoading(true);
         try {
-            const data = await adminClient.getUserRaw(foundUser.username);
+            const data = await adminClient.getUserRaw(foundUser.id);
             setRawJsonStr(JSON.stringify(data, null, 2));
             setJsonError(null);
             setShowRawModal(true);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to fetch raw user data.' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not load the raw user data.') });
         } finally {
             setLoading(false);
         }
@@ -254,19 +278,25 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         try {
             setLoading(true);
             const parsed = JSON.parse(rawJsonStr);
-            await adminClient.updateUserRaw(foundUser.username, parsed);
+            await adminClient.updateUserRaw(foundUser.id, parsed);
             setStatus({ type: 'success', title: 'Saved', msg: 'Raw user metadata updated successfully.' });
             setShowRawModal(false);
-            fetchUserProfile(foundUser.username);
+            fetchUserProfile(foundUser.id);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Error', msg: e instanceof SyntaxError ? 'Invalid JSON format.' : (e.response?.data || 'Server error saving raw data.') });
+            setStatus({
+                type: 'error',
+                title: 'Error',
+                msg: e instanceof SyntaxError
+                    ? 'Invalid JSON format.'
+                    : extractApiErrorMessage(e, 'We could not save the raw user data.')
+            });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem] p-10 shadow-2xl shadow-black/5">
+        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-md">
             <div className="flex gap-4 mb-8 border-b border-slate-200 dark:border-white/5 pb-4">
                 <button onClick={() => setViewMode('users')} className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'users' ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}>User Search</button>
                 <button onClick={() => setViewMode('bans')} className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'bans' ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}>Email Bans</button>
@@ -321,7 +351,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                         <button onClick={formatJson} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold rounded-lg border border-white/10 transition-colors">Format JSON</button>
                                     </div>
                                     <div className="relative flex-1 rounded-xl border border-white/10 overflow-hidden bg-black/20 flex flex-col">
-                                        <textarea ref={textareaRef} value={rawJsonStr} onChange={handleJsonChange} onKeyDown={handleJsonKeyDown} className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto custom-scrollbar transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`} spellCheck={false} />
+                                        <textarea ref={textareaRef} value={rawJsonStr} onChange={handleJsonChange} onKeyDown={handleJsonKeyDown} className={`flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm outline-none resize-none whitespace-pre overflow-auto transition-shadow ${jsonError ? 'shadow-[inset_0_0_0_2px_rgba(239,68,68,0.5)]' : 'focus:shadow-[inset_0_0_0_2px_rgba(99,102,241,0.5)]'}`} spellCheck={false} />
                                         {jsonError && <div className="absolute bottom-0 left-0 right-0 bg-red-500/90 text-white text-xs font-bold px-4 py-2 truncate shadow-lg backdrop-blur-sm">Parse Error: {jsonError}</div>}
                                     </div>
                                 </div>
@@ -338,7 +368,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                             <UserIcon className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
                             <input type="text" placeholder="Enter Username to manage..." className="w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium" value={username} onChange={handleInputChange} onFocus={() => { if(searchResults.length > 0) setShowResults(true); }} />
                             {showResults && searchResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                                     {searchResults.map(user => (
                                         <button key={user.id} type="button" onClick={() => handleSelectUser(user)} className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0">
                                             <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0"><img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /></div>

@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { StatusModal } from '@/components/ui/StatusModal';
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
 interface SidebarSectionProps {
     title: string;
@@ -21,7 +26,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = React.memo(({
                                                                          }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
-    const MOBILE_VISIBLE_KEYWORDS = ['Downloads', 'Ratings', 'Dependencies', 'Supported Versions', 'Tags'];
+    const MOBILE_VISIBLE_KEYWORDS = ['Downloads', 'Dependencies', 'Supported Versions', 'Tags'];
     const isVisibleOnMobile = MOBILE_VISIBLE_KEYWORDS.some(keyword =>
         title.toLowerCase().includes(keyword.toLowerCase())
     );
@@ -77,24 +82,52 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                                                        }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
+    const [tempImageFile, setTempImageFile] = useState<File | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
-    const [scrollY, setScrollY] = useState(0);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const bannerParallaxRef = useRef<HTMLDivElement>(null);
+    const bannerFadeRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        let ticking = false;
-        const handleScroll = () => {
-            if (!ticking) {
-                window.requestAnimationFrame(() => {
-                    setScrollY(Math.min(Math.max(0, window.scrollY), 1500));
-                    ticking = false;
-                });
-                ticking = true;
+        let rafId: number | null = null;
+        const applyParallax = () => {
+            const scrollY = Math.min(Math.max(0, window.scrollY), 1500);
+            const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
+            if (bannerParallaxRef.current) {
+                bannerParallaxRef.current.style.transform = `translateY(${parallaxOffset}px)`;
+            }
+            if (bannerFadeRef.current) {
+                bannerFadeRef.current.style.height = `calc(var(--fade-base) + ${parallaxOffset}px)`;
             }
         };
 
+        const handleScroll = () => {
+            if (rafId !== null) return;
+            rafId = window.requestAnimationFrame(() => {
+                applyParallax();
+                rafId = null;
+            });
+        };
+
+        const handleResize = () => {
+            if (rafId !== null) {
+                window.cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+            applyParallax();
+        };
+
         window.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll();
-        return () => window.removeEventListener('scroll', handleScroll);
+        window.addEventListener('resize', handleResize, { passive: true });
+        applyParallax();
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleResize);
+            if (rafId !== null) {
+                window.cancelAnimationFrame(rafId);
+            }
+        };
     }, []);
 
     const resolveUrl = (url?: string | null) => {
@@ -108,7 +141,15 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
         if (!isEditing || !e.target.files?.[0]) return;
-        setTempImage(URL.createObjectURL(e.target.files[0]));
+        const file = e.target.files[0];
+        if (isFileOverUploadLimit(file)) {
+            setUploadError(MAX_UPLOAD_ERROR_MESSAGE);
+            e.target.value = '';
+            return;
+        }
+        setUploadError(null);
+        setTempImage(URL.createObjectURL(file));
+        setTempImageFile(file);
         setCropType(type);
         setCropperOpen(true);
         e.target.value = '';
@@ -120,25 +161,34 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
         if (cropType === 'banner' && onBannerUpload) onBannerUpload(croppedFile, preview);
         setCropperOpen(false);
         setTempImage(null);
+        setTempImageFile(null);
     };
 
     const containerClasses = "max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28";
-    const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
-
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
+            {uploadError && (
+                <StatusModal
+                    type="error"
+                    title="Upload Failed"
+                    message={uploadError}
+                    onClose={() => setUploadError(null)}
+                />
+            )}
             {cropperOpen && tempImage && (
                 <ImageCropperModal
                     imageSrc={tempImage}
+                    sourceFile={tempImageFile}
                     aspect={cropType === 'banner' ? 3 : 1}
-                    onCancel={() => { setCropperOpen(false); setTempImage(null); }}
+                    onCancel={() => { setCropperOpen(false); setTempImage(null); setTempImageFile(null); }}
                     onCropComplete={handleCropComplete}
                 />
             )}
 
             <div
+                ref={bannerParallaxRef}
                 className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
-                style={{ transform: `translateY(${parallaxOffset}px)` }}
+                style={{ transform: 'translateY(0px)' }}
             >
                 <div className="absolute inset-0 z-0">
                     {finalBanner ? (
@@ -155,8 +205,9 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 </div>
 
                 <div
+                    ref={bannerFadeRef}
                     className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
-                    style={{ height: `calc(var(--fade-base) + ${parallaxOffset}px)` }}
+                    style={{ height: 'var(--fade-base)' }}
                 />
 
                 {isEditing && (

@@ -13,23 +13,31 @@ import {
     Key,
     Shield
 } from 'lucide-react';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Spinner } from '@/components/ui/Spinner';
 import type { User, Project } from '@/types';
-import { PermissionSelector, ALL_PERMISSION_GROUPS, getPermissionLabel, TOTAL_PERMISSIONS } from '@/components/ui/PermissionSelector';
+import { PermissionSelector } from '@/components/ui/PermissionSelector';
+import { ALL_PERMISSION_GROUPS, getPermissionLabel, Permission, TOTAL_PERMISSIONS } from '@/modules/permissions/permissions';
 
 interface ApiKey {
     id: string;
     name: string;
     prefix: string;
     tier: 'USER' | 'ENTERPRISE';
-    contextPermissions: Record<string, string[]>;
+    contextPermissions: Record<string, Permission[]>;
     createdAt: string;
     lastUsed: string | null;
 }
 
-const DEFAULT_PERMISSIONS = ['PROJECT_READ', 'VERSION_READ', 'VERSION_DOWNLOAD', 'PROFILE_READ', 'ORG_READ', 'NOTIFICATION_READ'];
+const DEFAULT_PERMISSIONS = [
+    Permission.PROJECT_READ,
+    Permission.VERSION_READ,
+    Permission.VERSION_DOWNLOAD,
+    Permission.PROFILE_READ,
+    Permission.ORG_READ,
+    Permission.NOTIFICATION_READ
+];
 
 interface DeveloperSettingsProps {
     user: User;
@@ -44,7 +52,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
     const [newKey, setNewKey] = useState<string | null>(null);
     const [keyName, setKeyName] = useState('');
 
-    const [contextPerms, setContextPerms] = useState<Record<string, string[]>>({ PERSONAL: DEFAULT_PERMISSIONS });
+    const [contextPerms, setContextPerms] = useState<Record<string, Permission[]>>({ PERSONAL: DEFAULT_PERMISSIONS });
     const [activeTab, setActiveTab] = useState<string>('PERSONAL');
 
     const [isCreating, setIsCreating] = useState(false);
@@ -103,7 +111,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const cleanContexts: Record<string, string[]> = {};
+        const cleanContexts: Record<string, Permission[]> = {};
         let hasAnyPerms = false;
 
         Object.entries(contextPerms).forEach(([ctx, perms]) => {
@@ -114,7 +122,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
         });
 
         if (!hasAnyPerms) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Please select at least one permission across any profile, organization, or project.' });
+            setStatus({ type: 'error', title: 'No Permissions Selected', msg: 'Select at least one permission for your personal account, an organization, or a project before creating an API key.' });
             return;
         }
 
@@ -132,10 +140,8 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
         } catch (e: any) {
             if (e.response?.status === 403 && e.response?.data?.error === "Email verification required.") {
                 setStatus({ type: 'error', title: 'Verification Required', msg: "You must verify your email address to generate API keys." });
-            } else if (e.response?.data?.error) {
-                setStatus({ type: 'error', title: 'Permission Error', msg: e.response.data.error });
             } else {
-                setStatus({ type: 'error', title: 'Error', msg: 'Failed to create key.' });
+                setStatus({ type: 'error', title: 'API Key Creation Failed', msg: extractApiErrorMessage(e, 'We could not create this API key.') });
             }
         } finally { setIsCreating(false); }
     };
@@ -144,7 +150,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
         setStatus({
             type: 'warning',
             title: 'Revoke API Key?',
-            message: 'Are you sure? This will break any integrations using this key.',
+            msg: 'Revoking this key will immediately break any scripts, apps, or integrations that still rely on it.',
             actionLabel: 'Revoke Key',
             secondaryLabel: 'Cancel',
             onAction: () => executeRevoke(id)
@@ -156,8 +162,8 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
             await api.delete(`/user/api-keys/${id}`);
             fetchKeys();
             setStatus(null);
-        } catch(e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Failed to revoke key.' });
+        } catch (e: unknown) {
+            setStatus({ type: 'error', title: 'API Key Revoke Failed', msg: extractApiErrorMessage(e, 'We could not revoke that API key.') });
         }
     };
 
@@ -217,7 +223,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
                             </h3>
                         </div>
 
-                        <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1 max-h-[400px] overflow-y-auto custom-scrollbar">
+                        <div className="divide-y divide-slate-200 dark:divide-white/5 flex-1 max-h-[400px] overflow-y-auto">
                             {keys.length === 0 ? (
                                 <div className="p-8 text-center text-slate-500 text-sm">No active keys found.</div>
                             ) : keys.map(k => {
@@ -316,7 +322,7 @@ export const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ user }) =>
                                             </button>
                                         </div>
 
-                                        <div className="flex w-full overflow-x-auto gap-2 pb-2 pt-1 px-1 custom-scrollbar">
+                                        <div className="flex w-full overflow-x-auto gap-2 pb-2 pt-1 px-1">
                                             <button
                                                 type="button"
                                                 onClick={() => setActiveTab('PERSONAL')}

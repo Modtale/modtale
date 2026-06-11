@@ -66,7 +66,7 @@ export const AnimatedThemeToggler = ({
                 {
                     duration,
                     easing: 'ease-in-out',
-                    pseudoElement: '::views-transition-new(root)',
+                    pseudoElement: '::view-transition-new(root)',
                 }
             );
         } else {

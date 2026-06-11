@@ -11,6 +11,16 @@ export const calculateWoW = (fullData: any[]) => fullData.map((p, i, arr) => {
     return { date: p.date, value: prev > 0 ? ((curr - prev) / prev) * 100 : (curr > 0 ? 100 : 0) };
 });
 
+export const calculateRollingAverage = (fullData: any[], windowSize: number) => {
+    if (!Array.isArray(fullData) || windowSize <= 0) return [];
+    return fullData.map((p, i, arr) => {
+        const start = Math.max(0, i - windowSize + 1);
+        const window = arr.slice(start, i + 1);
+        const sum = window.reduce((acc: number, x: any) => acc + (Number(x.value) || 0), 0);
+        return { date: p.date, value: window.length > 0 ? sum / window.length : 0 };
+    });
+};
+
 export const generateEmptyHistory = (days: number, start: Date) => {
     const l = [];
     const current = new Date(start);

@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/Spinner';
 
 interface ImageCropperModalProps {
     imageSrc: string;
+    sourceFile?: File | null;
     aspect: number;
     onCancel: () => void;
     onCropComplete: (file: File) => void;
@@ -19,8 +20,15 @@ const createImage = (url: string): Promise<HTMLImageElement> =>
         image.src = url;
     });
 
+const parseNumericLength = (value: string | null): number | null => {
+    if (!value) return null;
+    const match = value.trim().match(/^([0-9]*\.?[0-9]+)/);
+    return match ? Number(match[1]) : null;
+};
+
 export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                                                                         imageSrc,
+                                                                        sourceFile,
                                                                         aspect,
                                                                         onCancel,
                                                                         onCropComplete
@@ -33,6 +41,82 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     const onCropCompleteChange = useCallback((croppedArea: any, croppedAreaPixels: any) => {
         setCroppedAreaPixels(croppedAreaPixels);
     }, []);
+
+    const resolveSourceMimeType = useCallback(async (): Promise<string> => {
+        if (sourceFile?.type?.startsWith('image/')) {
+            return sourceFile.type;
+        }
+        if (sourceFile?.name?.toLowerCase().endsWith('.svg')) {
+            return 'image/svg+xml';
+        }
+
+        if (imageSrc.startsWith('data:image/')) {
+            const match = imageSrc.match(/^data:(image\/[a-zA-Z0-9.+-]+);/);
+            if (match?.[1]) return match[1];
+        }
+
+        try {
+            const response = await fetch(imageSrc);
+            const blob = await response.blob();
+            if (blob.type) return blob.type;
+        } catch (e) {
+            console.warn('Could not determine original MIME type, falling back to PNG');
+        }
+
+        return 'image/png';
+    }, [imageSrc, sourceFile]);
+
+    const buildCroppedSvgFile = useCallback(
+        async (image: HTMLImageElement, cropPixels: { x: number; y: number; width: number; height: number }) => {
+            const svgText = sourceFile ? await sourceFile.text() : await (await fetch(imageSrc)).text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgText, 'image/svg+xml');
+            const svg = doc.documentElement;
+
+            if (!svg || svg.tagName.toLowerCase() !== 'svg') {
+                throw new Error('Invalid SVG source');
+            }
+
+            const viewBoxAttr = svg.getAttribute('viewBox');
+            let baseX = 0;
+            let baseY = 0;
+            let baseWidth = image.naturalWidth;
+            let baseHeight = image.naturalHeight;
+
+            if (viewBoxAttr) {
+                const parts = viewBoxAttr.trim().split(/[\s,]+/).map(Number);
+                if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+                    baseX = parts[0];
+                    baseY = parts[1];
+                    baseWidth = parts[2];
+                    baseHeight = parts[3];
+                }
+            } else {
+                const widthAttr = parseNumericLength(svg.getAttribute('width'));
+                const heightAttr = parseNumericLength(svg.getAttribute('height'));
+                if (widthAttr && heightAttr) {
+                    baseWidth = widthAttr;
+                    baseHeight = heightAttr;
+                }
+            }
+
+            const scaleX = baseWidth / image.naturalWidth;
+            const scaleY = baseHeight / image.naturalHeight;
+
+            const cropX = baseX + cropPixels.x * scaleX;
+            const cropY = baseY + cropPixels.y * scaleY;
+            const cropWidth = cropPixels.width * scaleX;
+            const cropHeight = cropPixels.height * scaleY;
+
+            svg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
+            svg.setAttribute('width', `${cropWidth}`);
+            svg.setAttribute('height', `${cropHeight}`);
+
+            const serialized = new XMLSerializer().serializeToString(doc);
+            return new File([serialized], 'cropped-image.svg', { type: 'image/svg+xml' });
+        },
+        [imageSrc, sourceFile]
+    );
 
     const handleSave = async () => {
         if (!croppedAreaPixels) return;
@@ -60,16 +144,14 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 croppedAreaPixels.height
             );
 
-            let mimeType = 'image/jpeg';
-            try {
-                const response = await fetch(imageSrc);
-                const blob = await response.blob();
-                if (blob.type) {
-                    mimeType = blob.type;
-                }
-            } catch (e) {
-                console.warn('Could not determine original MIME type, falling back to JPEG');
+            const sourceMimeType = await resolveSourceMimeType();
+            if (sourceMimeType === 'image/svg+xml') {
+                const svgFile = await buildCroppedSvgFile(image, croppedAreaPixels);
+                onCropComplete(svgFile);
+                return;
             }
+
+            let mimeType = sourceMimeType;
 
             const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
             if (!supportedTypes.includes(mimeType)) {
@@ -133,7 +215,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                             step={0.1}
                             aria-labelledby="Zoom"
                             onChange={(e) => setZoom(Number(e.target.value))}
-                            className="w-full accent-modtale-accent h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer"
+                            className="themed-range h-4 w-full cursor-pointer"
                         />
                     </div>
                     <div className="flex items-center gap-3 w-full sm:w-auto">

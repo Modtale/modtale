@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Loader2, X, Plus, AlertTriangle, FileText, CheckSquare, ShieldCheck, RefreshCw, Check, AlertCircle, ChevronRight, ChevronDown, ToggleRight, ToggleLeft } from 'lucide-react';
 import { projectClient } from '@/modules/project/api/projectClient';
-import { ScrollStyles } from './FormShared';
 import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import type { Project, ProjectVersion, ProjectDependency } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { parseDependencyEntry, serializeDependencyEntry } from '../utils/dependencyEntries';
+import { useToast } from '@/components/ui/Toast';
 
 interface DependencyWizardProps {
     previousDeps: ProjectDependency[];
@@ -111,7 +112,7 @@ const DependencyRow: React.FC<{ dep: ProjectDependency; targetGameVersion: strin
                         </button>
 
                         {isOpen && (
-                            <div id={`dropdown-${dep.projectId}`} style={dropdownStyle} className={`max-h-60 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg shadow-2xl custom-scrollbar`}>
+                            <div id={`dropdown-${dep.projectId}`} style={dropdownStyle} className={`max-h-60 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg shadow-2xl`}>
                                 {compatibleVersions.length > 0 ? (
                                     <>
                                         <div className={`px-3 py-2 text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-wider ${theme.colors.bgSurface} sticky top-0 z-10 backdrop-blur-sm`}>Compatible</div>
@@ -165,9 +166,12 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
         previousDeps.forEach(dep => {
             const newVer = selections[dep.projectId];
             if (newVer) {
-                let entry = `${dep.projectId}:${newVer}`;
-                if (dep.isOptional) entry += `:optional`;
-                result.push(entry);
+                result.push(serializeDependencyEntry({
+                    projectId: dep.projectId,
+                    versionNumber: newVer,
+                    isOptional: Boolean(dep.isOptional),
+                    isEmbedded: Boolean(dep.isEmbedded)
+                }));
             }
         });
         onConfirm(result);
@@ -188,7 +192,7 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
                     <button onClick={onClose} className={`p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className={`p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1`}>
+                <div className={`p-4 sm:p-5 overflow-y-auto flex-1`}>
                     {!targetGameVersion && (
                         <div className={`mb-4 p-3 ${theme.colors.warningBg} border ${theme.colors.warningBorder} rounded-lg text-xs ${theme.colors.warningText} flex items-start gap-2`}>
                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -232,10 +236,13 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     const [results, setResults] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedModForVersion, setSelectedModForVersion] = useState<Project | null>(null);
+    const [loadingProjectVersions, setLoadingProjectVersions] = useState(false);
     const [showIncompatible, setShowIncompatible] = useState(false);
     const [showAlphaBeta, setShowAlphaBeta] = useState(false);
     const [isOptional, setIsOptional] = useState(false);
+    const [isEmbedded, setIsEmbedded] = useState(false);
     const [showWizard, setShowWizard] = useState(false);
+    const { showToast } = useToast();
 
     const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>({});
 
@@ -259,7 +266,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     useEffect(() => {
         if (selectedModForVersion) {
-            const compatible = selectedModForVersion.versions.filter(v => !targetGameVersion || v.gameVersions?.includes(targetGameVersion));
+            const compatible = (selectedModForVersion.versions || []).filter(v => !targetGameVersion || v.gameVersions?.includes(targetGameVersion));
             const hasRelease = compatible.some(v => !v.channel || v.channel === 'RELEASE');
             const hasAny = compatible.length > 0;
             setShowAlphaBeta(hasAny && !hasRelease);
@@ -281,16 +288,38 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     const confirmVersion = (versionNumber: string) => {
         if (!selectedModForVersion || disabled) return;
-        if (selectedDeps.some(d => d.startsWith(`${selectedModForVersion.id}:`))) { alert("Project already added."); return; }
+        if (selectedDeps.some(d => d.startsWith(`${selectedModForVersion.id}:`))) {
+            showToast("Project already added.", 'info');
+            return;
+        }
         setMetaCache(prev => ({ ...prev, [selectedModForVersion.id]: { title: selectedModForVersion.title, author: selectedModForVersion.author, icon: selectedModForVersion.imageUrl } }));
 
         const finalOptional = isModpack ? false : isOptional;
-        const entry = `${selectedModForVersion.id}:${versionNumber}${finalOptional ? ':optional' : ''}`;
+        const entry = serializeDependencyEntry({
+            projectId: selectedModForVersion.id,
+            versionNumber,
+            isOptional: finalOptional,
+            isEmbedded
+        });
         onChange([...selectedDeps, entry]);
         setSelectedModForVersion(null);
         setIsOptional(false);
+        setIsEmbedded(false);
         setSearch('');
         setResults([]);
+    };
+
+    const openVersionPicker = async (mod: Project) => {
+        if (disabled) return;
+        setLoadingProjectVersions(true);
+        try {
+            const fullProject = mod.versions ? mod : await projectClient.getProject(mod.id);
+            setSelectedModForVersion({ ...fullProject, versions: fullProject.versions || [] });
+        } catch (e) {
+            setSelectedModForVersion({ ...mod, versions: mod.versions || [] });
+        } finally {
+            setLoadingProjectVersions(false);
+        }
     };
 
     const removeDep = (index: number) => {
@@ -301,10 +330,22 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
     const toggleOptionalExisting = (index: number) => {
         if (isModpack || disabled) return;
         const next = [...selectedDeps];
-        const parts = next[index].split(':');
-        const iscurrentlyOptional = parts.length === 3 && parts[2] === 'optional';
-        if (iscurrentlyOptional) next[index] = `${parts[0]}:${parts[1]}`;
-        else next[index] = `${parts[0]}:${parts[1]}:optional`;
+        const parsed = parseDependencyEntry(next[index]);
+        next[index] = serializeDependencyEntry({
+            ...parsed,
+            isOptional: !parsed.isOptional
+        });
+        onChange(next);
+    };
+
+    const toggleEmbeddedExisting = (index: number) => {
+        if (disabled) return;
+        const next = [...selectedDeps];
+        const parsed = parseDependencyEntry(next[index]);
+        next[index] = serializeDependencyEntry({
+            ...parsed,
+            isEmbedded: !parsed.isEmbedded
+        });
         onChange(next);
     };
 
@@ -323,8 +364,6 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
 
     return (
         <div className={`space-y-4 border ${theme.colors.border} rounded-2xl p-6 ${theme.colors.bgSurface} ${disabled ? 'opacity-70' : ''}`}>
-            <ScrollStyles />
-
             {showWizard && previousDependencies && !disabled && (
                 <DependencyUpdateWizard
                     previousDeps={previousDependencies}
@@ -362,10 +401,20 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                                     <span className="text-xs font-bold">Optional Dependency</span>
                                 </div>
                             )}
+                            <div className={`flex items-center gap-2 cursor-pointer transition-colors ${isEmbedded ? 'text-emerald-600 dark:text-emerald-400' : theme.colors.textMuted}`} onClick={() => setIsEmbedded(!isEmbedded)}>
+                                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isEmbedded ? 'bg-emerald-500 border-emerald-500 text-white' : theme.colors.border}`}>
+                                    {isEmbedded && <CheckSquare className="w-3 h-3" />}
+                                </div>
+                                <span className="text-xs font-bold">Embedded Dependency</span>
+                            </div>
                         </div>
 
-                        <div className="p-3 sm:p-4 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
-                            {filteredVersions.length > 0 ? filteredVersions.map(v => {
+                        <div className="p-3 sm:p-4 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
+                            {loadingProjectVersions ? (
+                                <div className={`p-4 text-center text-xs ${theme.colors.textMuted} flex items-center justify-center gap-2`}>
+                                    <Loader2 className="w-4 h-4 animate-spin" /> Loading versions...
+                                </div>
+                            ) : filteredVersions.length > 0 ? filteredVersions.map(v => {
                                 const isCompatible = !targetGameVersion || v.gameVersions?.includes(targetGameVersion);
                                 return (
                                     <button key={v.id} onClick={() => confirmVersion(v.versionNumber)} className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-all duration-300 shadow-sm border ${!isCompatible ? "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50"}`}>
@@ -422,9 +471,9 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
             </div>
 
             {results.length > 0 && !disabled && (
-                <div className={`max-h-56 overflow-y-auto custom-scrollbar ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-lg divide-y ${theme.colors.borderFaint}`}>
+                <div className={`max-h-56 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-lg divide-y ${theme.colors.borderFaint}`}>
                     {results.map(mod => (
-                        <button key={mod.id} onClick={(e) => { e.preventDefault(); setSelectedModForVersion(mod); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
+                        <button key={mod.id} onClick={(e) => { e.preventDefault(); void openVersionPicker(mod); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
                             <div className="flex items-center gap-3">
                                 <img src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded-md bg-slate-200 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
                                 <div>
@@ -449,8 +498,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                 ) : (
                     <div className="grid grid-cols-1 gap-2">
                         {selectedDeps.map((entry, idx) => {
-                            const [id, ver, opt] = entry.split(':');
-                            const isOpt = opt === 'optional';
+                            const { projectId: id, versionNumber: ver, isOptional: isOpt, isEmbedded: embedded } = parseDependencyEntry(entry);
                             const meta = metaCache[id];
                             return (
                                 <div key={idx} className={`flex items-center justify-between ${theme.colors.bgBase} p-3 rounded-xl border ${theme.colors.border} text-sm shadow-sm group`}>
@@ -474,6 +522,9 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({ selected
                                                 {isOpt ? 'Optional' : 'Required'}
                                             </button>
                                         )}
+                                        <button type="button" disabled={disabled} onClick={() => toggleEmbeddedExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${embedded ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/30 dark:text-emerald-400' : `border-slate-200 ${theme.colors.textMuted} hover:${theme.colors.textPrimary} hover:bg-slate-50`} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
+                                            {embedded ? 'Embedded' : 'Standalone'}
+                                        </button>
                                         <button type="button" disabled={disabled} onClick={() => removeDep(idx)} className={`${theme.colors.textMuted} p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : `hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`}><X className="w-4 h-4" /></button>
                                     </div>
                                 </div>

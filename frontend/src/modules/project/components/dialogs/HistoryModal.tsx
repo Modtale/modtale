@@ -12,8 +12,9 @@ interface HistoryModalProps {
     history: any[];
     showExperimental: boolean;
     onToggleExperimental: () => void;
-    onDownload: (url: string, number: string, deps: any[], channel: string) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     hasExperimentalVersions?: boolean;
+    hasStableVersions?: boolean;
 }
 
 const HistoryVersionItem = memo(({
@@ -75,7 +76,7 @@ const HistoryVersionItem = memo(({
 });
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
-    show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions
+    show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions
 }) => {
     useScrollLock(show);
     const [expandedChangelog, setExpandedChangelog] = useState<string | null>(null);
@@ -85,9 +86,21 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
         return history.some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA');
     }, [history, hasExperimentalVersions]);
 
+    const actualHasStable = useMemo(() => {
+        if (hasStableVersions !== undefined) return hasStableVersions;
+        return history.some((v: any) => {
+            const channel = (v.channel || 'RELEASE').toUpperCase();
+            if (channel === 'ALPHA' || channel === 'BETA') return false;
+            return !String(v.versionNumber || '').includes('-');
+        });
+    }, [history, hasStableVersions]);
+
+    const forceShowExperimental = actualHasExperimental && !actualHasStable;
+    const effectiveShowExperimental = showExperimental || forceShowExperimental;
+
     const visibleHistory = useMemo(() => {
-        return history.filter((v: any) => showExperimental || !v.channel || v.channel === 'RELEASE');
-    }, [history, showExperimental]);
+        return history.filter((v: any) => effectiveShowExperimental || !v.channel || v.channel === 'RELEASE');
+    }, [history, effectiveShowExperimental]);
 
     const getVersionBadgeColor = useCallback((channel: string) => {
         switch(channel) {
@@ -103,7 +116,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
     const handleDownloadClick = useCallback((e: React.MouseEvent, ver: any) => {
         e.preventDefault();
-        onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies, ver.channel);
+        const gameVersion = Array.isArray(ver.gameVersions) && ver.gameVersions.length > 0 ? ver.gameVersions[0] : '';
+        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     }, [onDownload]);
 
     if (!show) return null;
@@ -114,7 +128,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
                     <div>
                         <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><List className={`w-5 h-5 ${theme.colors.accent}`} /> Changelog</h3>
-                        {actualHasExperimental && (
+                        {actualHasExperimental && actualHasStable && (
                             <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
                                 <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                     <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showExperimental ? 'translate-x-4' : ''}`} />
@@ -126,7 +140,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                     <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className={`p-6 overflow-y-auto custom-scrollbar flex-1 relative`}>
+                <div className={`p-6 overflow-y-auto flex-1 relative`}>
                     <div className="space-y-6">
                         {visibleHistory.map((ver: any) => {
                             return (

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Download, Calendar, Heart, Code, Paintbrush, Database, Layers, Layout, Box, Globe, ChevronRight } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Download, Calendar, Heart, Box, ChevronRight } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
 import { Link } from 'react-router-dom';
 import { SiteRoutes } from '@/utils/routes';
 import { prefetchProject } from '@/utils/prefetch';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { formatTimeAgo, getClassificationIcon, toTitleCase } from '@/utils/modHelpers';
 import type { Project } from '@/types';
 
 interface ProjectCardProps {
@@ -15,53 +16,19 @@ interface ProjectCardProps {
     isLoggedIn: boolean;
     priority?: boolean;
     viewStyle?: 'grid' | 'list' | 'compact';
+    onReady?: (projectId: string) => void;
+    isVisible?: boolean;
 }
 
-const getClassificationIcon = (cls: string) => {
-    switch(cls) {
-        case 'PLUGIN': return <Code className="w-4 h-4" />;
-        case 'ART': return <Paintbrush className="w-4 h-4" />;
-        case 'DATA': return <Database className="w-4 h-4" />;
-        case 'SAVE': return <Globe className="w-4 h-4" />;
-        case 'MODPACK': return <Layers className="w-4 h-4" />;
-        default: return <Layout className="w-4 h-4" />;
-    }
-}
-
-const toTitleCase = (str: string) => {
-    if (!str) return '';
-    if (str === 'SAVE') return 'World';
-    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+type IdleWindow = Window & typeof globalThis & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
 };
 
-const formatTimeAgo = (dateString: string) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + "y ago";
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + "mo ago";
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + "d ago";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + "h ago";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + "m ago";
-    return "Just now";
-};
-
-export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid' }) => {
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
+export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid', onReady, isVisible = true }) => {
     const title = project.title || 'Untitled Project';
     const author = project.author || 'Unknown';
+    const authorPath = project.authorId ? SiteRoutes.creator(project.authorId, author) : null;
 
     const canonicalPath = path || SiteRoutes.project(project);
 
@@ -71,7 +38,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     const downloads = (project.downloadCount || 0).toLocaleString();
     const favorites = (project.favoriteCount || 0).toLocaleString();
 
-    const timeAgo = formatTimeAgo(project.updatedAt || '');
+    const timeAgo = project.updatedAt ? formatTimeAgo(project.updatedAt) : null;
     const childCount = (project.projectIds || project.childProjectIds || []).length;
     const displayClassification = toTitleCase(classification);
 
@@ -83,24 +50,64 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 
     const resolvedImage = project.imageUrl ? resolveUrl(project.imageUrl) : '/assets/favicon.svg';
     const resolvedBanner = project.bannerUrl ? resolveUrl(project.bannerUrl) : null;
-
     const handleMouseEnter = () => {
         prefetchProject(project.id);
     };
 
     const BASE_HOVER_CLASSES = "hover:border-transparent transition-all duration-300 z-0 hover:z-10";
+    const VISIBILITY_CLASSES = isVisible ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none';
+    const hasReportedReady = useRef(false);
+    const [shouldLoadBanner, setShouldLoadBanner] = useState(false);
+
+    const reportReady = useCallback(() => {
+        if (hasReportedReady.current) return;
+        hasReportedReady.current = true;
+        onReady?.(project.id);
+    }, [onReady, project.id]);
+
+    useEffect(() => {
+        hasReportedReady.current = false;
+    }, [project.id]);
+
+    useEffect(() => {
+        if (!resolvedBanner || !isVisible || typeof window === 'undefined') {
+            setShouldLoadBanner(false);
+            return;
+        }
+
+        const idleWindow = window as IdleWindow;
+        let idleHandle: number | null = null;
+        let timeoutHandle: number | null = null;
+
+        const scheduleBannerLoad = () => setShouldLoadBanner(true);
+
+        if (idleWindow.requestIdleCallback) {
+            idleHandle = idleWindow.requestIdleCallback(scheduleBannerLoad, { timeout: priority ? 900 : 1400 });
+        } else {
+            timeoutHandle = window.setTimeout(scheduleBannerLoad, priority ? 180 : 320);
+        }
+
+        return () => {
+            if (idleHandle !== null && idleWindow.cancelIdleCallback) {
+                idleWindow.cancelIdleCallback(idleHandle);
+            }
+            if (timeoutHandle !== null) {
+                window.clearTimeout(timeoutHandle);
+            }
+        };
+    }, [isVisible, priority, resolvedBanner]);
 
     if (viewStyle === 'compact') {
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm transform-gpu hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 ${BASE_HOVER_CLASSES}`}
+                className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm transform-gpu hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-xl ring-0 group-hover:ring-2 group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
                 <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
                 <Link to={canonicalPath} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
-                    <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={48} className="w-full h-full bg-transparent object-cover" />
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
                 </Link>
                 <div className="flex-1 min-w-0 relative z-20 pointer-events-none">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
@@ -108,9 +115,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     </h3>
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
-                        <Link to={SiteRoutes.creator(author)} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
-                            {author}
-                        </Link>
+                        {authorPath ? (
+                            <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
+                                {author}
+                            </Link>
+                        ) : (
+                            <span className="font-bold truncate">{author}</span>
+                        )}
                     </div>
                 </div>
                 <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-tight relative z-20">
@@ -129,13 +140,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 p-4 sm:p-5 ${BASE_HOVER_CLASSES}`}
+                className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 p-4 sm:p-5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
                 <Link to={canonicalPath} className="absolute inset-0 z-10" />
 
                 <Link to={canonicalPath} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
-                    <OptimizedImage key={`icon-${isMounted}`} src={resolvedImage} alt={title} baseWidth={128} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} priority={priority} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" initialQuality="standard" onFirstLoad={reportReady} />
                 </Link>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center sm:justify-start relative z-20 pointer-events-none">
@@ -148,9 +159,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                             </h3>
                             <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
                                 <span>by</span>
-                                <Link to={SiteRoutes.creator(author)} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
-                                    {author}
-                                </Link>
+                                {authorPath ? (
+                                    <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
+                                        {author}
+                                    </Link>
+                                ) : (
+                                    <span className="truncate block">{author}</span>
+                                )}
                             </div>
                         </div>
                         <div className="hidden sm:flex bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5 pointer-events-none">
@@ -188,7 +203,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     return (
         <div
             onMouseEnter={handleMouseEnter}
-            className={`group relative flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 ${BASE_HOVER_CLASSES}`}
+            className={`group relative flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             role="article"
             aria-label={`Project: ${title} by ${author}`}
         >
@@ -201,17 +216,18 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 tabIndex={-1}
             />
 
-            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 pointer-events-none ${resolvedBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
-                {resolvedBanner ? (
+            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 ${resolvedBanner ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-200 dark:bg-slate-800'} pointer-events-none`}>
+                {resolvedBanner && shouldLoadBanner ? (
                     <OptimizedImage
-                        key={`banner-${isMounted}`}
                         src={resolvedBanner}
                         alt=""
-                        priority={priority}
+                        priority={false}
                         baseWidth={640}
-                        className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
+                        className="w-full h-full group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
                     />
-                ) : (
+                ) : null}
+
+                {!resolvedBanner && (
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 dark:from-slate-900 dark:via-slate-900/20 to-transparent pointer-events-none" />
                 )}
 
@@ -226,11 +242,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent z-20 pointer-events-none">
                 <Link to={canonicalPath} aria-label={`View ${title}`} className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto focus:outline-none">
                     <OptimizedImage
-                        key={`icon-${isMounted}`}
                         src={resolvedImage}
                         alt={title}
                         baseWidth={80}
+                        priority={priority}
                         className="w-full h-full bg-transparent object-cover"
+                        initialQuality="standard"
+                        onFirstLoad={reportReady}
                     />
                     {classification === 'MODPACK' && childCount > 0 && (
                         <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
@@ -251,13 +269,17 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 
                     <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
-                        <Link
-                            to={SiteRoutes.creator(author)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
-                        >
-                            {author}
-                        </Link>
+                        {authorPath ? (
+                            <Link
+                                to={authorPath}
+                                onClick={(e) => e.stopPropagation()}
+                                className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
+                            >
+                                {author}
+                            </Link>
+                        ) : (
+                            <span>{author}</span>
+                        )}
                     </div>
                 </div>
 
@@ -306,7 +328,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         p.isFavorite === n.isFavorite &&
         p.isLoggedIn === n.isLoggedIn &&
         p.priority === n.priority &&
-        p.viewStyle === n.viewStyle
+        p.viewStyle === n.viewStyle &&
+        p.isVisible === n.isVisible
     );
 });
 

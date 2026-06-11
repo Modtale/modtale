@@ -11,6 +11,7 @@ import { BACKEND_URL } from "@/utils/api.ts";
 const { slug } = Astro.params;
 const path = Astro.url.pathname;
 const cleanPath = path.replace(/\/$/, "");
+const projectId = slug ? SiteRoutes.extractId(slug) : '';
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
@@ -18,13 +19,13 @@ const isBot = isBotUserAgent(userAgent);
 let modData = null;
 let title = ROUTE_SEO['/worlds'].title;
 let description = ROUTE_SEO['/worlds'].description;
-let image = slug ? `${BACKEND_URL}/api/v1/og/project/${slug}.png` : "https://modtale.net/assets/favicon.svg";
+let image = projectId ? `${BACKEND_URL}/api/v1/og/project/${projectId}.png` : 'https://modtale.net/assets/logo.svg';
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 
-if (isBot && slug) {
+if (isBot && projectId) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${slug}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`);
         if (res.ok) {
             modData = await res.json();
             modData.classification = 'SAVE';
@@ -48,11 +49,7 @@ if (isBot && slug) {
                 "author": { "@type": "Person", "name": modData.author || 'Unknown' },
                 "applicationCategory": "GameApplication",
                 "operatingSystem": "Windows, macOS, Linux",
-                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-                "aggregateRating": (modData.rating && modData.rating > 0) ? {
-                    "@type": "AggregateRating",
-                    "ratingValue": modData.rating,
-                } : undefined
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
             };
 
             const crumbs = getBreadcrumbsForClassification('SAVE');
@@ -70,8 +67,10 @@ if (ssrSuccessfullyCompleted) {
 } else {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
+
+const projectBootstrapUrl = !modData && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
 ---
 
-<BaseLayout title={title} description={""} image={image} jsonLd={jsonLd} initialData={modData}>
+<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={modData} projectBootstrapUrl={projectBootstrapUrl}>
     <App client:load initialPath={path} ssrData={modData} />
 </BaseLayout>

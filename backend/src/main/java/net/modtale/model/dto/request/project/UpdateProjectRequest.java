@@ -1,15 +1,34 @@
 package net.modtale.model.dto.request.project;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
 import java.util.List;
 import java.util.Map;
 
 public class UpdateProjectRequest {
+    @Size(max = 100, message = "Project titles must be 100 characters or fewer.")
     private String title;
+
+    @Pattern(
+            regexp = "^$|^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$",
+            message = "Project slugs must be 3-50 lowercase characters and may include dashes."
+    )
     private String slug;
+
+    @Size(max = 250, message = "The short summary cannot exceed 250 characters.")
     private String description;
+
+    @Size(max = 50000, message = "The full description cannot exceed 50,000 characters.")
     private String about;
-    private List<String> tags;
+    private List<@NotBlank(message = "Project tags cannot be blank.") String> tags;
     private Map<String, String> links;
+
+    @Pattern(
+            regexp = "^$|https://(github\\.com|gitlab\\.com|codeberg\\.org)/[\\w.-]+/[\\w.-]+$",
+            message = "Repository links must be valid HTTPS GitHub, GitLab, or Codeberg URLs."
+    )
     private String repositoryUrl;
     private String license;
     private Boolean allowModpacks;
@@ -19,6 +38,11 @@ public class UpdateProjectRequest {
     private Integer suggestedDonationCents;
     private Boolean donationRecurringDefault;
     private Boolean hmWikiEnabled;
+
+    @Pattern(
+            regexp = "^$|^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$",
+            message = "Wiki slugs must be 3-50 lowercase characters and may include dashes."
+    )
     private String hmWikiSlug;
 
     public String getTitle() { return title; }

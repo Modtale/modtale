@@ -25,15 +25,6 @@ export type VersionFormData = {
     modIds: any[];
 };
 
-export const ScrollStyles = () => (
-    <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 20px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(156, 163, 175, 0.8); }
-    `}</style>
-);
-
 export const Label = ({ children, required, className }: { children: React.ReactNode, required?: boolean, className?: string }) => (
     <label className={`block text-xs font-bold uppercase ${theme.colors.textMuted} mb-2 tracking-wide flex items-center gap-1 ${className ?? ''}`}>
         {children} {required && <span className={theme.colors.dangerText}>*</span>}

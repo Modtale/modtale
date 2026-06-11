@@ -1,5 +1,19 @@
 import { api } from '@/utils/api';
 
+export type SignInResponsePayload = {
+    status?: string;
+    mfaRequired?: boolean;
+    preAuthToken?: string | null;
+    mfa_required?: boolean;
+    pre_auth_token?: string | null;
+};
+
+export const normalizeSignInResponse = (payload: SignInResponsePayload | null | undefined) => ({
+    status: payload?.status ?? null,
+    mfaRequired: Boolean(payload?.mfaRequired ?? payload?.mfa_required),
+    preAuthToken: payload?.preAuthToken ?? payload?.pre_auth_token ?? null
+});
+
 export const authClient = {
     signIn: async (data: any) => {
         return await api.post('/auth/signin', data);

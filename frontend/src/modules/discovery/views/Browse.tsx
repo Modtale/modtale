@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import { Search, X, ChevronLeft, ChevronRight, CornerDownLeft, PackageSearch } from 'lucide-react';
 
 import { useMobile } from '@/context/MobileContext';
@@ -10,8 +10,6 @@ import { getCategorySEO, generateDynamicSEO } from '@/data/seo-constants';
 import { BROWSE_VIEWS, PROJECT_TYPES } from '@/data/categories';
 import type { Classification } from '@/data/categories';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { BACKEND_URL } from '@/utils/api';
-import { SiteRoutes } from '@/utils/routes';
 
 import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
@@ -19,11 +17,6 @@ import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { BrowseAdPlacement } from '../components/BrowseAdPlacement';
 import { BrowseSkeletons } from '../components/BrowseSkeletons';
-
-const getResolvedImageUrl = (url?: string) => {
-    if (!url) return null;
-    return url.startsWith('/api') ? `${BACKEND_URL}${url}` : url;
-};
 
 interface BrowseViewProps {
     likedProjectIds: string[];
@@ -36,17 +29,20 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                                       likedProjectIds, onToggleFavorite, isLoggedIn, initialClassification
                                                   }) => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
     const [isMounted, setIsMounted] = useState(false);
 
     const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
-    const useSSR = initialData?.browseData && !hasComplexParams;
+    const hasUsableBrowseSSRData = Boolean(initialData?.browseData) && initialData?.browseDataReady !== false;
+    const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
+    const canRenderHydratedContent = useSSR || isMounted;
 
     const {
         page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
-        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, items,
+        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
 
@@ -59,8 +55,15 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const [jumpPage, setJumpPage] = useState('');
 
     useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const query = searchParams.toString();
+        const currentBrowseUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+        window.sessionStorage.setItem('modtale.lastBrowseUrl', currentBrowseUrl);
+    }, [location.pathname, searchParams]);
+
+    useEffect(() => {
         setIsMounted(true);
-        const saved = localStorage.getItem('modtale_view_style');
+        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('modtale_view_style') : null;
         if (saved === 'grid' || saved === 'list' || saved === 'compact') {
             setViewStyle(saved as 'grid' | 'list' | 'compact');
         }
@@ -76,17 +79,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
         return generateBreadcrumbSchema(crumbs);
     }, [selectedClassification]);
 
-    const lcpBannerUrl = useMemo(() => {
-        if (items.length > 0 && items[0].bannerUrl) {
-            return getResolvedImageUrl(items[0].bannerUrl);
-        }
-        return null;
-    }, [items]);
-
     const adContextProjectId = items.length > 0 ? items[0].id : '';
-
     useEffect(() => {
-        let lastScrollY = window.scrollY;
         let ticking = false;
         const handleScroll = () => {
             if (!ticking) {
@@ -185,12 +179,13 @@ export const Browse: React.FC<BrowseViewProps> = ({
                 <title>{dynamicSEO.title}</title>
                 <meta name="description" content={dynamicSEO.description} />
                 <meta name="keywords" content={seoContent.keywords} />
-                {lcpBannerUrl && <link rel="preload" as="image" href={lcpBannerUrl} fetchPriority="high" />}
                 {itemListSchema && <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>}
                 {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
             </Helmet>
 
             <main className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-2 pb-8 transition-[max-width] duration-300">
+                <h1 className="sr-only">{seoContent.h1}</h1>
+
                 <div className="flex flex-col md:flex-row gap-8">
                     <div className="hidden md:block w-60 flex-shrink-0 z-30 sticky top-24 pt-3 h-fit space-y-4">
                         <div className="mb-6">
@@ -206,6 +201,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 {BROWSE_VIEWS.map(v => {
                                     const s = new URLSearchParams(searchParams);
                                     if (v.id === 'all') s.delete('view'); else s.set('view', v.id);
+                                    if (v.defaultSort === 'relevance') s.delete('sort');
+                                    else s.set('sort', v.defaultSort);
                                     s.delete('page');
                                     const query = s.toString() ? `?${s.toString()}` : '?';
 
@@ -262,7 +259,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                             />
                         </div>
 
-                        {!isMounted || (loading && items.length === 0) ? (
+                        {!canRenderHydratedContent || isPending ? (
                             <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />
                         ) : items.length > 0 ? (
                             <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
@@ -272,36 +269,36 @@ export const Browse: React.FC<BrowseViewProps> = ({
                             </div>
                         )}
 
-                        {totalPages > 1 && isMounted && (
-                            <nav aria-label="Pagination" className="mt-12 flex flex-col md:flex-row justify-center items-center gap-12 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-                                <div className="flex items-center gap-2">
+                        {totalPages > 1 && canRenderHydratedContent && (
+                            <nav aria-label="Pagination" className="mt-12 flex flex-col md:flex-row justify-center items-center gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+                                <div className="rounded-2xl border border-modtale-accent/20 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl px-2 py-2 flex items-center gap-1">
                                     {page === 0 ? (
-                                        <span aria-disabled="true" className="text-slate-400 opacity-20 cursor-not-allowed p-2"><ChevronLeft className="w-5 h-5" /></span>
+                                        <span aria-disabled="true" className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 opacity-30 cursor-not-allowed"><ChevronLeft className="w-4 h-4" /></span>
                                     ) : (
-                                        <Link to={getPageUrl(page - 1)} rel="prev" aria-label="Previous Page" onClick={handleScrollTop} className="text-slate-500 hover:text-modtale-accent transition-all p-2"><ChevronLeft className="w-5 h-5" /></Link>
+                                        <Link to={getPageUrl(page - 1)} rel="prev" aria-label="Previous Page" onClick={handleScrollTop} className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:text-modtale-accent hover:bg-modtale-accent/10 transition-all"><ChevronLeft className="w-4 h-4" /></Link>
                                     )}
 
                                     <div className="hidden sm:flex items-center gap-1">
                                         {getPageNumbers().map((p, idx) => typeof p === 'number' ? (
-                                            <Link key={p} to={getPageUrl(p - 1)} onClick={handleScrollTop} aria-label={`Page ${p}`} aria-current={page === p - 1 ? 'page' : undefined} className={`w-9 h-9 flex items-center justify-center text-sm font-bold transition-all ${page === p - 1 ? 'text-modtale-accent' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
+                                            <Link key={p} to={getPageUrl(p - 1)} onClick={handleScrollTop} aria-label={`Page ${p}`} aria-current={page === p - 1 ? 'page' : undefined} className={`w-9 h-9 flex items-center justify-center text-sm font-black rounded-xl transition-all ${page === p - 1 ? 'text-white bg-gradient-to-br from-modtale-accent to-sky-600' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
                                                 {p}
                                             </Link>
                                         ) : (
-                                            <span key={`dots-${idx}`} className="px-2 text-slate-400">...</span>
+                                            <span key={`dots-${idx}`} className="px-2 text-slate-400 text-xs font-black tracking-widest">...</span>
                                         ))}
                                     </div>
 
                                     {page === totalPages - 1 ? (
-                                        <span aria-disabled="true" className="text-slate-400 opacity-20 cursor-not-allowed p-2"><ChevronRight className="w-5 h-5" /></span>
+                                        <span aria-disabled="true" className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 opacity-30 cursor-not-allowed"><ChevronRight className="w-4 h-4" /></span>
                                     ) : (
-                                        <Link to={getPageUrl(page + 1)} rel="next" aria-label="Next Page" onClick={handleScrollTop} className="text-slate-500 hover:text-modtale-accent transition-all p-2"><ChevronRight className="w-5 h-5" /></Link>
+                                        <Link to={getPageUrl(page + 1)} rel="next" aria-label="Next Page" onClick={handleScrollTop} className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:text-modtale-accent hover:bg-modtale-accent/10 transition-all"><ChevronRight className="w-4 h-4" /></Link>
                                     )}
                                 </div>
-                                <form onSubmit={(e) => { e.preventDefault(); const p = parseInt(jumpPage); if (p >= 1 && p <= totalPages) handlePageChange(p - 1); setJumpPage(''); }} className="flex items-center gap-4 group">
-                                    <label htmlFor="jump-page" className="text-[10px] font-black uppercase text-slate-400 tracking-widest pointer-events-none group-focus-within:text-modtale-accent transition-colors">Go to page</label>
-                                    <div className="relative">
-                                        <input id="jump-page" type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-12 h-8 bg-transparent border-b border-slate-300 dark:border-white/10 text-center text-sm font-bold text-slate-900 dark:text-white focus:border-modtale-accent focus:outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="..." />
-                                        <button type="submit" disabled={!jumpPage} aria-label="Go" className="absolute -right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-modtale-accent disabled:opacity-0 transition-all active:scale-90"><CornerDownLeft className="w-3.5 h-3.5" /></button>
+                                <form onSubmit={(e) => { e.preventDefault(); const p = parseInt(jumpPage); if (p >= 1 && p <= totalPages) handlePageChange(p - 1); setJumpPage(''); }} className="flex items-center gap-3 group rounded-2xl border border-slate-200 dark:border-white/10 px-3 py-2 bg-white/70 dark:bg-[#0f172a]/70 backdrop-blur">
+                                    <label htmlFor="jump-page" className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] pointer-events-none group-focus-within:text-modtale-accent transition-colors">Jump</label>
+                                    <div className="relative flex items-center">
+                                        <input id="jump-page" type="number" min={1} max={totalPages} value={jumpPage} onChange={(e) => setJumpPage(e.target.value)} className="w-14 h-8 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/70 text-center text-sm font-black text-slate-900 dark:text-white focus:border-modtale-accent focus:ring-2 focus:ring-modtale-accent/20 focus:outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="#" />
+                                        <button type="submit" disabled={!jumpPage} aria-label="Go" className="ml-2 h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-modtale-accent disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-all active:scale-90"><CornerDownLeft className="w-3.5 h-3.5" /></button>
                                     </div>
                                 </form>
                             </nav>

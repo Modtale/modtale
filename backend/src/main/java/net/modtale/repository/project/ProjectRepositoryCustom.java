@@ -13,15 +13,14 @@ public interface ProjectRepositoryCustom {
             List<String> tags,
             String gameVersion,
             String classification,
-            Double minRating,
             Integer minDownloads,
             Integer minFavorites,
             Pageable pageable,
-            String currentUsername,
+            String currentUserId,
             String sortBy,
             String viewCategory,
             LocalDate dateCutoff,
-            String author
+            String authorId
     );
 
     Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable);

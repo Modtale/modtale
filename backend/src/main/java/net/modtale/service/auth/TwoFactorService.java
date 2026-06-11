@@ -11,6 +11,7 @@ import dev.samstevens.totp.secret.DefaultSecretGenerator;
 import dev.samstevens.totp.secret.SecretGenerator;
 import dev.samstevens.totp.time.SystemTimeProvider;
 import dev.samstevens.totp.time.TimeProvider;
+import net.modtale.exception.AuthenticationOperationException;
 import org.springframework.stereotype.Service;
 
 import static dev.samstevens.totp.util.Utils.getDataUriForImage;
@@ -38,7 +39,7 @@ public class TwoFactorService {
         try {
             imageData = generator.generate(data);
         } catch (QrGenerationException e) {
-            throw new RuntimeException("Failed to generate QR code", e);
+            throw new AuthenticationOperationException("Failed to generate QR code.", e);
         }
 
         return getDataUriForImage(imageData, generator.getImageMimeType());

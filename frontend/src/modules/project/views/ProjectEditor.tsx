@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle } from 'lucide-react';
+import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle, Undo2, AlertTriangle, Info } from 'lucide-react';
 
 import type { User, Project, ProjectVersion } from '@/types';
 import { theme } from '@/styles/theme';
@@ -19,14 +19,22 @@ import { Team } from '../tabs/Team';
 import { Settings as SettingsTab } from '../tabs/Settings';
 import { WikiPreview } from '../tabs/WikiPreview';
 import { projectClient } from '../api/projectClient';
-import { api } from '@/utils/api';
-
+import { api, extractApiErrorMessage } from '@/utils/api';
+import { serializeProjectDependency } from '../utils/dependencyEntries';
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { PermissionSelector } from '@/components/ui/PermissionSelector';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import { ThemedInput } from '../components/FormShared';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
+import type { ProjectRole } from '@/types';
+import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
+import { VersionFields } from '../components/VersionFields';
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
 interface ProjectEditorViewProps {
     currentUser: User | null;
@@ -58,10 +66,20 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
         handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryDelete
-    } = useProjectEditor(projectData, currentUser, metaData, setMetaData, setProjectData, onShowStatus);
+    } = useProjectEditor(
+        projectData,
+        currentUser,
+        metaData,
+        bannerFile,
+        setMetaData,
+        setBannerFile,
+        setBannerPreview,
+        setProjectData,
+        onShowStatus
+    );
 
     const [wikiPreviewSlug, setWikiPreviewSlug] = useState<string | undefined>();
-    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(projectData?.hmWikiSlug, wikiPreviewSlug, activeTab === 'wiki' && projectData?.hmWikiEnabled === true);
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(projectData?.id, wikiPreviewSlug, activeTab === 'wiki' && projectData?.hmWikiEnabled === true);
 
     const [idCopied, setIdCopied] = useState(false);
     const [showCardPreview, setShowCardPreview] = useState(false);
@@ -72,7 +90,16 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [isSavingVersion, setIsSavingVersion] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
+    const [inviteUsername, setInviteUsername] = useState('');
+    const [inviteUserId, setInviteUserId] = useState('');
+    const [inviteRoleId, setInviteRoleId] = useState('');
+    const [inviteRoleDropdownOpen, setInviteRoleDropdownOpen] = useState(false);
+    const [memberRoleDropdownOpen, setMemberRoleDropdownOpen] = useState<string | null>(null);
+    const [isInviting, setIsInviting] = useState(false);
+    const [editingRole, setEditingRole] = useState<Partial<ProjectRole> | null>(null);
+    const [roleModalOpen, setRoleModalOpen] = useState(false);
     const [galleryCropImage, setGalleryCropImage] = useState<string | null>(null);
+    const [galleryCropFile, setGalleryCropFile] = useState<File | null>(null);
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isStatusChanging, setIsStatusChanging] = useState(false);
 
@@ -105,11 +132,31 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isDirty]);
 
+    useEffect(() => {
+        if (!inviteUsername || inviteUsername.length < 2 || inviteUserId) {
+            setUserSearchResults([]);
+            return;
+        }
+
+        const delayDebounceFn = window.setTimeout(async () => {
+            try {
+                const res = await projectClient.searchUsers(inviteUsername);
+                setUserSearchResults(res);
+            } catch {
+            }
+        }, 300);
+
+        return () => window.clearTimeout(delayDebounceFn);
+    }, [inviteUsername, inviteUserId, setUserSearchResults]);
+
     if (loading || !projectData) return <div className="min-h-screen flex items-center justify-center"><Spinner /></div>;
 
     const readOnly = projectData.status === 'PENDING' || projectData.status === 'ARCHIVED';
     const isModpack = projectData.classification === 'MODPACK';
-    const hasProjectPermission = (perm: string) => true;
+    const hasProjectPermission = (_perm: Permission) => true;
+    const canInvite = !readOnly && hasProjectPermission(Permission.PROJECT_TEAM_INVITE);
+    const canManageRoles = !readOnly && hasProjectPermission(Permission.PROJECT_MEMBER_EDIT_ROLE);
+    const canRemove = !readOnly && hasProjectPermission(Permission.PROJECT_TEAM_REMOVE);
     const toggleTag = (tag: string) => {
         if (readOnly) return;
         markDirty();
@@ -119,6 +166,127 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 ? prev.tags.filter(t => t !== tag)
                 : [...prev.tags, tag]
         }));
+    };
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (readOnly) return;
+        markDirty();
+        setSlugError(null);
+        setMetaData(prev => ({
+            ...prev,
+            slug: e.target.value
+        }));
+    };
+    const handleSubmitClick = () => {
+        if (!metaData.slug?.trim()) {
+            setShowSlugPrompt(true);
+            return;
+        }
+        handleSubmit();
+    };
+    const handleSetCustomSlug = () => {
+        setShowSlugPrompt(false);
+        setActiveTab('settings');
+        window.setTimeout(() => {
+            const slugInput = document.getElementById('project-custom-slug-input') as HTMLInputElement | null;
+            slugInput?.focus();
+        }, 0);
+    };
+    const handleInvite = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!projectData.id || !inviteUserId || !inviteRoleId) return;
+
+        setIsInviting(true);
+        try {
+            await projectClient.inviteUser(projectData.id, inviteUserId, inviteRoleId);
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            setInviteUsername('');
+            setInviteUserId('');
+            setInviteRoleId('');
+            setInviteRoleDropdownOpen(false);
+            setUserSearchResults([]);
+            onShowStatus('success', 'Invited', 'Contributor invitation sent successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Invitation Failed', extractApiErrorMessage(err, 'We could not send that project invite.'));
+        } finally {
+            setIsInviting(false);
+        }
+    };
+
+    const confirmRemoveMember = async () => {
+        if (!projectData.id || !memberToRemove) return;
+
+        try {
+            await projectClient.removeContributor(projectData.id, memberToRemove);
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            onShowStatus('success', memberToRemove === currentUser?.id ? 'Left Project' : 'Removed', memberToRemove === currentUser?.id ? 'You have left the project.' : 'Contributor removed successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Removal Failed', extractApiErrorMessage(err, 'We could not remove that contributor.'));
+        } finally {
+            setMemberToRemove(null);
+            setStatusModal(null);
+        }
+    };
+
+    const handleSaveRole = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!projectData.id || !editingRole?.name || !editingRole?.color) return;
+
+        try {
+            const updatedProject = await projectClient.saveProjectRole(projectData.id, editingRole);
+            setProjectData(updatedProject);
+            setRoleModalOpen(false);
+            setEditingRole(null);
+            onShowStatus('success', 'Saved', 'Project role saved successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Role Save Failed', extractApiErrorMessage(err, 'We could not save that project role.'));
+        }
+    };
+
+    const runDeleteRole = async (roleId: string) => {
+        if (!projectData.id) return;
+
+        try {
+            const updatedProject = await projectClient.deleteProjectRole(projectData.id, roleId);
+            setProjectData(updatedProject);
+            onShowStatus('success', 'Deleted', 'Project role deleted successfully.');
+        } catch (err: unknown) {
+            onShowStatus('error', 'Role Delete Failed', extractApiErrorMessage(err, 'We could not delete that project role.'));
+        } finally {
+            setStatusModal(null);
+        }
+    };
+
+    const handleDeleteRole = (roleId: string) => {
+        const role = projectData.projectRoles?.find(r => r.id === roleId);
+        setStatusModal({
+            type: 'warning',
+            title: 'Delete Role?',
+            message: `Are you sure you want to delete "${role?.name || 'this role'}"? Contributors currently assigned to it will need to be reassigned before this action can succeed.`,
+            actionLabel: 'Delete Role',
+            secondaryLabel: 'Cancel',
+            onClose: () => setStatusModal(null),
+            onAction: () => runDeleteRole(roleId)
+        });
+    };
+
+    const handleRequestRemoveMember = (userId: string) => {
+        const target = contributors.find(contributor => contributor.id === userId);
+        const targetLabel = userId === currentUser?.id ? 'leave this project' : `remove "${target?.username || 'this contributor'}"`;
+        setMemberToRemove(userId);
+        setStatusModal({
+            type: 'warning',
+            title: userId === currentUser?.id ? 'Leave Project?' : 'Remove Contributor?',
+            message: `Are you sure you want to ${targetLabel}?`,
+            actionLabel: userId === currentUser?.id ? 'Leave Project' : 'Remove',
+            secondaryLabel: 'Cancel',
+            onClose: () => {
+                setMemberToRemove(null);
+                setStatusModal(null);
+            },
+            onAction: confirmRemoveMember
+        });
     };
 
     const availableTabs = [
@@ -182,6 +350,10 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             onShowStatus('error', 'Upload Failed', 'Version number and game versions are required.');
             return;
         }
+        if (versionData.file && isFileOverUploadLimit(versionData.file)) {
+            onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
+            return;
+        }
 
         setIsSavingVersion(true);
         try {
@@ -200,29 +372,103 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             const refreshed = await projectClient.getProject(projectData.id);
             setProjectData(refreshed);
             setVersionData({
-                projectIds: [],
+                projectIds: versionData.projectIds || [],
                 versionNumber: '',
                 gameVersions: versionData.gameVersions,
                 changelog: '',
                 file: null,
                 dependencies: [],
                 modIds: [],
-                channel: 'RELEASE'
+                channel: versionData.channel || 'RELEASE'
             });
             onShowStatus('success', 'Uploaded', 'Version uploaded successfully.');
         } catch (e: any) {
-            onShowStatus('error', 'Upload Failed', e.response?.data || 'Failed to upload version.');
+            onShowStatus('error', 'Upload Failed', extractApiErrorMessage(e, 'Failed to upload version.'));
         } finally {
             setIsSavingVersion(false);
         }
     };
 
-    const runStatusTransition = async (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
+    const handleStartEditVersion = (version: ProjectVersion) => {
+        setEditingVersion(version);
+        setEditVersionData({
+            projectIds: (version.dependencies || []).map(serializeProjectDependency),
+            versionNumber: version.versionNumber || '',
+            gameVersions: version.gameVersions || (version.gameVersion ? [version.gameVersion] : []),
+            changelog: version.changelog || '',
+            file: null,
+            dependencies: [],
+            modIds: [],
+            channel: version.channel || 'RELEASE'
+        });
+    };
+
+    const handleSaveEditedVersion = async () => {
+        if (!projectData?.id || !editingVersion || !editVersionData) return;
+        if (!editVersionData.gameVersions || editVersionData.gameVersions.length === 0) {
+            onShowStatus('error', 'Update Failed', 'At least one game version is required.');
+            return;
+        }
+        setIsSavingVersion(true);
+        try {
+            await projectClient.updateVersion(projectData.id, editingVersion.id, {
+                modIds: editVersionData.projectIds || [],
+                gameVersions: editVersionData.gameVersions,
+                changelog: editVersionData.changelog || '',
+                channel: editVersionData.channel || 'RELEASE'
+            });
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            setEditingVersion(null);
+            setEditVersionData(null);
+            onShowStatus('success', 'Version Updated', 'Version metadata updated successfully.');
+        } catch (e: any) {
+            onShowStatus('error', 'Update Failed', e.response?.data || 'Failed to update version.');
+        } finally {
+            setIsSavingVersion(false);
+        }
+    };
+
+    const runDeleteVersion = async (versionId: string) => {
+        if (!projectData?.id) return;
+        setIsSavingVersion(true);
+        try {
+            await projectClient.deleteVersion(projectData.id, versionId);
+            const refreshed = await projectClient.getProject(projectData.id);
+            setProjectData(refreshed);
+            onShowStatus('success', 'Version Deleted', 'Version deleted successfully.');
+        } catch (e: any) {
+            onShowStatus('error', 'Delete Failed', e.response?.data || 'Failed to delete version.');
+        } finally {
+            setIsSavingVersion(false);
+            setStatusModal(null);
+        }
+    };
+
+    const handleDeleteVersion = (versionId: string) => {
+        const target = projectData?.versions?.find(v => v.id === versionId);
+        setStatusModal({
+            type: 'warning',
+            title: 'Delete Version?',
+            message: `This will permanently delete version ${target?.versionNumber || ''}. This action cannot be undone.`,
+            actionLabel: 'Delete Version',
+            secondaryLabel: 'Cancel',
+            onAction: () => runDeleteVersion(versionId)
+        });
+    };
+
+    const runStatusTransition = async (nextStatus: 'PUBLISHED' | 'PRIVATE' | 'UNLISTED' | 'ARCHIVED') => {
         if (!projectData?.id || isStatusChanging) return;
         setIsStatusChanging(true);
 
         try {
-            const endpoint = nextStatus === 'PUBLISHED' ? 'publish' : nextStatus === 'UNLISTED' ? 'unlist' : 'archive';
+            const endpoint = nextStatus === 'PUBLISHED'
+                ? 'publish'
+                : nextStatus === 'PRIVATE'
+                    ? 'private'
+                    : nextStatus === 'UNLISTED'
+                        ? 'unlist'
+                        : 'archive';
             await api.post(`/projects/${projectData.id}/${endpoint}`);
             setProjectData(prev => prev ? { ...prev, status: nextStatus } : null);
             onShowStatus('success', 'Status Updated', `Project status changed to ${nextStatus.toLowerCase()}.`);
@@ -234,13 +480,19 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
     };
 
-    const confirmStatusTransition = (nextStatus: 'PUBLISHED' | 'UNLISTED' | 'ARCHIVED') => {
+    const confirmStatusTransition = (nextStatus: 'PUBLISHED' | 'PRIVATE' | 'UNLISTED' | 'ARCHIVED') => {
         const config = {
             PUBLISHED: {
                 type: 'info' as const,
                 title: 'Publish Project?',
                 message: 'This will make your project visible to everyone in discovery.',
                 actionLabel: 'Publish'
+            },
+            PRIVATE: {
+                type: 'info' as const,
+                title: 'Make Project Private?',
+                message: 'This will hide your project from public discovery while keeping it fully editable.',
+                actionLabel: 'Make Private'
             },
             UNLISTED: {
                 type: 'info' as const,
@@ -263,15 +515,33 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         });
     };
 
+    const handleRevertToDraft = async () => {
+        if (!projectData?.id || isStatusChanging) return;
+        setIsStatusChanging(true);
+
+        try {
+            await api.post(`/projects/${projectData.id}/revert`);
+            setProjectData(prev => prev ? { ...prev, status: 'DRAFT' } : null);
+            onShowStatus('success', 'Reverted', 'Project returned to draft. Editing is now enabled.');
+        } catch (e: any) {
+            onShowStatus('error', 'Revert Failed', e.response?.data || 'Failed to revert project to draft.');
+        } finally {
+            setIsStatusChanging(false);
+            setStatusModal(null);
+        }
+    };
+
     return (
         <div className="relative">
             {galleryCropImage && createPortal(
                 <ImageCropperModal
                     imageSrc={galleryCropImage}
+                    sourceFile={galleryCropFile}
                     aspect={16 / 9}
-                    onCancel={() => setGalleryCropImage(null)}
+                    onCancel={() => { setGalleryCropImage(null); setGalleryCropFile(null); }}
                     onCropComplete={(file) => {
                         setGalleryCropImage(null);
+                        setGalleryCropFile(null);
                         handleGalleryUpload(file);
                     }}
                 />,
@@ -284,8 +554,166 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                     actionLabel={statusModal.actionLabel}
                     secondaryLabel={statusModal.secondaryLabel}
                     onAction={statusModal.onAction}
-                    onClose={() => !isStatusChanging && setStatusModal(null)}
+                    onClose={() => {
+                        if (isStatusChanging) return;
+                        if (typeof statusModal.onClose === 'function') {
+                            statusModal.onClose();
+                            return;
+                        }
+                        setStatusModal(null);
+                    }}
                 />,
+                document.body)}
+            {roleModalOpen && editingRole && createPortal(
+                <div className={theme.components.modalOverlay}>
+                    <div className={`${theme.components.modalContent} w-full max-w-3xl max-h-[85vh]`}>
+                        <div className={theme.components.modalHeader}>
+                            <div>
+                                <h3 className={`text-xl font-black ${theme.colors.textPrimary}`}>{editingRole.id ? 'Edit Role' : 'Create Role'}</h3>
+                                <p className={`text-xs ${theme.colors.textMuted}`}>Configure permissions for this project role.</p>
+                            </div>
+                            <button onClick={() => { setRoleModalOpen(false); setEditingRole(null); }} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-xl transition-colors`}><X className="w-5 h-5" /></button>
+                        </div>
+
+                        <form onSubmit={handleSaveRole} className="flex flex-col flex-1 overflow-hidden">
+                            <div className={theme.components.modalBody}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role Name</label>
+                                        <input
+                                            type="text"
+                                            value={editingRole.name || ''}
+                                            onChange={e => setEditingRole({ ...editingRole, name: e.target.value })}
+                                            className={theme.components.inputField}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role Color</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="color"
+                                                value={editingRole.color || '#3b82f6'}
+                                                onChange={e => setEditingRole({ ...editingRole, color: e.target.value })}
+                                                className={`w-12 h-12 p-1 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl cursor-pointer`}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={editingRole.color || '#3b82f6'}
+                                                onChange={e => setEditingRole({ ...editingRole, color: e.target.value })}
+                                                className={`${theme.components.inputField} flex-1 font-mono`}
+                                                pattern="^#[0-9A-Fa-f]{6}$"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h4 className={`font-bold ${theme.colors.textPrimary} text-sm border-b ${theme.colors.borderFaint} pb-2`}>Permissions</h4>
+                                    <PermissionSelector
+                                        groups={PROJECT_PERMISSION_GROUPS}
+                                        selectedPermissions={editingRole.permissions || []}
+                                        onChange={(perms) => setEditingRole({ ...editingRole, permissions: perms })}
+                                        variant="card"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className={theme.components.modalFooter}>
+                                <button type="button" onClick={() => { setRoleModalOpen(false); setEditingRole(null); }} className={theme.components.buttonSecondary}>Cancel</button>
+                                <button type="submit" className={theme.components.buttonPrimary}>Save Role</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body)}
+            {showSlugPrompt && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className={`bg-white dark:bg-modtale-card border ${theme.colors.border} rounded-xl w-full max-w-md shadow-2xl overflow-hidden relative z-[110]`}>
+                        <button onClick={() => setShowSlugPrompt(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="p-6 text-center bg-blue-500/10">
+                            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-blue-500 text-white">
+                                <Info className="w-8 h-8" />
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Choose a Custom Slug?</h2>
+                            <p className="text-slate-600 dark:text-slate-300">Your project can use a cleaner URL if you set a custom slug before submitting. You can still submit without one.</p>
+                        </div>
+                        <div className="p-4 flex justify-center gap-3">
+                            <button
+                                type="button"
+                                onClick={handleSetCustomSlug}
+                                className="px-6 py-3 rounded-lg font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                            >
+                                Set Custom Slug
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setShowSlugPrompt(false); handleSubmit(); }}
+                                className="flex items-center gap-2 px-8 py-3 rounded-lg font-bold text-white transition-transform active:scale-95 bg-blue-600 hover:bg-blue-700"
+                            >
+                                Submit Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body)}
+            {editingVersion && editVersionData && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className={`bg-white dark:bg-modtale-card border ${theme.colors.border} rounded-xl w-full max-w-3xl shadow-2xl overflow-hidden relative z-[110] max-h-[90vh] overflow-y-auto`}>
+                        <button onClick={() => { if (!isSavingVersion) { setEditingVersion(null); setEditVersionData(null); } }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="p-6 border-b border-slate-200 dark:border-white/10">
+                            <h2 className={`text-2xl font-black ${theme.colors.textPrimary}`}>Edit Version</h2>
+                            <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{editingVersion.versionNumber}</p>
+                        </div>
+                        <div className="p-6">
+                            <VersionFields
+                                data={editVersionData}
+                                onChange={setEditVersionData}
+                                isModpack={isModpack}
+                                projectType={projectData.classification || 'PLUGIN'}
+                                hideFilePicker={true}
+                                currentProjectId={projectData.id}
+                            />
+                        </div>
+                        <div className="p-4 border-t border-slate-200 dark:border-white/10 flex justify-end gap-3">
+                            <button type="button" disabled={isSavingVersion} onClick={() => { setEditingVersion(null); setEditVersionData(null); }} className={`px-5 py-2.5 rounded-lg font-bold ${theme.colors.textSecondary} hover:bg-slate-100 dark:hover:bg-white/10 transition-colors`}>
+                                Cancel
+                            </button>
+                            <button type="button" disabled={isSavingVersion} onClick={handleSaveEditedVersion} className={theme.components.buttonPrimary}>
+                                {isSavingVersion ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : 'Save Version'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body)}
+            {showCardPreview && createPortal(
+                <div className={theme.components.modalOverlay} onClick={() => setShowCardPreview(false)}>
+                    <div
+                        className={`${theme.components.modalContent} w-full max-w-4xl`}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className={theme.components.modalHeader}>
+                            <div>
+                                <h3 className={`text-xl font-black ${theme.colors.textPrimary}`}>Project Card Preview</h3>
+                                <p className={`text-xs ${theme.colors.textMuted}`}>A larger look at how this card will appear in discovery.</p>
+                            </div>
+                            <button onClick={() => setShowCardPreview(false)} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-xl transition-colors`} aria-label="Close card preview">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className={`${theme.components.modalBody} !p-4 sm:!p-6`}>
+                            <div className="mx-auto w-full max-w-2xl">
+                                <div className="pointer-events-none select-none">
+                                    <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
                 document.body)}
 
             <ProjectLayout
@@ -301,7 +729,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <ExternalLink className="w-5 h-5" />
                         </Link>
 
-                        {projectData.status === 'DRAFT' && (
+                        {(projectData.status === 'DRAFT' || projectData.status === 'PRIVATE') && (
                             <div className="relative group">
                                 <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-4 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-50">
                                     <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-white/5 pb-2">
@@ -324,7 +752,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                     <div className="absolute top-full right-8 -mt-[3px] border-[8px] border-transparent border-t-white dark:border-t-slate-900" />
                                 </div>
 
-                                <button onClick={handleSubmit} disabled={isSaving || !isPublishable} className={`h-10 px-6 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isPublishable ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 shadow-none cursor-not-allowed'}`}>
+                                <button onClick={handleSubmitClick} disabled={isSaving || !isPublishable} className={`h-10 px-6 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isPublishable ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 shadow-none cursor-not-allowed'}`}>
                                     {isSaving ? <Spinner className="w-4 h-4 !p-0" fullScreen={false} /> : <Send className="w-4 h-4" />}
                                     Submit
                                 </button>
@@ -371,7 +799,36 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 {!readOnly && <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
                             </div>
                         )}
-                        <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} className={`text-lg ${theme.colors.textSecondary} font-medium bg-transparent border-b border-transparent outline-none w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Short summary..."/>
+                        <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} className={`text-lg ${theme.colors.textPrimary} font-medium bg-transparent border-b border-transparent outline-none w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Short summary..."/>
+                        {projectData.status === 'PENDING' && (
+                            <div className="mt-4 rounded-2xl border border-amber-300/70 dark:border-amber-400/30 bg-amber-50/90 dark:bg-amber-500/10 p-4">
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                        <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-300 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-bold text-amber-900 dark:text-amber-200">This project is pending review.</p>
+                                            <p className="text-xs font-medium text-amber-800/90 dark:text-amber-200/80 mt-1">Need to fix something before approval? Revert to draft to unlock editing and resubmit when ready.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={isStatusChanging}
+                                        onClick={() => setStatusModal({
+                                            type: 'warning',
+                                            title: 'Revert to Draft?',
+                                            message: 'This will move your pending submission back to draft so you can make edits.',
+                                            actionLabel: 'Revert to Draft',
+                                            secondaryLabel: 'Cancel',
+                                            onAction: handleRevertToDraft
+                                        })}
+                                        className="h-10 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <Undo2 className="w-4 h-4" />
+                                        Revert to Draft
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 }
                 tabs={
@@ -390,19 +847,35 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} />
                         )}
                         <SidebarSection title="Card Preview" icon={Eye}>
-                            <div className={`w-full max-w-[340px] mx-auto relative group cursor-pointer overflow-hidden rounded-2xl border ${theme.colors.border}`} onClick={() => setShowCardPreview(true)}>
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setShowCardPreview(true)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        setShowCardPreview(true);
+                                    }
+                                }}
+                                className={`w-full max-w-[340px] mx-auto relative group overflow-hidden rounded-2xl border ${theme.colors.border} text-left transition-all hover:shadow-lg hover:shadow-modtale-accent/10 focus:outline-none focus:ring-2 focus:ring-modtale-accent focus:ring-offset-2 dark:focus:ring-offset-slate-950`}
+                                aria-label="Expand project card preview"
+                            >
                                 <div className="pointer-events-none select-none">
                                     <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} />
+                                </div>
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent px-4 py-3 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                                    <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Click to expand</span>
+                                    <ExternalLink className="w-4 h-4" />
                                 </div>
                             </div>
                         </SidebarSection>
                         {!isModpack && (
                             <SidebarSection title="License" icon={Scale} defaultOpen={false}>
-                                <div className={`bg-slate-50 dark:bg-slate-950/50 border ${theme.colors.border} rounded-xl p-2 max-h-80 overflow-y-auto custom-scrollbar`}>
+                                <div className={`bg-slate-50 dark:bg-slate-950/50 border ${theme.colors.border} rounded-xl p-2 max-h-80 overflow-y-auto`}>
                                     {LICENSES.map(lic => (
                                         <button
                                             key={lic.id}
-                                            disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                            disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                             onClick={() => { markDirty(); setMetaData({ ...metaData, license: lic.id }); }}
                                             className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${metaData.license === lic.id ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                         >
@@ -411,7 +884,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                         </button>
                                     ))}
                                     <button
-                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                         onClick={() => { markDirty(); if (!metaData.license || LICENSES.some(l => l.id === metaData.license)) setMetaData({ ...metaData, license: '' }); }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between border-t ${theme.colors.border} mt-1 pt-2 ${isCustomLicense ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                     >
@@ -424,14 +897,14 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                                 value={metaData.license || ''}
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, license: e.target.value }); }}
                                                 placeholder="License Name"
-                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                                 className={`w-full ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs`}
                                             />
                                             <input
                                                 value={metaData.links.LICENSE || ''}
                                                 onChange={(e) => { markDirty(); setMetaData({ ...metaData, links: { ...metaData.links, LICENSE: e.target.value } }); }}
                                                 placeholder="License URL"
-                                                disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                                 className={`w-full ${theme.colors.bgSurfaceAlt} border rounded-lg px-3 py-2 text-xs font-mono transition-colors ${!metaData.links.LICENSE ? 'border-red-500 focus:border-red-500' : theme.colors.border}`}
                                             />
                                             {!metaData.links.LICENSE && (
@@ -446,7 +919,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <div className="flex flex-wrap gap-2">
                                 {GLOBAL_TAGS.map(tag => (
                                     <button
-                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                         key={tag}
                                         onClick={() => toggleTag(tag)}
                                         className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${metaData.tags.includes(tag) ? 'bg-modtale-accent text-white border-modtale-accent' : 'bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10'}`}
@@ -461,7 +934,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 {['WEBSITE', 'WIKI', 'ISSUE_TRACKER', 'DISCORD'].map(k => (
                                     <ThemedInput
                                         key={k}
-                                        disabled={readOnly || !hasProjectPermission('PROJECT_EDIT_METADATA')}
+                                        disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                         label={k.replace('_', ' ')}
                                         value={metaData.links[k] || ''}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -481,15 +954,33 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <EditDetails metaData={metaData} setMetaData={setMetaData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} editorMode={editorMode} setEditorMode={setEditorMode} markDirty={markDirty} />
                         )}
                         {activeTab === 'files' && (
-                            <Files projectData={projectData} versionData={versionData} setVersionData={setVersionData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} classification={projectData.classification || 'PLUGIN'} handleUploadVersion={handleUploadVersion} handleEditVersion={() => {}} isLoading={isSavingVersion} />
+                            <Files
+                                projectData={projectData}
+                                versionData={versionData}
+                                setVersionData={setVersionData}
+                                readOnly={readOnly}
+                                hasProjectPermission={hasProjectPermission}
+                                classification={projectData.classification || 'PLUGIN'}
+                                handleUploadVersion={handleUploadVersion}
+                                handleEditVersion={handleStartEditVersion}
+                                handleDeleteVersion={handleDeleteVersion}
+                                isLoading={isSavingVersion}
+                            />
                         )}
                         {activeTab === 'gallery' && (
-                            <Gallery
+                <Gallery
                                 projectData={projectData}
                                 readOnly={readOnly}
                                 hasProjectPermission={hasProjectPermission}
                                 handleGalleryDelete={handleGalleryDelete}
-                                handleGallerySelect={(f) => setGalleryCropImage(URL.createObjectURL(f))}
+                    handleGallerySelect={(f) => {
+                        if (isFileOverUploadLimit(f)) {
+                            onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
+                            return;
+                        }
+                        setGalleryCropImage(URL.createObjectURL(f));
+                        setGalleryCropFile(f);
+                    }}
                                 isLoading={isSaving}
                             />
                         )}
@@ -497,29 +988,29 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             <Team
                                 projectData={projectData}
                                 currentUser={currentUser}
-                                canInvite={true}
-                                canManageRoles={true}
-                                canRemove={true}
-                                inviteUsername=""
-                                inviteUserId=""
-                                setInviteUsername={() => {}}
-                                setInviteUserId={() => {}}
-                                inviteRoleId=""
-                                setInviteRoleId={() => {}}
-                                userSearchResults={[]}
-                                setUserSearchResults={() => {}}
-                                inviteRoleDropdownOpen={false}
-                                setInviteRoleDropdownOpen={() => {}}
-                                memberRoleDropdownOpen={null}
-                                setMemberRoleDropdownOpen={() => {}}
-                                setMemberToRemove={() => {}}
-                                handleInvite={() => {}}
+                                canInvite={canInvite}
+                                canManageRoles={canManageRoles}
+                                canRemove={canRemove}
+                                inviteUsername={inviteUsername}
+                                inviteUserId={inviteUserId}
+                                setInviteUsername={setInviteUsername}
+                                setInviteUserId={setInviteUserId}
+                                inviteRoleId={inviteRoleId}
+                                setInviteRoleId={setInviteRoleId}
+                                userSearchResults={userSearchResults}
+                                setUserSearchResults={setUserSearchResults}
+                                inviteRoleDropdownOpen={inviteRoleDropdownOpen}
+                                setInviteRoleDropdownOpen={setInviteRoleDropdownOpen}
+                                memberRoleDropdownOpen={memberRoleDropdownOpen}
+                                setMemberRoleDropdownOpen={setMemberRoleDropdownOpen}
+                                setMemberToRemove={handleRequestRemoveMember}
+                                handleInvite={handleInvite}
                                 handleRoleUpdate={handleRoleUpdate}
                                 handleCancelInvite={handleCancelInvite}
-                                setEditingRole={() => {}}
-                                setRoleModalOpen={() => {}}
-                                handleDeleteRole={() => {}}
-                                isInviting={false}
+                                setEditingRole={setEditingRole}
+                                setRoleModalOpen={setRoleModalOpen}
+                                handleDeleteRole={handleDeleteRole}
+                                isInviting={isInviting}
                                 contributors={contributors}
                             />
                         )}
@@ -532,10 +1023,11 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 readOnly={readOnly}
                                 hasProjectPermission={hasProjectPermission}
                                 handleRestore={() => confirmStatusTransition('PUBLISHED')}
+                                handlePrivate={() => confirmStatusTransition('PRIVATE')}
                                 handleUnlist={() => confirmStatusTransition('UNLISTED')}
                                 handleArchive={() => confirmStatusTransition('ARCHIVED')}
                                 slugError={slugError}
-                                handleSlugChange={() => {}}
+                                handleSlugChange={handleSlugChange}
                                 getUrlPrefix={() => `https://modtale.net/${SiteRoutes.getProjectPrefix(projectData.classification)}/`}
                                 markDirty={markDirty}
                                 isLoading={isStatusChanging}
