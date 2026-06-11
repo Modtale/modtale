@@ -131,4 +131,79 @@ describe('WikiSidebar', () => {
         expect(container.textContent).toContain('Install');
         expect(container.querySelector('button[aria-label="Collapse Guides"]')).not.toBeNull();
     });
+
+    it('does not let empty category pages navigate but keeps their collapse toggle', async () => {
+        const onNavigate = vi.fn();
+        const emptyCache = {
+            'guides': { title: 'Guides', content: '' }
+        };
+
+        await act(async () => {
+            root.render(
+                <WikiSidebar
+                    tree={tree}
+                    projectUrl="/mod/project"
+                    currentSlug="guides"
+                    onNavigate={onNavigate}
+                    pageCache={emptyCache}
+                />
+            );
+        });
+
+        const guidesButton = [...container.querySelectorAll('button')].find((node) => node.textContent === 'Guides');
+        expect(guidesButton).toBeUndefined();
+
+        const guidesDiv = [...container.querySelectorAll('div')].find((node) => node.textContent === 'Guides');
+        expect(guidesDiv).not.toBeNull();
+
+        const collapseButton = container.querySelector('button[aria-label="Collapse Guides"]');
+        expect(collapseButton).not.toBeNull();
+    });
+
+    it('does not let category pages navigate if they are missing from the cache entirely', async () => {
+        const onNavigate = vi.fn();
+
+        await act(async () => {
+            root.render(
+                <WikiSidebar
+                    tree={tree}
+                    projectUrl="/mod/project"
+                    currentSlug="guides"
+                    onNavigate={onNavigate}
+                    pageCache={{}}
+                />
+            );
+        });
+
+        const guidesButton = [...container.querySelectorAll('button')].find((node) => node.textContent === 'Guides');
+        expect(guidesButton).toBeUndefined();
+    });
+
+    it('lets category pages navigate if they have non-empty content', async () => {
+        const onNavigate = vi.fn();
+        const pageCache = {
+            'guides': { title: 'Guides', content: 'Some guides content' }
+        };
+
+        await act(async () => {
+            root.render(
+                <WikiSidebar
+                    tree={tree}
+                    projectUrl="/mod/project"
+                    currentSlug="guides"
+                    onNavigate={onNavigate}
+                    pageCache={pageCache}
+                />
+            );
+        });
+
+        const guidesButton = [...container.querySelectorAll('button')].find((node) => node.textContent === 'Guides');
+        expect(guidesButton).not.toBeNull();
+
+        await act(async () => {
+            guidesButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onNavigate).toHaveBeenCalledWith('guides');
+    });
 });

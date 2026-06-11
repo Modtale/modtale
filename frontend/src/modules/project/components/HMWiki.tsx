@@ -15,6 +15,14 @@ const nodeContainsDescendantSlug = (node: any, slug?: string): boolean => {
     ));
 };
 
+const isPageEmpty = (slug?: string, pageCache?: Record<string, any>): boolean => {
+    if (!pageCache) return false;
+    if (!slug) return true;
+    const page = pageCache[slug];
+    if (!page) return true;
+    return !page.content || typeof page.content !== 'string' || page.content.trim().length === 0;
+};
+
 const WikiNode: React.FC<{
     node: any;
     projectUrl: string;
@@ -23,8 +31,10 @@ const WikiNode: React.FC<{
     onNavigate?: (slug: string) => void;
     depth: number;
     isFirst: boolean;
-}> = ({ node, projectUrl, currentSlug, indexSlug, onNavigate, depth, isFirst }) => {
+    pageCache?: Record<string, any>;
+}> = ({ node, projectUrl, currentSlug, indexSlug, onNavigate, depth, isFirst, pageCache }) => {
     const hasChildren = node.children && node.children.length > 0;
+    const isCategoryEmpty = hasChildren && (!node.slug || isPageEmpty(node.slug, pageCache));
     const isActive = currentSlug === node.slug || (!currentSlug && (indexSlug === node.slug || (isFirst && depth === 0 && node.slug)));
     const hasActiveDescendant = useMemo(() => hasChildren && nodeContainsDescendantSlug(node, currentSlug), [node, currentSlug, hasChildren]);
     const [isOpen, setIsOpen] = useState(true);
@@ -51,12 +61,16 @@ const WikiNode: React.FC<{
         return (
             <li key={node.id}>
                 <div className={`flex items-stretch gap-2 ${depth > 0 ? 'mt-2' : ''}`}>
-                    {node.slug ? (
+                    {node.slug && !isCategoryEmpty ? (
                         onNavigate ? (
                             <button type="button" onClick={navigateToNode} className={`flex-1 ${className}`}>{node.title}</button>
                         ) : (
                             <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} className={`flex-1 ${className}`}>{node.title}</Link>
                         )
+                    ) : node.slug ? (
+                        <div className={`flex-1 px-3 py-2 text-sm font-medium ${theme.colors.textMuted}`}>
+                            <span className="truncate pr-2 block">{node.title}</span>
+                        </div>
                     ) : (
                         <div className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest ${theme.colors.textMuted}`}>
                             <span className="truncate pr-2 block">{node.title}</span>
@@ -75,7 +89,7 @@ const WikiNode: React.FC<{
                 {isBranchOpen && (
                     <ul className={`space-y-1 mt-1 ml-3 pl-3 border-l ${theme.colors.border}`}>
                         {node.children.map((child: any) => (
-                            <WikiNode key={child.id} node={child} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={depth + 1} isFirst={false} />
+                            <WikiNode key={child.id} node={child} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={depth + 1} isFirst={false} pageCache={pageCache} />
                         ))}
                     </ul>
                 )}
@@ -94,13 +108,13 @@ const WikiNode: React.FC<{
     );
 };
 
-export const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate }) => {
+export const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void, pageCache?: Record<string, any> }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate, pageCache }) => {
     if (!tree || tree.length === 0) return null;
     return (
         <SidebarSection title="Wiki Navigation" icon={BookOpen} defaultOpen={true}>
             <ul className="space-y-1">
                 {tree.map((p, idx) => (
-                    <WikiNode key={p.id} node={p} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={0} isFirst={idx === 0} />
+                    <WikiNode key={p.id} node={p} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={0} isFirst={idx === 0} pageCache={pageCache} />
                 ))}
             </ul>
         </SidebarSection>
