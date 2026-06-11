@@ -11,7 +11,7 @@ export const generateWebsiteSchema = () => ({
     '@type': 'WebSite',
     name: 'Modtale',
     url: `${SITE_URL}/`,
-    description: 'Community hub for Hytale mods, Hytale plugins, and Hytale modding projects.',
+    description: 'Community hub for Hytale mods, Hytale plugins, and Hytale modpacks.',
     potentialAction: {
         '@type': 'SearchAction',
         target: `${SITE_URL}/mods?q={search_term_string}`,

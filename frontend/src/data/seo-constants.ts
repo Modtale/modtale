@@ -53,8 +53,8 @@ export const UTILITY_NOINDEX_EXACT_PATHS = new Set([
 export const UTILITY_NOINDEX_PREFIXES = ['/dashboard'];
 
 export const DEFAULT_SEO = {
-    title: 'Hytale Mods, Plugins & Modding Projects | Modtale',
-    description: 'Discover Hytale mods, Hytale plugins, modpacks, worlds, and creator tools. Modtale is the community hub for browsing, downloading, and publishing Hytale modding projects.',
+    title: 'Hytale Mods, Plugins & Modpacks | Modtale',
+    description: 'Discover Hytale mods, Hytale plugins, modpacks, worlds, and creator tools. Modtale is the community hub for browsing, downloading, and publishing Hytale modpacks.',
     keywords: 'hytale mods, hytale mod, hytale modding, hytale plugins, hytale modpacks, hytale worlds, hytale assets, modtale',
 };
 
@@ -107,16 +107,16 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             },
             {
                 question: 'Is Modtale useful for Hytale modding creators?',
-                answer: 'Yes. Modtale is designed for both players and creators, with upload flows, versioned releases, project pages, changelogs, and sharable links for Hytale modding projects.',
+                answer: 'Yes. Modtale is designed for both players and creators, with upload flows, versioned releases, project pages, changelogs, and sharable links for Hytale modpacks.',
             },
         ],
     },
     '/mods': {
-        title: 'Hytale Mods | Browse Hytale Mods and Modding Projects | Modtale',
+        title: 'Hytale Mods | Browse Hytale Mods and Modpacks | Modtale',
         h1: 'Hytale Mods',
-        description: 'Browse Hytale mods and related modding projects on Modtale. Discover gameplay changes, server plugins, data assets, art assets, save files, and fresh community releases.',
+        description: 'Browse Hytale mods and related modpacks on Modtale. Discover gameplay changes, server plugins, data assets, art assets, save files, and fresh community releases.',
         keywords: 'hytale mods, hytale mod, download hytale mods, best hytale mods, hytale modding, hytale addons, modtale mods',
-        intro: 'Browse Hytale mods and modding projects in one place. Modtale brings together gameplay packs, creator tools, server plugins, save files, and asset-driven releases for every kind of Hytale player.',
+        intro: 'Browse Hytale mods and modpacks in one place. Modtale brings together gameplay packs, creator tools, server plugins, save files, and asset-driven releases for every kind of Hytale player.',
         contentBlocks: [
             {
                 title: 'More Than a Single Hytale Mod List',
@@ -373,7 +373,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             },
             {
                 title: 'Built to Work with the Rest of Modtale',
-                body: 'Because data assets often complement plugins, worlds, or broader modding projects, Modtale keeps them discoverable as a first-class category instead of burying them under generic downloads.',
+                body: 'Because data assets often complement plugins, worlds, or broader modpacks, Modtale keeps them discoverable as a first-class category instead of burying them under generic downloads.',
             },
         ],
         relatedLinks: [
@@ -399,7 +399,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             },
             {
                 question: 'Do Hytale data assets work with other Modtale categories?',
-                answer: 'Yes. Data assets often complement plugins, worlds, and broader Hytale modding projects, which is why Modtale keeps the category tightly connected to the rest of the platform.',
+                answer: 'Yes. Data assets often complement plugins, worlds, and broader Hytale modpacks, which is why Modtale keeps the category tightly connected to the rest of the platform.',
             },
         ],
     },
