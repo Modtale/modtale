@@ -181,7 +181,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                 {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
             </Helmet>
 
-            <main className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-2 pb-8 transition-[max-width] duration-300">
+            <main className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 pt-2 pb-8 transition-[max-width] duration-300">
                 <h1 className="sr-only">{seoContent.h1}</h1>
 
                 <div className="flex flex-col md:flex-row gap-8">

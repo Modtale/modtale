@@ -164,7 +164,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
         setTempImageFile(null);
     };
 
-    const containerClasses = "max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28";
+    const containerClasses = "max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
             {uploadError && (
