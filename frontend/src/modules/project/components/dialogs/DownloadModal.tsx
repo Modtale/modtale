@@ -38,6 +38,39 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     const forceShowPreReleaseGameVersions = hasPreReleaseGameVersionEntries && !hasReleaseGameVersionEntries;
 
+    const onlyExperimentalArePreRelease = useMemo(() => {
+        const hasExperimentalInPreRelease = Object.entries(versionsByGame).some(([gv, builds]) =>
+            preReleaseGameVersionSet.has(gv) && Array.isArray(builds) && builds.some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA')
+        );
+        const hasExperimentalInRelease = Object.entries(versionsByGame).some(([gv, builds]) =>
+            !preReleaseGameVersionSet.has(gv) && Array.isArray(builds) && builds.some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA')
+        );
+        return hasExperimentalInPreRelease && !hasExperimentalInRelease;
+    }, [versionsByGame, preReleaseGameVersionSet]);
+
+    const onlyPreReleaseAreExperimental = useMemo(() => {
+        const latestReleaseVer = orderedGameVersions.find(v => !preReleaseGameVersionSet.has(v));
+        const latestReleaseIdx = latestReleaseVer ? orderedGameVersions.indexOf(latestReleaseVer) : orderedGameVersions.length;
+        const newerPreReleaseVersions = orderedGameVersions.slice(0, latestReleaseIdx).filter(v => preReleaseGameVersionSet.has(v));
+
+        let hasPreReleaseBuilds = false;
+        let hasReleaseInPreRelease = false;
+
+        for (const [gv, builds] of Object.entries(versionsByGame)) {
+            if (newerPreReleaseVersions.includes(gv) && Array.isArray(builds)) {
+                if (builds.length > 0) {
+                    hasPreReleaseBuilds = true;
+                }
+                if (builds.some((v: any) => !v.channel || v.channel === 'RELEASE')) {
+                    hasReleaseInPreRelease = true;
+                }
+            }
+        }
+        return hasPreReleaseBuilds && !hasReleaseInPreRelease;
+    }, [versionsByGame, orderedGameVersions, preReleaseGameVersionSet]);
+
+    const effectiveShowPreReleaseGameVersions = showPreReleaseGameVersions || forceShowPreReleaseGameVersions || (showExperimental && onlyExperimentalArePreRelease);
+
     const gameVersions = useMemo(() => {
         const available = new Set(Object.keys(versionsByGame));
         const orderedAvailable = orderedGameVersions.filter(version => available.has(version));
@@ -46,9 +79,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             .filter(version => !orderedSet.has(version))
             .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
         const all = [...orderedAvailable, ...unordered];
-        if (showPreReleaseGameVersions) return all;
+        if (effectiveShowPreReleaseGameVersions) return all;
         return all.filter(version => !preReleaseGameVersionSet.has(version));
-    }, [versionsByGame, showPreReleaseGameVersions, preReleaseGameVersionSet, orderedGameVersions]);
+    }, [versionsByGame, effectiveShowPreReleaseGameVersions, preReleaseGameVersionSet, orderedGameVersions]);
 
     const gameVersionOptions = useMemo<DropdownOption[]>(
         () => gameVersions.map((version) => ({ value: version, label: version })),
@@ -71,11 +104,18 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         wasOpenRef.current = show;
     }, [show, gameVersions, selectedGameVer, preferredGameVersion]);
 
+    const currentVersions = versionsByGame[selectedGameVer] || [];
+    const hasReleaseForSelectedGameVersion = currentVersions.some((v: any) => !v.channel || v.channel === 'RELEASE');
+    const hasExperimentalForSelectedGameVersion = currentVersions.some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA');
+    const forceShowExperimental = hasExperimentalForSelectedGameVersion && !hasReleaseForSelectedGameVersion;
+
+    const effectiveShowExperimental = showExperimental || forceShowExperimental || (effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental);
+
     useEffect(() => {
         if (!show || !preferredGameVersion) return;
         setSelectedGameVer(preferredGameVersion);
         setIsListExpanded(false);
-    }, [showPreReleaseGameVersions, showExperimental, show, preferredGameVersion]);
+    }, [effectiveShowPreReleaseGameVersions, effectiveShowExperimental, show, preferredGameVersion]);
 
     useEffect(() => {
         if (forceShowPreReleaseGameVersions && !showPreReleaseGameVersions) {
@@ -85,11 +125,6 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     if (!show) return null;
 
-    const currentVersions = versionsByGame[selectedGameVer] || [];
-    const hasReleaseForSelectedGameVersion = currentVersions.some((v: any) => !v.channel || v.channel === 'RELEASE');
-    const hasExperimentalForSelectedGameVersion = currentVersions.some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA');
-    const forceShowExperimental = hasExperimentalForSelectedGameVersion && !hasReleaseForSelectedGameVersion;
-    const effectiveShowExperimental = showExperimental || forceShowExperimental;
     const visibleVersions = currentVersions.filter((v: any) => effectiveShowExperimental || (!v.channel || v.channel === 'RELEASE'));
 
     const sortedVersions = [...visibleVersions].sort((a: any, b: any) => {
@@ -125,18 +160,18 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
                     <div>
                         <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><Download className={`w-5 h-5 ${theme.colors.accent}`} /> Download</h3>
-                        {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && (
+                        {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && !(showExperimental && onlyExperimentalArePreRelease) && (
                             <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
-                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
-                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
+                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
+                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
                                 </div>
                                 <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Pre-Release Game Versions</span>
                             </div>
                         )}
-                        {hasExperimentalForSelectedGameVersion && hasReleaseForSelectedGameVersion && (
+                        {hasExperimentalForSelectedGameVersion && hasReleaseForSelectedGameVersion && !(effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental) && (
                             <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
-                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
-                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showExperimental ? 'translate-x-4' : ''}`} />
+                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
+                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowExperimental ? 'translate-x-4' : ''}`} />
                                 </div>
                                 <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
                             </div>
