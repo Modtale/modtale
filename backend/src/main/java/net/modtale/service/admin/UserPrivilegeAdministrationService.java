@@ -28,14 +28,7 @@ public class UserPrivilegeAdministrationService {
         this.adminAuditLogger = adminAuditLogger;
     }
 
-    public UserTierUpdateResponse setUserTier(String adminId, String userId, String tier) {
-        ApiKey.Tier tierEnum;
-        if ("USER".equalsIgnoreCase(tier) || "FREE".equalsIgnoreCase(tier)) {
-            tierEnum = ApiKey.Tier.USER;
-        } else {
-            tierEnum = ApiKey.Tier.valueOf(tier.toUpperCase());
-        }
-
+    public UserTierUpdateResponse setUserTier(String adminId, String userId, ApiKey.Tier tierEnum) {
         User user = requireUser(userId);
         user.setTier(tierEnum);
         userRepository.save(user);

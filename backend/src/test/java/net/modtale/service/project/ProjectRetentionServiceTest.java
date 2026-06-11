@@ -59,7 +59,7 @@ class ProjectRetentionServiceTest {
     void restoreValidatesTargetStatusBeforeDelegating() {
         Project project = project("project-1", ProjectStatus.DELETED);
 
-        service.restore(project, "unlisted");
+        service.restore(project, ProjectStatus.UNLISTED);
 
         verify(projectDeletionService).restore(project, ProjectStatus.UNLISTED);
     }
@@ -68,7 +68,7 @@ class ProjectRetentionServiceTest {
     void restoreSupportsPrivateStatus() {
         Project project = project("project-1", ProjectStatus.DELETED);
 
-        service.restore(project, "private");
+        service.restore(project, ProjectStatus.PRIVATE);
 
         verify(projectDeletionService).restore(project, ProjectStatus.PRIVATE);
     }
@@ -79,7 +79,7 @@ class ProjectRetentionServiceTest {
 
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.restore(project, "deleted")
+                () -> service.restore(project, ProjectStatus.DELETED)
         );
 
         assertEquals("Invalid status.", error.getMessage());

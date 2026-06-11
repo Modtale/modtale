@@ -1,17 +1,14 @@
 package net.modtale.service.project;
 
-import net.modtale.exception.InvalidVersionChannelException;
 import net.modtale.model.dto.project.ManifestInspectionResult;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.dto.request.project.UpdateVersionRequest;
-import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,7 +29,7 @@ public class VersionMutationApplicationService {
                 requestPayload.getChangelog(),
                 normalizeDependencyEntries(requestPayload.getModIds()),
                 normalizeProjectIds(requestPayload.getIncompatibleProjectIds()),
-                resolveChannel(requestPayload.getChannel()),
+                requestPayload.getChannel(),
                 currentUser
         );
     }
@@ -49,7 +46,7 @@ public class VersionMutationApplicationService {
                 normalizeProjectIds(requestPayload.getIncompatibleProjectIds()),
                 requestPayload.getGameVersions(),
                 requestPayload.getChangelog(),
-                resolveChannelOrNull(requestPayload.getChannel()),
+                requestPayload.getChannel(),
                 currentUser
         );
     }
@@ -80,21 +77,4 @@ public class VersionMutationApplicationService {
                 .collect(Collectors.toList());
     }
 
-    private ProjectVersion.Channel resolveChannelOrNull(String channel) {
-        if (channel == null) {
-            return null;
-        }
-        return resolveChannel(channel);
-    }
-
-    private ProjectVersion.Channel resolveChannel(String channel) {
-        if (channel == null || channel.isBlank()) {
-            return ProjectVersion.Channel.RELEASE;
-        }
-        try {
-            return ProjectVersion.Channel.valueOf(channel.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            throw new InvalidVersionChannelException("Version channels must be RELEASE, BETA, or ALPHA.");
-        }
-    }
 }

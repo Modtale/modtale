@@ -6,7 +6,6 @@ import net.modtale.model.user.User;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumSet;
-import java.util.Locale;
 
 @Service
 public class ProjectRetentionService {
@@ -51,25 +50,13 @@ public class ProjectRetentionService {
         projectDeletionService.hardDelete(project);
     }
 
-    public void restore(Project project, String targetStatus) {
+    public void restore(Project project, ProjectStatus targetStatus) {
         if (project.getStatus() != ProjectStatus.DELETED) {
             throw new IllegalArgumentException("Project not in a recoverable state.");
         }
-        projectDeletionService.restore(project, parseRestoreStatus(targetStatus));
-    }
-
-    private ProjectStatus parseRestoreStatus(String targetStatus) {
-        try {
-            ProjectStatus parsedStatus = ProjectStatus.valueOf(targetStatus.toUpperCase(Locale.ROOT));
-            if (!RESTORABLE_STATUSES.contains(parsedStatus)) {
-                throw new IllegalArgumentException("Invalid status.");
-            }
-            return parsedStatus;
-        } catch (IllegalArgumentException ex) {
-            if ("Invalid status.".equals(ex.getMessage())) {
-                throw ex;
-            }
-            throw new IllegalArgumentException("Invalid status.", ex);
+        if (targetStatus == null || !RESTORABLE_STATUSES.contains(targetStatus)) {
+            throw new IllegalArgumentException("Invalid status.");
         }
+        projectDeletionService.restore(project, targetStatus);
     }
 }

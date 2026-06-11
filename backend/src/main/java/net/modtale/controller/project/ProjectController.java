@@ -14,6 +14,8 @@ import net.modtale.model.dto.request.project.CreateProjectRequest;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.model.user.User;
 import net.modtale.service.project.GameVersionService;
 import net.modtale.service.project.LifecycleService;
@@ -92,8 +94,8 @@ public class ProjectController {
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "Size must be at least 1.") @Max(value = 100, message = "Size must be 100 or less.") int size,
             @RequestParam(defaultValue = "relevance")
             @Pattern(
-                    regexp = "(?i)relevance|downloads|updated|new|newest|favorites",
-                    message = "Sort must be relevance, downloads, updated, new, newest, or favorites."
+                    regexp = "(?i)relevance|downloads|updated|new|newest|favorites|popular|trending",
+                    message = "Sort must be relevance, downloads, updated, new, newest, favorites, popular, or trending."
             )
             String sort,
             @RequestParam(required = false) String gameVersion,
@@ -121,16 +123,20 @@ public class ProjectController {
 
         User currentUser = accountService.getCurrentUser(authentication);
         boolean apiKeyRequest = hasApiRole(authentication);
-        String effectiveCategory = apiKeyRequest ? null : category;
+        ProjectSort sortEnum = ProjectSort.fromQueryValue(sort);
+        ProjectViewCategory effectiveCategory = apiKeyRequest
+                ? ProjectViewCategory.ALL
+                : ProjectViewCategory.fromQueryValue(category);
+        ProjectClassification classificationEnum = classification != null ? resolveClassification(classification) : null;
 
         Page<Project> data = searchService.searchProjects(
                 tagList,
                 search,
                 page,
                 size,
-                sort,
+                sortEnum,
                 gameVersion,
-                classification,
+                classificationEnum,
                 minDownloads,
                 minFavorites,
                 effectiveCategory,
@@ -139,7 +145,7 @@ public class ProjectController {
                 currentUser
         );
 
-        CacheControl cacheControl = ("Favorites".equals(effectiveCategory) || "Your Projects".equals(effectiveCategory))
+        CacheControl cacheControl = effectiveCategory.isPersonalView()
                 ? CacheControl.noCache()
                 : CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
 
@@ -190,7 +196,7 @@ public class ProjectController {
     }
 
     @GetMapping("/meta/classifications")
-    public ResponseEntity<List<String>> getClassifications() {
+    public ResponseEntity<List<ProjectClassification>> getClassifications() {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(24, TimeUnit.HOURS).cachePublic())
                 .body(validationService.getAllowedClassifications());
@@ -220,7 +226,7 @@ public class ProjectController {
         Project project = lifecycleService.createDraft(
                 requestPayload.getTitle(),
                 requestPayload.getDescription(),
-                resolveClassification(requestPayload.getClassification()),
+                requestPayload.getClassification(),
                 user,
                 requestPayload.getOwner(),
                 requestPayload.getSlug()

@@ -43,7 +43,7 @@ class ReportControllerTest {
 
         CreateReportRequest request = new CreateReportRequest();
         request.setTargetId("project-1");
-        request.setTargetType("PROJECT");
+        request.setTargetType(Report.TargetType.PROJECT);
         request.setReason("Spam");
         request.setDescription("Repeated reposts");
 
@@ -63,7 +63,7 @@ class ReportControllerTest {
         Authentication authentication = mock(Authentication.class);
         CreateReportRequest request = new CreateReportRequest();
         request.setTargetId("project-1");
-        request.setTargetType("PROJECT");
+        request.setTargetType(Report.TargetType.PROJECT);
         request.setReason("Spam");
 
         when(accessControlService.isApiKey(authentication)).thenReturn(true);
@@ -78,7 +78,7 @@ class ReportControllerTest {
     void resolveReportDelegatesUsingTheCurrentAdminUser() {
         User admin = user("admin-1", "mod");
         ResolveReportRequest request = new ResolveReportRequest();
-        request.setStatus("RESOLVED");
+        request.setStatus(Report.ReportStatus.RESOLVED);
         request.setNote("Handled");
 
         when(accountService.requireCurrentUser("resolving reports")).thenReturn(admin);

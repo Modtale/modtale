@@ -6,6 +6,7 @@ import net.modtale.model.dto.admin.AdminProjectReviewDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.request.admin.RejectReasonRequest;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.User;
 import net.modtale.service.admin.ProjectAdminOperationsService;
 import net.modtale.service.admin.ProjectReviewAdminService;
@@ -124,7 +125,7 @@ public class ProjectManagementController {
 
     @PostMapping("/projects/{id}/restore")
     @PreAuthorize("@apiSecurity.isAdmin(authentication)")
-    public ResponseEntity<Void> restoreProject(@PathVariable String id, @RequestParam(defaultValue = "PUBLISHED") String status) {
+    public ResponseEntity<Void> restoreProject(@PathVariable String id, @RequestParam(defaultValue = "PUBLISHED") ProjectStatus status) {
         User currentUser = accountService.requireCurrentUser("restoring projects");
         projectAdminOperationsService.restoreProject(currentUser, id, status);
         return ResponseEntity.ok().build();
