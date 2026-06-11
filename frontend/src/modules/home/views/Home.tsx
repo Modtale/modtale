@@ -603,9 +603,9 @@ export const Home: React.FC<{
 
                         <div
                             ref={heroTextColumnRef}
-                            className={`home-hero-copy ${isDesktopHeroLayout ? 'home-hero-copy-desktop' : ''} flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start text-center lg:text-left lg:mx-0 lg:max-w-xl' : 'text-center lg:text-center lg:mx-auto lg:max-w-2xl'} w-full max-w-2xl 2xl:max-w-2xl justify-center mx-auto`}
+                            className={`home-hero-copy ${isDesktopHeroLayout ? 'home-hero-copy-desktop' : ''} flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start text-center lg:text-left lg:mx-0 lg:max-w-xl' : 'text-center lg:text-left lg:items-start lg:mx-0 lg:max-w-2xl'} w-full max-w-2xl 2xl:max-w-2xl justify-center mx-auto`}
                         >
-                            <div className="home-hero-copy-primary w-full flex flex-col items-center">
+                            <div className="home-hero-copy-primary w-full flex flex-col items-center lg:items-start">
                                 <div className="shrink-0">
                                     <img
                                         src="/assets/logo.svg"
@@ -627,18 +627,18 @@ export const Home: React.FC<{
                                     />
                                 </div>
 
-                                <h1 className={`text-4xl sm:text-5xl ${isDesktopHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6`}>
+                                <h1 className={`text-4xl sm:text-5xl ${isDesktopHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 lg:self-start`}>
                                     The Hytale<br />
                                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                         Community<br />Repository
                                     </span>
                                 </h1>
 
-                                <p className={`text-base sm:text-lg ${isDesktopHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-6 sm:mb-10 font-medium leading-relaxed`}>
+                                <p className={`text-base sm:text-lg ${isDesktopHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-6 sm:mb-10 font-medium leading-relaxed lg:self-start`}>
                                     Discover, download, and seamlessly share Hytale projects, worlds, plugins, asset packs, and modpacks.
                                 </p>
 
-                                <nav ref={heroActionsRef} aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto mb-6 sm:mb-10 2xl:mb-14">
+                                <nav ref={heroActionsRef} aria-label="Primary Actions" className="flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-4 w-full sm:w-auto mb-6 sm:mb-10 2xl:mb-14 lg:self-start">
                                     <Link
                                         to={SiteRoutes.browse()}
                                         className={`flex items-center justify-center px-6 ${isDesktopHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto ring-1 ring-blue-500 transform-gpu whitespace-nowrap`}

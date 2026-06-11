@@ -311,6 +311,18 @@ describe('Home fallback requests', () => {
             });
 
             expect(container.querySelector('.home-hero-copy-desktop')).toBeTruthy();
+
+            const heroCopy = container.querySelector('.home-hero-copy');
+            expect(heroCopy?.className).toContain('lg:text-left');
+            expect(heroCopy?.className).toContain('lg:mx-0');
+            expect(heroCopy?.className).not.toContain('lg:mx-auto');
+            expect(heroCopy?.className).toContain('lg:items-start');
+
+            const heroPrimary = container.querySelector('.home-hero-copy-primary');
+            expect(heroPrimary?.className).toContain('lg:items-start');
+
+            const heroActions = container.querySelector('[aria-label="Primary Actions"]');
+            expect(heroActions?.className).toContain('lg:items-start');
         } finally {
             restoreMeasurements();
         }
