@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { UserPlus, ChevronDown, Check, Shield, Trash2 } from 'lucide-react';
 import { theme } from '@/styles/theme';
+import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { Spinner } from '@/components/ui/Spinner';
-import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
 
 interface MembersProps {
@@ -19,7 +21,6 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
     const [members, setMembers] = useState<User[]>([]);
     const [invites, setInvites] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviteUserId, setInviteUserId] = useState('');
@@ -27,14 +28,13 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
     const [isInviting, setIsInviting] = useState(false);
 
     const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
-    const [inviteRoleDropdownOpen, setInviteRoleDropdownOpen] = useState(false);
     const [memberRoleDropdownOpen, setMemberRoleDropdownOpen] = useState<string | null>(null);
 
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
 
-    const canInvite = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_INVITE');
-    const canManageRoles = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_EDIT_ROLE');
-    const canRemove = hasOrgPermission(org, currentUser.id, 'ORG_MEMBER_REMOVE');
+    const canInvite = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_INVITE);
+    const canManageRoles = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_EDIT_ROLE);
+    const canRemove = hasOrgPermission(org, currentUser.id, Permission.ORG_MEMBER_REMOVE);
 
     const nonOwnerRoles = org.organizationRoles?.filter(r => !r.isOwner) || [];
     const hasRoles = nonOwnerRoles.length > 0;
@@ -48,8 +48,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
                 ]);
                 setMembers(m);
                 setInvites(i);
-            } catch (err) {
-                console.error(err);
+            } catch (err: unknown) {
+                showStatus('error', 'Member Load Failed', extractApiErrorMessage(err, 'We could not load this organization roster.'));
             } finally {
                 setLoading(false);
             }
@@ -75,7 +75,6 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
         e.preventDefault();
         if (!inviteUserId || !inviteRoleId) return;
         setIsInviting(true);
-        setError(null);
         try {
             await organizationClient.addMember(org.id, inviteUserId, inviteRoleId);
             setInvites(await organizationClient.getInvites(org.id));
@@ -83,8 +82,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
             setInviteUserId('');
             setUserSearchResults([]);
             showStatus('success', 'Invited', 'Member invitation sent successfully.');
-        } catch (err: any) {
-            setError(err.response?.data || "Failed to add member.");
+        } catch (err: unknown) {
+            showStatus('error', 'Invitation Failed', extractApiErrorMessage(err, 'We could not send that organization invite.'));
         } finally {
             setIsInviting(false);
         }
@@ -95,8 +94,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
             await organizationClient.updateMemberRole(org.id, userId, newRoleId);
             setMembers(await organizationClient.getMembers(org.id));
             showStatus('success', 'Updated', 'Member role updated.');
-        } catch (err: any) {
-            showStatus('error', 'Update Failed', err.response?.data || "Failed to update member role.");
+        } catch (err: unknown) {
+            showStatus('error', 'Role Update Failed', extractApiErrorMessage(err, 'We could not update that member role.'));
         }
     };
 
@@ -110,8 +109,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
                 setMembers(await organizationClient.getMembers(org.id));
                 showStatus('success', 'Removed', 'Member has been removed.');
             }
-        } catch (err: any) {
-            showStatus('error', 'Failed', err.response?.data || "Could not remove member.");
+        } catch (err: unknown) {
+            showStatus('error', 'Member Removal Failed', extractApiErrorMessage(err, 'We could not remove that member from the organization.'));
         } finally {
             setMemberToRemove(null);
         }
@@ -121,8 +120,8 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
         try {
             await organizationClient.cancelInvite(org.id, userId);
             setInvites(await organizationClient.getInvites(org.id));
-        } catch (err: any) {
-            showStatus('error', 'Cancel Failed', err.response?.data || "Could not cancel invite.");
+        } catch (err: unknown) {
+            showStatus('error', 'Invite Cancel Failed', extractApiErrorMessage(err, 'We could not cancel that pending invite.'));
         }
     };
 
@@ -130,11 +129,9 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            {(inviteRoleDropdownOpen || memberRoleDropdownOpen) && (
-                <div className="fixed inset-0 z-[90]" onClick={() => { setInviteRoleDropdownOpen(false); setMemberRoleDropdownOpen(null); }} />
+            {memberRoleDropdownOpen && (
+                <div className="fixed inset-0 z-[90]" onClick={() => { setMemberRoleDropdownOpen(null); }} />
             )}
-
-            {error && <ErrorBanner message={error} />}
 
             {memberToRemove && createPortal(
                 <StatusModal
@@ -181,31 +178,20 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
                             <div className="w-full md:w-64 relative z-[95]">
                                 <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role</label>
-                                <button type="button" onClick={() => setInviteRoleDropdownOpen(!inviteRoleDropdownOpen)} className={`${theme.components.inputField} flex justify-between items-center cursor-pointer`}>
-                                    {inviteRoleId ? (
-                                        <div className="flex items-center gap-2 truncate">
-                                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: nonOwnerRoles.find(r => r.id === inviteRoleId)?.color}} />
-                                            <span className="truncate">{nonOwnerRoles.find(r => r.id === inviteRoleId)?.name}</span>
-                                        </div>
-                                    ) : <span className={theme.colors.textMuted}>Select Role...</span>}
-                                    <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted} flex-shrink-0 transition-transform ${inviteRoleDropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
-
-                                {inviteRoleDropdownOpen && (
-                                    <div className={`absolute top-full left-0 right-0 mt-2 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95`}>
-                                        <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
-                                            {nonOwnerRoles.map(role => (
-                                                <button key={role.id} type="button" onClick={() => { setInviteRoleId(role.id); setInviteRoleDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2.5 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
-                                                    <div className="flex items-center gap-2 truncate">
-                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: role.color}} />
-                                                        <span className={`font-bold text-sm ${theme.colors.textPrimary} truncate`}>{role.name}</span>
-                                                    </div>
-                                                    {inviteRoleId === role.id && <Check className="w-4 h-4 text-modtale-accent flex-shrink-0" />}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                <DropdownSelect
+                                    value={inviteRoleId}
+                                    onChange={setInviteRoleId}
+                                    placeholder={<span className={theme.colors.textMuted}>Select Role...</span>}
+                                    options={nonOwnerRoles.map(role => ({
+                                        value: role.id,
+                                        label: role.name,
+                                        leftAdornment: <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />
+                                    }))}
+                                    containerClassName="relative"
+                                    buttonClassName={`${theme.components.inputField} w-full flex justify-between items-center cursor-pointer`}
+                                    menuClassName={`${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 left-0 right-0`}
+                                    optionClassName={`w-full flex items-center justify-between px-3 py-2.5 ${theme.colors.bgSurfaceHover} transition-colors text-left font-bold text-sm ${theme.colors.textPrimary}`}
+                                />
                             </div>
 
                             <button type="submit" disabled={!inviteUserId || !inviteRoleId || isInviting} className="w-full md:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg h-11">
@@ -273,7 +259,7 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
                                             {memberRoleDropdownOpen === member.id && (
                                                 <div className={`absolute right-0 top-full mt-2 w-48 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95`}>
-                                                    <div className="max-h-48 overflow-y-auto custom-scrollbar py-1">
+                                                    <div className="max-h-48 overflow-y-auto py-1">
                                                         {org.organizationRoles?.filter(r => !r.isOwner || isOwner || myRole?.isOwner).map(r => (
                                                             <button key={r.id} type="button" onClick={() => { handleRoleUpdate(member.id, r.id); setMemberRoleDropdownOpen(null); }} className={`w-full flex items-center justify-between px-3 py-2 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
                                                                 <div className="flex items-center gap-2 truncate">

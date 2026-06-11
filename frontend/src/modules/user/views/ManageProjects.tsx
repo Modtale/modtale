@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
 import { Building2, Plus, Users, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -8,6 +8,8 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
 import { TransferProjectModal } from '@/components/shared/TransferProjectModal';
 import { SiteRoutes } from '@/utils/routes';
+import { hasOrgPermission } from '@/modules/organization/api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 
 interface ManageProjectsProps {
     user: User;
@@ -58,8 +60,12 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 });
                 setOrgProjects(orgData);
 
-            } catch (e) {
-                console.error("Failed to load projects", e);
+            } catch (e: unknown) {
+                setStatus({
+                    type: 'error',
+                    title: 'Projects Unavailable',
+                    msg: extractApiErrorMessage(e, 'We could not load your project dashboard.')
+                });
             } finally {
                 setLoading(false);
             }
@@ -83,8 +89,8 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
 
             setDeleteModal(null);
             setStatus({ type: 'success', title: 'Deleted', msg: "Project deleted successfully." });
-        } catch (e) {
-            setStatus({ type: 'error', title: 'Delete Failed', msg: "Could not delete project." });
+        } catch (e: unknown) {
+            setStatus({ type: 'error', title: 'Delete Failed', msg: extractApiErrorMessage(e, 'We could not delete that project.') });
         }
     };
 
@@ -155,12 +161,14 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                             </h2>
                             <div className="grid grid-cols-1 gap-4">
                                 {pList.map(project => {
-                                    const isOrgAdmin = myOrgs.some(o => o.id === orgId && o.organizationMembers?.some(m => m.userId === user.id && m.roleId === 'ADMIN'));
+                                    const canManageOrgProject = myOrgs.some(o =>
+                                        o.id === orgId && hasOrgPermission(o, user.id, Permission.PROJECT_EDIT_METADATA)
+                                    );
                                     return (
                                         <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
                                             <ManagedProjectCard
                                                 project={project}
-                                                canManage={isOrgAdmin}
+                                                canManage={canManageOrgProject}
                                                 showAuthor={false}
                                                 onTransfer={setTransferModal}
                                                 onDelete={setDeleteModal}

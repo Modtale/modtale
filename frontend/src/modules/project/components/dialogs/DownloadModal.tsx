@@ -1,57 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight } from 'lucide-react';
+import { DropdownSelect, type DropdownOption } from '@/components/ui/DropdownSelect';
 import { theme } from '@/styles/theme';
 import { formatTimeAgo, compareSemVer } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
-
-const CustomDropdown = ({ options, value, onChange, placeholder }: any) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false); };
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, []);
-
-    return (
-        <div className="relative" ref={ref}>
-            <button
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all duration-300 ${isOpen ? "ring-2 ring-modtale-accent border-transparent" : ""}`}
-            >
-                <span>{value ? value : placeholder}</span>
-                <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted} transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isOpen && (
-                <div className={`absolute top-[calc(100%+8px)] left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 overflow-hidden max-h-60 overflow-y-auto custom-scrollbar`}>
-                    {options.length > 0 ? (
-                        options.map((opt: string) => (
-                            <button
-                                key={opt}
-                                type="button"
-                                onClick={() => {
-                                    onChange(opt);
-                                    setIsOpen(false);
-                                }}
-                                className={`w-full text-left px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate ${value === opt ? "text-modtale-accent bg-blue-50/50 dark:bg-blue-500/10" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
-                            >
-                                {opt}
-                            </button>
-                        ))
-                    ) : (
-                        <div className={`p-4 text-center ${theme.colors.textMuted} text-sm`}>
-                            No versions found
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
 
 interface DownloadModalProps {
     show: boolean;
@@ -59,7 +12,7 @@ interface DownloadModalProps {
     versionsByGame: Record<string, any[]>;
     preReleaseGameVersions?: string[];
     orderedGameVersions?: string[];
-    onDownload: (url: string, number: string, deps: any[], channel: string) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
@@ -72,15 +25,18 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     const [selectedGameVer, setSelectedGameVer] = useState<string>('');
     const [isListExpanded, setIsListExpanded] = useState(false);
     const [showPreReleaseGameVersions, setShowPreReleaseGameVersions] = useState(false);
+    const wasOpenRef = useRef(false);
     const preReleaseGameVersionSet = useMemo(() => new Set(preReleaseGameVersions), [preReleaseGameVersions]);
-
-    const hasExperimentalVersions = useMemo(() => {
-        return Object.values(versionsByGame).flat().some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA');
-    }, [versionsByGame]);
 
     const hasPreReleaseGameVersionEntries = useMemo(() => {
         return Object.entries(versionsByGame).some(([version, builds]) => preReleaseGameVersionSet.has(version) && Array.isArray(builds) && builds.length > 0);
     }, [versionsByGame, preReleaseGameVersionSet]);
+
+    const hasReleaseGameVersionEntries = useMemo(() => {
+        return Object.entries(versionsByGame).some(([version, builds]) => !preReleaseGameVersionSet.has(version) && Array.isArray(builds) && builds.length > 0);
+    }, [versionsByGame, preReleaseGameVersionSet]);
+
+    const forceShowPreReleaseGameVersions = hasPreReleaseGameVersionEntries && !hasReleaseGameVersionEntries;
 
     const gameVersions = useMemo(() => {
         const available = new Set(Object.keys(versionsByGame));
@@ -94,36 +50,47 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         return all.filter(version => !preReleaseGameVersionSet.has(version));
     }, [versionsByGame, showPreReleaseGameVersions, preReleaseGameVersionSet, orderedGameVersions]);
 
-    useEffect(() => {
-        if (show) {
-            if (gameVersions.length > 0 && (!selectedGameVer || !gameVersions.includes(selectedGameVer))) {
-                setSelectedGameVer(gameVersions[0]);
-            }
-        }
-    }, [show, gameVersions, selectedGameVer]);
+    const gameVersionOptions = useMemo<DropdownOption[]>(
+        () => gameVersions.map((version) => ({ value: version, label: version })),
+        [gameVersions]
+    );
+
+    const preferredGameVersion = useMemo(() => gameVersions[0] || '', [gameVersions]);
 
     useEffect(() => {
-        if (!hasPreReleaseGameVersionEntries) return;
-        const hasReleaseGameVersionEntries = Object.entries(versionsByGame).some(([version, builds]) => !preReleaseGameVersionSet.has(version) && Array.isArray(builds) && builds.length > 0);
-        if (!hasReleaseGameVersionEntries && !showPreReleaseGameVersions) {
+        const isOpening = show && !wasOpenRef.current;
+        const effectivePreferredGameVersion = preferredGameVersion || gameVersions[0] || '';
+
+        if (isOpening && effectivePreferredGameVersion) {
+            setSelectedGameVer(effectivePreferredGameVersion);
+            setIsListExpanded(false);
+        } else if (show && effectivePreferredGameVersion && !gameVersions.includes(selectedGameVer)) {
+            setSelectedGameVer(effectivePreferredGameVersion);
+        }
+
+        wasOpenRef.current = show;
+    }, [show, gameVersions, selectedGameVer, preferredGameVersion]);
+
+    useEffect(() => {
+        if (!show || !preferredGameVersion) return;
+        setSelectedGameVer(preferredGameVersion);
+        setIsListExpanded(false);
+    }, [showPreReleaseGameVersions, showExperimental, show, preferredGameVersion]);
+
+    useEffect(() => {
+        if (forceShowPreReleaseGameVersions && !showPreReleaseGameVersions) {
             setShowPreReleaseGameVersions(true);
         }
-    }, [hasPreReleaseGameVersionEntries, versionsByGame, preReleaseGameVersionSet, showPreReleaseGameVersions]);
-
-    useEffect(() => {
-        const currentVersions = versionsByGame[selectedGameVer] || [];
-        if (currentVersions.length > 0) {
-            const hasRelease = currentVersions.some((v: any) => !v.channel || v.channel === 'RELEASE');
-            if (!hasRelease && !showExperimental && hasExperimentalVersions) {
-                onToggleExperimental();
-            }
-        }
-    }, [selectedGameVer, versionsByGame, showExperimental, onToggleExperimental, hasExperimentalVersions]);
+    }, [forceShowPreReleaseGameVersions, showPreReleaseGameVersions]);
 
     if (!show) return null;
 
     const currentVersions = versionsByGame[selectedGameVer] || [];
-    const visibleVersions = currentVersions.filter((v: any) => showExperimental || (!v.channel || v.channel === 'RELEASE'));
+    const hasReleaseForSelectedGameVersion = currentVersions.some((v: any) => !v.channel || v.channel === 'RELEASE');
+    const hasExperimentalForSelectedGameVersion = currentVersions.some((v: any) => v.channel === 'ALPHA' || v.channel === 'BETA');
+    const forceShowExperimental = hasExperimentalForSelectedGameVersion && !hasReleaseForSelectedGameVersion;
+    const effectiveShowExperimental = showExperimental || forceShowExperimental;
+    const visibleVersions = currentVersions.filter((v: any) => effectiveShowExperimental || (!v.channel || v.channel === 'RELEASE'));
 
     const sortedVersions = [...visibleVersions].sort((a: any, b: any) => {
         const dateDiff = new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
@@ -147,13 +114,18 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20 text-white'
             : 'bg-modtale-accent hover:bg-blue-500 shadow-blue-500/20 text-white';
 
+    const otherCompatibleVersions = (ver: any) => {
+        const versions = Array.isArray(ver?.gameVersions) ? ver.gameVersions : [];
+        return versions.filter((gv: string) => gv !== selectedGameVer);
+    };
+
     return (
         <div className={theme.components.modalOverlay} onClick={onClose}>
             <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
                 <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
                     <div>
                         <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><Download className={`w-5 h-5 ${theme.colors.accent}`} /> Download</h3>
-                        {hasPreReleaseGameVersionEntries && (
+                        {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && (
                             <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
                                 <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                     <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
@@ -161,7 +133,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                 <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Pre-Release Game Versions</span>
                             </div>
                         )}
-                        {hasExperimentalVersions && (
+                        {hasExperimentalForSelectedGameVersion && hasReleaseForSelectedGameVersion && (
                             <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
                                 <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                     <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showExperimental ? 'translate-x-4' : ''}`} />
@@ -176,11 +148,16 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 <div className={`p-6 overflow-visible relative flex-1 flex flex-col justify-center`}>
                     <div className="mb-6">
                         <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Game Version</label>
-                        <CustomDropdown
-                            options={gameVersions}
+                        <DropdownSelect
+                            options={gameVersionOptions}
                             value={selectedGameVer}
                             onChange={setSelectedGameVer}
                             placeholder="Select Game Version"
+                            emptyLabel="No versions found"
+                            showSelectedCheck={false}
+                            buttonClassName="w-full flex items-center justify-between gap-3 p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all duration-300"
+                            menuClassName="left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 overflow-hidden"
+                            optionClassName="w-full flex items-center justify-between text-left px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                         />
                     </div>
 
@@ -188,7 +165,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         <>
                             <Link
                                 to="#"
-                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, latestVer.dependencies, latestVer.channel); }}
+                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, selectedGameVer, latestVer.dependencies, latestVer.channel); }}
                                 className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
                             >
                                 <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
@@ -196,6 +173,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                     v{latestVer.versionNumber}
                                     {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
                                 </div>
+                                {otherCompatibleVersions(latestVer).length > 0 && (
+                                    <div className="text-[11px] font-semibold text-blue-50/95 z-10">
+                                        Also supports: {otherCompatibleVersions(latestVer).join(', ')}
+                                    </div>
+                                )}
                             </Link>
 
                             <div className="relative mb-6">
@@ -224,11 +206,16 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                         {ver.channel !== 'RELEASE' && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
                                                     </div>
                                                     <div className={`text-xs ${theme.colors.textMuted}`}>{formatTimeAgo(ver.releaseDate)}</div>
+                                                    {otherCompatibleVersions(ver).length > 0 && (
+                                                        <div className={`text-[11px] ${theme.colors.textSecondary}`}>
+                                                            Also supports: {otherCompatibleVersions(ver).join(', ')}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             <Link
                                                 to="#"
-                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, ver.dependencies, ver.channel); }}
+                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, selectedGameVer, ver.dependencies, ver.channel); }}
                                                 className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
                                             >
                                                 <Download className="w-4 h-4" />
@@ -242,7 +229,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         <div className={`text-center py-12 ${theme.colors.textMuted} flex flex-col items-center gap-2`}>
                             <AlertCircle className="w-8 h-8 opacity-50" />
                             <p className="font-medium">No compatible versions found.</p>
-                            {!showExperimental && currentVersions.length > 0 && hasExperimentalVersions && (
+                            {!effectiveShowExperimental && currentVersions.length > 0 && hasExperimentalForSelectedGameVersion && hasReleaseForSelectedGameVersion && (
                                 <button type="button" onClick={onToggleExperimental} className={`text-xs ${theme.colors.accent} font-bold hover:underline`}>
                                     Show Beta/Alpha versions
                                 </button>

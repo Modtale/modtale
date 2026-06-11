@@ -14,25 +14,30 @@ interface Props {
     canonicalOverride?: string;
     pageNext?: string;
     pagePrev?: string;
+    projectBootstrapUrl?: string;
+    robots?: string;
 }
 
 const {
     title = DEFAULT_SEO.title,
     description = DEFAULT_SEO.description,
     keywords = DEFAULT_SEO.keywords,
-    image = "https://modtale.net/assets/favicon.svg",
+    image = 'https://modtale.net/assets/logo.svg',
     ogType = "website",
     jsonLd,
     initialData,
     canonicalOverride,
     pageNext,
-    pagePrev
+    pagePrev,
+    projectBootstrapUrl,
+    robots = 'index,follow'
 } = Astro.props;
 
 const canonicalUrl = canonicalOverride || new URL(Astro.url.pathname, "https://modtale.net").toString();
 
 const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
+const projectBootstrapUrlString = projectBootstrapUrl ? JSON.stringify(projectBootstrapUrl).replace(/</g, '\\u003c') : null;
 ---
 
 <!DOCTYPE html>
@@ -43,6 +48,8 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : 
     <title>{title}</title>
 
     <meta name="description" content={description} />
+    <meta name="robots" content={robots} />
+    <meta name="googlebot" content={robots} />
     <link rel="canonical" href={canonicalUrl} />
     {pageNext && <link rel="next" href={pageNext} />}
     {pagePrev && <link rel="prev" href={pagePrev} />}
@@ -52,43 +59,70 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : 
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={image} />
+    <meta property="og:image:alt" content={title} />
     <meta property="og:site_name" content="Modtale" />
+    <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
+    <meta name="twitter:image:alt" content={title} />
 
     <meta name="keywords" content={keywords} />
+    <meta name="application-name" content="Modtale" />
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#3b82f6" />
 
     <link rel="preconnect" href={BACKEND_URL} crossorigin />
     <link rel="dns-prefetch" href={BACKEND_URL} />
-    <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" media="print" onload="this.media='all'" />
-    <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" />
-    </noscript>
-
-    {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
+    {jsonLdString && <script is:inline type="application/ld+json" set:html={jsonLdString} />}
 
     <script is:inline set:html={`window.INITIAL_DATA = ${initialDataString};`}></script>
+    <script is:inline>
+        (function() {
+            if (typeof window === 'undefined') return;
+            const tt = window.trustedTypes;
+            if (!tt || typeof tt.createPolicy !== 'function') return;
+            try {
+                tt.createPolicy('default', {
+                    createHTML: (value) => value,
+                    createScript: (value) => value,
+                    createScriptURL: (value) => value
+                });
+            } catch (e) {}
+        })();
+    </script>
 
     <script is:inline>
         (function() {
             try {
-                const localTheme = localStorage.getItem('theme');
+                const localTheme = localStorage.getItem('modtale-theme');
                 if (localTheme === 'light') {
                     document.documentElement.classList.remove('dark');
                 }
             } catch (e) {}
         })();
     </script>
+    {projectBootstrapUrlString && (
+        <script is:inline set:html={`
+            (function() {
+                var url = ${projectBootstrapUrlString};
+                if (!url || typeof window === 'undefined' || window.__MODTALE_PROJECT_BOOTSTRAP) return;
+                window.__MODTALE_PROJECT_BOOTSTRAP_URL = url;
+                window.__MODTALE_PROJECT_BOOTSTRAP = fetch(url, {
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' }
+                }).then(function(response) {
+                    return response.ok ? response.json() : null;
+                }).catch(function() {
+                    return null;
+                });
+            })();
+        `} />
+    )}
 </head>
 <body>
 <slot />

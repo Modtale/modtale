@@ -4,10 +4,10 @@ import { SiteRoutes } from '@/utils/routes';
 import { createPortal } from 'react-dom';
 import { Plus, Building2, ArrowLeft, X, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
-import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { organizationClient } from '../api/organizationClient';
+import { extractApiErrorMessage } from '@/utils/api';
 
 import { Members } from '../tabs/Members';
 import { Roles } from '../tabs/Roles';
@@ -27,7 +27,6 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
     const [isCreating, setIsCreating] = useState(false);
     const [newOrgName, setNewOrgName] = useState('');
-    const [createError, setCreateError] = useState<string | null>(null);
 
     const [status, setStatus] = useState<{type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string} | null>(null);
 
@@ -35,8 +34,12 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         const fetchOrgs = async () => {
             try {
                 setOrgs(await organizationClient.getUserOrgs());
-            } catch (e) {
-                console.error(e);
+            } catch (e: unknown) {
+                setStatus({
+                    type: 'error',
+                    title: 'Organizations Unavailable',
+                    msg: extractApiErrorMessage(e, 'We could not load your organizations.')
+                });
             } finally {
                 setLoading(false);
             }
@@ -46,7 +49,6 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
     const handleCreateOrg = async (e: React.FormEvent) => {
         e.preventDefault();
-        setCreateError(null);
         try {
             const newOrg = await organizationClient.createOrg(newOrgName);
             setOrgs([...orgs, newOrg]);
@@ -54,8 +56,12 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
             setIsCreating(false);
             setSelectedOrg(newOrg);
             setActiveTab('MEMBERS');
-        } catch (err: any) {
-            setCreateError(err.response?.data || "Failed to create organization.");
+        } catch (err: unknown) {
+            setStatus({
+                type: 'error',
+                title: 'Organization Creation Failed',
+                msg: extractApiErrorMessage(err, 'We could not create that organization.')
+            });
         }
     };
 
@@ -97,7 +103,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             <p className={theme.colors.textMuted}>Manage organization settings and members</p>
                         </div>
                     </div>
-                    <Link to={SiteRoutes.creator(selectedOrg.username)} className={`flex items-center gap-2 px-4 py-2 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} hover:${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold shadow-sm`}>
+                    <Link to={SiteRoutes.creator(selectedOrg.id, selectedOrg.username)} className={`flex items-center gap-2 px-4 py-2 ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} hover:${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold shadow-sm`}>
                         <ExternalLink className="w-4 h-4" /> View Profile
                     </Link>
                 </div>
@@ -124,6 +130,10 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
 
     return (
         <div className="space-y-6 relative">
+            {status && createPortal(
+                <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />,
+                document.body
+            )}
             <div className="flex justify-between items-center mb-6">
                 <h1 className={`text-2xl font-black ${theme.colors.textPrimary}`}>Organizations</h1>
                 <button onClick={() => setIsCreating(true)} className={theme.components.buttonPrimary}>
@@ -138,7 +148,6 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                             <h3 className={`font-black text-xl ${theme.colors.textPrimary}`}>Create Organization</h3>
                             <button onClick={() => setIsCreating(false)} className={`text-slate-400 hover:${theme.colors.textPrimary} transition-colors`}><X className="w-5 h-5" /></button>
                         </div>
-                        {createError && <ErrorBanner message={createError} className="mb-4" />}
                         <form onSubmit={handleCreateOrg} className="flex flex-col gap-4">
                             <div className="space-y-1.5">
                                 <label className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest px-1`}>Organization Name</label>

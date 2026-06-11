@@ -1,7 +1,6 @@
 package net.modtale.model.dto.admin;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import net.modtale.model.dto.project.ProjectVersionSummaryDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
@@ -39,10 +38,9 @@ public record AdminProjectDTO(
         String expiresAt,
         LocalDateTime deletedAt,
         String approvedBy,
-        List<String> contributors,
         List<String> galleryImages,
         List<Project.ProjectRole> projectRoles,
         List<Project.ProjectMember> teamMembers,
         List<Project.ProjectMember> teamInvites,
-        List<ProjectVersionSummaryDTO> versions
+        List<AdminProjectVersionSummaryDTO> versions
 ) {}

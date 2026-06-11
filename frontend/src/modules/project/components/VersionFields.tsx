@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useDropzone, type Accept } from 'react-dropzone';
+import { useDropzone, type Accept, type FileRejection } from 'react-dropzone';
 import { UploadCloud, CheckCircle2, AlertCircle, ChevronDown, Check, Beaker, Zap, Loader2 } from 'lucide-react';
 import { Label, Input } from './FormShared';
 import type { VersionFormData } from './FormShared';
@@ -7,6 +7,9 @@ import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
 import type { ManifestDependencySuggestion } from '@/types';
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 
 const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
@@ -19,15 +22,17 @@ interface VersionFieldsProps {
     disabled?: boolean;
     hideFilePicker?: boolean;
     currentProjectId?: string;
+    previousDependencies?: any[];
 }
 
-export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], disabled, hideFilePicker = false, currentProjectId }) => {
+export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], disabled, hideFilePicker = false, currentProjectId, previousDependencies }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [availableGameVersions, setAvailableGameVersions] = useState<string[]>([]);
     const [loadingVersions, setLoadingVersions] = useState(false);
     const [manifestSuggestions, setManifestSuggestions] = useState<ManifestDependencySuggestion[]>([]);
     const [loadingManifestSuggestions, setLoadingManifestSuggestions] = useState(false);
     const [manifestSuggestionError, setManifestSuggestionError] = useState<string | null>(null);
+    const [fileError, setFileError] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -71,6 +76,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         if (!nextFile || disabled) return;
 
         onChange({ ...data, file: nextFile });
+        setFileError(null);
         setManifestSuggestions([]);
         setManifestSuggestionError(null);
 
@@ -81,10 +87,13 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             projectClient.inspectManifest(currentProjectId, nextFile)
                 .then((result) => {
                     const manifestGameVersion = result?.gameVersion?.trim();
+                    const manifestModVersion = result?.modVersion?.trim();
+                    const canApplyManifestVersion = !!manifestGameVersion && availableGameVersions.includes(manifestGameVersion);
                     onChange({
                         ...data,
                         file: nextFile,
-                        gameVersions: manifestGameVersion ? [manifestGameVersion] : data.gameVersions
+                        versionNumber: manifestModVersion || data.versionNumber,
+                        gameVersions: canApplyManifestVersion ? [manifestGameVersion] : data.gameVersions
                     });
                     setManifestSuggestions(result?.suggestions || []);
                 })
@@ -94,10 +103,20 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                 })
                 .finally(() => setLoadingManifestSuggestions(false));
         }
-    }, [data, onChange, disabled, projectType, currentProjectId]);
+    }, [data, onChange, disabled, projectType, currentProjectId, availableGameVersions]);
+
+    const onFileDropRejected = useCallback((rejections: FileRejection[]) => {
+        const tooLarge = rejections.some(r => r.errors.some(e => e.code === 'file-too-large'));
+        setFileError(tooLarge ? MAX_UPLOAD_ERROR_MESSAGE : 'Invalid file type. Please upload a supported file.');
+    }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop: onFileDrop, maxFiles: 1, accept: getAcceptTypes(), disabled: disabled
+        onDrop: onFileDrop,
+        onDropRejected: onFileDropRejected,
+        maxFiles: 1,
+        maxSize: MAX_UPLOAD_BYTES,
+        accept: getAcceptTypes(),
+        disabled: disabled
     });
 
     const toggleGameVersion = (ver: string) => {
@@ -129,30 +148,30 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         <div className={`space-y-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             {!isModpack && !hideFilePicker && (
                 <div>
-                    <Label required>Project File <span className={`${theme.colors.textMuted} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
+                    <Label required>Project File <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
                     <div
                         {...getRootProps()}
-                        className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all group ${
+                        className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all group shadow-sm ${
                             isDragActive
-                                ? `border-modtale-accent ${theme.colors.accentAlpha}`
+                                ? `border-modtale-accent bg-modtale-accent/5 dark:bg-modtale-accent/10 shadow-modtale-accent/10`
                                 : disabled
                                     ? `${theme.colors.border} ${theme.colors.bgSurface} cursor-not-allowed`
-                                    : `${theme.colors.border} ${theme.colors.bgSurface} hover:border-modtale-accent hover:${theme.colors.bgBase} cursor-pointer`
+                                    : `border-slate-300 dark:border-white/15 ${theme.colors.bgBase} hover:border-modtale-accent hover:shadow-md hover:shadow-modtale-accent/10 cursor-pointer`
                         }`}
                     >
                         <input {...getInputProps()} disabled={disabled} />
-                        <div className={`mb-4 w-12 h-12 mx-auto ${theme.colors.bgBase} rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform`}>
+                        <div className={`mb-4 w-12 h-12 mx-auto ${theme.colors.bgSurfaceAlt} rounded-full flex items-center justify-center ring-1 ${theme.colors.border} shadow-sm group-hover:scale-110 transition-transform`}>
                             <UploadCloud className={`w-6 h-6 ${theme.colors.accent}`} />
                         </div>
                         {data.file ? (
                             <div>
                                 <div className={`font-bold ${theme.colors.textPrimary} text-lg`}>{data.file.name}</div>
-                                <div className={`text-xs ${theme.colors.textMuted} font-mono mt-1 mb-2`}>{(data.file.size / 1024 / 1024).toFixed(2)} MB</div>
+                                <div className={`text-xs ${theme.colors.textSecondary} font-mono mt-1 mb-2`}>{(data.file.size / 1024 / 1024).toFixed(2)} MB</div>
                                 <div className={`inline-flex items-center gap-1 text-xs font-bold ${theme.colors.successText} ${theme.colors.successBg} px-2 py-0.5 rounded-full`}>
                                     <Check className="w-3 h-3" /> Ready
                                 </div>
                                 {loadingManifestSuggestions && (
-                                    <div className={`mt-2 text-xs ${theme.colors.textMuted} flex items-center justify-center gap-1`}>
+                                    <div className={`mt-2 text-xs ${theme.colors.textSecondary} flex items-center justify-center gap-1`}>
                                         <Loader2 className="w-3 h-3 animate-spin" /> Reading manifest.json...
                                     </div>
                                 )}
@@ -160,12 +179,19 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         ) : (
                             <div>
                                 <div className={`font-bold ${theme.colors.textPrimary}`}>Click or drag file here</div>
-                                <div className={`text-xs ${theme.colors.textMuted} mt-1`}>
+                                <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>
                                     {allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
                                 </div>
+                                <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>Maximum file size: 100MB</div>
                             </div>
                         )}
                     </div>
+                    {fileError && (
+                        <div className={`mt-3 p-3 rounded-xl border ${theme.colors.dangerBorder} ${theme.colors.dangerBg} ${theme.colors.dangerText} text-xs font-bold flex items-start gap-2`}>
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>{fileError}</span>
+                        </div>
+                    )}
                     {manifestSuggestionError && (
                         <div className={`mt-3 p-3 rounded-xl border ${theme.colors.dangerBorder} ${theme.colors.dangerBg} ${theme.colors.dangerText} text-xs font-bold flex items-start gap-2`}>
                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -180,7 +206,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                     <div className="flex justify-between items-center mb-2">
                         <Label required>Version Number</Label>
                         {versionNum.length > 0 && !disabled && (
-                            <span className={`text-[10px] font-bold uppercase flex items-center gap-1 px-2 py-0.5 rounded ${isValid ? `${theme.colors.successText} ${theme.colors.successBg}` : `${theme.colors.dangerText} ${theme.colors.dangerBg}`}`}>
+                            <span className={`text-[10px] font-bold uppercase flex items-center gap-1 px-2 py-0.5 rounded border ${isValid ? `${theme.colors.successText} ${theme.colors.successBg} border-emerald-200 dark:border-emerald-500/20` : `${theme.colors.dangerText} ${theme.colors.dangerBg} border-red-200 dark:border-red-500/20`}`}>
                                 {isValid ? <><CheckCircle2 className="w-3 h-3" /> Valid</> : <><AlertCircle className="w-3 h-3" /> {isDuplicate ? 'Duplicate' : 'Invalid Format'}</>}
                             </span>
                         )}
@@ -192,7 +218,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         placeholder="e.g. 1.0.0"
                         className={`font-mono font-bold ${versionNum.length > 0 && !isValid && !disabled ? 'border-red-500 focus:ring-red-500' : ''}`}
                     />
-                    <p className={`text-[10px] ${theme.colors.textMuted} mt-1.5 ml-1`}>Must be unique and follow SemVer format (e.g. 1.0.0, 1.0.0-beta+exp).</p>
+                    <p className={`text-[10px] ${theme.colors.textSecondary} mt-1.5 ml-1`}>Must be unique and follow SemVer format (e.g. 1.0.0, 1.0.0-beta+exp).</p>
                 </div>
 
                 <div ref={dropdownRef}>
@@ -202,12 +228,12 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                             type="button"
                             disabled={disabled}
                             onClick={() => !disabled && setDropdownOpen(!dropdownOpen)}
-                            className={`w-full ${theme.colors.bgSurface} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none transition-all text-left flex justify-between items-center ${disabled ? 'cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent'}`}
+                            className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none transition-all text-left flex justify-between items-center shadow-sm ${disabled ? 'cursor-not-allowed opacity-70' : 'hover:border-modtale-accent focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent'}`}
                         >
-                            <span className={data.gameVersions?.length > 0 ? `${theme.colors.textPrimary} font-medium` : theme.colors.textMuted}>
+                            <span className={data.gameVersions?.length > 0 ? `${theme.colors.textPrimary} font-medium` : theme.colors.textSecondary}>
                                 {loadingVersions ? "Loading..." : data.gameVersions && data.gameVersions.length > 0 ? `${data.gameVersions.length} selected` : "Select Versions..."}
                             </span>
-                            {loadingVersions ? <Loader2 className={`w-4 h-4 ${theme.colors.textMuted} animate-spin`} /> : <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted}`} />}
+                            {loadingVersions ? <Loader2 className={`w-4 h-4 ${theme.colors.textSecondary} animate-spin`} /> : <ChevronDown className={`w-4 h-4 ${theme.colors.textSecondary}`} />}
                         </button>
                         {dropdownOpen && !disabled && !loadingVersions && (
                             <div className={`absolute top-full mt-1 left-0 w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100`}>
@@ -228,7 +254,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                     {data.gameVersions?.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                             {data.gameVersions.map(v => (
-                                <span key={v} className={`text-[10px] font-bold px-2 py-1 ${theme.colors.bgSurfaceAlt} rounded ${theme.colors.textSecondary}`}>{v}</span>
+                                <span key={v} className={`text-[10px] font-bold px-2 py-1 ${theme.colors.bgSurfaceAlt} rounded ${theme.colors.textPrimary}`}>{v}</span>
                             ))}
                         </div>
                     )}
@@ -262,7 +288,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             {projectType !== 'SAVE' && !isModpack && (
                 <div className="mt-4">
                     <Label>Dependencies</Label>
-                    <p className={`text-xs ${theme.colors.textMuted} mb-2`}>Does your project require other projects to work?</p>
+                    <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Does your project require other projects to work?</p>
                     {manifestSuggestions.length > 0 && (
                         <div className="mb-4 p-4 rounded-xl border border-blue-200 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/10">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -304,7 +330,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             {isModpack && (
                 <div className="mt-4">
                     <Label required>Included Projects</Label>
-                    <p className={`text-xs ${theme.colors.textMuted} mb-2`}>Select the projects to include in this modpack version.</p>
+                    <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Select the projects to include in this modpack version.</p>
                     <DependencySelector
                         selectedDeps={data.projectIds || []}
                         onChange={(deps) => onChange({ ...data, projectIds: deps })}
@@ -319,14 +345,14 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             <div>
                 <div className="flex justify-between items-center mb-2">
                     <Label>Changelog</Label>
-                    <span className={`text-[10px] uppercase font-bold ${theme.colors.textMuted} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded border ${theme.colors.border}`}>Markdown Only</span>
+                    <span className={`text-[10px] uppercase font-bold ${theme.colors.textSecondary} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded border ${theme.colors.border}`}>Markdown Only</span>
                 </div>
                 <textarea
                     value={data.changelog}
                     disabled={disabled}
                     onChange={e => onChange({...data, changelog: e.target.value})}
                     rows={6}
-                    className={`w-full ${theme.colors.bgSurface} border ${theme.colors.border} rounded-xl px-4 py-3 font-mono text-sm outline-none transition-all placeholder:text-slate-400 dark:text-white ${disabled ? 'cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent'}`}
+                    className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 font-mono text-sm outline-none transition-all placeholder:text-slate-400 dark:text-white shadow-sm ${disabled ? 'cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent hover:border-modtale-accent'}`}
                     placeholder="- Fixed bugs&#10;- Added new items"
                 />
             </div>

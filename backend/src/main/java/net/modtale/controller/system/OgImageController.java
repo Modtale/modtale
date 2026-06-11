@@ -3,12 +3,14 @@ package net.modtale.controller.system;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.weisj.jsvg.SVGDocument;
+import com.github.weisj.jsvg.parser.LoaderContext;
 import com.github.weisj.jsvg.parser.SVGLoader;
 import jakarta.servlet.http.HttpServletRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
-import net.modtale.model.project.ProjectStatus;
 import net.modtale.service.project.ProjectService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -27,16 +29,23 @@ import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/v1/og")
 public class OgImageController {
+
+    private static final Logger logger = LoggerFactory.getLogger(OgImageController.class);
 
     private final ProjectService ProjectService;
     private final Cache<String, CachedRender> renderCache;
@@ -58,9 +67,12 @@ public class OgImageController {
     private static final int CARD_ARC = 48;
     private static final int PROJECT_PADDING = 70;
     private static final int ICON_SIZE = 210;
-    private static final int STAT_VALUE_FONT_SIZE = 28;
+    private static final int STAT_VALUE_FONT_SIZE = 26;
     private static final int STAT_GAP = 60;
+    private static final int STAT_TEXT_X_OFFSET = 10;
     private static final int LOGO_HEIGHT = 28;
+    private static final int SVG_FALLBACK_SIZE = 1024;
+    private static final int SVG_MAX_RENDER_SIZE = 2048;
 
     private static final String LOGO_SVG = """
         <svg
@@ -101,7 +113,11 @@ public class OgImageController {
                 .build();
 
         SVGLoader loader = new SVGLoader();
-        this.logoDocument = loader.load(new ByteArrayInputStream(LOGO_SVG.getBytes(StandardCharsets.UTF_8)));
+        this.logoDocument = loader.load(
+                new ByteArrayInputStream(LOGO_SVG.getBytes(StandardCharsets.UTF_8)),
+                URI.create("memory:modtale-logo.svg"),
+                LoaderContext.createDefault()
+        );
     }
 
     private static class CachedRender {
@@ -114,9 +130,9 @@ public class OgImageController {
         }
     }
 
-    @GetMapping(value = {"/project/{identifier}", "/project/{identifier}.png", "/project/{identifier}.jpg", "/project/{identifier}.jpeg"})
+    @GetMapping(value = {"/project/{id}", "/project/{id}.png", "/project/{id}.jpg", "/project/{id}.jpeg"})
     public ResponseEntity<ByteArrayResource> generateOgImage(
-            @PathVariable String identifier,
+            @PathVariable String id,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
             HttpServletRequest request
     ) {
@@ -126,7 +142,7 @@ public class OgImageController {
             String formatName = isJpg ? "jpg" : "png";
             MediaType mediaType = isJpg ? MediaType.IMAGE_JPEG : MediaType.IMAGE_PNG;
 
-            Project project = ProjectService.getProjectById(identifier);
+            Project project = ProjectService.getProjectById(id);
             if (project == null) return ResponseEntity.notFound().build();
 
             String versionKey = generateEtag(project);
@@ -159,7 +175,12 @@ public class OgImageController {
 
             return serveImage(imageBytes, versionKey, mediaType);
 
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("OG image generation interrupted for project={}", id, e);
+            return ResponseEntity.internalServerError().build();
+        } catch (ExecutionException | TimeoutException | IOException | RuntimeException e) {
+            logger.warn("OG image generation failed for project={}", id, e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -176,7 +197,7 @@ public class OgImageController {
                 hexString.append(hex);
             }
             return "\"" + hexString + "\"";
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException e) {
             return "\"" + project.getId() + "_" + System.currentTimeMillis() + "\"";
         }
     }
@@ -204,18 +225,84 @@ public class OgImageController {
             connection.connect();
 
             try (var is = connection.getInputStream()) {
-                BufferedImage img = ImageIO.read(is);
+                String contentType = connection.getContentType();
+                byte[] data = is.readAllBytes();
+                BufferedImage img = decodeFetchedImage(data, contentType, fetchUrl);
                 if (img != null) {
                     assetCache.put(url, img);
                 }
                 return img;
             }
-        } catch (Exception e) {
+        } catch (IOException | IllegalArgumentException e) {
+            logger.debug("Failed to fetch OG asset from {}", url, e);
             return null;
         }
     }
 
-    private byte[] renderImage(Project project, BufferedImage banner, BufferedImage icon, String format, boolean isJpg) throws Exception {
+    private BufferedImage decodeFetchedImage(byte[] data, String contentType, String sourceUrl) {
+        if (data == null || data.length == 0) return null;
+
+        try {
+            BufferedImage raster = ImageIO.read(new ByteArrayInputStream(data));
+            if (raster != null) return raster;
+        } catch (IOException | RuntimeException ex) {
+            logger.debug("Failed to decode fetched raster image from {}", sourceUrl, ex);
+        }
+
+        if (!isSvgPayload(data, contentType, sourceUrl)) return null;
+
+        try {
+            SVGLoader loader = new SVGLoader();
+            SVGDocument document = loader.load(
+                    new ByteArrayInputStream(data),
+                    URI.create("memory:fetched-image.svg"),
+                    LoaderContext.createDefault()
+            );
+            if (document == null || document.size() == null) return null;
+
+            double sourceWidth = document.size().width;
+            double sourceHeight = document.size().height;
+            if (!Double.isFinite(sourceWidth) || sourceWidth <= 0) sourceWidth = SVG_FALLBACK_SIZE;
+            if (!Double.isFinite(sourceHeight) || sourceHeight <= 0) sourceHeight = SVG_FALLBACK_SIZE;
+
+            int width = resolveSvgDimension(sourceWidth, SVG_FALLBACK_SIZE);
+            int height = resolveSvgDimension(sourceHeight, SVG_FALLBACK_SIZE);
+
+            if (width > SVG_MAX_RENDER_SIZE || height > SVG_MAX_RENDER_SIZE) {
+                double scale = Math.min((double) SVG_MAX_RENDER_SIZE / width, (double) SVG_MAX_RENDER_SIZE / height);
+                width = Math.max(1, (int) Math.round(width * scale));
+                height = Math.max(1, (int) Math.round(height * scale));
+            }
+
+            BufferedImage svgImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D svgG = svgImage.createGraphics();
+            setupRenderingHints(svgG);
+            svgG.scale((double) width / sourceWidth, (double) height / sourceHeight);
+            document.render(null, svgG);
+            svgG.dispose();
+            return svgImage;
+        } catch (RuntimeException ex) {
+            logger.debug("Failed to render fetched SVG from {}", sourceUrl, ex);
+            return null;
+        }
+    }
+
+    private boolean isSvgPayload(byte[] data, String contentType, String sourceUrl) {
+        if (contentType != null && contentType.toLowerCase().contains("image/svg+xml")) return true;
+        if (sourceUrl != null && sourceUrl.toLowerCase().contains(".svg")) return true;
+
+        String prefix = new String(data, 0, Math.min(data.length, 256), StandardCharsets.UTF_8)
+                .trim()
+                .toLowerCase();
+        return prefix.startsWith("<svg") || prefix.startsWith("<?xml");
+    }
+
+    private int resolveSvgDimension(double value, int fallback) {
+        if (!Double.isFinite(value) || value <= 0) return fallback;
+        return Math.max(1, (int) Math.round(value));
+    }
+
+    private byte[] renderImage(Project project, BufferedImage banner, BufferedImage icon, String format, boolean isJpg) throws IOException {
         int width = 1200;
         int height = 950;
 
@@ -279,7 +366,9 @@ public class OgImageController {
                 g2d.drawImage(banner, x + (w - scaledW) / 2, y + (headerH - scaledH) / 2, scaledW, scaledH, null);
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
             }
-        } catch (Exception ignored) {}
+        } catch (RuntimeException ex) {
+            logger.debug("Failed to draw project banner for {}", project.getId(), ex);
+        }
 
         g2d.setClip(null);
 
@@ -365,7 +454,8 @@ public class OgImageController {
                 FontMetrics fm = g2d.getFontMetrics();
                 g2d.drawString(l, x + (size - fm.stringWidth(l)) / 2, y + (size + fm.getAscent()) / 2 - 25);
             }
-        } catch (Exception ignored) {
+        } catch (RuntimeException ex) {
+            logger.debug("Failed to draw project icon for {}", project.getId(), ex);
             g2d.setColor(BRAND_ACCENT);
             g2d.fillRect(x, y, size, size);
         }
@@ -442,12 +532,21 @@ public class OgImageController {
 
     private int drawStatWithIcon(Graphics2D g2d, int x, int y, String iconType, String value) {
         FontMetrics fm = g2d.getFontMetrics();
-        int textXOffset = 38;
+        int textHeight = fm.getAscent() + fm.getDescent();
+        int iconSize = textHeight;
+        int iconToTextGap = 10;
+        int textXOffset = iconSize + iconToTextGap;
 
         if (x != -1000) {
+            double iconMinY = 2.5;
+            double iconMaxY = 21.5;
+            double iconSourceHeight = iconMaxY - iconMinY;
+            double scale = iconSize / iconSourceHeight;
+            double iconTopY = y - fm.getAscent();
+
             Graphics2D iconG = (Graphics2D) g2d.create();
-            iconG.translate(x, y - fm.getAscent() + 2);
-            iconG.scale(1.4, 1.4);
+            iconG.translate(x, iconTopY - (iconMinY * scale));
+            iconG.scale(scale, scale);
             iconG.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
             if ("download".equals(iconType)) {
@@ -480,10 +579,10 @@ public class OgImageController {
             }
             iconG.dispose();
 
-            g2d.drawString(value, x + textXOffset, y);
+            g2d.drawString(value, x + textXOffset + STAT_TEXT_X_OFFSET, y);
         }
 
-        return textXOffset + fm.stringWidth(value);
+        return textXOffset + STAT_TEXT_X_OFFSET + fm.stringWidth(value);
     }
 
     private void drawBranding(Graphics2D g2d, int cardX, int cardY, int cardW, int cardH) {

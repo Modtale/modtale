@@ -7,7 +7,6 @@ import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.ScoringService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -32,36 +31,36 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
     private static final Logger logger = LoggerFactory.getLogger(ProjectRepositoryImpl.class);
 
-    @Autowired private MongoTemplate mongoTemplate;
-    @Autowired private UserRepository userRepository;
+    private final MongoTemplate mongoTemplate;
+    private final UserRepository userRepository;
+    private final ScoringService scoringService;
 
-    @Lazy
-    @Autowired private ScoringService scoringService;
+    public ProjectRepositoryImpl(MongoTemplate mongoTemplate, UserRepository userRepository, @Lazy ScoringService scoringService) {
+        this.mongoTemplate = mongoTemplate;
+        this.userRepository = userRepository;
+        this.scoringService = scoringService;
+    }
 
     @Override
     public Page<Project> searchProjects(
             String search, List<String> tags, String gameVersion, String classification,
-            Double minRating, Integer minDownloads, Integer minFavorites, Pageable pageable,
-            String currentUsername, String sortBy,
+            Integer minDownloads, Integer minFavorites, Pageable pageable,
+            String currentUserId, String sortBy,
             String viewCategory, LocalDate dateCutoff, String authorId
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
 
-        if ("Your Projects".equals(viewCategory) && currentUsername != null) {
+        if ("Your Projects".equals(viewCategory) && currentUserId != null) {
             criteriaList.add(new Criteria().orOperator(
-                    authorId != null ? Criteria.where("authorId").is(authorId) : new Criteria(),
-                    Criteria.where("author").is(currentUsername),
-                    Criteria.where("contributors").is(currentUsername)
+                    Criteria.where("authorId").is(currentUserId),
+                    Criteria.where("teamMembers.userId").is(currentUserId)
             ));
         } else {
             criteriaList.add(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED));
         }
 
         if (authorId != null && !authorId.trim().isEmpty()) {
-            criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("authorId").is(authorId),
-                    Criteria.where("author").is(authorId)
-            ));
+            criteriaList.add(Criteria.where("authorId").is(authorId));
         }
 
         if (search != null && !search.trim().isEmpty()) {
@@ -84,7 +83,6 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
         if (gameVersion != null && !gameVersion.isEmpty())
             criteriaList.add(Criteria.where("versions.gameVersions").is(gameVersion));
-        if (minRating != null) criteriaList.add(Criteria.where("rating").gte(minRating));
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
 

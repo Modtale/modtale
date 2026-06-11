@@ -1,26 +1,25 @@
 import type { APIRoute } from 'astro';
-import { BACKEND_URL } from '../utils/api';
+
+const BACKEND_SITEMAP_URL = 'https://api.modtale.net/sitemap.xml';
 
 export const GET: APIRoute = async () => {
-    try {
-        const response = await fetch(`${BACKEND_URL}/sitemap.xml`);
+    const lastmod = new Date().toISOString();
+    const body = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://modtale.net/sitemap-static.xml</loc>
+    <lastmod>${lastmod}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${BACKEND_SITEMAP_URL}</loc>
+    <lastmod>${lastmod}</lastmod>
+  </sitemap>
+</sitemapindex>`;
 
-        if (!response.ok) {
-            return new Response(`Error fetching sitemap: ${response.statusText}`, {
-                status: response.status
-            });
-        }
-
-        const xml = await response.text();
-
-        return new Response(xml, {
-            headers: {
-                'Content-Type': 'application/xml',
-                'Cache-Control': 'public, max-age=3600, s-maxage=14400, stale-while-revalidate=86400'
-            }
-        });
-    } catch (error) {
-        console.error('Sitemap proxy error:', error);
-        return new Response('Internal Server Error', { status: 500 });
-    }
+    return new Response(body, {
+        headers: {
+            'Content-Type': 'application/xml',
+            'Cache-Control': 'public, max-age=3600, s-maxage=14400, stale-while-revalidate=86400',
+        },
+    });
 };

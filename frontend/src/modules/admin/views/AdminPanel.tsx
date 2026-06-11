@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { extractApiErrorMessage } from '@/utils/api';
 import { VerificationQueue } from '../components/VerificationQueue';
 import { UserManagement } from '../components/UserManagement.tsx';
 import { Review } from './Review';
@@ -10,6 +11,7 @@ import { ProjectManagement } from '../components/ProjectManagement';
 import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
 import { FinanceAdmin } from '../components/FinanceAdmin';
+import { isAdminUser, isSuperAdminUser } from '../utils/access';
 import type { Project } from '@/types';
 
 interface AdminPanelProps {
@@ -22,14 +24,16 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
     const [loadingQueue, setLoadingQueue] = useState(false);
+    const [queueError, setQueueError] = useState<string | null>(null);
 
     const [reviewingProject, setReviewingProject] = useState<any>(null);
     const [loadingReview, setLoadingReview] = useState(false);
 
     const [reports, setReports] = useState<any[]>([]);
+    const [reportsError, setReportsError] = useState<string | null>(null);
 
-    const isAdmin = currentUser?.roles?.includes('ADMIN');
-    const isSuperAdmin = currentUser?.roles?.includes('SUPER_ADMIN') || currentUser?.id === '692620f7c2f3266e23ac0ded';
+    const isAdmin = isAdminUser(currentUser);
+    const isSuperAdmin = isSuperAdminUser(currentUser);
 
     useEffect(() => {
         if (isAdmin) {
@@ -38,13 +42,22 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         }
     }, [isAdmin]);
 
+    useEffect(() => {
+        if (!isAdmin) return;
+        const interval = setInterval(() => {
+            fetchQueue();
+        }, 30_000);
+        return () => clearInterval(interval);
+    }, [isAdmin]);
+
     const fetchQueue = async () => {
         setLoadingQueue(true);
         try {
             const data = await adminClient.getVerificationQueue();
             setPendingProjects(data);
+            setQueueError(null);
         } catch (e) {
-            console.error(e);
+            setQueueError(extractApiErrorMessage(e, 'We could not load the verification queue.'));
         } finally {
             setLoadingQueue(false);
         }
@@ -54,8 +67,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         try {
             const data = await adminClient.getReportQueue('OPEN');
             setReports(data);
+            setReportsError(null);
         } catch (e) {
-            console.error(e);
+            setReportsError(extractApiErrorMessage(e, 'We could not load the report queue.'));
         }
     };
 
@@ -65,7 +79,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             const data = await adminClient.getReviewDetails(id);
             setReviewingProject(data);
         } catch (e) {
-            setStatus({ type: 'error', title: 'Error', msg: 'Could not load project details' });
+            setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not load this project's review details.") });
         } finally {
             setLoadingReview(false);
         }
@@ -85,8 +99,8 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     if (!currentUser || !isAdmin) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-modtale-dark">
-                <div className="text-center p-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-white/5 shadow-xl">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+                <div className="text-center p-8 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl">
                     <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Access Denied</h1>
                     <p className="text-slate-500">You do not have permission to view this page.</p>
@@ -117,7 +131,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     );
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
             {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />}
 
             {reviewingProject && (
@@ -130,10 +144,10 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                 />
             )}
 
-            <div className="max-w-[112rem] mx-auto px-8 sm:px-12 md:px-16 lg:px-28 py-8 transition-[max-width,padding] duration-300">
+            <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-8 transition-[max-width,padding] duration-300">
                 <div className="flex flex-col lg:flex-row gap-8">
                     <aside className="w-full lg:w-64 flex-shrink-0">
-                        <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/5 rounded-2xl p-4 shadow-sm sticky top-28">
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-2xl sticky top-28">
                             <div className="flex items-center gap-3 px-4 py-4 mb-4 border-b border-slate-100 dark:border-white/5">
                                 <img src={currentUser.avatarUrl} alt="" className="w-10 h-10 rounded-full border border-slate-200 dark:border-white/10" />
                                 <div className="overflow-hidden">
@@ -189,73 +203,85 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                     </aside>
 
                     <div className="flex-1 min-w-0">
-                        {activeTab === 'verification' && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="mb-8">
-                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Verification Queue</h1>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
+                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-2xl">
+                            {activeTab === 'verification' && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="mb-8">
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Verification Queue</h1>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
+                                    </div>
+                                    {queueError && (
+                                        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                            {queueError}
+                                        </div>
+                                    )}
+                                    <VerificationQueue
+                                        pendingProjects={pendingProjects}
+                                        loadingQueue={loadingQueue}
+                                        loadingReview={loadingReview}
+                                        reviewingId={reviewingProject?.mod?.id}
+                                        onReview={fetchProjectDetails}
+                                    />
                                 </div>
-                                <VerificationQueue
-                                    pendingProjects={pendingProjects}
-                                    loadingQueue={loadingQueue}
-                                    loadingReview={loadingReview}
-                                    reviewingId={reviewingProject?.mod?.id}
-                                    onReview={fetchProjectDetails}
-                                />
-                            </div>
-                        )}
+                            )}
 
-                        {activeTab === 'reports' && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="mb-8">
-                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Report Queue</h1>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Handle content violations and user reports.</p>
+                            {activeTab === 'reports' && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="mb-8">
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Report Queue</h1>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Handle content violations and user reports.</p>
+                                    </div>
+                                    {reportsError && (
+                                        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                            {reportsError}
+                                        </div>
+                                    )}
+                                    <ReportQueue reports={reports} onRefresh={fetchReports} />
                                 </div>
-                                <ReportQueue reports={reports} onRefresh={fetchReports} />
-                            </div>
-                        )}
+                            )}
 
-                        {activeTab === 'analytics' && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <PlatformAnalytics />
-                            </div>
-                        )}
-
-                        {activeTab === 'finance' && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <FinanceAdmin isSuperAdmin={isSuperAdmin} />
-                            </div>
-                        )}
-
-                        {activeTab === 'projects' && isSuperAdmin && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="mb-8">
-                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Project Management</h1>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage, unlist, or delete any project.</p>
+                            {activeTab === 'analytics' && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <PlatformAnalytics />
                                 </div>
-                                <ProjectManagement setStatus={setStatus} />
-                            </div>
-                        )}
+                            )}
 
-                        {activeTab === 'users' && isSuperAdmin && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="mb-8">
-                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">User Management</h1>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage roles, tiers, and user statuses.</p>
+                            {activeTab === 'finance' && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <FinanceAdmin isSuperAdmin={isSuperAdmin} />
                                 </div>
-                                <UserManagement setStatus={setStatus} />
-                            </div>
-                        )}
+                            )}
 
-                        {activeTab === 'logs' && isSuperAdmin && (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="mb-8">
-                                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Audit Logs</h1>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review all administrative actions.</p>
+                            {activeTab === 'projects' && isSuperAdmin && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="mb-8">
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Project Management</h1>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage, unlist, or delete any project.</p>
+                                    </div>
+                                    <ProjectManagement setStatus={setStatus} />
                                 </div>
-                                <AuditLogs />
-                            </div>
-                        )}
+                            )}
+
+                            {activeTab === 'users' && isSuperAdmin && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="mb-8">
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">User Management</h1>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage roles, tiers, and user statuses.</p>
+                                    </div>
+                                    <UserManagement setStatus={setStatus} />
+                                </div>
+                            )}
+
+                            {activeTab === 'logs' && isSuperAdmin && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="mb-8">
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Audit Logs</h1>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review all administrative actions.</p>
+                                    </div>
+                                    <AuditLogs />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

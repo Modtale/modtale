@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { projectClient } from '@/modules/project/api/projectClient';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import { financeClient } from '@/modules/finance/api/financeClient';
 import type { Project, User } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
@@ -9,7 +9,10 @@ export const useProjectEditor = (
     projectData: Project | null,
     currentUser: User | null,
     metaData: MetadataFormData,
+    bannerFile: File | null,
     setMetaData: React.Dispatch<React.SetStateAction<MetadataFormData>>,
+    setBannerFile: React.Dispatch<React.SetStateAction<File | null>>,
+    setBannerPreview: React.Dispatch<React.SetStateAction<string | null>>,
     setProjectData: React.Dispatch<React.SetStateAction<Project | null>>,
     onShowStatus: any
 ) => {
@@ -41,9 +44,8 @@ export const useProjectEditor = (
         setLoadingRepos(true);
         projectClient.getGitRepos(provider)
             .then(data => setRepos(data || []))
-            .catch(e => {
-                const errorMsg = typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Failed to fetch repositories.';
-                onShowStatus('error', 'Repository Error', errorMsg);
+            .catch((e: unknown) => {
+                onShowStatus('error', 'Repository Error', extractApiErrorMessage(e, 'We could not load repositories for that connected account.'));
             })
             .finally(() => setLoadingRepos(false));
     }, [provider, hasGithub, hasGitlab, manualRepo, onShowStatus]);
@@ -60,8 +62,8 @@ export const useProjectEditor = (
                 return { ...prev, teamMembers: members };
             });
             onShowStatus('success', 'Updated', 'Member role updated.');
-        } catch (err: any) {
-            onShowStatus('error', 'Update Failed', err.response?.data || "Failed to update role.");
+        } catch (err: unknown) {
+            onShowStatus('error', 'Update Failed', extractApiErrorMessage(err, 'We could not update that team role.'));
         }
     };
 
@@ -70,8 +72,8 @@ export const useProjectEditor = (
         try {
             await projectClient.cancelInvite(projectData.id, userId);
             setProjectData(prev => prev ? ({ ...prev, teamInvites: (prev.teamInvites || []).filter(m => m.userId !== userId) }) : null);
-        } catch (e: any) {
-            onShowStatus('error', 'Error', e.response?.data || "Could not cancel invite.");
+        } catch (e: unknown) {
+            onShowStatus('error', 'Invite Cancel Failed', extractApiErrorMessage(e, 'We could not cancel that project invite.'));
         }
     };
 
@@ -88,7 +90,11 @@ export const useProjectEditor = (
                 tags: metaData.tags,
                 links: metaData.links,
                 repositoryUrl: metaData.repositoryUrl,
-                license: metaData.license
+                license: metaData.license,
+                allowModpacks: projectData.allowModpacks,
+                allowComments: projectData.allowComments,
+                hmWikiEnabled: projectData.hmWikiEnabled,
+                hmWikiSlug: projectData.hmWikiSlug
             };
 
             await api.put(`/projects/${projectData.id}`, payload);
@@ -99,27 +105,61 @@ export const useProjectEditor = (
                 donationRecurringDefault: Boolean(projectData.donationRecurringDefault),
                 donationPlatformCutBps: Math.max(0, Math.min(10000, Math.round(Number(projectData.donationPlatformCutBps || 0))))
             });
-            setIsDirty(false);
 
-            setProjectData(prev => prev ? {
+            if (metaData.iconFile) {
+                const iconFormData = new FormData();
+                iconFormData.append('file', metaData.iconFile);
+                await api.put(`/projects/${projectData.id}/icon`, iconFormData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+
+            if (bannerFile) {
+                const bannerFormData = new FormData();
+                bannerFormData.append('file', bannerFile);
+                await api.put(`/projects/${projectData.id}/banner`, bannerFormData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+
+            let refreshed: Project | null = null;
+            try {
+                refreshed = await projectClient.getProject(projectData.id);
+            } catch {
+            }
+
+            setProjectData(prev => {
+                if (refreshed && prev) return { ...prev, ...refreshed };
+                if (refreshed) return refreshed;
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    title: metaData.title,
+                    slug: metaData.slug,
+                    description: metaData.summary,
+                    about: metaData.description,
+                    tags: metaData.tags,
+                    links: metaData.links,
+                    repositoryUrl: metaData.repositoryUrl,
+                    license: metaData.license
+                };
+            });
+            setIsDirty(false);
+            setMetaData(prev => ({
                 ...prev,
-                title: metaData.title,
-                slug: metaData.slug,
-                description: metaData.summary,
-                about: metaData.description,
-                tags: metaData.tags,
-                links: metaData.links,
-                repositoryUrl: metaData.repositoryUrl,
-                license: metaData.license
-            } : null);
+                iconFile: null,
+                iconPreview: refreshed?.imageUrl || prev.iconPreview
+            }));
+            setBannerFile(null);
+            setBannerPreview(prev => refreshed?.bannerUrl ?? prev);
 
             onShowStatus('success', 'Saved', 'Project details saved successfully.');
-        } catch (e: any) {
-            const errData = e.response?.data;
-            if (typeof errData === 'string' && errData.toLowerCase().includes('slug')) {
-                setSlugError(errData);
+        } catch (e: unknown) {
+            const errorMessage = extractApiErrorMessage(e, 'We could not save this project.');
+            if (errorMessage.toLowerCase().includes('slug')) {
+                setSlugError(errorMessage.replace(/^we could not save this project\.\s*/i, ''));
             }
-            onShowStatus('error', 'Save Failed', errData || 'Failed to save project.');
+            onShowStatus('error', 'Save Failed', errorMessage);
         } finally {
             setIsSaving(false);
         }
@@ -134,7 +174,7 @@ export const useProjectEditor = (
             setProjectData(prev => prev ? { ...prev, status: 'PENDING' as any } : null);
             onShowStatus('success', 'Submitted', 'Project submitted for review successfully.');
         } catch (e: any) {
-            onShowStatus('error', 'Submit Failed', e.response?.data || 'Failed to submit project.');
+            onShowStatus('error', 'Submit Failed', extractApiErrorMessage(e, 'Failed to submit project.'));
         } finally {
             setIsSaving(false);
         }
@@ -151,7 +191,7 @@ export const useProjectEditor = (
             setProjectData(res.data);
             onShowStatus('success', 'Uploaded', 'Image added to gallery.');
         } catch (e: any) {
-            onShowStatus('error', 'Upload Failed', e.response?.data || 'Failed to upload image.');
+            onShowStatus('error', 'Upload Failed', extractApiErrorMessage(e, 'Failed to upload image.'));
         }
     };
 
@@ -165,10 +205,7 @@ export const useProjectEditor = (
             setProjectData(res.data);
             onShowStatus('success', 'Deleted', 'Image removed from gallery.');
         } catch (e: any) {
-            const errorMsg = (e.response?.data && typeof e.response.data === 'object')
-                ? (e.response.data.message || "Failed to delete image.")
-                : (e.response?.data || e.message || 'Failed to delete image.');
-            onShowStatus('error', 'Delete Failed', errorMsg);
+            onShowStatus('error', 'Delete Failed', extractApiErrorMessage(e, 'Failed to delete image.'));
         }
     };
 

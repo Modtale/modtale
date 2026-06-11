@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, AlertCircle, Building2, User as UserIcon, ChevronDown, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, User as UserIcon, ChevronDown, Check } from 'lucide-react';
 
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import { PROJECT_TYPES, type Classification } from '@/data/categories';
 import type { User } from '@/types';
+import { SiteRoutes } from '@/utils/routes';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -21,7 +22,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [statusModal, setStatusModal] = useState<{type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string} | null>(null);
     const [showSignInModal, setShowSignInModal] = useState(false);
 
@@ -29,7 +29,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
     const [title, setTitle] = useState('');
     const [summary, setSummary] = useState('');
 
-    const [owner, setOwner] = useState<string>(currentUser?.username || '');
+    const [owner, setOwner] = useState<string>(currentUser?.id || '');
     const [myOrgs, setMyOrgs] = useState<User[]>([]);
     const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
     const ownerDropdownRef = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
             });
         } else {
             if (!owner) {
-                setOwner(currentUser.username);
+                setOwner(currentUser.id);
             }
 
             api.get('/user/orgs').then(res => {
@@ -54,7 +54,13 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                     return adminRole && o.organizationMembers?.some(m => m.userId === currentUser.id && m.roleId === adminRole.id);
                 });
                 setMyOrgs(adminOrgs);
-            }).catch(console.error);
+            }).catch((error: unknown) => {
+                setStatusModal({
+                    type: 'error',
+                    title: 'Owner List Unavailable',
+                    msg: extractApiErrorMessage(error, 'We could not load your eligible organization owners.')
+                });
+            });
         }
 
         const handleClickOutside = (event: MouseEvent) => {
@@ -112,12 +118,21 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
         }
 
         if (!title.trim() || !summary.trim() || !classification) {
-            setError("Please fill in all fields."); return;
+            setStatusModal({
+                type: 'error',
+                title: 'Missing Project Details',
+                msg: 'Please choose a project type, add a title, and write a short summary before continuing.'
+            });
+            return;
         }
 
-        const effectiveOwner = owner || currentUser?.username;
+        const effectiveOwner = owner || currentUser?.id;
         if (!effectiveOwner) {
-            setError("Unable to determine project owner. Please refresh and try again.");
+            setStatusModal({
+                type: 'error',
+                title: 'Project Owner Missing',
+                msg: 'We could not determine which account should own this draft. Refresh the page and try again.'
+            });
             return;
         }
 
@@ -135,16 +150,15 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
             const res = await api.post('/projects', formData, uploadConfig);
 
-            const slug = res.data.slug || res.data.id;
-            let prefix = '/mod';
-            if (res.data.classification === 'MODPACK') prefix = '/modpack';
-            if (res.data.classification === 'SAVE') prefix = '/world';
+            navigate(SiteRoutes.projectEdit(res.data));
 
-            navigate(`${prefix}/${slug}/edit`);
-
-        } catch (e: any) {
-            const errorMsg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || "Failed to create draft.");
-            setError(errorMsg);
+        } catch (e: unknown) {
+            setStatusModal({
+                type: 'error',
+                title: 'Draft Creation Failed',
+                msg: extractApiErrorMessage(e, 'We could not create this project draft.')
+            });
+        } finally {
             setIsLoading(false);
         }
     };
@@ -230,7 +244,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
         );
     }
 
-    const selectedOwner = owner === currentUser?.username ? currentUser : myOrgs.find(o => o.username === owner);
+    const selectedOwner = owner === currentUser?.id ? currentUser : myOrgs.find(o => o.id === owner);
 
     return (
         <>
@@ -249,8 +263,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                 <p className="text-slate-500 dark:text-slate-400 font-bold mt-10 uppercase tracking-widest text-xs">You can always change this later.</p>
                             </div>
 
-                            {error && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl flex items-center gap-2 text-sm font-bold animate-in shake duration-300"><AlertCircle className="w-5 h-5"/> {error}</div>}
-
                             <div className="space-y-6 bg-white/60 dark:bg-slate-900/60 backdrop-blur-3xl p-8 md:p-12 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl shadow-modtale-accent/5 animate-in fade-in zoom-in-95 duration-500">
                                 {myOrgs.length > 0 && (
                                     <div className="relative z-50" ref={ownerDropdownRef}>
@@ -260,14 +272,14 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                             className="w-full flex items-center justify-between bg-white/90 dark:bg-black/50 border border-slate-300 dark:border-white/20 rounded-2xl px-5 py-4 text-left transition-all hover:bg-white dark:hover:bg-white/5 shadow-inner backdrop-blur-md"
                                         >
                                             <div className="flex items-center gap-4">
-                                                {owner === currentUser?.username ? (
+                                                {owner === currentUser?.id ? (
                                                     <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-800/30 shadow-sm"><UserIcon className="w-5 h-5"/></div>
                                                 ) : (
                                                     <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200 dark:border-purple-800/30 shadow-sm"><Building2 className="w-5 h-5"/></div>
                                                 )}
                                                 <div>
                                                     <div className="font-bold text-slate-900 dark:text-white text-base leading-none">{selectedOwner?.displayName || selectedOwner?.username}</div>
-                                                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1.5">{owner === currentUser?.username ? 'Personal' : 'Organization'}</div>
+                                                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1.5">{owner === currentUser?.id ? 'Personal' : 'Organization'}</div>
                                                 </div>
                                             </div>
                                             <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${ownerDropdownOpen ? 'rotate-180' : ''}`} />
@@ -275,23 +287,23 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
                                         {ownerDropdownOpen && (
                                             <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-2 shadow-modtale-accent/10">
-                                                <button onClick={() => { setOwner(currentUser?.username || ''); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
+                                                <button onClick={() => { setOwner(currentUser?.id || ''); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
                                                     <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform"><UserIcon className="w-5 h-5"/></div>
                                                     <div className="text-left flex-1">
                                                         <div className="font-bold text-slate-900 dark:text-white text-sm">{currentUser?.username}</div>
                                                         <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Personal Account</div>
                                                     </div>
-                                                    {owner === currentUser?.username && <Check className="w-5 h-5 text-modtale-accent" />}
+                                                    {owner === currentUser?.id && <Check className="w-5 h-5 text-modtale-accent" />}
                                                 </button>
                                                 <div className="h-px bg-slate-100 dark:bg-white/5 mx-3 my-2" />
                                                 {myOrgs.map(org => (
-                                                    <button key={org.id} onClick={() => { setOwner(org.username); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
+                                                    <button key={org.id} onClick={() => { setOwner(org.id); setOwnerDropdownOpen(false); }} className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors rounded-xl group">
                                                         <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform"><Building2 className="w-5 h-5"/></div>
                                                         <div className="text-left flex-1">
                                                             <div className="font-bold text-slate-900 dark:text-white text-sm">{org.displayName || org.username}</div>
                                                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Organization</div>
                                                         </div>
-                                                        {owner === org.username && <Check className="w-4 h-4 text-modtale-accent" />}
+                                                        {owner === org.id && <Check className="w-4 h-4 text-modtale-accent" />}
                                                     </button>
                                                 ))}
                                             </div>
@@ -300,15 +312,15 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                 )}
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Project Title</label>
-                                    <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 font-black text-2xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md placeholder:text-slate-300 dark:placeholder:text-white/10" placeholder="My Awesome Project"/>
+                                    <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">Project Title</label>
+                                    <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 font-black text-2xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="My Awesome Project"/>
                                 </div>
                                 <div>
                                     <div className="flex justify-between items-end mb-2 ml-1 pr-1">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Short Summary</label>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{summary.length}/250</p>
+                                        <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">Short Summary</label>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-300 font-bold uppercase tracking-tighter">{summary.length}/250</p>
                                     </div>
-                                    <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-300 dark:placeholder:text-white/10" placeholder="A brief description of what this does..."/>
+                                    <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="A brief description of what this does..."/>
                                 </div>
 
                                 <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary || summary.length < 10} className="w-full h-16 mt-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-modtale-accent/20 active:scale-95 group">

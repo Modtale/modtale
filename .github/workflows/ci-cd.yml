@@ -98,6 +98,7 @@ jobs:
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
+            ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
             ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
           else
@@ -121,6 +122,7 @@ jobs:
             ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
             ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
+            ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
           fi
 
           gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt

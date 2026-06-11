@@ -16,12 +16,13 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                                                                     dependencies, onClose, onDownloadBundle, onDownloadProjectOnly
                                                                 }) => {
     useScrollLock(true);
-    const [selected, setSelected] = useState<Set<string>>(new Set(dependencies.map(d => d.projectId)));
+    const [selected, setSelected] = useState<Set<string>>(new Set(dependencies.filter(d => !d.isEmbedded).map(d => d.projectId)));
     const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>({});
+    const selectableDependencies = dependencies.filter(dep => !dep.isEmbedded);
 
     useEffect(() => {
         const fetchMeta = async () => {
-            const missingIds = dependencies.filter(d => !metaCache[d.projectId]).map(d => d.projectId);
+            const missingIds = selectableDependencies.filter(d => !metaCache[d.projectId]).map(d => d.projectId);
             if (missingIds.length === 0) return;
 
             const newCache = { ...metaCache };
@@ -36,9 +37,9 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
             setMetaCache(newCache);
         };
         fetchMeta();
-    }, [dependencies, metaCache]);
+    }, [selectableDependencies, metaCache]);
 
-    const missingRequired = dependencies.filter(d => !d.isOptional && !selected.has(d.projectId)).length > 0;
+    const missingRequired = selectableDependencies.filter(d => !d.isOptional && !selected.has(d.projectId)).length > 0;
 
     const toggleDep = (id: string) => {
         const next = new Set(selected);
@@ -47,10 +48,10 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
     };
 
     const toggleAll = () => {
-        if (selected.size === dependencies.length) {
+        if (selected.size === selectableDependencies.length) {
             setSelected(new Set());
         } else {
-            setSelected(new Set(dependencies.map(d => d.projectId)));
+            setSelected(new Set(selectableDependencies.map(d => d.projectId)));
         }
     };
 
@@ -75,12 +76,12 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                             Select dependencies to include in your bundle download.
                         </div>
                         <button type="button" onClick={toggleAll} className={`text-xs font-bold ${theme.colors.accent} hover:underline`}>
-                            {selected.size === dependencies.length ? 'Deselect All' : 'Select All'}
+                            {selected.size === selectableDependencies.length ? 'Deselect All' : 'Select All'}
                         </button>
                     </div>
 
                     <div className="space-y-2">
-                        {dependencies.map(dep => {
+                        {selectableDependencies.map(dep => {
                             const meta = metaCache[dep.projectId];
                             const isSelected = selected.has(dep.projectId);
                             const isRequiredMissing = !dep.isOptional && !isSelected;

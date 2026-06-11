@@ -5,8 +5,9 @@ import { isBotUserAgent } from '../../utils/seo';
 import { generateUserMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
 import { BACKEND_URL } from "@/utils/api.ts";
+import { SiteRoutes } from '../../utils/routes';
 
-const { username } = Astro.params;
+const { username: handle } = Astro.params;
 const path = Astro.url.pathname;
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
@@ -15,46 +16,47 @@ const isBot = isBotUserAgent(userAgent);
 let userData = null;
 let title = ROUTE_SEO['/mods'].title;
 let description = ROUTE_SEO['/mods'].description;
-let image = "https://modtale.net/assets/favicon.svg";
+let image = 'https://modtale.net/assets/logo.svg';
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 let ogType = "website";
 
-if (isBot && username) {
+if (isBot && handle) {
     try {
-        const lookupRes = await fetch(`${BACKEND_URL}/api/v1/users/lookup/${username}`);
-        if (lookupRes.ok) {
-            const lookupData = await lookupRes.json();
-            const userId = lookupData.id;
-            const res = await fetch(`${BACKEND_URL}/api/v1/user/profile/${userId}`);
+        const userId = SiteRoutes.extractId(handle);
+        const res = await fetch(`${BACKEND_URL}/api/v1/user/profile/${userId}`);
 
-            if (res.ok) {
-                userData = await res.json();
-                
-                const meta = generateUserMeta(userData);
-                if (meta) {
-                    title = meta.title;
-                    description = meta.description;
-                }
-
-                if (userData.avatarUrl) {
-                    image = userData.avatarUrl;
-                }
-                
-                ogType = userData.accountType === 'ORGANIZATION' ? 'website' : 'profile';
-
-                const personSchema = {
-                    "@context": "https://schema.org",
-                    "@type": userData.accountType === 'ORGANIZATION' ? "Organization" : "",
-                    "name": userData.displayName || userData.username,
-                    "description": userData.bio,
-                    "image": userData.avatarUrl,
-                    "url": `https://modtale.net/creator/${userData.username}`
-                };
-
-                jsonLd = [personSchema];
-                ssrSuccessfullyCompleted = true;
+        if (res.ok) {
+            userData = await res.json();
+            
+            const meta = generateUserMeta(userData);
+            if (meta) {
+                title = meta.title;
+                description = meta.description;
             }
+
+            if (userData.avatarUrl) {
+                image = userData.avatarUrl;
+            }
+            
+            ogType = userData.accountType === 'ORGANIZATION' ? 'website' : 'profile';
+
+            const canonicalPath = SiteRoutes.creator(userData.id, userData.username);
+            if (path.replace(/\/$/, "") !== canonicalPath.replace(/\/$/, "")) {
+                return Astro.redirect(canonicalPath, 301);
+            }
+
+            const personSchema = {
+                "@context": "https://schema.org",
+                "@type": userData.accountType === 'ORGANIZATION' ? 'Organization' : 'Person',
+                "name": userData.displayName || userData.username,
+                "description": userData.bio,
+                "image": userData.avatarUrl,
+                "url": `https://modtale.net${canonicalPath}`
+            };
+
+            jsonLd = [personSchema];
+            ssrSuccessfullyCompleted = true;
         }
     } catch (e) {}
 }

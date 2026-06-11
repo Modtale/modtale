@@ -1,69 +1,55 @@
 package net.modtale.controller.auth;
 
+import jakarta.validation.Valid;
 import net.modtale.mapper.AuthMapper;
 import net.modtale.model.dto.auth.ApiKeyDTO;
+import net.modtale.model.dto.response.auth.ApiKeySecretResponse;
 import net.modtale.model.dto.request.auth.CreateApiKeyRequest;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.ApiKeyService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/user/api-keys")
 public class ApiKeyController {
 
-    @Autowired
-    private ApiKeyService apiKeyService;
+    private final ApiKeyService apiKeyService;
+    private final AccountService accountService;
 
-    @Autowired
-    private AccountService accountService;
+    public ApiKeyController(ApiKeyService apiKeyService, AccountService accountService) {
+        this.apiKeyService = apiKeyService;
+        this.accountService = accountService;
+    }
 
     @GetMapping
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<List<ApiKeyDTO>> getMyKeys() {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-
+        User user = accountService.requireCurrentUser("viewing your API keys");
         List<ApiKey> keys = apiKeyService.getMyKeys(user.getId());
         return ResponseEntity.ok(keys.stream().map(AuthMapper::toApiKeyDTO).toList());
     }
 
     @PostMapping
-    public ResponseEntity<?> createKey(@RequestBody CreateApiKeyRequest payload) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<ApiKeySecretResponse> createKey(@Valid @RequestBody CreateApiKeyRequest payload) {
+        User user = accountService.requireCurrentUser("creating an API key");
         if (!user.isEmailVerified()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Email verification required."));
+            throw new SecurityException("Verify your email address before creating an API key.");
         }
-
-        String name = payload.getName();
-        if (name == null || name.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        try {
-            String rawKey = apiKeyService.createApiKey(user.getId(), name, payload.getContextPermissions());
-            return ResponseEntity.ok(Map.of("key", rawKey));
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        String rawKey = apiKeyService.createApiKey(user.getId(), payload.getName(), payload.getContextPermissions());
+        return ResponseEntity.ok(new ApiKeySecretResponse(rawKey));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<Void> revokeKey(@PathVariable String id) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-
+        User user = accountService.requireCurrentUser("revoking an API key");
         apiKeyService.revokeKey(id, user.getId());
         return ResponseEntity.ok().build();
     }

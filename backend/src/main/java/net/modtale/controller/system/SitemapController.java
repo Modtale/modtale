@@ -1,14 +1,15 @@
 package net.modtale.controller.system;
 
+import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.project.Project;
+import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
@@ -17,10 +18,19 @@ import java.util.Set;
 @RestController
 public class SitemapController {
 
-    @Autowired private SearchService searchService;
+    private final SearchService searchService;
+    private final ProjectService projectService;
+    private final String baseUrl;
 
-    @Value("${app.frontend.url:https://modtale.net}")
-    private String baseUrl;
+    public SitemapController(
+            SearchService searchService,
+            ProjectService projectService,
+            AppFrontendProperties frontendProperties
+    ) {
+        this.searchService = searchService;
+        this.projectService = projectService;
+        this.baseUrl = frontendProperties.url();
+    }
 
     @GetMapping(value = "/sitemap.xml", produces = MediaType.APPLICATION_XML_VALUE)
     public String generateSitemap() {
@@ -42,15 +52,11 @@ public class SitemapController {
         List<Project> projects = searchService.getPublishedProjects();
 
         for (Project p : projects) {
-            String prefix = "/mod/";
-            if ("MODPACK".equals(p.getClassification())) prefix = "/modpack/";
-            else if ("SAVE".equals(p.getClassification())) prefix = "/world/";
-
-            String slug = (p.getSlug() != null && !p.getSlug().isBlank()) ? p.getSlug() : createSlug(p.getTitle(), p.getId());
-
             if (p.getUpdatedAt() != null) {
-                addUrl(xml, baseUrl + prefix + slug, "0.8", parseDate(p.getUpdatedAt()));
-                activeAuthors.add(p.getAuthor());
+                addUrl(xml, baseUrl + projectService.getProjectLink(p), "0.8", parseDate(p.getUpdatedAt()));
+                if (p.getAuthorId() != null && !p.getAuthorId().isBlank()) {
+                    activeAuthors.add(p.getAuthorId());
+                }
             }
         }
 
@@ -76,17 +82,8 @@ public class SitemapController {
         try {
             if (dateStr == null) return LocalDate.now();
             return LocalDate.parse(dateStr);
-        } catch (Exception e) {
+        } catch (DateTimeParseException e) {
             return LocalDate.now();
         }
-    }
-
-    private String createSlug(String title, String id) {
-        if (title == null) return id;
-        String slug = title.toLowerCase()
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("(^-|-$)", "");
-        if (slug.length() > 30) slug = slug.substring(0, 30);
-        return slug.isEmpty() ? id : slug + "-" + id;
     }
 }

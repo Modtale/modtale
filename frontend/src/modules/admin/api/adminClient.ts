@@ -29,17 +29,17 @@ export const adminClient = {
     banEmail: async (data: any) => (await api.post('/admin/users/bans', data)).data,
     unbanEmail: async (email: string) => (await api.delete('/admin/users/bans', { params: { email } })).data,
     searchUsers: async (query: string) => (await api.get('/users/search', { params: { query } })).data,
-    getUserProfile: async (name: string) => (await api.get(`/admin/users/${name}`)).data,
-    updateUserTier: async (username: string, tier: string) => {
+    getUserProfile: async (userId: string) => (await api.get(`/admin/users/${userId}`)).data,
+    updateUserTier: async (userId: string, tier: string) => {
         const formData = new FormData();
         formData.append('tier', tier);
-        return (await api.post(`/admin/users/${username}/tier`, formData)).data;
+        return (await api.post(`/admin/users/${userId}/tier`, formData)).data;
     },
-    grantAdmin: async (username: string) => (await api.post(`/admin/users/${username}/role`, null, { params: { role: 'ADMIN' } })).data,
-    revokeAdmin: async (username: string) => (await api.delete(`/admin/users/${username}/role`, { params: { role: 'ADMIN' } })).data,
-    deleteUser: async (username: string, reason: string) => (await api.delete(`/admin/users/${username}`, { params: { reason } })).data,
-    getUserRaw: async (username: string) => (await api.get(`/admin/users/${username}/raw`)).data,
-    updateUserRaw: async (username: string, data: any) => (await api.put(`/admin/users/${username}/raw`, data)).data,
+    grantAdmin: async (userId: string) => (await api.post(`/admin/users/${userId}/role`, null, { params: { role: 'ADMIN' } })).data,
+    revokeAdmin: async (userId: string) => (await api.delete(`/admin/users/${userId}/role`, { params: { role: 'ADMIN' } })).data,
+    deleteUser: async (userId: string, reason: string) => (await api.delete(`/admin/users/${userId}`, { params: { reason } })).data,
+    getUserRaw: async (userId: string) => (await api.get(`/admin/users/${userId}/raw`)).data,
+    updateUserRaw: async (userId: string, data: any) => (await api.put(`/admin/users/${userId}/raw`, data)).data,
 
     getVerificationQueue: async () => (await api.get('/admin/verification/queue')).data,
     getReviewDetails: async (id: string) => (await api.get(`/admin/projects/${id}/review-details`)).data,
