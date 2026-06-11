@@ -9,7 +9,7 @@ import type { Project, User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
 
-import { MarqueeColumn, MarqueeRow } from '../components/HeroMarquee';
+import { MarqueeColumn } from '../components/HeroMarquee';
 import {
     TrendingProjectsSection,
     NewReleasesSection,
@@ -515,16 +515,7 @@ export const Home: React.FC<{
                                     </aside>
                                 )}
                             </div>
-                        ) : (
-                            <div className="-mx-6 sm:-mx-12 md:-mx-16 flex flex-col gap-4 mt-8 sm:mt-12 mb-4 contain-content">
-                                {validFeaturedProjects.length > 0 && (
-                                    <>
-                                        <MarqueeRow projects={col1Projects} duration="35s" />
-                                        <MarqueeRow projects={col2Projects} duration="45s" reverse={true} />
-                                    </>
-                                )}
-                            </div>
-                        )}
+                        ) : null}
                     </div>
 
                     <div className="absolute bottom-0 left-0 right-0 h-[150px] bg-gradient-to-t from-slate-100/30 dark:from-[#080d19] to-transparent pointer-events-none z-10" />

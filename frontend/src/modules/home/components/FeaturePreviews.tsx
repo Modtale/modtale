@@ -754,7 +754,7 @@ export const TrendingProjectsSection = ({
     if (projects.length === 0) return null;
     return (
         <section className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-5 gap-4 relative">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-3 gap-4 relative">
                 <div className="space-y-1 flex-1">
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         Trending
@@ -767,7 +767,6 @@ export const TrendingProjectsSection = ({
                     Browse All
                     <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
-                <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-orange-500/30 via-rose-500/20 to-transparent dark:from-orange-400/30 dark:via-rose-400/20" />
             </div>
             
             <ScrollContainer>
@@ -801,7 +800,7 @@ export const NewReleasesSection = ({
     if (projects.length === 0) return null;
     return (
         <section className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-5 gap-4 relative">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-3 gap-4 relative">
                 <div className="space-y-1 flex-1">
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         New Releases
@@ -814,7 +813,6 @@ export const NewReleasesSection = ({
                     Browse All
                     <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
-                <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-emerald-500/30 via-teal-500/20 to-transparent dark:from-emerald-400/30 dark:via-teal-400/20" />
             </div>
             
             <ScrollContainer>
