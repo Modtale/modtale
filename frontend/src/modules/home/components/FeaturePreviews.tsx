@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Crown, Settings } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
-import { BACKEND_URL } from '@/utils/api';
+import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { ProjectCard } from '@/modules/project/components/ProjectCard';
 import type { Project, User } from '@/types';
@@ -453,6 +453,29 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
     const userAvatar = resolveAvatar(currentUser?.avatarUrl);
     const userInitial = currentUser?.username?.charAt(0)?.toUpperCase() ?? 'Y';
 
+    const [randomCommenter, setRandomCommenter] = useState<{ name: string; avatar: string } | null>(null);
+
+    useEffect(() => {
+        if (!project?.authorId) return;
+        api.get(`/user/profile/${project.authorId}`)
+            .then(res => {
+                const u = res.data;
+                if (!u?.username) return;
+                const raw: string = u.avatarUrl ?? '';
+                const resolvedAvatar = raw.startsWith('http')
+                    ? raw
+                    : raw ? `${BACKEND_URL}${raw.startsWith('/') ? '' : '/'}${raw}` : '';
+                setRandomCommenter({
+                    name: u.displayName || u.username,
+                    avatar: resolvedAvatar,
+                });
+            })
+            .catch(() => { /* silently fail */ });
+    }, [project?.authorId]);
+
+    const commenterName = randomCommenter?.name ?? project?.author ?? '…';
+    const commenterAvatar = randomCommenter?.avatar;
+
     return (
     <PreviewPanel icon={MessageSquare} title="Comments" accentClass="text-violet-600 dark:text-violet-400" className="min-h-[360px]">
         <div className="space-y-4">
@@ -492,11 +515,14 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm border border-slate-200 dark:border-white/5 shrink-0">
-                            <img src="https://avatars.githubusercontent.com/u/26007280" alt="Dsjoo" className="w-full h-full object-cover" loading="lazy" />
+                        <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm border border-slate-200 dark:border-white/5 shrink-0 bg-slate-200 dark:bg-slate-700">
+                            {commenterAvatar
+                                ? <img src={commenterAvatar} alt={commenterName} className="w-full h-full object-cover" loading="lazy" />
+                                : <span className="w-full h-full flex items-center justify-center text-sm font-bold text-slate-500">{commenterName.charAt(0)}</span>
+                            }
                         </div>
                         <div className="flex flex-col">
-                            <span className="font-bold text-sm text-slate-900 dark:text-white">Dsjoo</span>
+                            <span className="font-bold text-sm text-slate-900 dark:text-white">{commenterName}</span>
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">2 hours ago</span>
                         </div>
                     </div>
