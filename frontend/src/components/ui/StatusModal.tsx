@@ -1,6 +1,5 @@
-import React, {useEffect, useRef} from 'react';
-import { Check, AlertTriangle, ArrowRight, X, Info } from 'lucide-react';
-import { theme } from '@/styles/theme';
+import React, { useEffect, useRef } from 'react';
+import { AlertTriangle, ArrowRight, Check, Info, Trash2, X } from 'lucide-react';
 
 interface Particle {
     x: number;
@@ -30,9 +29,13 @@ const Confetti: React.FC = () => {
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = window.innerWidth * dpr;
-        canvas.height = window.innerHeight * dpr;
-        ctx.scale(dpr, dpr);
+        const resize = () => {
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+
+        resize();
 
         const particles: Particle[] = [];
         const particleCount = 400;
@@ -59,33 +62,34 @@ const Confetti: React.FC = () => {
             });
         }
 
-        let animationFrameId: number;
+        let animationFrameId = 0;
         const animate = () => {
             ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
             let activeCount = 0;
 
-            particles.forEach(p => {
-                if (!p.active) return;
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vy += p.gravity;
-                p.vx *= p.drag;
-                p.vy *= p.drag;
-                p.tilt += p.tiltAngleIncrement;
-                p.angle += p.rotationSpeed;
+            particles.forEach((particle) => {
+                if (!particle.active) return;
 
-                if (p.y > window.innerHeight + 100) {
-                    p.active = false;
-                } else {
-                    activeCount++;
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.vy += particle.gravity;
+                particle.vx *= particle.drag;
+                particle.vy *= particle.drag;
+                particle.tilt += particle.tiltAngleIncrement;
+                particle.angle += particle.rotationSpeed;
+
+                if (particle.y > window.innerHeight + 100) {
+                    particle.active = false;
+                    return;
                 }
 
+                activeCount += 1;
                 ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.angle);
-                ctx.scale(1, Math.cos(p.tilt));
-                ctx.fillStyle = p.color;
-                ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                ctx.translate(particle.x, particle.y);
+                ctx.rotate(particle.angle);
+                ctx.scale(1, Math.cos(particle.tilt));
+                ctx.fillStyle = particle.color;
+                ctx.fillRect(-particle.w / 2, -particle.h / 2, particle.w, particle.h);
                 ctx.restore();
             });
 
@@ -95,10 +99,15 @@ const Confetti: React.FC = () => {
         };
 
         animate();
-        return () => cancelAnimationFrame(animationFrameId);
+        window.addEventListener('resize', resize);
+
+        return () => {
+            window.removeEventListener('resize', resize);
+            cancelAnimationFrame(animationFrameId);
+        };
     }, []);
 
-    return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[60] w-full h-full" />;
+    return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[60] h-full w-full" />;
 };
 
 interface StatusModalProps {
@@ -111,50 +120,69 @@ interface StatusModalProps {
     secondaryLabel?: string;
 }
 
-export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, onClose, actionLabel, onAction, secondaryLabel }) => {
+export const StatusModal: React.FC<StatusModalProps> = ({
+    type,
+    title,
+    message,
+    onClose,
+    actionLabel,
+    onAction,
+    secondaryLabel,
+}) => {
     const config = {
         success: {
-            icon: <Check className="w-8 h-8" />,
+            icon: <Check className="h-8 w-8" />,
             shell: 'border-modtale-accent/30 shadow-[0_40px_120px_-45px_rgba(37,99,235,0.6)]',
             hero: 'from-modtale-accent/18 via-sky-500/10 to-transparent dark:from-modtale-accent/18 dark:via-sky-500/10 dark:to-transparent',
             badge: 'bg-modtale-accent text-white',
-            button: theme.components.buttonPrimary,
+            button: 'bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
         },
         error: {
-            icon: <AlertTriangle className="w-8 h-8" />,
+            icon: <AlertTriangle className="h-8 w-8" />,
             shell: 'border-red-500/25 shadow-[0_40px_120px_-45px_rgba(239,68,68,0.55)]',
             hero: 'from-red-500/16 via-rose-500/10 to-transparent dark:from-red-500/20 dark:via-rose-500/10 dark:to-transparent',
             badge: 'bg-red-500 text-white',
-            button: theme.components.buttonDanger,
+            button: 'bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
         },
         warning: {
-            icon: <AlertTriangle className="w-8 h-8" />,
+            icon: <Trash2 className="h-8 w-8" />,
             shell: 'border-amber-400/30 shadow-[0_40px_120px_-45px_rgba(245,158,11,0.55)]',
             hero: 'from-amber-400/20 via-orange-400/10 to-transparent dark:from-amber-500/20 dark:via-orange-500/10 dark:to-transparent',
             badge: 'bg-amber-500 text-white',
-            button: 'bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
+            button: 'bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
         },
         info: {
-            icon: <Info className="w-8 h-8" />,
+            icon: <Info className="h-8 w-8" />,
             shell: 'border-sky-500/25 shadow-[0_40px_120px_-45px_rgba(14,165,233,0.5)]',
             hero: 'from-sky-500/16 via-blue-500/10 to-transparent dark:from-sky-500/18 dark:via-blue-500/10 dark:to-transparent',
             badge: 'bg-sky-500 text-white',
             button: 'bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
-        }
+        },
     }[type];
 
     return (
-        <div className={`${theme.components.modalOverlay} z-[100]`}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             {type === 'success' && <Confetti />}
+
             <div className={`relative z-[110] w-full max-w-xl overflow-hidden rounded-[28px] border bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl ${config.shell}`}>
-                <button onClick={onClose} className={`absolute right-4 top-4 z-10 ${theme.components.iconButton}`}>
-                    <X className="w-5 h-5" />
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="absolute right-4 top-4 z-10 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+                    aria-label="Close dialog"
+                >
+                    <X className="h-5 w-5" />
                 </button>
-                <div className={`bg-gradient-to-br ${config.hero} px-6 pb-6 pt-8 text-center`}>
+
+                <div className={`bg-gradient-to-br px-6 pb-6 pt-8 text-center ${config.hero}`}>
                     <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.35rem] shadow-lg ${config.badge}`}>
                         {config.icon}
                     </div>
-                    <h2 className="mb-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">{title}</h2>
+
+                    <h2 className="mb-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                        {title}
+                    </h2>
+
                     {typeof message === 'string' ? (
                         <p className="mx-auto max-w-md whitespace-pre-line text-left leading-relaxed text-slate-600 dark:text-slate-300">
                             {message}
@@ -165,23 +193,28 @@ export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, 
                         </div>
                     )}
                 </div>
+
                 <div className="flex flex-col-reverse justify-center gap-3 border-t border-slate-200/70 bg-slate-50/85 p-4 dark:border-white/10 dark:bg-white/5 sm:flex-row">
                     {(type === 'warning' || type === 'info') && (
                         <button
                             type="button"
                             onClick={onClose}
-                            className={`${theme.components.buttonGhost} justify-center`}
+                            className="rounded-xl px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
                         >
-                            {secondaryLabel || "Cancel"}
+                            {secondaryLabel || 'Cancel'}
                         </button>
                     )}
+
                     <button
                         type="button"
-                        onClick={() => { if (onAction) onAction(); else onClose(); }}
+                        onClick={() => {
+                            if (onAction) onAction();
+                            else onClose();
+                        }}
                         className={config.button}
                     >
-                        {actionLabel || "Close"}
-                        {type === 'success' && <ArrowRight className="w-5 h-5" />}
+                        {actionLabel || 'Close'}
+                        {type === 'success' && <ArrowRight className="h-5 w-5" />}
                     </button>
                 </div>
             </div>
