@@ -448,7 +448,9 @@ export const Analytics: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <SummaryCard title="Downloads" value={summary.downloads.value.toLocaleString()} subValue={`Total: ${summary.downloads.total.toLocaleString()}`} trend={summary.downloads.trend} icon={Download} color="text-blue-500" />
                         <SummaryCard title="Views" value={summary.views.value.toLocaleString()} subValue={`Total: ${summary.views.total.toLocaleString()}`} trend={summary.views.trend} icon={Eye} color="text-purple-500" />
-                        <SummaryCard title="Conversion Rate" value={summary.conversion.toFixed(1)} subValue="Downloads per View" icon={PieChart} color="text-emerald-500" isPercent />
+                        <div className="hidden md:block">
+                            <SummaryCard title="Conversion Rate" value={summary.conversion.toFixed(1)} subValue="Downloads per View" icon={PieChart} color="text-emerald-500" isPercent />
+                        </div>
                         <SummaryCard title={summary.contentCount.label} value={summary.contentCount.value.toLocaleString()} subValue="Active Items" icon={Layers} color="text-yellow-500" />
                     </div>
                 )}
