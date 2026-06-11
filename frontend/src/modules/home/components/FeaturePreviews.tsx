@@ -98,25 +98,49 @@ export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project 
 
 export const InlineDownloadUI = () => {
     const [showExperimental, setShowExperimental] = useState(false);
+    const [showPreReleaseGameVersions, setShowPreReleaseGameVersions] = useState(false);
     const [view, setView] = useState<'download' | 'changelog'>('download');
-    const [selectedVersion, setSelectedVersion] = useState('2026.03.11-dcad8778f');
+    const [selectedVersion, setSelectedVersion] = useState('0.5.4');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const versions = ['2026.03.11-dcad8778f', '2026.02.28-b8e9f1a2', '2026.01.15-a7c6d5e4'];
+    const orderedGameVersions = ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.4', '0.5.3', '0.5.2', '0.5.1', '0.5.0', '0.5.0-pre.9.2', '0.5.0-pre.9.1'];
+    const preReleaseGameVersions = ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.0-pre.9.2', '0.5.0-pre.9.1'];
+    const preReleaseGameVersionSet = useMemo(() => new Set(preReleaseGameVersions), []);
+    const gameVersions = useMemo(() => {
+        if (showPreReleaseGameVersions) return orderedGameVersions;
+        return orderedGameVersions.filter(version => !preReleaseGameVersionSet.has(version));
+    }, [orderedGameVersions, preReleaseGameVersionSet, showPreReleaseGameVersions]);
+    const preferredGameVersion = useMemo(() => gameVersions[0] || '', [gameVersions]);
 
     const allVersions = [
-        { id: 'v8', versionNumber: '3.0.1-alpha', channel: 'ALPHA', gameVersion: '2026.03.11-dcad8778f', date: '1 hour ago', changelog: 'Hotfix: resolved immediate crash on startup with specific GPU drivers.' },
-        { id: 'v7', versionNumber: '3.0.0-alpha', channel: 'ALPHA', gameVersion: '2026.03.11-dcad8778f', date: '2 hours ago', changelog: 'Complete rewrite of the rendering engine. Highly unstable.' },
-        { id: 'v6', versionNumber: '2.5.1', channel: 'RELEASE', gameVersion: '2026.03.11-dcad8778f', date: '12 hours ago', changelog: 'Minor localization fixes for French and German.' },
-        { id: 'v5', versionNumber: '2.5.0', channel: 'RELEASE', gameVersion: '2026.03.11-dcad8778f', date: '1 day ago', changelog: 'Compatibility update for the latest game patch. Added new dynamic lighting.' },
-        { id: 'v4', versionNumber: '2.4.5-beta', channel: 'BETA', gameVersion: '2026.02.28-b8e9f1a2', date: '1 week ago', changelog: 'Testing new durability mechanics. Expect bugs.' },
-        { id: 'v3', versionNumber: '2.4.1', channel: 'RELEASE', gameVersion: '2026.02.28-b8e9f1a2', date: '2 weeks ago', changelog: 'Added 5 new elemental wands.\nFixed visual bugs with particle effects.' },
-        { id: 'v2', versionNumber: '2.4.0', channel: 'RELEASE', gameVersion: '2026.01.15-a7c6d5e4', date: '1 month ago', changelog: 'Initial release of the expanded magic system. Includes 20 new spells and 3 new mob types.' },
-        { id: 'v1', versionNumber: '2.3.9', channel: 'RELEASE', gameVersion: '2026.01.15-a7c6d5e4', date: '2 months ago', changelog: 'Final update for the old magic system before the rewrite.' }
+        { id: 'v9', versionNumber: '3.1.0-pre.2', channel: 'BETA', gameVersion: '0.6.0-pre.2', date: '30 minutes ago', changelog: 'Latest Hytale prerelease preview. Stabilized menus, polished world loading, and one more pass on particles.' },
+        { id: 'v8', versionNumber: '3.1.0-pre.1.1', channel: 'ALPHA', gameVersion: '0.6.0-pre.1.1', date: '1 hour ago', changelog: 'Hotfix preview for the next Hytale build. Focused on crash recovery and startup stability.' },
+        { id: 'v7', versionNumber: '3.1.0-pre.1', channel: 'ALPHA', gameVersion: '0.6.0-pre.1', date: '2 hours ago', changelog: 'Early Hytale prerelease with the new rendering pipeline. Expect rough edges.' },
+        { id: 'v6', versionNumber: '3.0.4', channel: 'RELEASE', gameVersion: '0.5.4', date: '12 hours ago', changelog: 'Hytale release branch update. Minor localization fixes and a few stability improvements.' },
+        { id: 'v5', versionNumber: '3.0.3', channel: 'RELEASE', gameVersion: '0.5.3', date: '1 day ago', changelog: 'Compatibility update for Hytale 0.5.3. Added new dynamic lighting and UI polish.' },
+        { id: 'v4', versionNumber: '3.0.2-beta', channel: 'BETA', gameVersion: '0.5.2', date: '1 week ago', changelog: 'Testing new durability mechanics against Hytale 0.5.2. Expect bugs.' },
+        { id: 'v3', versionNumber: '3.0.1', channel: 'RELEASE', gameVersion: '0.5.1', date: '2 weeks ago', changelog: 'Added new elemental wand effects and fixed visual bugs with particle effects.' },
+        { id: 'v2', versionNumber: '3.0.0', channel: 'RELEASE', gameVersion: '0.5.0', date: '1 month ago', changelog: 'Initial release of the expanded magic system for Hytale 0.5.0.' },
+        { id: 'v1', versionNumber: '2.9.9', channel: 'RELEASE', gameVersion: '0.5.0-pre.9.2', date: '2 months ago', changelog: 'Final update for the old magic system before the Hytale prerelease branch changed over.' }
     ];
+
+    useEffect(() => {
+        if (!preferredGameVersion) return;
+        setSelectedVersion(preferredGameVersion);
+        setIsDropdownOpen(false);
+    }, [preferredGameVersion, showPreReleaseGameVersions, showExperimental]);
 
     const currentVersions = allVersions.filter(v => v.gameVersion === selectedVersion);
     const visibleVersions = currentVersions.filter(v => showExperimental || v.channel === 'RELEASE');
     const latestVer = visibleVersions[0];
+    const hasPreReleaseGameVersionEntries = preReleaseGameVersions.some(version => allVersions.some(v => v.gameVersion === version));
+    const hasReleaseGameVersionEntries = orderedGameVersions.some(version => !preReleaseGameVersionSet.has(version) && allVersions.some(v => v.gameVersion === version));
+    const forceShowPreReleaseGameVersions = hasPreReleaseGameVersionEntries && !hasReleaseGameVersionEntries;
+
+    useEffect(() => {
+        if (forceShowPreReleaseGameVersions && !showPreReleaseGameVersions) {
+            setShowPreReleaseGameVersions(true);
+        }
+    }, [forceShowPreReleaseGameVersions, showPreReleaseGameVersions]);
 
     const getVersionBadgeColor = (channel: string) => {
         switch(channel) {
@@ -191,6 +215,14 @@ export const InlineDownloadUI = () => {
                     <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                         <Download className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Download
                     </h3>
+                    {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && (
+                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
+                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
+                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showPreReleaseGameVersions ? 'translate-x-3 sm:translate-x-4' : ''}`} />
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Pre-Release Game Versions</span>
+                        </div>
+                    )}
                     <div className="mt-1 flex items-center gap-2 group cursor-pointer" onClick={() => setShowExperimental(!showExperimental)}>
                         <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
                             <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
@@ -213,7 +245,7 @@ export const InlineDownloadUI = () => {
                         </div>
                         {isDropdownOpen && (
                             <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
-                                {versions.map(v => (
+                                {gameVersions.map(v => (
                                     <div
                                         key={v}
                                         className={`px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate ${selectedVersion === v ? 'text-modtale-accent bg-blue-50/50 dark:bg-blue-500/10' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
