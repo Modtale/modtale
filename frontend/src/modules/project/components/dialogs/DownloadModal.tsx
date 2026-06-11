@@ -16,12 +16,14 @@ interface DownloadModalProps {
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
+    isInline?: boolean;
+    containerRef?: React.Ref<HTMLDivElement>;
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({
-                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory
+                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isInline = false, containerRef
                                                             }) => {
-    useScrollLock(show);
+    useScrollLock(show && !isInline);
     const [selectedGameVer, setSelectedGameVer] = useState<string>('');
     const [isListExpanded, setIsListExpanded] = useState(false);
     const [showPreReleaseGameVersions, setShowPreReleaseGameVersions] = useState(false);
@@ -37,6 +39,31 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     }, [versionsByGame, preReleaseGameVersionSet]);
 
     const forceShowPreReleaseGameVersions = hasPreReleaseGameVersionEntries && !hasReleaseGameVersionEntries;
+
+    const allVersions = useMemo(() => {
+        return Object.values(versionsByGame).flat();
+    }, [versionsByGame]);
+
+    const activeGameVersions = useMemo(() => {
+        return Object.keys(versionsByGame).filter(gv => Array.isArray(versionsByGame[gv]) && versionsByGame[gv].length > 0);
+    }, [versionsByGame]);
+
+    const preReleaseBuilds = useMemo(() => {
+        return Object.entries(versionsByGame)
+            .filter(([gv]) => preReleaseGameVersionSet.has(gv))
+            .flatMap(([_, builds]) => builds);
+    }, [versionsByGame, preReleaseGameVersionSet]);
+
+    const experimentalBuilds = useMemo(() => {
+        return allVersions.filter(v => v.channel === 'ALPHA' || v.channel === 'BETA');
+    }, [allVersions]);
+
+    const experimentalBuildsInReleaseGameVersions = useMemo(() => {
+        return Object.entries(versionsByGame)
+            .filter(([gv]) => !preReleaseGameVersionSet.has(gv))
+            .flatMap(([_, builds]) => builds)
+            .filter(v => v.channel === 'ALPHA' || v.channel === 'BETA');
+    }, [versionsByGame, preReleaseGameVersionSet]);
 
     const onlyExperimentalArePreRelease = useMemo(() => {
         const hasExperimentalInPreRelease = Object.entries(versionsByGame).some(([gv, builds]) =>
@@ -111,6 +138,18 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     const effectiveShowExperimental = showExperimental || forceShowExperimental || (effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental);
 
+    const showAlphaBetaToggle = useMemo(() => {
+        const isLockedOn = forceShowExperimental || (effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental);
+        const isLockedOff = experimentalBuilds.length === 0;
+        return !(isLockedOn || isLockedOff);
+    }, [forceShowExperimental, effectiveShowPreReleaseGameVersions, onlyPreReleaseAreExperimental, experimentalBuilds]);
+
+    const showPreReleaseToggle = useMemo(() => {
+        const isLockedOn = forceShowPreReleaseGameVersions || (effectiveShowExperimental && onlyExperimentalArePreRelease);
+        const isLockedOff = !hasPreReleaseGameVersionEntries;
+        return !(isLockedOn || isLockedOff);
+    }, [forceShowPreReleaseGameVersions, effectiveShowExperimental, onlyExperimentalArePreRelease, hasPreReleaseGameVersionEntries]);
+
     useEffect(() => {
         if (!show || !preferredGameVersion) return;
         setSelectedGameVer(preferredGameVersion);
@@ -154,131 +193,139 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         return versions.filter((gv: string) => gv !== selectedGameVer);
     };
 
-    return (
-        <div className={theme.components.modalOverlay} onClick={onClose}>
-            <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
-                <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
-                    <div>
-                        <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><Download className={`w-5 h-5 ${theme.colors.accent}`} /> Download</h3>
-                        {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && !(showExperimental && onlyExperimentalArePreRelease) && (
-                            <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
-                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
-                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
-                                </div>
-                                <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Pre-Release Game Versions</span>
+    const content = (
+        <div ref={containerRef} className={`${isInline ? 'w-full overflow-hidden relative flex flex-col transform transition-transform duration-500' : 'fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100]'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
+            <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
+                <div>
+                    <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><Download className={`w-5 h-5 ${theme.colors.accent}`} /> Download</h3>
+                    {showPreReleaseToggle && (
+                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
+                            <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
+                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
                             </div>
-                        )}
-                        {hasExperimentalForSelectedGameVersion && hasReleaseForSelectedGameVersion && !(effectiveShowPreReleaseGameVersions && onlyPreReleaseAreExperimental) && (
-                            <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
-                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
-                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowExperimental ? 'translate-x-4' : ''}`} />
-                                </div>
-                                <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
+                            <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Pre-Release Game Versions</span>
+                        </div>
+                    )}
+                    {showAlphaBetaToggle && (
+                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                            <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
+                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowExperimental ? 'translate-x-4' : ''}`} />
                             </div>
-                        )}
-                    </div>
-                    <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
-                </div>
-
-                <div className={`p-6 overflow-visible relative flex-1 flex flex-col justify-center`}>
-                    <div className="mb-6">
-                        <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Game Version</label>
-                        <DropdownSelect
-                            options={gameVersionOptions}
-                            value={selectedGameVer}
-                            onChange={setSelectedGameVer}
-                            placeholder="Select Game Version"
-                            emptyLabel="No versions found"
-                            showSelectedCheck={false}
-                            buttonClassName="w-full flex items-center justify-between gap-3 p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all duration-300"
-                            menuClassName="left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 overflow-hidden"
-                            optionClassName="w-full flex items-center justify-between text-left px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-                        />
-                    </div>
-
-                    {latestVer ? (
-                        <>
-                            <Link
-                                to="#"
-                                onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, selectedGameVer, latestVer.dependencies, latestVer.channel); }}
-                                className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
-                            >
-                                <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
-                                <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
-                                    v{latestVer.versionNumber}
-                                    {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
-                                </div>
-                                {otherCompatibleVersions(latestVer).length > 0 && (
-                                    <div className="text-[11px] font-semibold text-blue-50/95 z-10">
-                                        Also supports: {otherCompatibleVersions(latestVer).join(', ')}
-                                    </div>
-                                )}
-                            </Link>
-
-                            <div className="relative mb-6">
-                                <div className="absolute inset-0 flex items-center"><div className={`w-full border-t ${theme.colors.borderFaint}`}></div></div>
-                                <div className="relative flex justify-center"><span className={`bg-white dark:bg-slate-900 px-3 text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest`}>Other Versions</span></div>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setIsListExpanded(!isListExpanded)}
-                                className={`w-full flex items-center justify-between p-3 rounded-xl border ${theme.colors.border} bg-white dark:bg-slate-900 ${theme.colors.bgSurfaceHover} transition-colors group shadow-sm`}
-                            >
-                                <span className={`font-bold ${theme.colors.textPrimary} text-sm`}>View all files for {selectedGameVer}</span>
-                                <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted} transition-transform ${isListExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {isListExpanded && (
-                                <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    {sortedVersions.map((ver: any) => (
-                                        <div key={ver.id} className={`flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-colors`}>
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-lg ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} flex items-center justify-center ${theme.colors.textMuted}`}><FileText className="w-5 h-5" /></div>
-                                                <div>
-                                                    <div className={`font-bold ${theme.colors.textPrimary} text-sm flex items-center gap-2`}>
-                                                        v{ver.versionNumber}
-                                                        {ver.channel !== 'RELEASE' && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
-                                                    </div>
-                                                    <div className={`text-xs ${theme.colors.textMuted}`}>{formatTimeAgo(ver.releaseDate)}</div>
-                                                    {otherCompatibleVersions(ver).length > 0 && (
-                                                        <div className={`text-[11px] ${theme.colors.textSecondary}`}>
-                                                            Also supports: {otherCompatibleVersions(ver).join(', ')}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <Link
-                                                to="#"
-                                                onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, selectedGameVer, ver.dependencies, ver.channel); }}
-                                                className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
-                                            >
-                                                <Download className="w-4 h-4" />
-                                            </Link>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className={`text-center py-12 ${theme.colors.textMuted} flex flex-col items-center gap-2`}>
-                            <AlertCircle className="w-8 h-8 opacity-50" />
-                            <p className="font-medium">No compatible versions found.</p>
-                            {!effectiveShowExperimental && currentVersions.length > 0 && hasExperimentalForSelectedGameVersion && hasReleaseForSelectedGameVersion && (
-                                <button type="button" onClick={onToggleExperimental} className={`text-xs ${theme.colors.accent} font-bold hover:underline`}>
-                                    Show Beta/Alpha versions
-                                </button>
-                            )}
+                            <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
                         </div>
                     )}
                 </div>
-
-                <div className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
-                    <button type="button" onClick={onViewHistory} className={`text-xs ${theme.colors.textMuted} hover:${theme.colors.accent} font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors w-full`}>
-                        View Full Changelog <ChevronRight className="w-3 h-3" />
-                    </button>
-                </div>
+                {!isInline && (
+                    <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
+                )}
             </div>
+
+            <div className={`p-6 overflow-visible relative flex-1 flex flex-col justify-start`}>
+                <div className="mb-6">
+                    <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Game Version</label>
+                    <DropdownSelect
+                        options={gameVersionOptions}
+                        value={selectedGameVer}
+                        onChange={setSelectedGameVer}
+                        placeholder="Select Game Version"
+                        emptyLabel="No versions found"
+                        showSelectedCheck={false}
+                        buttonClassName="w-full flex items-center justify-between gap-3 p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all duration-300"
+                        menuClassName="left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 overflow-hidden"
+                        optionClassName="w-full flex items-center justify-between text-left px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    />
+                </div>
+
+                {latestVer ? (
+                    <>
+                        <Link
+                            to="#"
+                            onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, selectedGameVer, latestVer.dependencies, latestVer.channel); }}
+                            className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
+                        >
+                            <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
+                            <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
+                                v{latestVer.versionNumber}
+                                {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
+                            </div>
+                            {otherCompatibleVersions(latestVer).length > 0 && (
+                                <div className="text-[11px] font-semibold text-blue-50/95 z-10">
+                                    Also supports: {otherCompatibleVersions(latestVer).join(', ')}
+                                </div>
+                            )}
+                        </Link>
+
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 flex items-center"><div className={`w-full border-t ${theme.colors.borderFaint}`}></div></div>
+                            <div className="relative flex justify-center"><span className={`bg-white dark:bg-slate-900 px-3 text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest`}>Other Versions</span></div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setIsListExpanded(!isListExpanded)}
+                            className={`w-full flex items-center justify-between p-3 rounded-xl border ${theme.colors.border} bg-white dark:bg-slate-900 ${theme.colors.bgSurfaceHover} transition-colors group shadow-sm`}
+                        >
+                            <span className={`font-bold ${theme.colors.textPrimary} text-sm`}>View all files for {selectedGameVer}</span>
+                            <ChevronDown className={`w-4 h-4 ${theme.colors.textMuted} transition-transform ${isListExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isListExpanded && (
+                            <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                {sortedVersions.map((ver: any) => (
+                                    <div key={ver.id} className={`flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-colors`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-lg ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} flex items-center justify-center ${theme.colors.textMuted}`}><FileText className="w-5 h-5" /></div>
+                                            <div>
+                                                <div className={`font-bold ${theme.colors.textPrimary} text-sm flex items-center gap-2`}>
+                                                    v{ver.versionNumber}
+                                                    {ver.channel !== 'RELEASE' && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
+                                                </div>
+                                                <div className={`text-xs ${theme.colors.textMuted}`}>{formatTimeAgo(ver.releaseDate)}</div>
+                                                {otherCompatibleVersions(ver).length > 0 && (
+                                                    <div className={`text-[11px] ${theme.colors.textSecondary}`}>
+                                                        Also supports: {otherCompatibleVersions(ver).join(', ')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Link
+                                            to="#"
+                                            onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, selectedGameVer, ver.dependencies, ver.channel); }}
+                                            className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
+                                        >
+                                            <Download className="w-4 h-4" />
+                                        </Link>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-500 min-h-[160px]">
+                        <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-50 mb-2" aria-hidden="true" />
+                        <p className="font-medium text-xs sm:text-sm text-center">No compatible versions.</p>
+                        {!effectiveShowExperimental && currentVersions.length > 0 && (
+                            <button onClick={onToggleExperimental} className="mt-2 text-[10px] sm:text-[11px] font-bold text-modtale-accent hover:underline">
+                                Show experimental
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            <div className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
+                <button type="button" onClick={onViewHistory} className={`text-xs ${theme.colors.textMuted} hover:${theme.colors.accent} font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors w-full`}>
+                    View Full Changelog <ChevronRight className="w-3 h-3" />
+                </button>
+            </div>
+        </div>
+    );
+
+    if (isInline) return content;
+
+    return (
+        <div className={theme.components.modalOverlay} onClick={onClose}>
+            {content}
         </div>
     );
 };

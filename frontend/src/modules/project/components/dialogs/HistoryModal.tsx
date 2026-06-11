@@ -15,6 +15,8 @@ interface HistoryModalProps {
     onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     hasExperimentalVersions?: boolean;
     hasStableVersions?: boolean;
+    isInline?: boolean;
+    inlineHeight?: number;
 }
 
 const HistoryVersionItem = memo(({
@@ -76,9 +78,9 @@ const HistoryVersionItem = memo(({
 });
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
-    show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions
+    show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions, isInline = false, inlineHeight
 }) => {
-    useScrollLock(show);
+    useScrollLock(show && !isInline);
     const [expandedChangelog, setExpandedChangelog] = useState<string | null>(null);
 
     const actualHasExperimental = useMemo(() => {
@@ -120,43 +122,53 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
         onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     }, [onDownload]);
 
-    if (!show) return null;
+    if (!show && !isInline) return null;
+
+    const content = (
+        <div
+            className={`${isInline ? 'w-full overflow-hidden relative flex flex-col transform transition-transform duration-500' : 'fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-3xl max-h-[85dvh] flex flex-col z-[100]'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`}
+            style={isInline && inlineHeight ? { height: `${inlineHeight}px` } : undefined}
+            onClick={e => e.stopPropagation()}
+        >
+            <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
+                <div>
+                    <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><List className={`w-5 h-5 ${theme.colors.accent}`} /> Changelog</h3>
+                    {actualHasExperimental && actualHasStable && (
+                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                            <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
+                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showExperimental ? 'translate-x-4' : ''}`} />
+                            </div>
+                            <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
+                        </div>
+                    )}
+                </div>
+                <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`} aria-label="Close Changelog"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className={`p-6 overflow-y-auto flex-1 relative`}>
+                <div className="space-y-6">
+                    {visibleHistory.map((ver: any) => {
+                        return (
+                            <HistoryVersionItem
+                                key={ver.id}
+                                ver={ver}
+                                isExpanded={expandedChangelog === ver.id}
+                                onToggleExpand={handleToggleExpand}
+                                onDownload={handleDownloadClick}
+                                badgeClass={getVersionBadgeColor(ver.channel)}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+
+    if (isInline) return content;
 
     return (
         <div className={theme.components.modalOverlay} onClick={onClose}>
-            <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-3xl max-h-[85dvh] flex flex-col z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
-                <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
-                    <div>
-                        <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><List className={`w-5 h-5 ${theme.colors.accent}`} /> Changelog</h3>
-                        {actualHasExperimental && actualHasStable && (
-                            <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
-                                <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
-                                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showExperimental ? 'translate-x-4' : ''}`} />
-                                </div>
-                                <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
-                            </div>
-                        )}
-                    </div>
-                    <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
-                </div>
-
-                <div className={`p-6 overflow-y-auto flex-1 relative`}>
-                    <div className="space-y-6">
-                        {visibleHistory.map((ver: any) => {
-                            return (
-                                <HistoryVersionItem
-                                    key={ver.id}
-                                    ver={ver}
-                                    isExpanded={expandedChangelog === ver.id}
-                                    onToggleExpand={handleToggleExpand}
-                                    onDownload={handleDownloadClick}
-                                    badgeClass={getVersionBadgeColor(ver.channel)}
-                                />
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
+            {content}
         </div>
     );
 };
