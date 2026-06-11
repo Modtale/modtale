@@ -6,7 +6,7 @@ import type { VersionFormData } from './FormShared';
 import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
-import type { ManifestDependencySuggestion } from '@/types';
+import type { ManifestDependencySuggestion, ProjectDependency } from '@/types';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -19,12 +19,13 @@ interface VersionFieldsProps {
     isModpack?: boolean;
     projectType?: string;
     existingVersions?: string[];
+    previousDependencies?: ProjectDependency[];
     disabled?: boolean;
     hideFilePicker?: boolean;
     currentProjectId?: string;
 }
 
-export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], disabled, hideFilePicker = false, currentProjectId }) => {
+export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], previousDependencies, disabled, hideFilePicker = false, currentProjectId }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [availableGameVersions, setAvailableGameVersions] = useState<string[]>([]);
     const [loadingVersions, setLoadingVersions] = useState(false);
@@ -319,6 +320,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         onChange={(deps) => onChange({ ...data, projectIds: deps })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Dependency"
+                        previousDependencies={previousDependencies}
                         currentProjectId={currentProjectId}
                         isModpack={false}
                         disabled={disabled}
@@ -335,6 +337,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         onChange={(deps) => onChange({ ...data, projectIds: deps })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Projects"
+                        previousDependencies={previousDependencies}
                         isModpack={true}
                         disabled={disabled}
                     />

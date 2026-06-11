@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { User, Package, Users, Code, BarChart2, Bell } from 'lucide-react';
+import { User, Package, Users, Code, BarChart2, Bell, Trophy } from 'lucide-react';
 import type { User as UserType } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 
@@ -10,6 +10,7 @@ import { Analytics } from './Analytics';
 import { Notifications } from './Notifications';
 import { ManageProfile } from './ManageProfile';
 import { ManageOrganization } from '@/modules/organization/views/ManageOrganization';
+import { ManageJams } from './ManageJams';
 
 interface DashboardProps {
     user: UserType | null;
@@ -50,6 +51,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
                             <nav className="space-y-1">
                                 <SidebarLink to={SiteRoutes.dashboardProfile()} icon={User} label="Manage Profile" />
                                 <SidebarLink to={SiteRoutes.dashboardProjects()} icon={Package} label="Manage Projects" />
+                                <SidebarLink to={`${SiteRoutes.dashboard()}/jams`} icon={Trophy} label="Manage Jams" />
                                 <SidebarLink to={SiteRoutes.dashboardOrgs()} icon={Users} label="Organizations" />
                                 <SidebarLink to={SiteRoutes.dashboardAnalytics()} icon={BarChart2} label="Analytics" />
                                 <SidebarLink to={SiteRoutes.dashboardNotifications()} icon={Bell} label="Notifications" />
@@ -65,6 +67,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
                                 <Route path="/" element={<Navigate to="projects" replace />} />
                                 <Route path="profile" element={<ManageProfile user={user} onUpdate={onRefreshUser || (() => {})} />} />
                                 <Route path="projects" element={<ManageProjects user={user} />} />
+                                <Route path="jams" element={<ManageJams user={user} />} />
                                 <Route path="orgs" element={<ManageOrganization user={user} />} />
                                 <Route path="analytics" element={<Analytics />} />
                                 <Route path="analytics/project/:id" element={<Analytics />} />

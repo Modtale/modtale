@@ -184,7 +184,6 @@ if (classification) {
                 else if (view === 'trending') categoryParam = '&category=trending';
 
                 const searchParamStr = qParam ? `&search=${encodeURIComponent(qParam)}` : '';
-
                 const tagsVal = searchParams.get('tags') || '';
                 const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
 

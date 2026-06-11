@@ -1,7 +1,9 @@
 package net.modtale.controller.system;
 
 import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.jam.Modjam;
 import net.modtale.model.project.Project;
+import net.modtale.service.ModjamService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
 import org.springframework.http.MediaType;
@@ -9,8 +11,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,15 +22,18 @@ import java.util.Set;
 public class SitemapController {
 
     private final SearchService searchService;
+    private final ModjamService modjamService;
     private final ProjectService projectService;
     private final String baseUrl;
 
     public SitemapController(
             SearchService searchService,
+            ModjamService modjamService,
             ProjectService projectService,
             AppFrontendProperties frontendProperties
     ) {
         this.searchService = searchService;
+        this.modjamService = modjamService;
         this.projectService = projectService;
         this.baseUrl = frontendProperties.url();
     }
@@ -44,14 +50,33 @@ public class SitemapController {
         addUrl(xml, baseUrl + "/worlds", "0.9", LocalDate.now());
         addUrl(xml, baseUrl + "/data", "0.9", LocalDate.now());
         addUrl(xml, baseUrl + "/art", "0.9", LocalDate.now());
-
+        addUrl(xml, baseUrl + "/jams", "0.9", LocalDate.now());
         addUrl(xml, baseUrl + "/api-docs", "0.8", LocalDate.now());
 
         Set<String> activeAuthors = new HashSet<>();
 
-        List<Project> projects = searchService.getPublishedProjects();
+        List<Modjam> jams = modjamService.getAllJams();
+        for (Modjam jam : jams) {
+            if ("DRAFT".equals(jam.getStatus())) continue;
 
+            String priority = "COMPLETED".equals(jam.getStatus()) ? "0.6" : "0.8";
+            LocalDate lastMod = jam.getUpdatedAt() != null
+                    ? jam.getUpdatedAt().atZone(ZoneOffset.UTC).toLocalDate()
+                    : LocalDate.now();
+
+            if (jam.getSlug() != null && !jam.getSlug().isBlank()) {
+                addUrl(xml, baseUrl + "/jam/" + jam.getSlug(), priority, lastMod);
+            }
+
+            if (jam.getHostName() != null && !jam.getHostName().isBlank()) {
+                activeAuthors.add(jam.getHostName());
+            }
+        }
+
+        List<Project> projects = searchService.getPublishedProjects();
         for (Project p : projects) {
+            if (p.getClassification() == null) continue;
+
             if (p.getUpdatedAt() != null) {
                 addUrl(xml, baseUrl + projectService.getProjectLink(p), "0.8", parseDate(p.getUpdatedAt()));
                 if (p.getAuthorId() != null && !p.getAuthorId().isBlank()) {
@@ -80,8 +105,8 @@ public class SitemapController {
 
     private LocalDate parseDate(String dateStr) {
         try {
-            if (dateStr == null) return LocalDate.now();
-            return LocalDate.parse(dateStr);
+            if (dateStr == null || dateStr.length() < 10) return LocalDate.now();
+            return LocalDate.parse(dateStr.substring(0, 10));
         } catch (DateTimeParseException e) {
             return LocalDate.now();
         }

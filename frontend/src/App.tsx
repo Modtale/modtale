@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
@@ -28,6 +28,8 @@ const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
 const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
 const Browse = lazy(() => import('@/modules/discovery/views/Browse').then((module) => ({ default: module.Browse })));
+const JamsList = lazy(() => import('@/modules/jam/views/JamsList').then((module) => ({ default: module.JamsList })));
+const JamDetail = lazy(() => import('@/modules/jam/views/JamDetail').then((module) => ({ default: module.JamDetail })));
 const ProjectDetails = lazy(() => import('@/modules/project/views/ProjectDetails').then((module) => ({ default: module.ProjectDetails })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
 const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((module) => ({ default: module.Dashboard })));
@@ -50,7 +52,22 @@ const hasLikelyAuthCookie = () => {
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
+    const previousPathname = useRef<string | null>(null);
     useEffect(() => {
+        const prev = previousPathname.current;
+        previousPathname.current = pathname;
+        if (!prev) return;
+
+        const jamTabPattern = /^\/jam\/[^/]+\/(overview|rules|entries)$/;
+        const prevJamTabMatch = prev.match(jamTabPattern);
+        const nextJamTabMatch = pathname.match(jamTabPattern);
+
+        if (prevJamTabMatch && nextJamTabMatch) {
+            const prevJamBase = prev.replace(/\/(overview|rules|entries)$/, '');
+            const nextJamBase = pathname.replace(/\/(overview|rules|entries)$/, '');
+            if (prevJamBase === nextJamBase) return;
+        }
+
         window.scrollTo(0, 0);
     }, [pathname]);
     return null;
@@ -236,6 +253,9 @@ const AppContent: React.FC = () => {
                                     <Route path="/worlds" element={renderBrowse('SAVE')} />
                                     <Route path="/art" element={renderBrowse('ART')} />
                                     <Route path="/data" element={renderBrowse('DATA')} />
+                                    <Route path={SiteRoutes.jams()} element={<JamsList currentUser={user} />} />
+                                    <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
+                                    <Route path="/jam/:id/edit" element={<JamDetail currentUser={user} />} />
 
                                     <Route path="/upload" element={
                                         loadingAuth ? <RouteLoading /> :
