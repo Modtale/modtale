@@ -18,25 +18,34 @@ export const getCloudflareUrl = (url: string, width: number, quality: number) =>
         return url;
     }
 
-    if (isLocalEnvironment()) {
-        return url;
-    }
+    const isLocal = isLocalEnvironment();
+    const cloudflareOrigin = 'https://modtale.net';
+    let canUseCloudflareProxy = !isLocal;
 
     if (url.startsWith('http')) {
-        if (typeof window !== 'undefined') {
-            try {
-                const srcHost = new URL(url).hostname;
+        try {
+            const srcHost = new URL(url).hostname;
+            const isFirstPartyCdn = srcHost === 'cdn.modtale.net';
+
+            if (typeof window !== 'undefined') {
                 const appHost = window.location.hostname;
                 const isSameHost = srcHost === appHost;
                 const isSubdomainOfAppHost = srcHost.endsWith(`.${appHost}`);
-                const isFirstPartyCdn = srcHost === 'cdn.modtale.net';
+
                 if (!isSameHost && !isSubdomainOfAppHost && !isFirstPartyCdn) return url;
-            } catch {
-                return url;
+                canUseCloudflareProxy = !isLocal || isFirstPartyCdn;
+            } else {
+                canUseCloudflareProxy = isFirstPartyCdn;
             }
-        } else {
+        } catch {
             return url;
         }
+    } else if (isLocal) {
+        return url;
+    }
+
+    if (!canUseCloudflareProxy) {
+        return url;
     }
 
     const steppedWidth = getSteppedWidth(width);
@@ -46,7 +55,9 @@ export const getCloudflareUrl = (url: string, width: number, quality: number) =>
         absoluteUrl = `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
     }
 
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const origin = typeof window !== 'undefined' && !isLocal
+        ? window.location.origin
+        : cloudflareOrigin;
 
     return `${origin}/cdn-cgi/image/width=${steppedWidth},quality=${quality},format=auto,onerror=redirect/${absoluteUrl}`;
 };

@@ -11,41 +11,23 @@ vi.mock('@/modules/project/components/ProjectCard', () => ({
     )
 }));
 
-describe('ProjectGrid progressive reveal', () => {
+describe('ProjectGrid fast render', () => {
     let container: HTMLDivElement;
     let root: Root;
-    let createdImages: Array<{ onload: null | (() => void); onerror: null | (() => void); complete: boolean; naturalWidth: number; src: string }>;
-
     beforeEach(() => {
         container = document.createElement('div');
         document.body.appendChild(container);
         root = createRoot(container);
-        createdImages = [];
-
-        class MockImage {
-            onload: null | (() => void) = null;
-            onerror: null | (() => void) = null;
-            complete = false;
-            naturalWidth = 0;
-            src = '';
-
-            constructor() {
-                createdImages.push(this);
-            }
-        }
-
-        vi.stubGlobal('Image', MockImage as any);
     });
 
     afterEach(async () => {
         await act(async () => {
             root.unmount();
         });
-        vi.unstubAllGlobals();
         container.remove();
     });
 
-    it('loads and reveals cards one at a time as each icon preload completes', async () => {
+    it('renders all cards immediately without waiting for image preloads', async () => {
         const items = [
             { id: 'project-1', title: 'Project 1' },
             { id: 'project-2', title: 'Project 2' },
@@ -80,31 +62,7 @@ describe('ProjectGrid progressive reveal', () => {
             );
         });
 
-        let cards = Array.from(container.querySelectorAll('[data-project-id]'));
-        expect(cards).toHaveLength(0);
-        expect(createdImages).toHaveLength(1);
-
-        await act(async () => {
-            createdImages[0]?.onload?.();
-        });
-
-        cards = Array.from(container.querySelectorAll('[data-project-id]'));
-        expect(cards).toHaveLength(1);
-        expect(createdImages).toHaveLength(2);
-
-        await act(async () => {
-            createdImages[1]?.onload?.();
-        });
-
-        cards = Array.from(container.querySelectorAll('[data-project-id]'));
-        expect(cards).toHaveLength(2);
-        expect(createdImages).toHaveLength(3);
-
-        await act(async () => {
-            createdImages[2]?.onload?.();
-        });
-
-        cards = Array.from(container.querySelectorAll('[data-project-id]'));
+        const cards = Array.from(container.querySelectorAll('[data-project-id]'));
         expect(cards).toHaveLength(3);
     });
 });

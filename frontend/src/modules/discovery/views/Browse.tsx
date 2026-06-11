@@ -32,12 +32,9 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
-    const [isMounted, setIsMounted] = useState(false);
-
     const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
     const hasUsableBrowseSSRData = Boolean(initialData?.browseData) && initialData?.browseDataReady !== false;
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
-    const canRenderHydratedContent = useSSR || isMounted;
 
     const {
         page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
@@ -61,7 +58,6 @@ export const Browse: React.FC<BrowseViewProps> = ({
     }, [location.pathname, searchParams]);
 
     useEffect(() => {
-        setIsMounted(true);
         const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('modtale_view_style') : null;
         if (saved === 'grid' || saved === 'list' || saved === 'compact') {
             setViewStyle(saved as 'grid' | 'list' | 'compact');
@@ -251,17 +247,17 @@ export const Browse: React.FC<BrowseViewProps> = ({
                             />
                         </div>
 
-                        {!canRenderHydratedContent || isPending ? (
-                            <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />
-                        ) : items.length > 0 ? (
+                        {items.length > 0 ? (
                             <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
+                        ) : isPending || loading ? (
+                            <BrowseSkeletons viewStyle={viewStyle} count={Math.min(itemsPerPage, 12)} />
                         ) : (
                             <div className="mt-8 animate-in fade-in zoom-in-95 duration-500">
                                 <EmptyState icon={PackageSearch} title="No matches found" message="Try adjusting your search terms or filters to find what you're looking for." />
                             </div>
                         )}
 
-                        {totalPages > 1 && canRenderHydratedContent && (
+                        {totalPages > 1 && (
                             <nav aria-label="Pagination" className="mt-12 flex flex-col md:flex-row justify-center items-center gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                 <div className="rounded-2xl border border-modtale-accent/20 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl px-2 py-2 flex items-center gap-1">
                                     {page === 0 ? (
