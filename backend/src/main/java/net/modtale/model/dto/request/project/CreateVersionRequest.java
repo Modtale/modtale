@@ -1,0 +1,75 @@
+package net.modtale.model.dto.request.project;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+
+public class CreateVersionRequest {
+
+    @NotBlank(message = "A version number is required before we can upload a project version.")
+    private String versionNumber;
+
+    private List<@NotBlank(message = "Game version entries cannot be blank.") String> gameVersions;
+    private MultipartFile file;
+    private List<@NotBlank(message = "Dependency entries cannot be blank.") String> modIds;
+
+    @Size(max = 50000, message = "Version changelogs cannot exceed 50,000 characters.")
+    private String changelog;
+
+    @Pattern(
+            regexp = "(?i)RELEASE|BETA|ALPHA",
+            message = "Version channels must be RELEASE, BETA, or ALPHA."
+    )
+    private String channel = "RELEASE";
+
+    public String getVersionNumber() {
+        return versionNumber;
+    }
+
+    public void setVersionNumber(String versionNumber) {
+        this.versionNumber = versionNumber;
+    }
+
+    public List<String> getGameVersions() {
+        return gameVersions;
+    }
+
+    public void setGameVersions(List<String> gameVersions) {
+        this.gameVersions = gameVersions;
+    }
+
+    public MultipartFile getFile() {
+        return file;
+    }
+
+    public void setFile(MultipartFile file) {
+        this.file = file;
+    }
+
+    public List<String> getModIds() {
+        return modIds;
+    }
+
+    public void setModIds(List<String> modIds) {
+        this.modIds = modIds;
+    }
+
+    public String getChangelog() {
+        return changelog;
+    }
+
+    public void setChangelog(String changelog) {
+        this.changelog = changelog;
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannel(String channel) {
+        this.channel = channel;
+    }
+}

@@ -19,7 +19,7 @@ public class AsyncConfig {
         executor.setCorePoolSize(5);
         executor.setMaxPoolSize(20);
         executor.setQueueCapacity(500);
-        executor.setThreadNamePrefix("ModTale-Async-");
+        executor.setThreadNamePrefix("Modtale-Async-");
         executor.initialize();
         return executor;
     }

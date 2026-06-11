@@ -44,7 +44,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-2">
                     {loading ? (
                         <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
                             <Loader2 className="w-6 h-6 animate-spin text-modtale-accent" />
@@ -63,7 +63,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
                             {users.map(u => (
                                 <Link
                                     key={u.id}
-                                    to={SiteRoutes.creator(u.username)}
+                                    to={SiteRoutes.creator(u.id, u.username)}
                                     onClick={onClose}
                                     className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
                                 >

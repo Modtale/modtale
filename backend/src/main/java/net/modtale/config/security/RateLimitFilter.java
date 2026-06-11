@@ -9,13 +9,13 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.ApiKeyService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -29,9 +29,11 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    @Autowired
-    @Lazy
-    private ApiKeyService apiKeyService;
+    private final ApiKeyService apiKeyService;
+
+    public RateLimitFilter(@Lazy ApiKeyService apiKeyService) {
+        this.apiKeyService = apiKeyService;
+    }
 
     private final Cache<String, Bucket> bucketCache = Caffeine.newBuilder()
             .maximumSize(100_000)
@@ -53,7 +55,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (path.equals("/api/v1/status") || path.equals("/api/v1/auth/session")) {
+        if (path.equals("/api/v1/status") || path.equals("/api/v1/auth/session") || path.startsWith("/api/v1/docs/")) {
             chain.doFilter(req, res);
             return;
         }
@@ -83,8 +85,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 sendError(res, 401, "Unauthorized", "Invalid API Key.");
                 return;
             }
-        } else if (isAuthenticatedUser()) {
-            User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        } else if (isAuthenticatedUser(req)) {
+            Authentication authentication = currentAuthentication(req);
+            User user = (User) authentication.getPrincipal();
             limitKey = "USER:" + user.getId();
 
             boolean isAdmin = user.getRoles() != null && user.getRoles().contains("ADMIN");
@@ -133,11 +136,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
         });
     }
 
-    private boolean isAuthenticatedUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    private boolean isAuthenticatedUser(HttpServletRequest request) {
+        Authentication auth = currentAuthentication(request);
         return auth != null && auth.isAuthenticated() &&
                 auth.getPrincipal() instanceof User &&
                 !"anonymousUser".equals(auth.getName());
+    }
+
+    private Authentication currentAuthentication(HttpServletRequest request) {
+        return request.getUserPrincipal() instanceof Authentication auth ? auth : null;
     }
 
     private boolean isFrontendRequest(HttpServletRequest req) {
@@ -169,8 +176,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private void sendError(HttpServletResponse res, int status, String error, String message) throws IOException {
-        res.setStatus(status);
-        res.setContentType("application/json");
-        res.getWriter().write(String.format("{\"error\": \"%s\", \"message\": \"%s\"}", error, message));
+        HttpStatus httpStatus = HttpStatus.resolve(status);
+        if (httpStatus == null) {
+            httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        ErrorMessageUtils.writeJsonError(res, httpStatus, message);
     }
 }

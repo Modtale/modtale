@@ -1,4 +1,4 @@
-import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { captureError } from '../../../utils/errorTracking.ts';
 
@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
         console.error("Uncaught error:", error, errorInfo);
-        captureError(error, { componentStack: errorInfo.componentStack });
+        void captureError(error, { componentStack: errorInfo.componentStack });
     }
 
     public render() {

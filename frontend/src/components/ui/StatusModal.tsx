@@ -1,5 +1,6 @@
-import React, {useEffect, useRef, useState} from 'react';
-import { Check, AlertTriangle, ArrowRight, X, Trash2, Info } from 'lucide-react';
+import React, {useEffect, useRef} from 'react';
+import { Check, AlertTriangle, ArrowRight, X, Info } from 'lucide-react';
+import { theme } from '@/styles/theme';
 
 interface Particle {
     x: number;
@@ -103,7 +104,7 @@ const Confetti: React.FC = () => {
 interface StatusModalProps {
     type: 'success' | 'error' | 'warning' | 'info';
     title: string;
-    message: string;
+    message: React.ReactNode;
     onClose: () => void;
     actionLabel?: string;
     onAction?: () => void;
@@ -111,52 +112,65 @@ interface StatusModalProps {
 }
 
 export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, onClose, actionLabel, onAction, secondaryLabel }) => {
-    let icon = <Check className="w-8 h-8" />;
-    let colorClass = 'bg-modtale-accent text-white';
-    let bgClass = 'bg-modtale-accent/10';
-    let borderClass = 'border-modtale-accent';
-    let buttonClass = 'bg-modtale-accent hover:bg-modtale-accentHover';
-
-    if (type === 'error') {
-        icon = <AlertTriangle className="w-8 h-8" />;
-        colorClass = 'bg-red-500 text-white';
-        bgClass = 'bg-red-500/10';
-        borderClass = 'border-red-500';
-        buttonClass = 'bg-red-500 hover:bg-red-600';
-    } else if (type === 'warning') {
-        icon = <Trash2 className="w-8 h-8" />;
-        colorClass = 'bg-orange-500 text-white';
-        bgClass = 'bg-orange-500/10';
-        borderClass = 'border-orange-500';
-        buttonClass = 'bg-red-500 hover:bg-red-600';
-    } else if (type === 'info') {
-        icon = <Info className="w-8 h-8" />;
-        colorClass = 'bg-blue-500 text-white';
-        bgClass = 'bg-blue-500/10';
-        borderClass = 'border-blue-500';
-        buttonClass = 'bg-blue-600 hover:bg-blue-700';
-    }
+    const config = {
+        success: {
+            icon: <Check className="w-8 h-8" />,
+            shell: 'border-modtale-accent/30 shadow-[0_40px_120px_-45px_rgba(37,99,235,0.6)]',
+            hero: 'from-modtale-accent/18 via-sky-500/10 to-transparent dark:from-modtale-accent/18 dark:via-sky-500/10 dark:to-transparent',
+            badge: 'bg-modtale-accent text-white',
+            button: theme.components.buttonPrimary,
+        },
+        error: {
+            icon: <AlertTriangle className="w-8 h-8" />,
+            shell: 'border-red-500/25 shadow-[0_40px_120px_-45px_rgba(239,68,68,0.55)]',
+            hero: 'from-red-500/16 via-rose-500/10 to-transparent dark:from-red-500/20 dark:via-rose-500/10 dark:to-transparent',
+            badge: 'bg-red-500 text-white',
+            button: theme.components.buttonDanger,
+        },
+        warning: {
+            icon: <AlertTriangle className="w-8 h-8" />,
+            shell: 'border-amber-400/30 shadow-[0_40px_120px_-45px_rgba(245,158,11,0.55)]',
+            hero: 'from-amber-400/20 via-orange-400/10 to-transparent dark:from-amber-500/20 dark:via-orange-500/10 dark:to-transparent',
+            badge: 'bg-amber-500 text-white',
+            button: 'bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
+        },
+        info: {
+            icon: <Info className="w-8 h-8" />,
+            shell: 'border-sky-500/25 shadow-[0_40px_120px_-45px_rgba(14,165,233,0.5)]',
+            hero: 'from-sky-500/16 via-blue-500/10 to-transparent dark:from-sky-500/18 dark:via-blue-500/10 dark:to-transparent',
+            badge: 'bg-sky-500 text-white',
+            button: 'bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none',
+        }
+    }[type];
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className={`${theme.components.modalOverlay} z-[100]`}>
             {type === 'success' && <Confetti />}
-            <div className={`bg-white dark:bg-modtale-card border ${borderClass} rounded-xl w-full max-w-md shadow-2xl overflow-hidden relative z-[110]`}>
-                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+            <div className={`relative z-[110] w-full max-w-xl overflow-hidden rounded-[28px] border bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl ${config.shell}`}>
+                <button onClick={onClose} className={`absolute right-4 top-4 z-10 ${theme.components.iconButton}`}>
                     <X className="w-5 h-5" />
                 </button>
-                <div className={`p-6 text-center ${bgClass}`}>
-                    <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${colorClass}`}>
-                        {icon}
+                <div className={`bg-gradient-to-br ${config.hero} px-6 pb-6 pt-8 text-center`}>
+                    <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.35rem] shadow-lg ${config.badge}`}>
+                        {config.icon}
                     </div>
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{title}</h2>
-                    <p className="text-slate-600 dark:text-slate-300">{message}</p>
+                    <h2 className="mb-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">{title}</h2>
+                    {typeof message === 'string' ? (
+                        <p className="mx-auto max-w-md whitespace-pre-line text-left leading-relaxed text-slate-600 dark:text-slate-300">
+                            {message}
+                        </p>
+                    ) : (
+                        <div className="mx-auto max-w-md text-left leading-relaxed text-slate-600 dark:text-slate-300">
+                            {message}
+                        </div>
+                    )}
                 </div>
-                <div className="p-4 flex justify-center gap-3">
+                <div className="flex flex-col-reverse justify-center gap-3 border-t border-slate-200/70 bg-slate-50/85 p-4 dark:border-white/10 dark:bg-white/5 sm:flex-row">
                     {(type === 'warning' || type === 'info') && (
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-3 rounded-lg font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                            className={`${theme.components.buttonGhost} justify-center`}
                         >
                             {secondaryLabel || "Cancel"}
                         </button>
@@ -164,7 +178,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ type, title, message, 
                     <button
                         type="button"
                         onClick={() => { if (onAction) onAction(); else onClose(); }}
-                        className={`flex items-center gap-2 px-8 py-3 rounded-lg font-bold text-white transition-transform active:scale-95 ${buttonClass}`}
+                        className={config.button}
                     >
                         {actionLabel || "Close"}
                         {type === 'success' && <ArrowRight className="w-5 h-5" />}

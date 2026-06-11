@@ -1,12 +1,22 @@
 package net.modtale.model.dto.request.organization;
 
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import net.modtale.model.user.ApiKey;
 
 import java.util.Set;
 
 public class OrganizationRoleRequest {
+
+    @Size(max = 40, message = "Organization role names must be 40 characters or fewer.")
     private String name;
+
+    @Pattern(
+            regexp = "^#?[0-9a-fA-F]{6}$",
+            message = "Role colors must be a valid 6-digit hex code."
+    )
     private String color;
+
     private Set<ApiKey.ApiPermission> permissions;
 
     public String getName() { return name; }

@@ -30,11 +30,20 @@ export default defineConfig({
             cssCodeSplit: true,
             rollupOptions: {
                 output: {
-                    manualChunks: (id) => {
-                        if (id.includes('node_modules')) {
-                            if (id.includes('react')) return 'vendor-react';
-                            if (id.includes('lucide')) return 'vendor-icons';
-                            return 'vendor';
+                    manualChunks(id) {
+                        if (id.includes('/node_modules/@sentry/')) {
+                            return 'sentry';
+                        }
+                        if (
+                            id.includes('/node_modules/react/') ||
+                            id.includes('/node_modules/react-dom/') ||
+                            id.includes('/node_modules/react-router-dom/') ||
+                            id.includes('/node_modules/react-helmet-async/')
+                        ) {
+                            return 'react-core';
+                        }
+                        if (id.includes('/node_modules/lucide-react/')) {
+                            return 'icons';
                         }
                     }
                 }

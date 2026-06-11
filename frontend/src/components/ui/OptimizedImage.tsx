@@ -8,6 +8,8 @@ interface OptimizedImageProps {
     baseWidth: number;
     priority?: boolean;
     aspectRatio?: string;
+    initialQuality?: 'placeholder' | 'standard';
+    onFirstLoad?: () => void;
 }
 
 const FALLBACK_SRC = '/assets/favicon.svg';
@@ -15,9 +17,11 @@ const FALLBACK_SRC = '/assets/favicon.svg';
 const loadedImageCache = new Set<string>();
 
 export const OptimizedImage: React.FC<OptimizedImageProps> = ({
-                                                                  src, alt, className, baseWidth, priority = false, aspectRatio
+                                                                  src, alt, className, baseWidth, priority = false, aspectRatio, initialQuality = 'placeholder', onFirstLoad
                                                               }) => {
     const hasFallenBack = useRef(false);
+    const hasReportedLoad = useRef(false);
+    const imgRef = useRef<HTMLImageElement | null>(null);
 
     const { downlink, effectiveType, isSaveData } = useMemo(() => {
         const conn = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
@@ -45,21 +49,49 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         };
     }, [src, baseWidth, priority, downlink, effectiveType, isSaveData]);
 
-    const [isLoaded, setIsLoaded] = useState(() => {
-        return config.isFast || loadedImageCache.has(config.res2x);
-    });
+    const [isLoaded, setIsLoaded] = useState(() => config.isFast || loadedImageCache.has(config.res2x));
+    const [isBaseImageReady, setIsBaseImageReady] = useState(() => (
+        config.isFast ||
+        loadedImageCache.has(config.res2x) ||
+        (initialQuality === 'standard' && loadedImageCache.has(config.res1x))
+    ));
 
     const wasLoadedInitially = useRef(isLoaded);
+
+    const reportImageReady = (img: HTMLImageElement) => {
+        const currentSrc = img.currentSrc || img.src;
+        if (currentSrc) {
+            loadedImageCache.add(currentSrc);
+            if (currentSrc === config.res2x) {
+                setIsLoaded(true);
+            }
+        }
+
+        if (!isBaseImageReady) {
+            setIsBaseImageReady(true);
+        }
+
+        if (!hasReportedLoad.current) {
+            hasReportedLoad.current = true;
+            onFirstLoad?.();
+        }
+    };
 
     useEffect(() => {
         const shouldBeLoaded = config.isFast || loadedImageCache.has(config.res2x);
         setIsLoaded(shouldBeLoaded);
+        setIsBaseImageReady(
+            shouldBeLoaded ||
+            (initialQuality === 'standard' && loadedImageCache.has(config.res1x))
+        );
         hasFallenBack.current = false;
+        hasReportedLoad.current = false;
         wasLoadedInitially.current = shouldBeLoaded;
-    }, [src, config.res2x, config.isFast]);
+    }, [src, config.res1x, config.res2x, config.isFast, initialQuality]);
 
     useEffect(() => {
         if (isLoaded) return;
+        if (initialQuality === 'standard' && !isBaseImageReady && !priority) return;
 
         const img = new Image();
         img.src = config.res2x;
@@ -71,7 +103,35 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         return () => {
             img.onload = null;
         };
-    }, [config.res2x, isLoaded]);
+    }, [config.res2x, initialQuality, isBaseImageReady, isLoaded, priority]);
+
+    useEffect(() => {
+        let timeoutHandle = 0;
+        let attemptCount = 0;
+
+        const checkImageCompletion = () => {
+            const img = imgRef.current;
+            if (!img || hasReportedLoad.current) return;
+
+            if (img.complete && img.naturalWidth > 0) {
+                reportImageReady(img);
+                return;
+            }
+
+            if (typeof window !== 'undefined' && attemptCount < 20) {
+                attemptCount += 1;
+                timeoutHandle = window.setTimeout(checkImageCompletion, 50);
+            }
+        };
+
+        checkImageCompletion();
+
+        return () => {
+            if (timeoutHandle && typeof window !== 'undefined') {
+                window.clearTimeout(timeoutHandle);
+            }
+        };
+    }, [config.res2x, isBaseImageReady, onFirstLoad, src]);
 
     const srcSet = useMemo(() => {
         if (!isLoaded) return undefined;
@@ -80,14 +140,17 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
             : `${config.res1x} 1x, ${config.res2x} 2x`;
     }, [isLoaded, config.isUltraSlow, config.res1x, config.res2x]);
 
+    const initialSrc = initialQuality === 'standard' ? config.res1x : config.placeholder;
+
     return (
         <div
             className={`relative overflow-hidden ${className || ''}`}
             style={{ aspectRatio }}
         >
             <img
+                ref={imgRef}
                 key={src}
-                src={isLoaded ? config.res2x : config.placeholder}
+                src={isLoaded ? config.res2x : initialSrc}
                 srcSet={srcSet}
                 alt={alt}
                 loading={priority ? 'eager' : 'lazy'}
@@ -96,11 +159,18 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
                 className={`w-full h-full object-cover ${
                     !wasLoadedInitially.current ? 'transition-all duration-700' : ''
                 } ${
-                    isLoaded ? 'blur-0 scale-100' : 'blur-2xl scale-110'
+                    isLoaded || initialQuality === 'standard' ? 'blur-0 scale-100' : 'blur-2xl scale-110'
                 }`}
+                onLoad={(e) => {
+                    reportImageReady(e.currentTarget);
+                }}
                 onError={(e) => {
                     if (hasFallenBack.current) return;
                     hasFallenBack.current = true;
+                    if (!hasReportedLoad.current) {
+                        hasReportedLoad.current = true;
+                        onFirstLoad?.();
+                    }
                     e.currentTarget.src = FALLBACK_SRC;
                     e.currentTarget.srcset = '';
                 }}

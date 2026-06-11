@@ -1,6 +1,7 @@
 package net.modtale.repository.user;
 
 import net.modtale.model.user.User;
+import net.modtale.model.user.OAuthProvider;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -27,8 +28,8 @@ public interface UserRepository extends MongoRepository<User, String> {
 
     List<User> findByDeletedAtBefore(LocalDateTime dateTime);
 
-    @Query("{ 'connectedAccounts.providerId': ?0 }")
-    Optional<User> findByConnectedAccountsProviderId(String providerId);
+    @Query("{ 'connectedAccounts': { '$elemMatch': { 'provider': ?0, 'providerId': ?1 } } }")
+    Optional<User> findByConnectedAccountsProviderAndProviderId(OAuthProvider provider, String providerId);
 
     List<User> findByLikedModIdsContaining(String modId);
     List<User> findByFollowingIdsContaining(String userId);

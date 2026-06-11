@@ -6,6 +6,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { theme } from '@/styles/theme';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
+import { Permission } from '@/modules/permissions/permissions';
 import type { Project, User } from '@/types';
 
 interface ProjectsProps {
@@ -21,7 +22,7 @@ export const Projects: React.FC<ProjectsProps> = ({ org, currentUser, userOrgs }
     const [transferModal, setTransferModal] = useState<Project | null>(null);
     const [status, setStatus] = useState<{type: 'success'|'error', title: string, msg: string} | null>(null);
 
-    const canManage = hasOrgPermission(org, currentUser.id, 'PROJECT_EDIT_METADATA');
+    const canManage = hasOrgPermission(org, currentUser.id, Permission.PROJECT_EDIT_METADATA);
 
     useEffect(() => {
         const fetchProjects = async () => {

@@ -1,6 +1,7 @@
 package net.modtale.controller.system;
 
-import org.springframework.beans.factory.annotation.Value;
+import net.modtale.config.properties.AppBackendProperties;
+import net.modtale.config.properties.AppFrontendProperties;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -13,11 +14,16 @@ import static java.util.Map.entry;
 @RestController
 public class ClientMetadataController {
 
-    @Value("${app.backend.url:https://api.modtale.net}")
-    private String backendUrl;
+    private final String backendUrl;
+    private final String frontendUrl;
 
-    @Value("${app.frontend.url:https://modtale.net}")
-    private String frontendUrl;
+    public ClientMetadataController(
+            AppBackendProperties backendProperties,
+            AppFrontendProperties frontendProperties
+    ) {
+        this.backendUrl = backendProperties.url();
+        this.frontendUrl = frontendProperties.url();
+    }
 
     @GetMapping("/client-metadata.json")
     public Map<String, Object> getClientMetadata() {

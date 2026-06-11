@@ -1,13 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useRef, useEffect } from 'react';
 import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid, Trophy } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { NotificationMenu } from '@/modules/user/components/NotificationMenu';
-import { FollowingModal } from '@/modules/user/components/FollowingModal';
-import { SignInModal } from '@/modules/auth/components/SignInModal.tsx';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
 import { SiteRoutes } from '@/utils/routes';
 import type { User } from "@/types.ts";
+
+const NotificationMenu = lazy(() => import('@/modules/user/components/NotificationMenu').then((module) => ({ default: module.NotificationMenu })));
+const FollowingModal = lazy(() => import('@/modules/user/components/FollowingModal').then((module) => ({ default: module.FollowingModal })));
+const SignInModal = lazy(() => import('@/modules/auth/components/SignInModal.tsx').then((module) => ({ default: module.SignInModal })));
 
 interface NavbarProps {
     user: User | null;
@@ -16,13 +17,15 @@ interface NavbarProps {
     onNavigate: (page: string) => void;
     isDarkMode: boolean;
     toggleDarkMode: () => void;
-    onUserClick: (username: string) => void;
+    onUserClick: (userId: string, username?: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
                                                   user, onLogout, currentPage, isDarkMode, toggleDarkMode
                                               }) => {
     const { isMobile } = useMobile();
+    const location = useLocation();
+    const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isFollowingOpen, setIsFollowingOpen] = useState(false);
@@ -61,20 +64,50 @@ export const Navbar: React.FC<NavbarProps> = ({
         }
     }, [isMobile]);
 
+    useEffect(() => {
+        const isLoginRoute = location.pathname === '/login';
+        const redirectTo = SiteRoutes.internalRedirect(
+            new URLSearchParams(location.search).get('redirect'),
+            SiteRoutes.dashboardProfile()
+        );
+
+        if (user && isLoginRoute) {
+            navigate(redirectTo || SiteRoutes.dashboardProfile(), { replace: true });
+            return;
+        }
+
+        if (!user) {
+            setIsSignInOpen(isLoginRoute);
+        }
+    }, [location.pathname, location.search, navigate, user]);
+
     const browsePages = ['mods', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const isBrowseActive = browsePages.includes(currentPage);
 
     const widthClass = "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
+    const handleSignInClose = () => {
+        setIsSignInOpen(false);
+
+        if (location.pathname !== '/login') return;
+
+        const redirectTo = SiteRoutes.internalRedirect(
+            new URLSearchParams(location.search).get('redirect'),
+            SiteRoutes.home()
+        );
+        navigate(redirectTo || SiteRoutes.home(), { replace: true });
+    };
 
     const isJamPage = currentPage === 'jams' || currentPage.startsWith('jam/');
 
     return (
         <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
-            <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
+            <Suspense fallback={null}>
+                {isSignInOpen && <SignInModal isOpen={isSignInOpen} onClose={handleSignInClose} />}
 
-            {isFollowingOpen && user && (
-                <FollowingModal userId={user.id} onClose={() => setIsFollowingOpen(false)} />
-            )}
+                {isFollowingOpen && user && (
+                    <FollowingModal userId={user.id} onClose={() => setIsFollowingOpen(false)} />
+                )}
+            </Suspense>
 
             <div className="flex justify-center w-full h-full">
                 <div className={`${widthClass} w-full h-full transition-[padding] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]`}>
@@ -98,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     <button
                                         onClick={() => setIsBrowseDropdownOpen(!isBrowseDropdownOpen)}
                                         className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                            isBrowseActive && !isJamPage
+                                            isBrowseActive
                                                 ? 'text-modtale-accent bg-modtale-accent/10'
                                                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                         }`}
@@ -166,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 <Link
                                     to={SiteRoutes.apiDocs()}
                                     className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                        currentPage === 'api-docs'
+                                        currentPage.startsWith('api-docs')
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                     }`}
@@ -216,7 +249,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                                 <div className="h-5 w-px bg-slate-200 dark:bg-white/10 mx-1"></div>
 
-                                {user && <NotificationMenu />}
+                                {user && (
+                                    <Suspense fallback={null}>
+                                        <NotificationMenu />
+                                    </Suspense>
+                                )}
 
                                 <AnimatedThemeToggler
                                     onToggle={toggleDarkMode}
@@ -248,7 +285,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                 </div>
 
                                                 <div className="px-2 space-y-0.5">
-                                                    <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
+                                                    <Link to={SiteRoutes.creator(user.id, user.username)} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                                                         <UserIcon className="w-4 h-4 text-slate-400" /> Your Profile
                                                     </Link>
                                                     <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
@@ -282,8 +319,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                             </div>
                         ) : (
                             <div className="flex items-center justify-end flex-1 gap-2">
-                                {user && <NotificationMenu />}
-                                <button id="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 focus:outline-none">
+                                {user && (
+                                    <Suspense fallback={null}>
+                                        <NotificationMenu />
+                                    </Suspense>
+                                )}
+                                <button
+                                    id="mobile-menu-btn"
+                                    type="button"
+                                    aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                                    aria-expanded={isMobileMenuOpen}
+                                    aria-controls="mobile-nav-menu"
+                                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                    className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 focus:outline-none"
+                                >
                                     {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                                 </button>
                             </div>
@@ -293,21 +342,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {isMobile && isMobileMenuOpen && (
-                <div ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
+                <div id="mobile-nav-menu" ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
                     <div className="space-y-1">
                         <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Browse</div>
-                        <Link to={SiteRoutes.browse()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
-                        <Link to={SiteRoutes.browse('PLUGIN')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Plugins</Link>
-                        <Link to={SiteRoutes.browse('MODPACK')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Modpacks</Link>
-                        <Link to={SiteRoutes.browse('SAVE')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Worlds</Link>
-                        <Link to={SiteRoutes.browse('ART')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Palette className="w-4 h-4 mr-3" /> Art Assets</Link>
-                        <Link to={SiteRoutes.browse('DATA')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Database className="w-4 h-4 mr-3" /> Data Assets</Link>
+                        <Link to={SiteRoutes.browse()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> Hytale Mods</Link>
+                        <Link to={SiteRoutes.browse('PLUGIN')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Hytale Plugins</Link>
+                        <Link to={SiteRoutes.browse('MODPACK')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Hytale Modpacks</Link>
+                        <Link to={SiteRoutes.browse('SAVE')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Hytale Worlds</Link>
+                        <Link to={SiteRoutes.browse('ART')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Palette className="w-4 h-4 mr-3" /> Hytale Art Assets</Link>
+                        <Link to={SiteRoutes.browse('DATA')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Database className="w-4 h-4 mr-3" /> Hytale Data Assets</Link>
                     </div>
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
 
                     <Link to={SiteRoutes.apiDocs()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> API</Link>
-                    <Link to={SiteRoutes.jams()} onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center p-3 rounded-lg font-bold text-left ${isJamPage ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5'}`}><Trophy className="w-4 h-4 mr-3" /> Modjams</Link>
                     {user && (
                         <>
                             <Link to={SiteRoutes.dashboard()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
@@ -328,7 +376,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     {user ? (
                         <>
-                            <Link to={SiteRoutes.creator(user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
+                            <Link to={SiteRoutes.creator(user.id, user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
                                 <img src={user.avatarUrl} className="w-6 h-6 rounded-full" alt="" /> Profile
                             </Link>
                             <button onClick={() => { setIsFollowingOpen(true); setIsMobileMenuOpen(false); }} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">

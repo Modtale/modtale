@@ -1,11 +1,16 @@
 package net.modtale.service.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import net.modtale.exception.AuthenticationOperationException;
+import net.modtale.exception.ForbiddenOperationException;
+import net.modtale.exception.InvalidAuthenticationRequestException;
+import net.modtale.exception.OAuthAccountCollisionException;
+import net.modtale.exception.OrganizationNotFoundException;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.User;
 import net.modtale.service.user.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -21,26 +26,34 @@ import java.util.Map;
 @Service
 public class OidcLoginService extends OidcUserService {
 
-    @Autowired
-    private AccountService accountService;
+    private final AccountService accountService;
+    private final AuthenticationService authenticationService;
+    private final ObjectProvider<HttpServletRequest> requestProvider;
 
-    @Autowired
-    private AuthenticationService authenticationService;
-
-    @Autowired
-    private HttpServletRequest request;
+    public OidcLoginService(
+            AccountService accountService,
+            AuthenticationService authenticationService,
+            ObjectProvider<HttpServletRequest> requestProvider
+    ) {
+        this.accountService = accountService;
+        this.authenticationService = authenticationService;
+        this.requestProvider = requestProvider;
+    }
 
     @Override
     public OidcUser loadUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
         String provider = userRequest.getClientRegistration().getRegistrationId();
-        OidcUser oidcUser = super.loadUser(userRequest);
+        OidcUser oidcUser = fetchOidcUser(userRequest);
         String accessToken = userRequest.getAccessToken().getTokenValue();
 
         try {
-            Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+            Authentication currentAuth = currentAuthentication();
+            HttpServletRequest request = currentRequest();
 
             if (currentAuth != null && currentAuth.isAuthenticated() && !currentAuth.getName().equals("anonymousUser")) {
-                String pendingOrgId = (String) request.getSession().getAttribute("pending_org_link_id");
+                String pendingOrgId = request != null
+                        ? (String) request.getSession().getAttribute("pending_org_link_id")
+                        : null;
 
                 if (pendingOrgId != null) {
                     request.getSession().removeAttribute("pending_org_link_id");
@@ -59,9 +72,26 @@ public class OidcLoginService extends OidcUserService {
             DefaultOAuth2User appUser = authenticationService.processUserLogin(provider, oidcUser, accessToken);
             return new CustomOidcUser(appUser, oidcUser.getIdToken(), oidcUser.getUserInfo());
 
-        } catch (Exception ex) {
-            throw new OAuth2AuthenticationException(new OAuth2Error("login_failure"), "Authentication processing failed: " + ex.getMessage());
+        } catch (OAuthAccountCollisionException ex) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("account_collision"), ex.getMessage());
+        } catch (InvalidAuthenticationRequestException | ForbiddenOperationException | UnauthorizedException | OrganizationNotFoundException ex) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("login_failure"), ex.getMessage());
+        } catch (AuthenticationOperationException ex) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("login_failure"), ex.getMessage());
         }
+    }
+
+    private Authentication currentAuthentication() {
+        HttpServletRequest request = currentRequest();
+        return request != null && request.getUserPrincipal() instanceof Authentication auth ? auth : null;
+    }
+
+    private HttpServletRequest currentRequest() {
+        return requestProvider.getIfAvailable();
+    }
+
+    protected OidcUser fetchOidcUser(OidcUserRequest userRequest) {
+        return super.loadUser(userRequest);
     }
 
     public static class CustomOidcUser extends DefaultOAuth2User implements OidcUser {

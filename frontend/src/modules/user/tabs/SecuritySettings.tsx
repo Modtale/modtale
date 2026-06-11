@@ -4,7 +4,7 @@ import { Lock, Mail, ShieldCheck, ShieldAlert, AlertTriangle, Check, Smartphone,
 import { userClient } from '../api/userClient';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { ErrorBanner } from '@/components/ui/error/ErrorBanner';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
 
 interface SecuritySettingsProps {
@@ -19,7 +19,7 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
     const [currentPassword, setCurrentPassword] = useState('');
     const [savingCreds, setSavingCreds] = useState(false);
     const [credsSaved, setCredsSaved] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
 
     const [showMfaSetup, setShowMfaSetup] = useState(false);
     const [mfaSecret, setMfaSecret] = useState('');
@@ -31,11 +31,23 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
     const [emailSent, setEmailSent] = useState(false);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const showError = (title: string, error: unknown, fallback: string) => {
+        setStatusModal({
+            title,
+            msg: extractApiErrorMessage(error, fallback)
+        });
+    };
 
     const handleSaveCredentials = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError(null);
-        if (credPassword !== confirmPassword) { setError("Passwords do not match."); return; }
+        setStatusModal(null);
+        if (credPassword !== confirmPassword) {
+            setStatusModal({
+                title: 'Credentials Not Saved',
+                msg: 'The new password and confirmation do not match yet. Please make sure both fields are identical before saving.'
+            });
+            return;
+        }
 
         setSavingCreds(true);
         try {
@@ -45,8 +57,8 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
             setConfirmPassword('');
             setTimeout(() => setCredsSaved(false), 3000);
             onUpdate();
-        } catch (e: any) {
-            setError(e.response?.data || "Failed to update credentials.");
+        } catch (e: unknown) {
+            showError('Credentials Update Failed', e, 'We could not update your account credentials.');
         } finally {
             setSavingCreds(false);
         }
@@ -54,8 +66,14 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
 
     const handleChangePassword = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError(null);
-        if (credPassword !== confirmPassword) { setError("New passwords do not match."); return; }
+        setStatusModal(null);
+        if (credPassword !== confirmPassword) {
+            setStatusModal({
+                title: 'Password Change Failed',
+                msg: 'The new password and confirmation do not match yet. Please make sure both fields are identical before trying again.'
+            });
+            return;
+        }
 
         setSavingCreds(true);
         try {
@@ -65,8 +83,8 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
             setCredPassword('');
             setConfirmPassword('');
             setTimeout(() => setCredsSaved(false), 3000);
-        } catch (e: any) {
-            setError(e.response?.data || "Failed to change password.");
+        } catch (e: unknown) {
+            showError('Password Change Failed', e, 'We could not change your password.');
         } finally {
             setSavingCreds(false);
         }
@@ -77,8 +95,8 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
         try {
             await userClient.resendVerification();
             setEmailSent(true);
-        } catch (e: any) {
-            setError(e.response?.data?.error || "Failed to send email.");
+        } catch (e: unknown) {
+            showError('Verification Email Failed', e, 'We could not send another verification email.');
         } finally {
             setResendingEmail(false);
         }
@@ -90,9 +108,9 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
             setMfaSecret(data.secret);
             setMfaQr(data.qrCode);
             setShowMfaSetup(true);
-            setError(null);
-        } catch (e: any) {
-            setError(e.response?.data?.error || "Failed to start 2FA setup.");
+            setStatusModal(null);
+        } catch (e: unknown) {
+            showError('Two-Factor Setup Failed', e, 'We could not start two-factor authentication setup.');
         }
     };
 
@@ -103,8 +121,8 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
             setShowMfaSetup(false);
             setMfaCode('');
             onUpdate();
-        } catch (e: any) {
-            setError(e.response?.data?.error || "Invalid verification code.");
+        } catch (e: unknown) {
+            showError('Two-Factor Verification Failed', e, 'We could not verify that authentication code.');
         } finally {
             setMfaLoading(false);
         }
@@ -114,15 +132,22 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
         try {
             await userClient.deleteAccount();
             window.location.href = '/';
-        } catch (e) {
-            setError("Failed to delete account. Please try again later.");
+        } catch (e: unknown) {
             setShowDeleteModal(false);
+            showError('Account Deletion Failed', e, 'We could not delete your account.');
         }
     };
 
     return (
         <>
-            {error && <ErrorBanner message={error} className="mb-6" />}
+            {statusModal && (
+                <StatusModal
+                    type="error"
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                />
+            )}
             {showDeleteModal && createPortal(
                 <StatusModal type="error" title="Delete Account?" message="This action is permanent and cannot be undone. All your data, including preferences and API keys, will be removed." actionLabel="Yes, Delete My Account" onAction={handleDeleteAccount} onClose={() => setShowDeleteModal(false)} secondaryLabel="Cancel" />,
                 document.body

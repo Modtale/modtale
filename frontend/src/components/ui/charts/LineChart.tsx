@@ -23,10 +23,16 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
     const [hoverIndex, setHoverIndex] = useState<number | null>(null);
     const chartId = useId();
 
-    const activeDatasets = datasets.filter(d => !d.hidden);
-    const hasData = activeDatasets.length > 0;
+    const normalizedDatasets = (datasets || []).map(d => ({
+        ...d,
+        data: Array.isArray(d.data) ? d.data : []
+    }));
 
-    const allValues = activeDatasets.flatMap(d => d.data.map(p => p.value));
+    const activeDatasets = normalizedDatasets.filter(d => !d.hidden);
+    const plottedDatasets = activeDatasets.filter(d => d.data.length > 0);
+    const hasData = plottedDatasets.length > 0;
+
+    const allValues = plottedDatasets.flatMap(d => d.data.map(p => p.value));
     const rawMax = hasData ? Math.max(...allValues, 5) : 5;
     const rawMin = hasData ? Math.min(...allValues, 0) : 0;
 
@@ -87,7 +93,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
         ticks.push(i);
     }
 
-    const dataLength = Math.max(...activeDatasets.map(d => d.data.length), 0);
+    const dataLength = Math.max(...plottedDatasets.map(d => d.data.length), 0);
 
     const width = 1000;
     const height = 400;
@@ -131,14 +137,14 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
         return Math.round(val).toLocaleString();
     };
 
-    const referenceDataset = activeDatasets.find(d => d.data.length > 0) || activeDatasets[0];
+    const referenceDataset = plottedDatasets[0];
     const dates = referenceDataset?.data.map(d => d.date) || [];
     const zeroY = targetDisplayMin < 0 && targetDisplayMax > 0 ? getY(0) : null;
 
     return (
         <div className="w-full select-none h-full flex flex-col relative">
             <div className="flex flex-wrap gap-2 mb-6 flex-shrink-0">
-                {datasets.map(d => (
+                {normalizedDatasets.map(d => (
                     <button
                         key={d.id}
                         onClick={() => onToggle && onToggle(d.id)}
@@ -184,7 +190,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                                 <clipPath id={`grid-clip-${chartId}`}>
                                     <rect x={paddingX} y={paddingTop} width={chartWidth} height={chartHeight} />
                                 </clipPath>
-                                {activeDatasets.map(d => (
+                                {plottedDatasets.map(d => (
                                     <linearGradient key={`area-grad-${d.id}`} id={`area-grad-${d.id}`} x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="0%" stopColor={d.color} stopOpacity="0.25" />
                                         <stop offset="100%" stopColor={d.color} stopOpacity="0.0" />
@@ -221,7 +227,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                             </g>
 
                             <g clipPath={`url(#grid-clip-${chartId})`}>
-                                {activeDatasets.map(d => (
+                                {plottedDatasets.map(d => (
                                     <path
                                         key={`area-${d.id}`}
                                         d={`${makePath(d.data)} L ${getX(d.data.length - 1)} ${height - paddingBottom} L ${getX(0)} ${height - paddingBottom} Z`}
@@ -232,7 +238,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                                     />
                                 ))}
 
-                                {activeDatasets.map(d => (
+                                {plottedDatasets.map(d => (
                                     <path
                                         key={d.id}
                                         d={makePath(d.data)}
@@ -247,7 +253,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                                     />
                                 ))}
 
-                                {activeDatasets.map(d => (
+                                {plottedDatasets.map(d => (
                                     <path
                                         key={`highlight-${d.id}`}
                                         d={makePath(d.data)}

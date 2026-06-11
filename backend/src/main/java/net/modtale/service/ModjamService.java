@@ -718,7 +718,7 @@ public class ModjamService {
                 }
             }
 
-            int contributorCount = (project.getContributors() != null ? project.getContributors().size() : 0) + 1;
+            int contributorCount = (project.getTeamMembers() != null ? project.getTeamMembers().size() : 0) + 1;
             if (res.getMinContributors() != null && contributorCount < res.getMinContributors()) {
                 throw new IllegalArgumentException("Project does not meet the minimum contributor requirement.");
             }

@@ -23,15 +23,16 @@ interface UserProfileProps {
 export const UserProfile: React.FC<UserProfileProps> = ({
                                                             onBack, likedModIds, onToggleFavorite, currentUser, onRefreshUser
                                                         }) => {
-    const { username } = useParams<{ username: string }>();
+    const { id } = useParams<{ id: string }>();
     const { initialData } = useSSRData();
     const navigate = useNavigate();
     const location = useLocation();
     const projectsTitleRef = useRef<HTMLHeadingElement>(null);
+    const userId = SiteRoutes.extractId(id);
 
 
     const [profileUser, setProfileUser] = useState<User | null>(() => {
-        if (initialData && initialData.username === username) {
+        if (initialData && initialData.id === userId) {
             return initialData;
         }
         return null;
@@ -78,17 +79,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
     useEffect(() => {
         const fetchUserData = async () => {
-            if (!username) return;
-            if (profileUser && profileUser.username === username) {
+            if (!userId) return;
+            if (profileUser && profileUser.id === userId) {
                 setLoadingUser(false);
                 return;
             }
             setLoadingUser(true);
             setNotFound(false);
             try {
-                const lookupRes = await api.get(`/users/lookup/${username}`);
-                const userId = lookupRes.data.id;
-
                 const userRes = await api.get(`/user/profile/${userId}`);
                 const userData = userRes.data;
                 setProfileUser(userData);
@@ -113,7 +111,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             }
         };
         fetchUserData();
-    }, [username]);
+    }, [userId, profileUser]);
 
     const fetchProjects = useCallback(async () => {
         if (!profileUser?.id) return;
@@ -148,7 +146,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
     useEffect(() => {
         if (profileUser && !loadingProjects) {
-            const canonicalPath = SiteRoutes.creator(profileUser.username);
+            const canonicalPath = SiteRoutes.creator(profileUser.id, profileUser.username);
             const currentPrefixMatch = location.pathname.match(/^\/(user|creator)\/[^/]+/i);
 
             if (currentPrefixMatch) {
@@ -165,7 +163,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }, [profileUser, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
 
     const handleToggleFollow = async () => {
-        if (!currentUser) { navigate(SiteRoutes.login()); return; }
+        if (!currentUser) {
+            const returnTo = `${location.pathname}${location.search}${location.hash}`;
+            navigate(SiteRoutes.login(returnTo));
+            return;
+        }
         if (!profileUser) return;
         const previousState = actualIsFollowing;
         setIsFollowingOptimistic(!previousState);
@@ -226,7 +228,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
     if (loadingUser) return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark"><Spinner fullScreen /></div>;
     if (notFound) return <NotFound />;
-    if (!profileUser) return <div className="min-h-screen flex flex-col items-center justify-center"><h2 className="text-2xl font-bold">User not found</h2><button onClick={onBack}>Go Back</button></div>;
+    if (!profileUser) return <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center"><h2 className="text-2xl font-black text-slate-900 dark:text-white">User not found</h2><button onClick={onBack} className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">Go Back</button></div>;
 
     const stats = {
         downloads: totalDownloads,
@@ -275,7 +277,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                     return (
                                         <Link
                                             key={member.id}
-                                            to={SiteRoutes.creator(member.username)}
+                                            to={SiteRoutes.creator(member.id, member.username)}
                                             className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                         >
                                             <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -308,7 +310,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                 {memberOrgs.map(org => (
                                     <Link
                                         key={org.id}
-                                        to={SiteRoutes.creator(org.username)}
+                                        to={SiteRoutes.creator(org.id, org.username)}
                                         className="flex items-center gap-3 p-2 pr-4 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-modtale-accent dark:hover:border-modtale-accent transition-all group backdrop-blur-md"
                                     >
                                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 dark:border-white/10 flex items-center justify-center">

@@ -1,8 +1,8 @@
 package net.modtale.service.auth;
 
 import net.modtale.model.user.User;
+import net.modtale.exception.ReservedAccountAccessException;
 import net.modtale.repository.user.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -14,10 +14,16 @@ import java.util.stream.Collectors;
 @Service
 public class LocalUserDetailsService implements UserDetailsService {
 
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private ReservedAccountGuardService reservedAccountGuardService;
+    private final UserRepository userRepository;
+    private final ReservedAccountGuardService reservedAccountGuardService;
+
+    public LocalUserDetailsService(
+            UserRepository userRepository,
+            ReservedAccountGuardService reservedAccountGuardService
+    ) {
+        this.userRepository = userRepository;
+        this.reservedAccountGuardService = reservedAccountGuardService;
+    }
 
     @Override
     public UserDetails loadUserByUsername(String login) throws UsernameNotFoundException {
@@ -26,7 +32,7 @@ public class LocalUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with identifier: " + login));
         try {
             reservedAccountGuardService.rejectReservedUserInProduction(user);
-        } catch (IllegalArgumentException ex) {
+        } catch (ReservedAccountAccessException ex) {
             throw new UsernameNotFoundException("User not found with identifier: " + login);
         }
 

@@ -1,3 +1,5 @@
+import type { Permission } from '@/modules/permissions/permissions';
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;
@@ -10,7 +12,7 @@ export interface OrganizationRole {
     id: string;
     name: string;
     color: string;
-    permissions: string[];
+    permissions: Permission[];
     isOwner?: boolean;
 }
 
@@ -55,6 +57,7 @@ export interface ProjectDependency {
     projectTitle: string;
     versionNumber: string;
     isOptional?: boolean;
+    isEmbedded?: boolean;
 }
 
 export interface ManifestDependencySuggestion {
@@ -70,6 +73,7 @@ export interface ManifestDependencySuggestion {
 
 export interface ManifestInspectionResult {
     gameVersion?: string;
+    modVersion?: string;
     suggestions: ManifestDependencySuggestion[];
 }
 
@@ -86,18 +90,77 @@ export interface GameVersionCatalog {
 }
 
 export interface ScanIssue {
-    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | string;
     type: string;
+    category?: string;
     description: string;
     filePath: string;
     lineStart: number;
     lineEnd: number;
+    scoreImpact?: number;
+    confidence?: number;
+    reviewPriority?: 'P0' | 'P1' | 'P2' | string;
+    evidenceLevel?: 'SIGNATURE' | 'CORRELATED' | 'BEHAVIORAL' | 'HEURISTIC' | string;
+    reviewCadence?: 'ALWAYS' | 'WHEN_CHANGED' | string;
+    noiseSuppressed?: boolean;
+    tactics?: string[];
     resolved?: boolean;
+    fingerprint?: string;
+    knownIssue?: boolean;
+    escalated?: boolean;
+    baselineVersion?: string;
+    baselineScoreImpact?: number;
+    baselineSeverity?: string;
+}
+
+export interface ScanSummary {
+    totalIssues?: number;
+    criticalIssues?: number;
+    highIssues?: number;
+    mediumIssues?: number;
+    lowIssues?: number;
+    lowConfidenceIssues?: number;
+    filesScanned?: number;
+    classFilesScanned?: number;
+    archivesScanned?: number;
+    recoverableErrors?: number;
+    uniquePackageRoots?: number;
+    dominantPackageRootClasses?: number;
+    dominantPackageRootSharePercent?: number;
+    maxArchiveDepthReached?: number;
+    oversizedEntriesSkipped?: number;
+    nestedArchiveReadFailures?: number;
+    correlatedThreatClusters?: number;
+    alwaysReviewIssues?: number;
+    suppressedNoiseIssues?: number;
+}
+
+export interface ScanReviewTarget {
+    filePath: string;
+    priority: 'P0' | 'P1' | 'P2' | string;
+    reason: string;
+    issueCount: number;
+    cumulativeImpact: number;
+    alwaysReview?: boolean;
+    tactics?: string[];
+    relatedChecks?: string[];
 }
 
 export interface ScanResult {
-    status: 'CLEAN' | 'SUSPICIOUS' | 'INFECTED' | 'FAILED';
+    status: 'SCANNING' | 'CLEAN' | 'SUSPICIOUS' | 'INFECTED' | 'FAILED' | 'FLAGGED' | string;
+    verdict?: 'AUTO_APPROVE' | 'REVIEW' | 'BLOCK' | string;
+    riskLevel?: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL' | string;
+    scanState?: string;
     riskScore: number;
+    confidenceScore?: number;
+    scanAttempt?: number;
+    holdUntilTimestamp?: number;
+    reviewerNotes?: string[];
+    summary?: ScanSummary;
+    reviewTargets?: ScanReviewTarget[];
+    knownIssueCount?: number;
+    newIssueCount?: number;
+    escalatedIssueCount?: number;
     issues: ScanIssue[];
     scanTimestamp: number;
 }
@@ -114,7 +177,7 @@ export interface ProjectVersion {
     dependencies?: ProjectDependency[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     scanResult?: ScanResult;
-    reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    reviewStatus?: 'PENDING' | 'SCHEDULED' | 'APPROVED' | 'REJECTED';
     rejectionReason?: string;
 }
 
@@ -146,7 +209,7 @@ export interface ProjectRole {
     id: string;
     name: string;
     color: string;
-    permissions: string[];
+    permissions: Permission[];
 }
 
 export interface ProjectMember {
@@ -192,7 +255,7 @@ export interface Project {
     allowComments?: boolean;
     hmWikiEnabled?: boolean;
     hmWikiSlug?: string;
-    status?: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
+    status?: 'DRAFT' | 'PRIVATE' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;
     isOwner?: boolean;

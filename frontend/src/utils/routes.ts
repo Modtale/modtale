@@ -3,6 +3,21 @@ export class SiteRoutes {
     static upload() { return '/upload'; }
     static admin() { return '/admin'; }
     static apiDocs() { return '/api-docs'; }
+    static swaggerDocs() { return '/api-docs/swagger'; }
+    static login(redirectTo?: string) {
+        const params = new URLSearchParams();
+        if (redirectTo) params.set('redirect', redirectTo);
+        const query = params.toString();
+        return `/login${query ? `?${query}` : ''}`;
+    }
+
+    static internalRedirect(redirectTo: string | null | undefined, fallback: string = '/'): string {
+        if (!redirectTo) return fallback;
+        if (!redirectTo.startsWith('/')) return fallback;
+        if (redirectTo.startsWith('//')) return fallback;
+        return redirectTo;
+    }
+
     static jams() { return '/jams'; }
     static jam(slug: string) { return `/jam/${slug}`; }
 
@@ -17,9 +32,10 @@ export class SiteRoutes {
 
     static project(project: { id: string; title: string; slug?: string; classification?: string } | null) {
         if (!project) return '/';
-        const generatedSlug = this.createSlug(project.title, project.id);
-        const finalSlug = (project.slug && project.slug.trim().length > 0) ? project.slug : generatedSlug;
-        return `/${this.getProjectPrefix(project.classification)}/${finalSlug}`;
+        const handle = (project.slug && project.slug.trim().length > 0)
+            ? this.createHandle(project.slug, project.id)
+            : this.createSlug(project.title, project.id);
+        return `/${this.getProjectPrefix(project.classification)}/${handle}`;
     }
 
     static projectDownload(project: any) { return `${this.project(project)}/download`; }
@@ -28,9 +44,10 @@ export class SiteRoutes {
     static projectWiki(project: any, path?: string) { return `${this.project(project)}/wiki${path ? `/${path}` : ''}`; }
     static projectEdit(project: any) { return `${this.project(project)}/edit`; }
 
-    static creator(username: string) {
-        if (!username) return '/';
-        return `/creator/${username}`;
+    static creator(userId: string, username?: string) {
+        if (!userId) return '/';
+        if (!username) return `/creator/${userId}`;
+        return `/creator/${this.createHandle(username, userId)}`;
     }
 
     static dashboard() { return '/dashboard'; }
@@ -40,8 +57,6 @@ export class SiteRoutes {
     static dashboardAnalytics() { return '/dashboard/analytics'; }
     static dashboardNotifications() { return '/dashboard/notifications'; }
     static dashboardDeveloper() { return '/dashboard/developer'; }
-
-    static login() { return '/login'; }
     static verify() { return '/verify'; }
     static resetPassword() { return '/reset-password'; }
     static mfa() { return '/mfa'; }
@@ -65,12 +80,33 @@ export class SiteRoutes {
             .substring(0, 30);
 
         if (!slug) return id;
-        if (/^\d+$/.test(slug)) return `${slug}-mod-${id}`;
-        return `${slug}-${id}`;
+        if (/^\d+$/.test(slug)) return `${slug}-mod~${id}`;
+        return `${slug}~${id}`;
+    }
+
+    static createHandle(label: string, id: string) {
+        if (!label) return id;
+        let normalized = label
+            .toLowerCase()
+            .replace(/[^a-z0-9_.-]+/g, '-')
+            .replace(/(^-|-$)+/g, '')
+            .substring(0, 30);
+
+        if (normalized === id) return id;
+        if (id) {
+            const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            normalized = normalized.replace(new RegExp(`(?:~|-)${escapedId}$`, 'i'), '');
+        }
+        if (!normalized) return id;
+        return `${normalized}~${id}`;
     }
 
     static extractId(param: string | undefined) {
         if (!param) return '';
+        const tildeIndex = param.lastIndexOf('~');
+        if (tildeIndex >= 0 && tildeIndex < param.length - 1) {
+            return param.slice(tildeIndex + 1);
+        }
         const match = param.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
         return match ? match[0] : param;
     }
