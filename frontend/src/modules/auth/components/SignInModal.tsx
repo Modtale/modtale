@@ -7,7 +7,7 @@ import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { useToast } from '@/components/ui/Toast';
 import { SiteRoutes } from '@/utils/routes';
-import { authClient } from '../api/authClient';
+import { authClient, normalizeSignInResponse } from '../api/authClient';
 
 interface SignInModalProps {
     isOpen: boolean;
@@ -69,11 +69,13 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 password
             });
 
-            if (res.data.mfa_required) {
+            const signInResult = normalizeSignInResponse(res.data);
+
+            if (signInResult.mfaRequired) {
                 if (location.pathname !== '/login') {
                     onClose();
                 }
-                const searchParams = new URLSearchParams({ token: res.data.pre_auth_token });
+                const searchParams = new URLSearchParams({ token: signInResult.preAuthToken || '' });
                 if (redirectTo) searchParams.set('redirect', redirectTo);
                 navigate(`${SiteRoutes.mfa()}?${searchParams.toString()}`);
                 return;
