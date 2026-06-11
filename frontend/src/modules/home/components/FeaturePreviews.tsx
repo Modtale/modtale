@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Crown, Settings } from 'lucide-react';
+import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -11,6 +11,7 @@ import { GLASS_CARD, GLASS_HEADER } from '../styles';
 import { getClassificationIcon, toTitleCase, formatTimeAgo } from '@/utils/modHelpers';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { FeaturedModCard } from './HeroMarquee';
+import { getCommentRoleBadge } from '@/modules/project/utils/commentRoles';
 
 export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project }) => {
     const [isMounted, setIsMounted] = useState(false);
@@ -454,12 +455,14 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
     const userInitial = currentUser?.username?.charAt(0)?.toUpperCase() ?? 'Y';
 
     const [randomCommenter, setRandomCommenter] = useState<{ name: string; avatar: string } | null>(null);
+    const [authorProfile, setAuthorProfile] = useState<User | null>(null);
 
     useEffect(() => {
         if (!project?.authorId) return;
         api.get(`/user/profile/${project.authorId}`)
             .then(res => {
                 const u = res.data;
+                setAuthorProfile(u);
                 if (!u?.username) return;
                 const raw: string = u.avatarUrl ?? '';
                 const resolvedAvatar = raw.startsWith('http')
@@ -475,6 +478,9 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
 
     const commenterName = randomCommenter?.name ?? project?.author ?? '…';
     const commenterAvatar = randomCommenter?.avatar;
+    const commenterRoleBadge = getCommentRoleBadge(project?.authorId, project, authorProfile);
+    const previewReplyUserId = project?.teamMembers?.[0]?.userId ?? project?.authorId;
+    const previewReplyRoleBadge = getCommentRoleBadge(previewReplyUserId, project, authorProfile);
 
     return (
     <PreviewPanel icon={MessageSquare} title="Comments" accentClass="text-violet-600 dark:text-violet-400" className="min-h-[360px]">
@@ -523,6 +529,18 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                         </div>
                         <div className="flex flex-col">
                             <span className="font-bold text-sm text-slate-900 dark:text-white">{commenterName}</span>
+                            {commenterRoleBadge && (
+                                <span
+                                    className="w-fit text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border"
+                                    style={{
+                                        color: commenterRoleBadge.color,
+                                        backgroundColor: `${commenterRoleBadge.color}1A`,
+                                        borderColor: `${commenterRoleBadge.color}33`
+                                    }}
+                                >
+                                    {commenterRoleBadge.label}
+                                </span>
+                            )}
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">2 hours ago</span>
                         </div>
                     </div>
@@ -553,8 +571,19 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                                 <div className="flex flex-col">
                                     <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                                         AzureDoom
-                                        <span className="bg-modtale-accent/10 text-modtale-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest flex items-center gap-1"><Crown className="w-2.5 h-2.5"/> Creator</span>
                                     </span>
+                                    {previewReplyRoleBadge && (
+                                        <span
+                                            className="w-fit text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border"
+                                            style={{
+                                                color: previewReplyRoleBadge.color,
+                                                backgroundColor: `${previewReplyRoleBadge.color}1A`,
+                                                borderColor: `${previewReplyRoleBadge.color}33`
+                                            }}
+                                        >
+                                            {previewReplyRoleBadge.label}
+                                        </span>
+                                    )}
                                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">1 hour ago</span>
                                 </div>
                             </div>
