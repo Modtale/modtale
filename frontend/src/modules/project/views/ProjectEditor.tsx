@@ -372,14 +372,14 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             const refreshed = await projectClient.getProject(projectData.id);
             setProjectData(refreshed);
             setVersionData({
-                projectIds: [],
+                projectIds: versionData.projectIds || [],
                 versionNumber: '',
                 gameVersions: versionData.gameVersions,
                 changelog: '',
                 file: null,
                 dependencies: [],
                 modIds: [],
-                channel: 'RELEASE'
+                channel: versionData.channel || 'RELEASE'
             });
             onShowStatus('success', 'Uploaded', 'Version uploaded successfully.');
         } catch (e: any) {
