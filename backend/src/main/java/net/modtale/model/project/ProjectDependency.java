@@ -12,18 +12,24 @@ public class ProjectDependency {
 
     private String versionNumber;
     private boolean isOptional;
+    private boolean isEmbedded;
 
     public ProjectDependency() {}
 
     public ProjectDependency(String modId, String modTitle, String versionNumber) {
-        this(modId, modTitle, versionNumber, false);
+        this(modId, modTitle, versionNumber, false, false);
     }
 
     public ProjectDependency(String modId, String modTitle, String versionNumber, boolean isOptional) {
+        this(modId, modTitle, versionNumber, isOptional, false);
+    }
+
+    public ProjectDependency(String modId, String modTitle, String versionNumber, boolean isOptional, boolean isEmbedded) {
         this.modId = modId;
         this.modTitle = modTitle;
         this.versionNumber = versionNumber;
         this.isOptional = isOptional;
+        this.isEmbedded = isEmbedded;
     }
 
     @JsonProperty("projectId")
@@ -45,4 +51,9 @@ public class ProjectDependency {
     public boolean isOptional() { return isOptional; }
 
     public void setOptional(boolean optional) { isOptional = optional; }
+
+    @JsonProperty("isEmbedded")
+    public boolean isEmbedded() { return isEmbedded; }
+
+    public void setEmbedded(boolean embedded) { isEmbedded = embedded; }
 }

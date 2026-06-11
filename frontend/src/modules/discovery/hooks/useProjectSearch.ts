@@ -1,19 +1,30 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { discoveryClient } from '../api/discoveryClient';
 import { captureError } from '@/utils/errorTracking';
-import { compareSemVer } from '@/utils/modHelpers';
 import type { Project } from '@/types';
 import type { Classification } from '@/data/categories';
 
-export type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'updated' | 'trending' | 'gems' | 'popular';
+export type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'updated';
+
+const normalizeSort = (sort: string | null): SortOption => {
+    switch (sort) {
+        case 'downloads':
+        case 'favorites':
+        case 'newest':
+        case 'updated':
+            return sort;
+        default:
+            return 'relevance';
+    }
+};
 
 export const useProjectSearch = (initialClassification: Classification | 'All', useSSRData: boolean, initialItems: Project[], initialTotalPages: number, initialTotalItems: number) => {
     const [searchParams, setSearchParams] = useSearchParams();
 
     const parsedPage = parseInt(searchParams.get('page') || '0', 10);
     const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 0;
-    const sortBy = (searchParams.get('sort') as SortOption) || 'relevance';
+    const sortBy = normalizeSort(searchParams.get('sort'));
     const activeViewId = searchParams.get('view') || 'all';
     const selectedVersion = searchParams.get('version') || 'Any';
     const minDownloads = parseInt(searchParams.get('minDl') || '0');
@@ -28,11 +39,13 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     const [totalPages, setTotalPages] = useState(initialTotalPages);
     const [totalItems, setTotalItems] = useState(initialTotalItems);
     const [loading, setLoading] = useState(!useSSRData);
+    const [isPending, setIsPending] = useState(!useSSRData);
     const [items, setItems] = useState<Project[]>(initialItems);
     const [itemsPerPage, setItemsPerPage] = useState(12);
 
     const abortControllerRef = useRef<AbortController | null>(null);
     const isFirstRender = useRef(true);
+    const previousQueryKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (urlSearchTerm !== searchTerm) {
@@ -41,8 +54,13 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     }, [urlSearchTerm]);
 
     useEffect(() => {
+        setSelectedClassification(initialClassification);
+    }, [initialClassification]);
+
+    useEffect(() => {
         const handler = setTimeout(() => {
             if (searchTerm !== urlSearchTerm) {
+                setIsPending(true);
                 setSearchParams(prev => {
                     const next = new URLSearchParams(prev);
                     if (searchTerm) next.set('q', searchTerm);
@@ -55,9 +73,39 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         return () => clearTimeout(handler);
     }, [searchTerm, urlSearchTerm, setSearchParams]);
 
+    const queryKey = useMemo(() => JSON.stringify({
+        page,
+        itemsPerPage,
+        selectedClassification,
+        selectedTags,
+        urlSearchTerm,
+        sortBy,
+        selectedVersion,
+        minDownloads,
+        minFavorites,
+        filterDate,
+        activeViewId,
+    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
+
+    useLayoutEffect(() => {
+        if (previousQueryKeyRef.current === null) {
+            previousQueryKeyRef.current = queryKey;
+            return;
+        }
+        if (previousQueryKeyRef.current !== queryKey) {
+            previousQueryKeyRef.current = queryKey;
+            setItems([]);
+            setTotalPages(0);
+            setTotalItems(0);
+            setLoading(true);
+            setIsPending(true);
+        }
+    }, [queryKey]);
+
     const fetchData = useCallback(async () => {
         if (isFirstRender.current && useSSRData) {
             isFirstRender.current = false;
+            setIsPending(false);
             return;
         }
         isFirstRender.current = false;
@@ -110,7 +158,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
             setTotalItems(nextTotalItems);
         } catch (err: any) {
             if (err.name !== 'Canceled') {
-                captureError(err);
+                void captureError(err);
                 setItems([]);
                 setTotalPages(0);
                 setTotalItems(0);
@@ -118,6 +166,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         } finally {
             if (!controller.signal.aborted) {
                 setLoading(false);
+                setIsPending(false);
             }
         }
     }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId, useSSRData, setSearchParams]);
@@ -127,6 +176,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     }, [fetchData]);
 
     const updateParams = useCallback((updates: Record<string, string | null>) => {
+        setIsPending(true);
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             Object.entries(updates).forEach(([key, value]) => {
@@ -153,7 +203,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
 
     return {
         page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
-        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, items, setItems,
+        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items, setItems,
         itemsPerPage, setItemsPerPage, updateParams, searchParams, setSearchParams
     };
 };

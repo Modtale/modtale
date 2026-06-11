@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import type { Project } from '@/types';
 import { Download, Eye, BarChart2, Edit, ArrowRightLeft, Trash2, Building2, Undo2, Clock, AlertCircle, ExternalLink } from 'lucide-react';
+import { SiteRoutes } from '@/utils/routes';
 
 interface ManagedProjectCardProps {
     project: Project;
@@ -19,15 +20,8 @@ export const ManagedProjectCard: React.FC<ManagedProjectCardProps> = ({
     const pendingVersion = project.versions?.find(v => v.reviewStatus === 'PENDING');
     const rejectedVersion = project.versions?.find(v => v.reviewStatus === 'REJECTED');
 
-    let projectLink = `/mod/${project.id}`;
-    if (project.classification === 'MODPACK') projectLink = `/modpack/${project.id}`;
-    if (project.classification === 'SAVE') projectLink = `/world/${project.id}`;
-
-    if (project.slug) {
-        if (project.classification === 'MODPACK') projectLink = `/modpack/${project.slug}`;
-        else if (project.classification === 'SAVE') projectLink = `/world/${project.slug}`;
-        else projectLink = `/mod/${project.slug}`;
-    }
+    const projectLink = SiteRoutes.project(project);
+    const editLink = SiteRoutes.projectEdit(project);
 
     return (
         <div className="p-4 flex flex-col sm:flex-row items-center gap-4 group relative w-full h-full">
@@ -43,6 +37,7 @@ export const ManagedProjectCard: React.FC<ManagedProjectCardProps> = ({
                     </Link>
 
                     {project.status === 'DRAFT' && <span className="text-[10px] bg-yellow-50 text-yellow-800 border border-yellow-200 dark:border-yellow-900/50 dark:bg-yellow-900/30 dark:text-yellow-200 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Draft</span>}
+                    {project.status === 'PRIVATE' && <span className="text-[10px] bg-blue-50 text-blue-800 border border-blue-200 dark:border-blue-900/50 dark:bg-blue-900/30 dark:text-blue-200 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Private</span>}
                     {project.status === 'PENDING' && <span className="text-[10px] bg-orange-50 text-orange-800 border border-orange-200 dark:border-orange-900/50 dark:bg-orange-900/30 dark:text-orange-200 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Pending Approval</span>}
                     {project.status === 'UNLISTED' && <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">Unlisted</span>}
 
@@ -76,7 +71,7 @@ export const ManagedProjectCard: React.FC<ManagedProjectCardProps> = ({
                             <button onClick={() => onRevert(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-orange-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Revert to Draft"><Undo2 className="w-4 h-4" /></button>
                         )}
                         <Link to={`/dashboard/analytics/project/${project.id}`} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Analytics"><BarChart2 className="w-4 h-4" /></Link>
-                        <Link to={`/mod/${project.id}/edit`} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Edit"><Edit className="w-4 h-4" /></Link>
+                        <Link to={editLink} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-modtale-accent hover:text-white rounded-xl transition-colors shadow-sm" title="Edit"><Edit className="w-4 h-4" /></Link>
                         <button onClick={() => onTransfer(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 rounded-xl transition-colors shadow-sm" title="Transfer"><ArrowRightLeft className="w-4 h-4" /></button>
                         <button onClick={() => onDelete(project)} className="p-2.5 bg-slate-200/50 dark:bg-white/5 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm" title="Delete"><Trash2 className="w-4 h-4" /></button>
                     </>

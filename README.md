@@ -1,5 +1,5 @@
 <div align="center">
-<a href="[https://modtale.net](https://modtale.net)">
+<a href="https://modtale.net">
 <img src="logo.svg" alt="Modtale Logo" width="850" height="132">
 </a>
 
@@ -7,17 +7,17 @@
 <strong>The Hytale Community Repository</strong>
 </p>
 
-  <p align="center">
+<p align="center">
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square&logo=gnu" alt="License: AGPL v3"></a>
     <a href="https://astro.build"><img src="https://img.shields.io/badge/Astro-4.0-orange?style=flat-square&logo=astro" alt="Astro"></a>
     <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19.0-blue?style=flat-square&logo=react" alt="React"></a>
     <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-3.3-green?style=flat-square&logo=springboot" alt="Spring Boot"></a>
     <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-21-red?style=flat-square&logo=openjdk" alt="Java 21"></a>
     <a href="https://www.mongodb.com"><img src="https://img.shields.io/badge/Database-MongoDB-forestgreen?style=flat-square&logo=mongodb" alt="MongoDB"></a>
+    <a href="https://github.com/Modtale/modtale"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fghloc.vercel.app%2Fapi%2FModtale%2Fmodtale%2Fbadge&style=flat-square&logo=git" alt="Lines of Code"></a>
 </p>
-</div>
-
 <br />
+</div>
 
 ## Welcome to the Modtale Monorepo!
 

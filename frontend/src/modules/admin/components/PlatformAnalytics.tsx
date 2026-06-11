@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Eye, Download, TrendingUp, TrendingDown, PackagePlus, Server, UserPlus, Activity } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { LineChart } from '@/components/ui/charts/LineChart';
-import { sliceData, calculateWoW } from '@/utils/analytics';
+import { extractApiErrorMessage } from '@/utils/api';
+import { sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
 
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
@@ -35,18 +36,20 @@ export function PlatformAnalytics() {
     const [range, setRange] = useState('30d');
     const [data, setData] = useState<any>(null);
     const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            try {
-                const res = await adminClient.getPlatformAnalytics(range);
-                setData(res);
-            } catch (e) {
-                console.error("Failed to fetch platform analytics", e);
-            } finally {
-                setLoading(false);
-            }
+        try {
+            const res = await adminClient.getPlatformAnalytics(range);
+            setData(res);
+            setErrorMessage(null);
+        } catch (e) {
+            setErrorMessage(extractApiErrorMessage(e, 'We could not load platform analytics.'));
+        } finally {
+            setLoading(false);
+        }
         };
         fetchData();
     }, [range]);
@@ -73,7 +76,14 @@ export function PlatformAnalytics() {
         </div>
     );
 
-    if (!data) return null;
+    if (!data) {
+        if (!errorMessage) return null;
+        return (
+            <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-5 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                {errorMessage}
+            </div>
+        );
+    }
 
     const calcTrend = (current: number, previous: number) => {
         if (!previous) return current > 0 ? 100 : 0;
@@ -87,6 +97,10 @@ export function PlatformAnalytics() {
     const downloadsData = formatData(data.downloadsChart);
     const apiDownloadsData = formatData(data.apiDownloadsChart);
     const viewsData = formatData(data.viewsChart);
+    const downloadsAvg7 = calculateRollingAverage(downloadsData, 7);
+    const downloadsAvg30 = calculateRollingAverage(downloadsData, 30);
+    const viewsAvg7 = calculateRollingAverage(viewsData, 7);
+    const viewsAvg30 = calculateRollingAverage(viewsData, 30);
     const newProjectsData = formatData(data.newProjectsChart);
     const newUsersData = formatData(data.newUsersChart);
     const newOrgsData = formatData(data.newOrgsChart);
@@ -94,10 +108,14 @@ export function PlatformAnalytics() {
     const chartDatasets = {
         downloads: [
             { id: 'downloads', label: 'Platform Downloads', color: '#3b82f6', data: sliceData(downloadsData), hidden: !!hiddenSeries['downloads'] },
-            { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: !!hiddenSeries['apiDownloads'] }
+            { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: !!hiddenSeries['apiDownloads'] },
+            { id: 'downloadsAvg7', label: 'Downloads 7d Avg', color: '#14b8a6', data: sliceData(downloadsAvg7), hidden: hiddenSeries['downloadsAvg7'] ?? true },
+            { id: 'downloadsAvg30', label: 'Downloads 30d Avg', color: '#a855f7', data: sliceData(downloadsAvg30), hidden: hiddenSeries['downloadsAvg30'] ?? true }
         ],
         views: [
-            { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: !!hiddenSeries['views'] }
+            { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: !!hiddenSeries['views'] },
+            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(viewsAvg7), hidden: hiddenSeries['viewsAvg7'] ?? true },
+            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(viewsAvg30), hidden: hiddenSeries['viewsAvg30'] ?? true }
         ],
         newProjects: [
             { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: !!hiddenSeries['newProjects'] },
@@ -117,6 +135,11 @@ export function PlatformAnalytics() {
 
     return (
         <div className="relative animate-in fade-in duration-500">
+            {errorMessage && (
+                <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                    {errorMessage}
+                </div>
+            )}
             <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Platform Analytics</h1>

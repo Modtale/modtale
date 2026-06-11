@@ -2,59 +2,96 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import App from '../App';
 import { SiteRoutes } from '../utils/routes';
-import { isBotUserAgent } from '../utils/seo';
+import {
+    buildCanonicalUrl,
+    getRobotsDirective,
+    isBotUserAgent,
+    isBrowseRoutePath,
+    normalizeSeoPath,
+} from '../utils/seo';
 import { DEFAULT_SEO, ROUTE_SEO, generateDynamicSEO } from '../data/seo-constants';
 import { generateProjectMeta } from '../utils/meta';
-import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../utils/schema';
-import { BACKEND_URL } from "@/utils/api.ts";
+import {
+    generateBreadcrumbSchema,
+    generateCollectionPageSchema,
+    generateItemListSchema,
+    generateOrganizationSchema,
+    generateWebsiteSchema,
+    getBreadcrumbsForClassification,
+} from '../utils/schema';
+import { BACKEND_URL } from '@/utils/api.ts';
 
 const { all } = Astro.params;
 const url = Astro.url;
 const path = url.pathname;
-const cleanPath = path.replace(/\/$/, "");
+const cleanPath = normalizeSeoPath(path);
 const searchParams = url.searchParams;
 
-let title = DEFAULT_SEO.title;
-let description = DEFAULT_SEO.description;
-let keywords = DEFAULT_SEO.keywords;
+const routeSeo = ROUTE_SEO[cleanPath];
+let title = routeSeo?.title || DEFAULT_SEO.title;
+let description = routeSeo?.description || DEFAULT_SEO.description;
+let keywords = routeSeo?.keywords || DEFAULT_SEO.keywords;
 let jsonLd: any = undefined;
 let initialData: any = null;
 let ssrSuccessfullyCompleted = false;
 
-let canonicalOverride = `https://modtale.net${cleanPath === '' ? '/' : cleanPath}`;
-let pageNext = undefined;
-let pagePrev = undefined;
+const DAY_IN_SECONDS = 60 * 60 * 24;
 
-let baseSEO = { title: DEFAULT_SEO.title, description: DEFAULT_SEO.description };
-if (ROUTE_SEO[cleanPath]) {
-    baseSEO = { title: ROUTE_SEO[cleanPath].title, description: ROUTE_SEO[cleanPath].description };
-    keywords = ROUTE_SEO[cleanPath].keywords;
-}
-
-const websiteSchema = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Modtale",
-    "url": "https://modtale.net/",
-    "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://modtale.net/mods?q={search_term_string}",
-        "query-input": "required name=search_term_string"
+const fetchJsonWithTimeout = async (resource: string, timeoutMs = 1500, init: RequestInit = {}) => {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(resource, {
+            ...init,
+            signal: controller.signal,
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutHandle);
     }
 };
 
-if (cleanPath === '' || cleanPath === '/') {
-    jsonLd = websiteSchema;
-}
+let canonicalOverride = buildCanonicalUrl(cleanPath, searchParams);
+let pageNext = undefined;
+let pagePrev = undefined;
+let robots = getRobotsDirective(cleanPath, searchParams);
+
+const baseSEO = {
+    title: routeSeo?.title || DEFAULT_SEO.title,
+    description: routeSeo?.description || DEFAULT_SEO.description,
+};
+
+const websiteSchema = generateWebsiteSchema();
+const organizationSchema = generateOrganizationSchema();
+const collectionPageSchema = routeSeo && (cleanPath === '/' || isBrowseRoutePath(cleanPath))
+    ? generateCollectionPageSchema({
+        name: routeSeo.h1,
+        description: routeSeo.description,
+        path: cleanPath,
+        keywords: routeSeo.keywords,
+        about: routeSeo.keywords.split(',').map((item) => item.trim()).slice(0, 8),
+    })
+    : null;
+
+const baseSchemas: any[] = [websiteSchema, organizationSchema];
+if (collectionPageSchema) baseSchemas.push(collectionPageSchema);
 
 const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
 const identifier = all ? all.split('/').pop() : '';
-const isProjectRoute = cleanPath.startsWith('/mod/') || cleanPath.startsWith('/modpack/') || cleanPath.startsWith('/world/');
+const projectId = identifier ? SiteRoutes.extractId(identifier) : '';
+
+const isProjectRoute = cleanPath.startsWith('/project/')
+    || cleanPath.startsWith('/mod/')
+    || cleanPath.startsWith('/modpack/')
+    || cleanPath.startsWith('/world/');
 
 let image = (isProjectRoute && identifier)
-    ? `${BACKEND_URL}/api/v1/og/project/${identifier}.png`
-    : "https://modtale.net/assets/favicon.svg";
+    ? `${BACKEND_URL}/api/v1/og/project/${projectId}.png`
+    : 'https://modtale.net/assets/logo.svg';
 
 let classification = null;
 let isHome = false;
@@ -65,7 +102,7 @@ else if (cleanPath === '/worlds') classification = 'SAVE';
 else if (cleanPath === '/art') classification = 'ART';
 else if (cleanPath === '/data') classification = 'DATA';
 else if (cleanPath === '/mods') classification = 'ALL';
-else if (cleanPath === '' || cleanPath === '/') {
+else if (cleanPath === '/') {
     classification = 'ALL';
     isHome = true;
 }
@@ -76,6 +113,11 @@ const styleParam = searchParams.get('style') || 'grid';
 const sortParam = searchParams.get('sort') || '';
 const viewParam = searchParams.get('view') || '';
 const qParam = searchParams.get('q') || '';
+const normalizeSort = (sort: string) => (
+    sort === 'downloads' || sort === 'favorites' || sort === 'newest' || sort === 'updated'
+        ? sort
+        : 'relevance'
+);
 
 if (classification && !isHome) {
     const dynamicMeta = generateDynamicSEO(baseSEO, pageNum, sortParam, viewParam, qParam);
@@ -83,73 +125,55 @@ if (classification && !isHome) {
     description = dynamicMeta.description;
 
     if (pageNum > 0) {
-        canonicalOverride = `https://modtale.net${cleanPath}?page=${pageNum}`;
-        pagePrev = `https://modtale.net${cleanPath}${pageNum === 1 ? '' : `?page=${pageNum - 1}`}`;
+        const prevParams = new URLSearchParams();
+        if (pageNum > 1) prevParams.set('page', String(pageNum - 1));
+        pagePrev = buildCanonicalUrl(cleanPath, prevParams);
     }
 }
 
 const isComplex =
-    searchParams.has('q') ||
-    searchParams.has('tags') ||
-    searchParams.has('version') ||
-    searchParams.has('minDl') ||
-    searchParams.has('minFav') ||
-    searchParams.has('date') ||
-    pageNum > 0 ||
-    styleParam !== 'grid';
+    searchParams.has('q')
+    || searchParams.has('tags')
+    || searchParams.has('version')
+    || searchParams.has('minDl')
+    || searchParams.has('minFav')
+    || searchParams.has('date')
+    || pageNum > 0
+    || styleParam !== 'grid'
+    || searchParams.has('view')
+    || searchParams.has('sort');
 
-function getSecondsUntilNextUpdate() {
-    const now = new Date();
-    const nextUpdate = new Date(now);
-    nextUpdate.setUTCHours(0, 35, 0, 0);
-    if (now > nextUpdate) nextUpdate.setUTCDate(nextUpdate.getUTCDate() + 1);
-    return Math.max(60, Math.floor((nextUpdate.getTime() - now.getTime()) / 1000));
-}
+const isBrowseRoute = !!classification && !isHome;
+const isStaticBrowseRequest = isBrowseRoute && !isComplex;
 
 if (classification) {
     if (!isComplex || isBot) {
         try {
             if (isHome) {
-                const [trendingRes, popularRes, gemsRes, relevanceRes, statsRes] = await Promise.allSettled([
-                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=trending`),
-                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=popular`),
-                    fetch(`${BACKEND_URL}/api/v1/projects?category=hidden_gems&size=20&sort=favorites`),
-                    fetch(`${BACKEND_URL}/api/v1/projects?size=20&sort=relevance`),
-                    fetch(`${BACKEND_URL}/api/v1/analytics/platform/stats`)
+                const [trending, newest, stats] = await Promise.all([
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=24&sort=relevance&category=trending`),
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=newest`),
+                    fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`),
                 ]);
 
-                const getJson = async (res: any) => res.status === 'fulfilled' && res.value.ok ? await res.value.json() : null;
-
-                const trending = await getJson(trendingRes);
-                const popular = await getJson(popularRes);
-                const gems = await getJson(gemsRes);
-                const relevance = await getJson(relevanceRes);
-                const stats = await getJson(statsRes);
-
-                const combined = [
-                    ...(trending?.content || []),
-                    ...(popular?.content || []),
-                    ...(gems?.content || []),
-                    ...(relevance?.content || [])
-                ];
-
-                const uniqueMap = new Map();
-                combined.forEach(m => uniqueMap.set(m.id, m));
-                const unique = Array.from(uniqueMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+                const unique = trending?.content || [];
+                const newestProjects = newest?.content || [];
 
                 initialData = {
-                    homeMods: unique || [],
-                    stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }
+                    homeProjects: unique || [],
+                    homeTrendingProjects: unique || [],
+                    homeNewestProjects: newestProjects,
+                    stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 },
                 };
 
                 const homeListSchema = generateItemListSchema(unique.slice(0, 20));
-                const schemas: any[] = [websiteSchema];
+                const schemas: any[] = [...baseSchemas];
                 if (homeListSchema) schemas.push(homeListSchema);
                 jsonLd = schemas;
-                ssrSuccessfullyCompleted = true;
 
+                ssrSuccessfullyCompleted = true;
             } else {
-                const sort = searchParams.get('sort') || 'relevance';
+                const sort = normalizeSort(searchParams.get('sort') || '');
                 const view = searchParams.get('view');
                 const page = searchParams.get('page') || '0';
 
@@ -162,20 +186,21 @@ if (classification) {
                 const searchParamStr = qParam ? `&search=${encodeURIComponent(qParam)}` : '';
                 const tagsVal = searchParams.get('tags') || '';
                 const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
-                const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
 
+                const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
                 const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
 
-                const res = await fetch(endpoint, {
-                    headers: { "Cache-Control": "public, s-maxage=300" }
+                const data = await fetchJsonWithTimeout(endpoint, 2000, {
+                    headers: { 'Cache-Control': 'public, s-maxage=300' },
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    initialData = { browseData: data };
+                if (data) {
+                    initialData = { browseData: data, browseDataReady: true };
 
                     if (data.totalPages > pageNum + 1) {
-                        pageNext = `https://modtale.net${cleanPath}?page=${pageNum + 1}`;
+                        const nextParams = new URLSearchParams();
+                        nextParams.set('page', String(pageNum + 1));
+                        pageNext = buildCanonicalUrl(cleanPath, nextParams);
                     }
 
                     const items = data.content || [];
@@ -183,34 +208,38 @@ if (classification) {
                     const crumbs = getBreadcrumbsForClassification(classification);
                     const breadcrumbSchema = generateBreadcrumbSchema(crumbs);
 
-                    const schemas: any[] = [websiteSchema];
+                    const schemas: any[] = [...baseSchemas];
                     if (listSchema) schemas.push(listSchema);
                     if (breadcrumbSchema) schemas.push(breadcrumbSchema);
 
                     jsonLd = schemas;
                     ssrSuccessfullyCompleted = true;
                 } else {
-                    initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 } };
+                    initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 }, browseDataReady: false };
                 }
             }
-        } catch (e) {
-            console.error("[SSR] List Fetch Error:", e);
-            initialData = isHome
-                ? { homeMods: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } }
-                : { browseData: { content: [], totalElements: 0, totalPages: 0 } };
+        } catch {
+            if (isHome) {
+                initialData = { homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
+            } else {
+                initialData = { browseData: { content: [], totalElements: 0, totalPages: 0 }, browseDataReady: false };
+            }
         }
+    } else {
+        jsonLd = baseSchemas;
     }
 } else if (isBot && identifier && isProjectRoute) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${identifier}`);
-        if (res.ok) {
-            const modData = await res.json();
+        const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${projectId}`, 2500);
+
+        if (modData) {
             const projectUrl = SiteRoutes.project(modData);
-            if (cleanPath !== projectUrl.replace(/\/$/, "")) {
+            if (cleanPath !== normalizeSeoPath(projectUrl)) {
                 return Astro.redirect(projectUrl, 301);
             }
 
             initialData = modData;
+
             const meta = generateProjectMeta(modData);
             if (meta) {
                 title = meta.title;
@@ -218,51 +247,56 @@ if (classification) {
             }
 
             const appSchema = {
-                "@context": "https://schema.org",
-                "@type": "SoftwareApplication",
-                "name": modData.title,
-                "description": meta?.description || description,
-                "image": image,
-                "author": { "@type": "Person", "name": modData.author || 'Unknown' },
-                "applicationCategory": "GameApplication",
-                "operatingSystem": "Windows, macOS, Linux",
-                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-                "aggregateRating": modData.rating > 0 ? {
-                    "@type": "AggregateRating",
-                    "ratingValue": modData.rating,
-                } : undefined
+                '@context': 'https://schema.org',
+                '@type': 'SoftwareApplication',
+                name: modData.title,
+                description: meta?.description || description,
+                image,
+                author: { '@type': 'Person', name: modData.author || 'Unknown' },
+                applicationCategory: 'GameApplication',
+                operatingSystem: 'Windows, macOS, Linux',
+                offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
             };
 
             const crumbs = getBreadcrumbsForClassification(modData.classification || 'PLUGIN');
             const fullCrumbs = [...crumbs, { name: modData.title, url: projectUrl }];
             const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
 
-            jsonLd = [websiteSchema, appSchema, breadcrumbSchema];
+            const schemas: any[] = [websiteSchema, organizationSchema, appSchema];
+            if (breadcrumbSchema) schemas.push(breadcrumbSchema);
+            jsonLd = schemas;
             ssrSuccessfullyCompleted = true;
+        } else {
+            initialData = null;
         }
-    } catch (e) {
-        console.error("[SSR] Bot Project Fetch Error:", e);
+    } catch {
+        initialData = null;
     }
 }
 
-if (ssrSuccessfullyCompleted) {
-    const ttl = getSecondsUntilNextUpdate();
-    Astro.response.headers.set('Cache-Control', `public, max-age=60, s-maxage=${ttl}, stale-while-revalidate=86400`);
+if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
+    Astro.response.headers.set('Cache-Control', `public, max-age=300, s-maxage=${DAY_IN_SECONDS}, stale-while-revalidate=${DAY_IN_SECONDS}`);
+} else if (ssrSuccessfullyCompleted && isProjectRoute && isBot) {
+    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=3600');
 } else {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
+
+const projectBootstrapUrl = !initialData && isProjectRoute && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
 ---
 
 <BaseLayout
-        title={title}
-        description={description}
-        keywords={keywords}
-        image={image}
-        jsonLd={jsonLd}
-        initialData={initialData}
-        canonicalOverride={canonicalOverride}
-        pageNext={pageNext}
-        pagePrev={pagePrev}
+    title={title}
+    description={description}
+    keywords={keywords}
+    image={image}
+    jsonLd={jsonLd}
+    initialData={initialData}
+    canonicalOverride={canonicalOverride}
+    pageNext={pageNext}
+    pagePrev={pagePrev}
+    projectBootstrapUrl={projectBootstrapUrl}
+    robots={robots}
 >
     <App client:load initialPath={path} ssrData={initialData} />
 </BaseLayout>

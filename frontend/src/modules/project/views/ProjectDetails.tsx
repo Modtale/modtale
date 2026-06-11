@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
@@ -20,22 +20,25 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
-import { Wiki } from '../tabs/Wiki';
-import { useHMWiki, WikiSidebar } from '../components/HMWiki';
+import { useHMWiki } from '../hooks/useHMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
 import { Spinner } from '@/components/ui/Spinner';
 import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { ShareModal } from '../components/dialogs/ShareModal';
-import { ReportModal } from '../components/dialogs/ReportModal';
-import { PostDownloadModal } from '../components/dialogs/PostDownloadModal';
-import { HistoryModal } from '../components/dialogs/HistoryModal';
-import { DownloadModal } from '../components/dialogs/DownloadModal';
-import { DependencyModal } from '../components/dialogs/DependencyModal';
-import { api } from '@/utils/api';
+import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import '../styles/downloadFx.css';
+
+const ShareModal = lazy(() => import('../components/dialogs/ShareModal').then((module) => ({ default: module.ShareModal })));
+const ReportModal = lazy(() => import('../components/dialogs/ReportModal').then((module) => ({ default: module.ReportModal })));
+const PostDownloadModal = lazy(() => import('../components/dialogs/PostDownloadModal').then((module) => ({ default: module.PostDownloadModal })));
+const HistoryModal = lazy(() => import('../components/dialogs/HistoryModal').then((module) => ({ default: module.HistoryModal })));
+const DownloadModal = lazy(() => import('../components/dialogs/DownloadModal').then((module) => ({ default: module.DownloadModal })));
+const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal').then((module) => ({ default: module.DependencyModal })));
+const Wiki = lazy(() => import('../tabs/Wiki').then((module) => ({ default: module.Wiki })));
+const WikiSidebar = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiSidebar })));
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -45,6 +48,12 @@ interface ProjectDetailViewProps {
     downloadedSessionIds: Set<string>;
     onRefresh: () => Promise<void>;
 }
+
+type DownloadChannel = 'RELEASE' | 'BETA' | 'ALPHA';
+
+const normalizeDownloadChannel = (channel?: string): DownloadChannel => (
+    channel === 'BETA' || channel === 'ALPHA' ? channel : 'RELEASE'
+);
 
 export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                                                                      currentUser, isLiked, onToggleFavorite, onDownload, downloadedSessionIds, onRefresh
@@ -57,7 +66,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser);
 
-    const [statusModal, setStatusModal] = useState<any>(null);
+    const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
 
@@ -67,20 +76,31 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const [showPostDownloadModal, setShowPostDownloadModal] = useState(false);
     const [lastDownloadWasBundle, setLastDownloadWasBundle] = useState(false);
+    const [lastDownloadedFileName, setLastDownloadedFileName] = useState('');
+    const [lastDownloadChannel, setLastDownloadChannel] = useState<DownloadChannel>('RELEASE');
     const [showDownloadFx, setShowDownloadFx] = useState(false);
     const [preReleaseGameVersions, setPreReleaseGameVersions] = useState<string[]>([]);
     const [orderedGameVersions, setOrderedGameVersions] = useState<string[]>([]);
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
-    const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; dependencies: any[] } | null>(null);
+    const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[]; channel: DownloadChannel } | null>(null);
     const commentsRef = useRef<HTMLDivElement>(null);
+
+    const browseBackTarget = useMemo(() => {
+        if (typeof window === 'undefined') return SiteRoutes.browse();
+        const stored = window.sessionStorage.getItem('modtale.lastBrowseUrl');
+        if (!stored) return SiteRoutes.browse();
+
+        const isBrowsePath = /^\/(mods|plugins|modpacks|worlds|art|data)(\?|$)/.test(stored);
+        return isBrowsePath ? stored : SiteRoutes.browse();
+    }, []);
 
     const isWikiRoute = location.pathname.includes('/wiki');
     const isGalleryRoute = /\/gallery\/?$/.test(location.pathname);
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
     const wikiPageSlug = wikiMatch?.[1];
 
-    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(project?.hmWikiSlug, wikiPageSlug, isWikiRoute && !!project?.hmWikiEnabled);
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(project?.id, wikiPageSlug, isWikiRoute && !!project?.hmWikiEnabled);
     const [displayWikiData, setDisplayWikiData] = useState(wikiData);
     const [displaySlug, setDisplaySlug] = useState(wikiPageSlug);
     const wikiContentRef = useRef<HTMLDivElement>(null);
@@ -92,6 +112,17 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [galleryIndex, setGalleryIndex] = useState(0);
     const galleryImages = project?.galleryImages || [];
     const projectUrl = project ? SiteRoutes.project(project) : '';
+
+    const isStableBuild = useCallback((version: any) => {
+        if (!version) return false;
+        const channel = (version.channel || 'RELEASE').toUpperCase();
+        if (channel === 'ALPHA' || channel === 'BETA') return false;
+        return !String(version.versionNumber || '').includes('-');
+    }, []);
+
+    const hasStableBuilds = useMemo(() => {
+        return (project?.versions || []).some((v: any) => isStableBuild(v));
+    }, [project?.versions, isStableBuild]);
 
     const openGalleryIndexFromHash = () => {
         const hashIndex = Number((location.hash || '').replace('#', ''));
@@ -115,16 +146,45 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, []);
 
     useEffect(() => {
+        if (!isDownloadOpen) return;
+        if (orderedGameVersions.length > 0 || preReleaseGameVersions.length > 0) return;
+
+        let isCancelled = false;
+
         projectClient.getMetaGameVersionCatalog()
             .then((catalog) => {
+                if (isCancelled) return;
                 setPreReleaseGameVersions(catalog?.preReleaseVersions || []);
                 setOrderedGameVersions(catalog?.orderedVersions || catalog?.allVersions || []);
             })
             .catch(() => {
+                if (isCancelled) return;
                 setPreReleaseGameVersions([]);
                 setOrderedGameVersions([]);
             });
-    }, []);
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isDownloadOpen, orderedGameVersions.length, preReleaseGameVersions.length]);
+
+    useEffect(() => {
+        if (!isDownloadOpen) return;
+        if (hasStableBuilds) {
+            setShowExperimental(false);
+        } else {
+            setShowExperimental(true);
+        }
+    }, [isDownloadOpen, hasStableBuilds]);
+
+    useEffect(() => {
+        if (!isHistoryOpen) return;
+        if (hasStableBuilds) {
+            setShowExperimental(false);
+        } else {
+            setShowExperimental(true);
+        }
+    }, [isHistoryOpen, hasStableBuilds]);
 
     useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
@@ -212,16 +272,52 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
         return '';
     };
+    const showDownloadError = useCallback((error: unknown, fallback: string) => {
+        setStatusModal({
+            type: 'error',
+            title: 'Download Unavailable',
+            message: extractApiErrorMessage(error, fallback)
+        });
+    }, []);
 
-    const finishVersionDownload = async (versionNumber: string, selectedDeps: string[]) => {
+    const sanitizeDownloadName = (input: string) => input.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+    const extractFileNameFromUrl = (rawUrl?: string) => {
+        if (!rawUrl) return '';
+        const withoutQuery = rawUrl.split('?')[0];
+        const lastSegment = withoutQuery.substring(withoutQuery.lastIndexOf('/') + 1);
+        const decoded = decodeURIComponent(lastSegment);
+        return decoded.length > 37 && decoded.charAt(36) === '-' ? decoded.substring(37) : decoded;
+    };
+
+    const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean) => {
+        if (!projectData) return '';
+        if (isBundle) return `${sanitizeDownloadName(projectData.title)}-UNZIP-ME.zip`;
+        if (projectData.classification === 'MODPACK') return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
+
+        const matchedVersion = (projectData.versions || []).find((v: any) => {
+            if (v.versionNumber !== versionNumber) return false;
+            if (!gameVersion) return true;
+            const gameVersions = Array.isArray(v.gameVersions) ? v.gameVersions : [];
+            return gameVersions.includes(gameVersion);
+        });
+
+        return extractFileNameFromUrl(matchedVersion?.fileUrl);
+    };
+
+    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE') => {
         if (!project) return;
         const currentProject = project;
         const isBundle = selectedDeps.length > 0;
         const depsQuery = isBundle ? `?deps=${selectedDeps.map(encodeURIComponent).join(',')}` : '';
+        const params = new URLSearchParams();
+        if (gameVersion) params.set('gameVersion', gameVersion);
+        const queryPrefix = isBundle ? '&' : '?';
+        const resolverQuery = params.toString() ? `${queryPrefix}${params.toString()}` : '';
 
         const endpoint = isBundle
-            ? `/projects/${currentProject.id}/versions/${versionNumber}/download-bundle-url${depsQuery}`
-            : `/projects/${currentProject.id}/versions/${versionNumber}/download-url`;
+            ? `/projects/${currentProject.id}/versions/${versionNumber}/download-bundle-url${depsQuery}${resolverQuery}`
+            : `/projects/${currentProject.id}/versions/${versionNumber}/download-url${params.toString() ? `?${params.toString()}` : ''}`;
 
         const res = await api.get(endpoint);
 
@@ -231,6 +327,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 downloadUrl = baseUrl + downloadUrl;
             }
+            setLastDownloadedFileName(resolveDownloadedFileName(currentProject, versionNumber, gameVersion, isBundle));
 
             window.open(downloadUrl, '_blank');
             setShowDownloadFx(true);
@@ -247,20 +344,28 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             setIsDepModalOpen(false);
             setPendingDownload(null);
             setLastDownloadWasBundle(isBundle || currentProject.classification === 'MODPACK');
+            setLastDownloadChannel(channel);
 
             if (localStorage.getItem('hideInstallInstructions') !== 'true') {
                 setShowPostDownloadModal(true);
             }
 
             if (location.pathname.endsWith('/download')) navigate(SiteRoutes.project(currentProject), { replace: true });
+            return;
         }
+
+        throw new Error('The server did not return a usable download link for this file.');
     };
 
-    const handleDownloadClick = async (url: string, versionNumber: string, deps: any[], channel: string) => {
+    const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
+            const downloadChannel = normalizeDownloadChannel(channel);
+
             if (!versionNumber) {
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 const targetUrl = baseUrl + '/files/download/' + encodeURI(url);
+                setLastDownloadedFileName(extractFileNameFromUrl(url));
+                setLastDownloadChannel(downloadChannel);
                 window.open(targetUrl, '_blank');
                 setShowDownloadFx(true);
                 if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
@@ -281,24 +386,26 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep));
+            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !dep?.isEmbedded);
             if (selectableDeps.length > 0) {
-                setPendingDownload({ versionNumber, dependencies: selectableDeps });
+                setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps, channel: downloadChannel });
                 setIsDepModalOpen(true);
                 return;
             }
 
-            await finishVersionDownload(versionNumber, []);
-        } catch (e) {
-            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
+            await finishVersionDownload(versionNumber, gameVersion, [], downloadChannel);
+        } catch (e: unknown) {
+            showDownloadError(e, 'We could not prepare this download.');
         }
     };
 
     const versionsByGame = useMemo(() => {
         return (project?.versions || []).reduce((acc: any, v: any) => {
-            const key = v.gameVersions?.[0] || 'Any';
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(v);
+            const keys = Array.isArray(v.gameVersions) && v.gameVersions.length > 0 ? v.gameVersions : ['Any'];
+            keys.forEach((key: string) => {
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(v);
+            });
             return acc;
         }, {});
     }, [project?.versions]);
@@ -314,7 +421,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     if (isNotFound) return <NotFound />;
     if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
 
-    const canEdit = project.canEdit ?? (currentUser && (currentUser.username === project.author || project.teamMembers?.some(m => m.userId === currentUser.id)));
+    const canEdit = project.canEdit ?? Boolean(
+        currentUser && (
+            currentUser.id === project.authorId ||
+            project.teamMembers?.some(m => m.userId === currentUser.id)
+        )
+    );
 
     const meta = generateProjectMeta(project);
     const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);
@@ -352,53 +464,60 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             </Helmet>
 
             {statusModal && <StatusModal {...statusModal} onClose={() => setStatusModal(null)} />}
-            <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />
-            <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />
-            <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} isBundle={lastDownloadWasBundle} />
+            <Suspense fallback={null}>
+                {isShareOpen && <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />}
+                {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
+                {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} />}
 
-            <HistoryModal
-                show={isHistoryOpen}
-                onClose={() => navigate(projectUrl)}
-                history={sortedHistory}
-                showExperimental={showExperimental}
-                onToggleExperimental={toggleExperimental}
-                onDownload={handleDownloadClick}
-            />
-            <DownloadModal
-                show={isDownloadOpen}
-                onClose={() => navigate(projectUrl)}
-                versionsByGame={versionsByGame}
-                preReleaseGameVersions={preReleaseGameVersions}
-                orderedGameVersions={orderedGameVersions}
-                onDownload={handleDownloadClick}
-                showExperimental={showExperimental}
-                onToggleExperimental={toggleExperimental}
-                onViewHistory={() => navigate(projectUrl + '/changelog')}
-            />
-            {isDepModalOpen && pendingDownload && (
-                <DependencyModal
-                    dependencies={pendingDownload.dependencies}
-                    onClose={() => {
-                        setIsDepModalOpen(false);
-                        setPendingDownload(null);
-                    }}
-                    onDownloadBundle={(selectedDeps) => {
-                        finishVersionDownload(pendingDownload.versionNumber, selectedDeps).catch(() => {
-                            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
-                        });
-                    }}
-                    onDownloadProjectOnly={() => {
-                        finishVersionDownload(pendingDownload.versionNumber, []).catch(() => {
-                            setStatusModal({ type: 'error', title: 'Download Failed', msg: 'Could not generate download link. Please try again later.' });
-                        });
-                    }}
-                />
-            )}
+                {isHistoryOpen && (
+                    <HistoryModal
+                        show={isHistoryOpen}
+                        onClose={() => navigate(projectUrl)}
+                        history={sortedHistory}
+                        showExperimental={showExperimental}
+                        onToggleExperimental={toggleExperimental}
+                        onDownload={handleDownloadClick}
+                        hasStableVersions={hasStableBuilds}
+                    />
+                )}
+                {isDownloadOpen && (
+                    <DownloadModal
+                        show={isDownloadOpen}
+                        onClose={() => navigate(projectUrl)}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={preReleaseGameVersions}
+                        orderedGameVersions={orderedGameVersions}
+                        onDownload={handleDownloadClick}
+                        showExperimental={showExperimental}
+                        onToggleExperimental={toggleExperimental}
+                        onViewHistory={() => navigate(projectUrl + '/changelog')}
+                    />
+                )}
+                {isDepModalOpen && pendingDownload && (
+                    <DependencyModal
+                        dependencies={pendingDownload.dependencies}
+                        onClose={() => {
+                            setIsDepModalOpen(false);
+                            setPendingDownload(null);
+                        }}
+                        onDownloadBundle={(selectedDeps) => {
+                            finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, selectedDeps, pendingDownload.channel).catch(() => {
+                                showDownloadError(new Error('The dependency bundle link could not be generated.'), 'We could not prepare that bundle download.');
+                            });
+                        }}
+                        onDownloadProjectOnly={() => {
+                            finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, [], pendingDownload.channel).catch(() => {
+                                showDownloadError(new Error('The project-only download link could not be generated.'), 'We could not prepare that download.');
+                            });
+                        }}
+                    />
+                )}
+            </Suspense>
 
             <ProjectLayout
                 bannerUrl={project.bannerUrl}
                 iconUrl={project.imageUrl}
-                onBack={() => navigate(SiteRoutes.home())}
+                onBack={() => navigate(browseBackTarget)}
                 headerActions={
                     <HeaderActions
                         project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} canEdit={Boolean(canEdit)} projectUrl={projectUrl}
@@ -410,7 +529,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 sidebarContent={
                     isWikiRoute ? (
                         <>
-                            <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} />
+                            <Suspense fallback={null}>
+                                <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} />
+                            </Suspense>
                             <div className="mt-4">
                                 <Link to={projectUrl} className={`block text-sm font-bold ${theme.colors.accent} hover:underline flex items-center gap-2`}>
                                     <ChevronLeft className="w-4 h-4" /> Back to Project
@@ -423,9 +544,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 }
                 mainContent={
                     isWikiRoute ? (
-                        <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
+                        <Suspense fallback={<div className="flex justify-center p-12"><Spinner /></div>}>
+                            <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
+                        </Suspense>
                     ) : (
-                        <ViewDetails project={project} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} />
+                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} />
                     )
                 }
             />

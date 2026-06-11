@@ -1,9 +1,13 @@
 package net.modtale.config.db;
 
+import com.mongodb.MongoBulkWriteException;
+import com.mongodb.MongoException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import net.modtale.config.properties.AppSeedingProperties;
+import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
@@ -14,7 +18,6 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,23 +35,25 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ReservedAccountGuardService reservedAccountGuardService;
-
-    @Value("${app.seeding.enabled:false}")
-    private boolean seedingEnabled;
-
-    @Value("${app.seeding.source-db:modtale}")
-    private String sourceDbName;
+    private final AppSeedingProperties seedingProperties;
 
     private static final int PUBLISHED_PROJECT_LIMIT = 100;
     private static final int REPORT_LIMIT = 20;
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
     private static final String ADMIN_ID = "692620f7c2f3266e23ac0dee";
 
-    public DataSeeder(MongoTemplate mongoTemplate, UserRepository userRepository, PasswordEncoder passwordEncoder, ReservedAccountGuardService reservedAccountGuardService) {
+    public DataSeeder(
+            MongoTemplate mongoTemplate,
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            ReservedAccountGuardService reservedAccountGuardService,
+            AppSeedingProperties seedingProperties
+    ) {
         this.mongoTemplate = mongoTemplate;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.reservedAccountGuardService = reservedAccountGuardService;
+        this.seedingProperties = seedingProperties;
     }
 
     @Override
@@ -60,7 +65,7 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        if (!seedingEnabled) {
+        if (!seedingProperties.enabled()) {
             return;
         }
 
@@ -70,7 +75,7 @@ public class DataSeeder implements CommandLineRunner {
 
         String currentDbName = mongoTemplate.getDb().getName();
 
-        if (currentDbName.equalsIgnoreCase(sourceDbName)) {
+        if (currentDbName.equalsIgnoreCase(seedingProperties.sourceDb())) {
             logger.warn("Seeding ABORTED: Current DB is same as Source DB ({})", currentDbName);
             return;
         }
@@ -83,14 +88,14 @@ public class DataSeeder implements CommandLineRunner {
         logger.info("Initializing Preview Environment...");
 
         try {
-            logger.info("Attempting to clone relational subset from '{}'...", sourceDbName);
+            logger.info("Attempting to clone relational subset from '{}'...", seedingProperties.sourceDb());
 
-            MongoDatabase sourceDb = mongoTemplate.getMongoDatabaseFactory().getMongoDatabase(sourceDbName);
+            MongoDatabase sourceDb = mongoTemplate.getMongoDatabaseFactory().getMongoDatabase(seedingProperties.sourceDb());
             MongoDatabase targetDb = mongoTemplate.getDb();
 
             long sourceProjectCount = sourceDb.getCollection("projects").countDocuments();
             if (sourceProjectCount == 0) {
-                logger.warn("SOURCE DB '{}' IS EMPTY! Cannot clone data.", sourceDbName);
+                logger.warn("SOURCE DB '{}' IS EMPTY! Cannot clone data.", seedingProperties.sourceDb());
                 return;
             }
 
@@ -118,6 +123,8 @@ public class DataSeeder implements CommandLineRunner {
                     logger.warn("No source project found with status: {}", status.name());
                 }
             }
+
+            ensureClassificationCoverage(sourceProjectsCol, compiledProjects);
 
             Set<String> selectedProjectIds = compiledProjects.stream()
                     .map(doc -> doc.get("_id"))
@@ -152,7 +159,7 @@ public class DataSeeder implements CommandLineRunner {
             try {
                 targetDb.getCollection("projects").insertMany(compiledProjects);
                 logger.info("Cloned {} mixed-status projects to local database.", compiledProjects.size());
-            } catch (Exception e) {
+            } catch (MongoBulkWriteException e) {
                 logger.warn("Project insertion warning (duplicates might exist): {}", e.getMessage());
             }
 
@@ -161,7 +168,7 @@ public class DataSeeder implements CommandLineRunner {
 
             logger.info("Seeding completed successfully.");
 
-        } catch (Exception e) {
+        } catch (MongoException e) {
             logger.error("Failed to seed preview database", e);
         }
     }
@@ -288,7 +295,7 @@ public class DataSeeder implements CommandLineRunner {
             try {
                 targetCol.insertMany(safeToInsert);
                 logger.info("Cloned and sanitized {} users.", safeToInsert.size());
-            } catch (Exception e) {
+            } catch (MongoBulkWriteException e) {
                 logger.warn("Partial user insertion error: {}", e.getMessage());
             }
         }
@@ -314,7 +321,7 @@ public class DataSeeder implements CommandLineRunner {
             try {
                 target.getCollection("project_monthly_stats").insertMany(stats);
                 logger.info("Cloned {} project statistics records.", stats.size());
-            } catch (Exception e) {
+            } catch (MongoBulkWriteException e) {
                 logger.warn("Stats insertion error: {}", e.getMessage());
             }
         }
@@ -327,12 +334,12 @@ public class DataSeeder implements CommandLineRunner {
                 try {
                     target.getCollection(collectionName).insertMany(docs);
                     logger.info("Cloned {} documents from {}.", docs.size(), collectionName);
-                } catch (Exception e) {
+                } catch (MongoBulkWriteException e) {
                     logger.warn("Insertion error for {}: {}", collectionName, e.getMessage());
                 }
             }
-        } catch (Exception e) {
-            logger.warn("Could not clone subset of {}", collectionName);
+        } catch (MongoException e) {
+            logger.warn("Could not clone subset of {}: {}", collectionName, e.getMessage());
         }
     }
 
@@ -408,5 +415,42 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         return dependencyIds;
+    }
+
+    private void ensureClassificationCoverage(MongoCollection<Document> sourceProjectsCol, List<Document> compiledProjects) {
+        Set<String> existingProjectIds = compiledProjects.stream()
+                .map(doc -> doc.get("_id"))
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .collect(Collectors.toSet());
+
+        Set<String> includedClassifications = compiledProjects.stream()
+                .map(doc -> doc.getString("classification"))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        for (ProjectClassification classification : ProjectClassification.values()) {
+            if (includedClassifications.contains(classification.name())) {
+                continue;
+            }
+
+            Document projectForClassification = sourceProjectsCol.aggregate(Arrays.asList(
+                    Aggregates.match(Filters.eq("classification", classification.name())),
+                    Aggregates.sample(1)
+            )).first();
+
+            if (projectForClassification == null) {
+                logger.warn("No source project found with classification: {}", classification.name());
+                continue;
+            }
+
+            Object id = projectForClassification.get("_id");
+            String projectId = id != null ? id.toString() : null;
+            if (projectId != null && existingProjectIds.add(projectId)) {
+                compiledProjects.add(projectForClassification);
+                includedClassifications.add(classification.name());
+                logger.info("Guaranteed inclusion of project with classification: {}", classification.name());
+            }
+        }
     }
 }

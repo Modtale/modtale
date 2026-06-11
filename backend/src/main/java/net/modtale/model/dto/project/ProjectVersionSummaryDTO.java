@@ -2,7 +2,6 @@ package net.modtale.model.dto.project;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.model.project.ScanResult;
 
 import java.util.List;
 
@@ -15,6 +14,5 @@ public record ProjectVersionSummaryDTO(
         String releaseDate,
         ProjectVersion.Channel channel,
         ProjectVersion.ReviewStatus reviewStatus,
-        String rejectionReason,
-        ScanResult scanResult
+        String rejectionReason
 ) {}

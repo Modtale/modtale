@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, Loader2, Lock } from 'lucide-react';
 import { authClient } from '../api/authClient';
+import { StatusModal } from '@/components/ui/StatusModal';
+import { extractApiErrorMessage } from '@/utils/api';
 
 export function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -10,7 +12,7 @@ export function ResetPassword() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
     const [success, setSuccess] = useState(false);
 
     if (!token) {
@@ -27,18 +29,24 @@ export function ResetPassword() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (password !== confirmPassword) {
-            setError("Passwords do not match.");
+            setStatusModal({
+                title: 'Passwords Do Not Match',
+                msg: 'The new password and confirmation do not match yet. Please make sure both fields are identical before continuing.'
+            });
             return;
         }
 
         setLoading(true);
-        setError(null);
+        setStatusModal(null);
 
         try {
             await authClient.resetPassword({ token, password });
             setSuccess(true);
-        } catch (err: any) {
-            setError(err.response?.data?.error || "Failed to reset password.");
+        } catch (err: unknown) {
+            setStatusModal({
+                title: 'Password Reset Failed',
+                msg: extractApiErrorMessage(err, 'We could not reset your password.')
+            });
         } finally {
             setLoading(false);
         }
@@ -68,6 +76,14 @@ export function ResetPassword() {
 
     return (
         <div className="flex-1 flex items-center justify-center p-4 min-h-[80vh]">
+            {statusModal && (
+                <StatusModal
+                    type="error"
+                    title={statusModal.title}
+                    message={statusModal.msg}
+                    onClose={() => setStatusModal(null)}
+                />
+            )}
             <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl">
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 bg-modtale-accent/10 text-modtale-accent rounded-2xl flex items-center justify-center mx-auto mb-4 border border-modtale-accent/20 shadow-inner">
@@ -78,12 +94,6 @@ export function ResetPassword() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                    {error && (
-                        <div className="p-3 text-sm font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 rounded-xl text-center">
-                            {error}
-                        </div>
-                    )}
-
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">New Password</label>
                         <input

@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, CheckCircle2, Square, RefreshCw } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { extractApiErrorMessage } from '@/utils/api';
 import type { ScanIssue } from '@/types';
 
 interface SourceInspectorProps {
@@ -127,17 +128,7 @@ const FileTreeNode: React.FC<{
 };
 
 const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number }> = ({ content, filename, startLine, endLine }) => {
-    let ext = filename.split('.').pop()?.toLowerCase();
-    if (ext === 'class') ext = 'java';
-
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-    const scrollbarStyles = `
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #0f1117; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; border: 2px solid #0f1117; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-    `;
 
     const safeContent = useMemo(() => {
         if (content === null || content === undefined) return '';
@@ -148,28 +139,6 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [content]);
 
     const lines = useMemo(() => safeContent.split('\n'), [safeContent]);
-
-    const highlightedCode = useMemo(() => {
-        if (!safeContent) return '';
-        const entityMap: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-        let src = safeContent.replace(/[&<>"']/g, (m) => entityMap[m] || m);
-        if (src.length > 50000) return src;
-
-        const tokens: string[] = [];
-        const saveToken = (text: string, type: string) => {
-            tokens.push(`<span class="${type}">${text}</span>`);
-            return `___TOKEN${tokens.length - 1}___`;
-        };
-
-        if (ext === 'java') {
-            src = src.replace(/(&quot;(\\.|[^&"\\])*&quot;)/g, (m) => saveToken(m, 'text-emerald-400'));
-            src = src.replace(/(\/\/.*)/g, (m) => saveToken(m, 'text-slate-500 italic'));
-            src = src.replace(/\b(public|private|protected|static|final|class|void|int|boolean|if|else|return|new)\b/g, (m) => saveToken(m, 'text-purple-400 font-bold'));
-        }
-
-        tokens.forEach((html, i) => { src = src.split(`___TOKEN${i}___`).join(html); });
-        return src;
-    }, [safeContent, ext]);
 
     useEffect(() => {
         if (startLine && scrollContainerRef.current && startLine > 1) {
@@ -183,24 +152,21 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [startLine, content]);
 
     return (
-        <>
-            <style>{scrollbarStyles}</style>
-            <div ref={scrollContainerRef} className="flex h-full font-mono text-xs overflow-auto custom-scrollbar bg-[#0d1117] relative">
-                <div className="sticky left-0 z-10 w-12 bg-[#0d1117] border-r border-white/5 text-slate-600 text-right py-4 pr-3 select-none leading-5 min-h-full h-fit">
-                    {lines.map((_, i) => (
-                        <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
-                            {i + 1}
-                        </div>
-                    ))}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                    <pre className="text-slate-300 leading-5 p-4 pt-4 w-fit min-w-full">
-                         <code dangerouslySetInnerHTML={{ __html: highlightedCode || safeContent }} />
-                    </pre>
-                </div>
+        <div ref={scrollContainerRef} className="flex h-full overflow-auto bg-[#0d1117] font-mono text-xs relative">
+            <div className="sticky left-0 z-10 h-fit min-h-full w-12 select-none border-r border-white/5 bg-[#0d1117] py-4 pr-3 text-right leading-5 text-slate-600">
+                {lines.map((_, i) => (
+                    <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
+                        {i + 1}
+                    </div>
+                ))}
             </div>
-        </>
+
+            <div className="flex-1 min-w-0">
+                <pre className="text-slate-300 leading-5 p-4 pt-4 w-fit min-w-full">
+                     <code>{safeContent}</code>
+                </pre>
+            </div>
+        </div>
     );
 };
 
@@ -213,6 +179,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     const [showIssuesDropdown, setShowIssuesDropdown] = useState(false);
     const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set());
     const [isScanning, setIsScanning] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     const [activeHighlight, setActiveHighlight] = useState<{
         file: string;
@@ -258,8 +225,11 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         try {
             const data = await adminClient.getFileContent(modId, version, path);
             setInspectorContent(data);
+            setActionError(null);
         } catch (e) {
-            setInspectorContent('// Error loading file content.');
+            const message = extractApiErrorMessage(e, 'We could not load this file from the archive.');
+            setActionError(message);
+            setInspectorContent(`// ${message}`);
         } finally {
             setLoadingFile(false);
         }
@@ -294,8 +264,9 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         setIsScanning(true);
         try {
             await adminClient.scanVersion(modId, versionId);
+            setActionError(null);
         } catch (e) {
-            console.error("Rescan failed", e);
+            setActionError(extractApiErrorMessage(e, 'We could not start a rescan for this version.'));
         } finally {
             setIsScanning(false);
         }
@@ -375,7 +346,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                             </button>
 
                             {showIssuesDropdown && (
-                                <div className="absolute top-full left-0 mt-2 w-[500px] max-h-[600px] overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2 custom-scrollbar">
+                                <div className="absolute top-full left-0 mt-2 w-[500px] max-h-[600px] overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 p-2">
                                     <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2 flex justify-between sticky top-0 bg-slate-900 z-10 py-1">
                                         <span>Active Issues</span>
                                     </h4>
@@ -414,6 +385,12 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                 </div>
             </div>
 
+            {actionError && (
+                <div className="border-b border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+                    {actionError}
+                </div>
+            )}
+
             <div className="flex-1 flex overflow-hidden">
                 <div className="w-80 bg-slate-950 border-r border-white/10 flex flex-col">
                     <div className="p-3 border-b border-white/10 bg-slate-950 sticky top-0 z-10">
@@ -429,7 +406,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-2">
                         {fileSearch ? (
                             <div>
                                 {filteredFiles.length === 0 && (

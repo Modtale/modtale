@@ -21,13 +21,15 @@ public class DownloadTokenService {
     public static class DownloadToken {
         private final String projectId;
         private final String version;
+        private final String gameVersion;
         private final Instant expiresAt;
         private final List<String> selectedDependencies;
         private boolean used;
 
-        public DownloadToken(String projectId, String version, List<String> selectedDependencies, Instant expiresAt) {
+        public DownloadToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, Instant expiresAt) {
             this.projectId = projectId;
             this.version = version;
+            this.gameVersion = gameVersion;
             this.selectedDependencies = selectedDependencies;
             this.expiresAt = expiresAt;
             this.used = false;
@@ -35,6 +37,7 @@ public class DownloadTokenService {
 
         public String getProjectId() { return projectId; }
         public String getVersion() { return version; }
+        public String getGameVersion() { return gameVersion; }
         public List<String> getSelectedDependencies() { return selectedDependencies; }
         public Instant getExpiresAt() { return expiresAt; }
         public boolean isUsed() { return used; }
@@ -45,7 +48,7 @@ public class DownloadTokenService {
         }
     }
 
-    public String generateToken(String projectId, String version, List<String> selectedDependencies) {
+    public String generateToken(String projectId, String version, String gameVersion, List<String> selectedDependencies) {
         cleanExpiredTokens();
 
         byte[] randomBytes = new byte[TOKEN_LENGTH];
@@ -53,13 +56,17 @@ public class DownloadTokenService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
 
         Instant expiresAt = Instant.now().plusSeconds(TOKEN_VALIDITY_MINUTES * 60);
-        tokens.put(token, new DownloadToken(projectId, version, selectedDependencies, expiresAt));
+        tokens.put(token, new DownloadToken(projectId, version, gameVersion, selectedDependencies, expiresAt));
 
         return token;
     }
 
+    public String generateToken(String projectId, String version, String gameVersion) {
+        return generateToken(projectId, version, gameVersion, null);
+    }
+
     public String generateToken(String projectId, String version) {
-        return generateToken(projectId, version, null);
+        return generateToken(projectId, version, null, null);
     }
 
     public DownloadToken validateAndConsume(String token) {
@@ -91,5 +98,9 @@ public class DownloadTokenService {
     public int getActiveTokenCount() {
         cleanExpiredTokens();
         return tokens.size();
+    }
+
+    public int getTokenValiditySeconds() {
+        return TOKEN_VALIDITY_MINUTES * 60;
     }
 }

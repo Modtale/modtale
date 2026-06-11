@@ -1,66 +1,80 @@
 package net.modtale.controller.project;
 
+import jakarta.validation.Valid;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
 import net.modtale.model.user.User;
-import net.modtale.service.project.MetadataService;
+import net.modtale.service.project.ProjectMediaService;
 import net.modtale.service.user.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/projects")
 public class MediaController {
 
-    @Autowired private MetadataService metadataService;
-    @Autowired private AccountService accountService;
+    private final ProjectMediaService projectMediaService;
+    private final AccountService accountService;
+
+    public MediaController(ProjectMediaService projectMediaService, AccountService accountService) {
+        this.projectMediaService = projectMediaService;
+        this.accountService = accountService;
+    }
 
     @PutMapping("/{id}/icon")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_EDIT_ICON', authentication)")
-    public ResponseEntity<?> updateIcon(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        try { metadataService.updateProjectImage(id, file, user, false); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+    public ResponseEntity<Void> updateIcon(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "updating a project icon");
+        projectMediaService.updateProjectImage(id, file, user, false);
+        return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}/banner")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_EDIT_BANNER', authentication)")
-    public ResponseEntity<?> updateBanner(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        try { metadataService.updateProjectImage(id, file, user, true); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+    public ResponseEntity<Void> updateBanner(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "updating a project banner");
+        projectMediaService.updateProjectImage(id, file, user, true);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/gallery")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_ADD', authentication)")
-    public ResponseEntity<?> addGalleryImage(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        try { metadataService.addGalleryImage(id, file, user); return ResponseEntity.ok().build(); }
-        catch (Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+    public ResponseEntity<Void> addGalleryImage(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "uploading a gallery image");
+        projectMediaService.addGalleryImage(id, file, user);
+        return ResponseEntity.ok().build();
     }
-
 
     @DeleteMapping("/{id}/gallery")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_REMOVE', authentication)")
-    public ResponseEntity<?> removeGalleryImage(
+    public ResponseEntity<Void> removeGalleryImage(
             @PathVariable String id,
-            @RequestBody RemoveGalleryImageRequest requestPayload
+            @Valid @RequestBody RemoveGalleryImageRequest requestPayload,
+            Authentication authentication
     ) {
-        User user = accountService.getCurrentUser();
-        if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-
-        String imageUrl = requestPayload.getImageUrl();
-        if (imageUrl == null || imageUrl.isEmpty()) {
-            return ResponseEntity.badRequest().body("imageUrl is required");
-        }
-
-        metadataService.removeGalleryImage(id, imageUrl, user);
+        User user = accountService.requireCurrentUser(authentication, "removing a gallery image");
+        projectMediaService.removeGalleryImage(id, requestPayload.getImageUrl(), user);
         return ResponseEntity.ok().build();
     }
 }

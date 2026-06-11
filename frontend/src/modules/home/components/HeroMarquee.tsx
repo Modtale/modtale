@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
@@ -7,9 +7,6 @@ import { SiteRoutes } from '@/utils/routes';
 import type { Project } from '@/types';
 
 export const FeaturedModCard = ({ project, priority = false }: { project: Project, priority?: boolean }) => {
-    const [isMounted, setIsMounted] = useState(false);
-    useEffect(() => setIsMounted(true), []);
-
     const iconUrl = project.imageUrl
         ? (project.imageUrl.startsWith('/api') ? `${BACKEND_URL}${project.imageUrl}` : project.imageUrl)
         : '/assets/favicon.svg';
@@ -31,10 +28,9 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
             <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 rounded-t-2xl overflow-hidden shrink-0 ${bannerUrl ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {bannerUrl ? (
                     <OptimizedImage
-                        key={`banner-${isMounted}`}
                         src={bannerUrl}
                         alt={`${project.title} Banner`}
-                        baseWidth={400}
+                        baseWidth={320}
                         priority={priority}
                         className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
                     />
@@ -46,7 +42,6 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
             <div className="px-4 sm:px-6 pb-4 sm:pb-6 relative flex flex-col flex-1 bg-transparent">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl absolute -top-6 sm:-top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
                     <OptimizedImage
-                        key={`icon-${isMounted}`}
                         src={iconUrl}
                         alt={`${project.title} Icon`}
                         baseWidth={64}
@@ -62,7 +57,7 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
                     <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
                         <Link
-                            to={SiteRoutes.creator(project.author)}
+                            to={SiteRoutes.creator(project.authorId, project.author)}
                             className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-40 pointer-events-auto"
                             aria-label={`View profile for ${project.author}`}
                             onClick={(e) => e.stopPropagation()}
@@ -85,7 +80,7 @@ export const MarqueeColumn = ({ projects, duration }: { projects: Project[], dur
     <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0">
         <div className="flex flex-col gap-6 animate-marquee-up will-change-transform" style={{ '--marquee-duration': duration } as any}>
             {[...projects, ...projects].map((mod, index) => (
-                <FeaturedModCard key={`${mod.id}-${index}`} project={mod} priority={index < 2} />
+                <FeaturedModCard key={`${mod.id}-${index}`} project={mod} priority={index === 0} />
             ))}
         </div>
     </div>
@@ -100,7 +95,7 @@ export const MarqueeRow = ({ projects, duration, reverse = false }: { projects: 
             <div className="flex gap-4 pr-4">
                 {projects.map((mod, index) => (
                     <div key={`row1-${mod.id}-${index}`} className="w-[220px] sm:w-[280px] shrink-0">
-                        <FeaturedModCard project={mod} priority={index < 2 && !reverse} />
+                        <FeaturedModCard project={mod} priority={index === 0 && !reverse} />
                     </div>
                 ))}
             </div>

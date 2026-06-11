@@ -4,16 +4,16 @@ import { theme } from '@/styles/theme';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { StatusModal } from '@/components/ui/StatusModal';
+import { DiscordBrandIcon } from '@/components/ui/icons/BrandIcons';
 import type { User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { Link } from 'react-router-dom';
 
-const DiscordIcon = ({ className }: { className?: string }) => (
-    <svg className={className} fill="currentColor" viewBox="0 0 127.14 96.36">
-        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-4.2-48.62-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
-    </svg>
-);
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
 const Badge = ({ type }: { type: string }) => {
     if (type === 'OG') return <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tighter cursor-help align-middle" title="Early Adopter">OG</span>;
@@ -50,8 +50,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                                             }) => {
     const [bannerToCrop, setBannerToCrop] = useState<string | null>(null);
     const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
+    const [bannerSourceFile, setBannerSourceFile] = useState<File | null>(null);
+    const [avatarSourceFile, setAvatarSourceFile] = useState<File | null>(null);
     const [uploadingBanner, setUploadingBanner] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const bannerParallaxRef = useRef<HTMLDivElement>(null);
     const bannerFadeRef = useRef<HTMLDivElement>(null);
 
@@ -120,21 +123,34 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
         if (!e.target.files || !e.target.files.length) return;
         const file = e.target.files[0];
+        if (isFileOverUploadLimit(file)) {
+            setUploadError(MAX_UPLOAD_ERROR_MESSAGE);
+            e.target.value = '';
+            return;
+        }
+        setUploadError(null);
         const url = URL.createObjectURL(file);
-        if (type === 'banner') setBannerToCrop(url);
-        else setAvatarToCrop(url);
+        if (type === 'banner') {
+            setBannerToCrop(url);
+            setBannerSourceFile(file);
+        } else {
+            setAvatarToCrop(url);
+            setAvatarSourceFile(file);
+        }
         e.target.value = '';
     };
 
     const handleCropComplete = async (file: File, type: 'banner' | 'avatar') => {
         if (type === 'banner') {
             setBannerToCrop(null);
+            setBannerSourceFile(null);
             if (onBannerUpload) {
                 setUploadingBanner(true);
                 await onBannerUpload(file).finally(() => setUploadingBanner(false));
             }
         } else {
             setAvatarToCrop(null);
+            setAvatarSourceFile(null);
             if (onAvatarUpload) {
                 setUploadingAvatar(true);
                 await onAvatarUpload(file).finally(() => setUploadingAvatar(false));
@@ -159,7 +175,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             case 'github': return { icon: Github, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
             case 'gitlab': return { icon: Gitlab, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
             case 'twitter': return { icon: Twitter, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
-            case 'discord': return { icon: DiscordIcon, label: 'Discord', activeClass: 'group-hover/social:text-[#5865F2] group-hover/social:border-[#5865F2]/30', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
+            case 'discord': return { icon: DiscordBrandIcon, label: 'Discord', activeClass: 'group-hover/social:text-[#5865F2] group-hover/social:border-[#5865F2]/30', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
             default: return { icon: Globe, label: 'Website', activeClass: 'group-hover/social:text-blue-500 group-hover/social:border-blue-500/30', iconBg: 'bg-blue-500/10 text-blue-500', profileBtnBg: 'bg-blue-500' };
         }
     };
@@ -259,8 +275,16 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
-            {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} onCancel={() => setBannerToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
-            {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} onCancel={() => setAvatarToCrop(null)} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
+            {bannerToCrop && <ImageCropperModal imageSrc={bannerToCrop} sourceFile={bannerSourceFile} onCancel={() => { setBannerToCrop(null); setBannerSourceFile(null); }} onCropComplete={(f) => handleCropComplete(f, 'banner')} aspect={3/1} />}
+            {avatarToCrop && <ImageCropperModal imageSrc={avatarToCrop} sourceFile={avatarSourceFile} onCancel={() => { setAvatarToCrop(null); setAvatarSourceFile(null); }} onCropComplete={(f) => handleCropComplete(f, 'avatar')} aspect={1/1} />}
+            {uploadError && (
+                <StatusModal
+                    type="error"
+                    title="Upload Failed"
+                    message={uploadError}
+                    onClose={() => setUploadError(null)}
+                />
+            )}
 
             <div
                 ref={bannerParallaxRef}

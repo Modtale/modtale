@@ -11,14 +11,10 @@ export const projectClient = {
         return res.data;
     },
     trackView: async (id: string) => {
-        await api.post(`/analytics/view/${id}`);
+        await api.post(`/views/project/${id}`);
     },
     getUserProfile: async (id: string) => {
         const res = await api.get<User>(`/user/profile/${id}`);
-        return res.data;
-    },
-    lookupUser: async (username: string) => {
-        const res = await api.get<{ id: string }>(`/users/lookup/${username}`);
         return res.data;
     },
     getOrgMembers: async (orgId: string) => {
@@ -65,12 +61,12 @@ export const projectClient = {
         const res = await api.post('/reports', { targetId, targetType, reason, description });
         return res.data;
     },
-    getWikiData: async (slug: string) => {
-        const res = await api.get(`/wiki/${slug}`);
+    getWikiData: async (projectId: string) => {
+        const res = await api.get(`/wiki/${projectId}`);
         return res.data;
     },
-    getWikiPage: async (projectSlug: string, pageSlug: string) => {
-        const res = await api.get(`/wiki/${projectSlug}/${pageSlug}`);
+    getWikiPage: async (projectId: string, pageSlug: string) => {
+        const res = await api.get(`/wiki/${projectId}/${pageSlug}`);
         return res.data;
     },
 
@@ -126,5 +122,8 @@ export const projectClient = {
     },
     updateVersion: async (projectId: string, versionId: string, data: any) => {
         await api.put(`/projects/${projectId}/versions/${versionId}`, data);
+    },
+    deleteVersion: async (projectId: string, versionId: string) => {
+        await api.delete(`/projects/${projectId}/versions/${versionId}`);
     }
 };

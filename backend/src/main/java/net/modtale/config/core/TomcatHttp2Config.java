@@ -2,7 +2,7 @@ package net.modtale.config.core;
 
 import org.apache.catalina.connector.Connector;
 import org.apache.coyote.http2.Http2Protocol;
-import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Configuration;
 

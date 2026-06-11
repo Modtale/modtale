@@ -18,7 +18,12 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
     const [hoverIndex, setHoverIndex] = useState<number | null>(null);
     const chartId = useId();
 
-    const activeData = data.filter(d => !d.hidden);
+    const normalizedData = (data || []).map(d => ({
+        ...d,
+        value: typeof d.value === 'number' && Number.isFinite(d.value) ? d.value : 0
+    }));
+
+    const activeData = normalizedData.filter(d => !d.hidden);
     const hasData = activeData.length > 0;
 
     const width = 1000;
@@ -94,7 +99,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
     return (
         <div className="w-full select-none h-full flex flex-col relative">
             <div className="flex flex-wrap gap-2 mb-6 flex-shrink-0">
-                {data.map(d => (
+                {normalizedData.map(d => (
                     <button
                         key={d.id}
                         onClick={() => onToggle && onToggle(d.id)}

@@ -23,7 +23,7 @@ const {
 
 const canonicalUrl = new URL(Astro.url.pathname, "https://modtale.net");
 
-const image = propImage || "https://modtale.net/assets/favicon.svg";
+const image = propImage || 'https://modtale.net/assets/logo.svg';
 
 const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
@@ -58,23 +58,29 @@ const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : 
     <link rel="preconnect" href={BACKEND_URL} crossorigin />
     <link rel="dns-prefetch" href={BACKEND_URL} />
     <link rel="preconnect" href="https://cdn.modtale.net" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" media="print" onload="this.media='all'" />
-    <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" />
-    </noscript>
-
-    {jsonLdString && <script type="application/ld+json" set:html={jsonLdString} />}
+    {jsonLdString && <script is:inline type="application/ld+json" set:html={jsonLdString} />}
 
     <script is:inline set:html={`window.INITIAL_DATA = ${initialDataString};`}></script>
+    <script is:inline>
+        (function() {
+            if (typeof window === 'undefined') return;
+            const tt = window.trustedTypes;
+            if (!tt || typeof tt.createPolicy !== 'function') return;
+            try {
+                tt.createPolicy('default', {
+                    createHTML: (value) => value,
+                    createScript: (value) => value,
+                    createScriptURL: (value) => value
+                });
+            } catch (e) {}
+        })();
+    </script>
 
     <script is:inline>
         (function() {
             try {
-                const localTheme = localStorage.getItem('theme');
+                const localTheme = localStorage.getItem('modtale-theme');
                 if (localTheme === 'light') {
                     document.documentElement.classList.remove('dark');
                 }

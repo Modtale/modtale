@@ -7,10 +7,14 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import net.modtale.model.user.ApiKey;
+
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.time.LocalDateTime;
 
 @Document(collection = "projects")
@@ -33,11 +37,14 @@ public class Project {
         private String id;
         private String name;
         private String color;
-        private List<String> permissions;
+        private Set<ApiKey.ApiPermission> permissions;
 
         public ProjectRole() {}
-        public ProjectRole(String id, String name, String color, List<String> permissions) {
-            this.id = id; this.name = name; this.color = color; this.permissions = permissions;
+        public ProjectRole(String id, String name, String color, Set<ApiKey.ApiPermission> permissions) {
+            this.id = id;
+            this.name = name;
+            this.color = color;
+            this.permissions = copyPermissions(permissions);
         }
 
         public String getId() { return id; }
@@ -46,8 +53,18 @@ public class Project {
         public void setName(String name) { this.name = name; }
         public String getColor() { return color; }
         public void setColor(String color) { this.color = color; }
-        public List<String> getPermissions() { return permissions; }
-        public void setPermissions(List<String> permissions) { this.permissions = permissions; }
+        public Set<ApiKey.ApiPermission> getPermissions() { return permissions; }
+        public void setPermissions(Set<ApiKey.ApiPermission> permissions) { this.permissions = copyPermissions(permissions); }
+
+        private static Set<ApiKey.ApiPermission> copyPermissions(Set<ApiKey.ApiPermission> permissions) {
+            if (permissions == null) {
+                return null;
+            }
+            if (permissions.isEmpty()) {
+                return EnumSet.noneOf(ApiKey.ApiPermission.class);
+            }
+            return EnumSet.copyOf(permissions);
+        }
     }
 
     public static class ProjectMember {
@@ -140,9 +157,6 @@ public class Project {
     private LocalDateTime deletedAt;
 
     private String approvedBy;
-
-    private List<String> contributors = new ArrayList<>();
-    private List<String> pendingInvites = new ArrayList<>();
 
     private List<ProjectRole> projectRoles = new ArrayList<>();
     private List<ProjectMember> teamMembers = new ArrayList<>();
@@ -238,11 +252,6 @@ public class Project {
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
     public String getApprovedBy() { return approvedBy; }
     public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
-
-    public List<String> getContributors() { return contributors; }
-    public void setContributors(List<String> contributors) { this.contributors = contributors; }
-    public List<String> getPendingInvites() { return pendingInvites; }
-    public void setPendingInvites(List<String> pendingInvites) { this.pendingInvites = pendingInvites; }
 
     public List<ProjectRole> getProjectRoles() { return projectRoles; }
     public void setProjectRoles(List<ProjectRole> projectRoles) { this.projectRoles = projectRoles; }

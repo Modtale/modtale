@@ -1,6 +1,8 @@
 package net.modtale.config.security;
 
 import net.modtale.config.auth.ApiKeyAuthFilter;
+import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.LocalUserDetailsService;
@@ -9,8 +11,6 @@ import net.modtale.service.auth.OidcLoginService;
 import net.modtale.service.user.AccountService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -46,37 +46,63 @@ import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Configuration
 public class SecurityConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
-    @Value("${app.frontend.url}")
-    private String frontendUrl;
+    private final ApiKeyAuthFilter apiKeyAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
+    private final OAuth2LoginService oauth2LoginService;
+    private final OidcLoginService oidcLoginService;
+    private final OAuth2AuthorizedClientRepository authorizedClientRepository;
+    private final LocalUserDetailsService userDetailsService;
+    private final PasswordEncoder passwordEncoder;
+    private final AccountService accountService;
+    private final AuthenticationService authenticationService;
+    private final AppFrontendProperties frontendProperties;
 
-    @Autowired private ApiKeyAuthFilter apiKeyAuthFilter;
-    @Autowired private RateLimitFilter rateLimitFilter;
-    @Autowired private OAuth2LoginService oauth2LoginService;
-    @Autowired private OidcLoginService oidcLoginService;
-    @Autowired private OAuth2AuthorizedClientRepository authorizedClientRepository;
-    @Autowired private LocalUserDetailsService userDetailsService;
-    @Autowired private PasswordEncoder passwordEncoder;
-
-    @Autowired private AccountService accountService;
-    @Autowired private AuthenticationService authenticationService;
+    public SecurityConfig(
+            ApiKeyAuthFilter apiKeyAuthFilter,
+            RateLimitFilter rateLimitFilter,
+            OAuth2LoginService oauth2LoginService,
+            OidcLoginService oidcLoginService,
+            OAuth2AuthorizedClientRepository authorizedClientRepository,
+            LocalUserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder,
+            AccountService accountService,
+            AuthenticationService authenticationService,
+            AppFrontendProperties frontendProperties
+    ) {
+        this.apiKeyAuthFilter = apiKeyAuthFilter;
+        this.rateLimitFilter = rateLimitFilter;
+        this.oauth2LoginService = oauth2LoginService;
+        this.oidcLoginService = oidcLoginService;
+        this.authorizedClientRepository = authorizedClientRepository;
+        this.userDetailsService = userDetailsService;
+        this.passwordEncoder = passwordEncoder;
+        this.accountService = accountService;
+        this.authenticationService = authenticationService;
+        this.frontendProperties = frontendProperties;
+    }
 
     @PostConstruct
     public void logConfig() {
-        logger.info("Security Config Initialized. Frontend URL: {}", frontendUrl);
+        logger.info("Security Config Initialized. Frontend URL: {}", frontendProperties.url());
     }
 
     private String getCleanFrontendUrl() {
+        String frontendUrl = frontendProperties.url();
         if (frontendUrl != null && frontendUrl.endsWith("/")) {
             return frontendUrl.substring(0, frontendUrl.length() - 1);
         }
@@ -85,8 +111,7 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
     }
@@ -94,17 +119,62 @@ public class SecurityConfig {
     private boolean isPreviewEnvironment() {
         String cleanUrl = getCleanFrontendUrl();
         if (cleanUrl == null || cleanUrl.isBlank()) return false;
-        try {
-            String host = URI.create(cleanUrl).getHost();
-            return (host != null && host.endsWith(".run.app")) || "dev.modtale.net".equalsIgnoreCase(host);
-        } catch (Exception e) {
-            return false;
-        }
+        String host = safeHostFromUrl(cleanUrl);
+        return (host != null && host.endsWith(".run.app")) || "dev.modtale.net".equalsIgnoreCase(host);
     }
 
     private boolean isLocalhost() {
         String cleanUrl = getCleanFrontendUrl();
         return cleanUrl != null && (cleanUrl.contains("localhost") || cleanUrl.contains("127.0.0.1"));
+    }
+
+    private Set<String> getAllowedFrontendOriginPatterns() {
+        Set<String> origins = new LinkedHashSet<>();
+        origins.add("https://modtale.net");
+        origins.add("https://*.modtale.net");
+
+        String cleanUrl = getCleanFrontendUrl();
+        if (cleanUrl == null || cleanUrl.isBlank()) {
+            return origins;
+        }
+
+        origins.add(cleanUrl);
+        URI uri = safeUri(cleanUrl, "frontend URL");
+        if (uri != null) {
+            String host = uri.getHost();
+            String scheme = uri.getScheme();
+            if (host == null || scheme == null) {
+                return origins;
+            }
+
+            if (!host.endsWith(".run.app") && !"localhost".equalsIgnoreCase(host) && !"127.0.0.1".equals(host)) {
+                if (host.startsWith("www.")) {
+                    origins.add(scheme + "://" + host.substring(4));
+                } else {
+                    origins.add(scheme + "://www." + host);
+                }
+            }
+
+            if (host.endsWith("modtale.net")) {
+                origins.add("https://modtale.net");
+                origins.add("https://www.modtale.net");
+                origins.add("https://*.modtale.net");
+            }
+        }
+
+        return origins;
+    }
+
+    private boolean isAllowedFrontendHost(String host) {
+        if (host == null || host.isBlank()) return false;
+        String normalized = host.toLowerCase();
+        for (String originPattern : getAllowedFrontendOriginPatterns()) {
+            String allowedHost = safeHostFromUrl(originPattern);
+            if (allowedHost != null && normalized.equalsIgnoreCase(allowedHost)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Bean
@@ -122,17 +192,13 @@ public class SecurityConfig {
             serializer.setSameSite("Lax");
 
             if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
-                try {
-                    String host = URI.create(cleanUrl).getHost();
-                    if (host != null) {
-                        String[] parts = host.split("\\.");
-                        if (parts.length >= 2) {
-                            String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
-                            serializer.setDomainName(rootDomain);
-                        }
+                String host = safeHostFromUrl(cleanUrl);
+                if (host != null) {
+                    String[] parts = host.split("\\.");
+                    if (parts.length >= 2) {
+                        String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                        serializer.setDomainName(rootDomain);
                     }
-                } catch (Exception e) {
-                    logger.warn("Failed to parse frontend URL for cookie domain: {}", e.getMessage());
                 }
             }
         }
@@ -141,14 +207,13 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository tokenRepository = new CookieCsrfTokenRepository();
-        tokenRepository.setCookieHttpOnly(false);
-        tokenRepository.setSecure(!isLocalhost());
+        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         tokenRepository.setCookiePath("/");
 
         tokenRepository.setCookieCustomizer(cookie -> {
             boolean isPreview = isPreviewEnvironment();
             String cleanUrl = getCleanFrontendUrl();
+            cookie.secure(!isLocalhost());
 
             if (isPreview) {
                 cookie.sameSite("None");
@@ -156,17 +221,13 @@ public class SecurityConfig {
             } else {
                 cookie.sameSite("Lax");
                 if (cleanUrl != null && !cleanUrl.isBlank() && !isLocalhost()) {
-                    try {
-                        String host = URI.create(cleanUrl).getHost();
-                        if (host != null) {
-                            String[] parts = host.split("\\.");
-                            if (parts.length >= 2) {
-                                String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
-                                cookie.domain(rootDomain);
-                            }
+                    String host = safeHostFromUrl(cleanUrl);
+                    if (host != null) {
+                        String[] parts = host.split("\\.");
+                        if (parts.length >= 2) {
+                            String rootDomain = parts[parts.length - 2] + "." + parts[parts.length - 1];
+                            cookie.domain(rootDomain);
                         }
-                    } catch (Exception e) {
-                        logger.warn("Failed to set CSRF cookie domain: {}", e.getMessage());
                     }
                 }
             }
@@ -216,10 +277,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login**", "/error", "/logout").permitAll()
+                        .requestMatchers("/api/v1/docs/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/verify",
                                 "/api/v1/auth/signin",
+                                "/api/v1/auth/logout",
                                 "/api/v1/auth/mfa/validate-login",
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password"
@@ -250,7 +313,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/users/batch"
                         ).permitAll()
-                        .requestMatchers("/api/v1/analytics/view/**").access((authentication, context) -> {
+                        .requestMatchers("/api/v1/analytics/platform/full").access((authentication, context) -> {
+                            boolean isApiKeyUser = authentication.get().getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
+                            if (isApiKeyUser) return new AuthorizationDecision(false);
+
+                            boolean isSuperAdmin = authentication.get().getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+                            return new AuthorizationDecision(authentication.get().isAuthenticated() && isSuperAdmin);
+                        })
+                        .requestMatchers("/api/v1/analytics/view/**", "/api/v1/views/project/**").access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
                             if (isApiKeyUser) return new AuthorizationDecision(false);
@@ -258,11 +330,11 @@ public class SecurityConfig {
                             HttpServletRequest request = context.getRequest();
                             String origin = request.getHeader("Origin");
                             String referer = request.getHeader("Referer");
-                            String cleanUrl = getCleanFrontendUrl();
-                            String validHost = cleanUrl != null ? URI.create(cleanUrl).getHost() : "localhost";
+                            String originHost = safeHostFromUrl(origin);
+                            String refererHost = safeHostFromUrl(referer);
 
-                            boolean isValidOrigin = (origin != null && origin.contains(validHost));
-                            boolean isValidReferer = (referer != null && referer.contains(validHost));
+                            boolean isValidOrigin = isAllowedFrontendHost(originHost);
+                            boolean isValidReferer = isAllowedFrontendHost(refererHost);
 
                             if (isPreviewEnvironment() && (origin != null && origin.contains(".run.app"))) {
                                 return new AuthorizationDecision(true);
@@ -287,7 +359,6 @@ public class SecurityConfig {
                                 "/api/v1/user/settings/**",
                                 "/api/v1/user/repos/**",
                                 "/api/v1/projects/*/favorite",
-                                "/api/v1/projects/*/reviews",
                                 "/api/v1/auth/mfa/setup",
                                 "/api/v1/auth/mfa/verify",
                                 "/api/v1/auth/resend-verification",
@@ -310,9 +381,19 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exception -> exception
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.sendError(HttpStatus.FORBIDDEN.value(), "Access Denied: " + accessDeniedException.getMessage());
+                            ErrorMessageUtils.writeJsonError(
+                                    response,
+                                    HttpStatus.FORBIDDEN,
+                                    "You do not have permission to perform this action with the current account or API key."
+                            );
                         })
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            ErrorMessageUtils.writeJsonError(
+                                    response,
+                                    HttpStatus.UNAUTHORIZED,
+                                    "You need to sign in before performing this action. If you were already signed in, your session may have expired."
+                            );
+                        })
                 );
         return http.build();
     }
@@ -324,6 +405,7 @@ public class SecurityConfig {
         List<String> restrictedOrigins = new ArrayList<>();
 
         boolean isPreview = isPreviewEnvironment();
+        Set<String> frontendOrigins = getAllowedFrontendOriginPatterns();
         String cleanUrl = getCleanFrontendUrl();
 
         if (isPreview) {
@@ -332,9 +414,7 @@ public class SecurityConfig {
                 restrictedOrigins.add(cleanUrl);
             }
         } else {
-            if (cleanUrl != null && !cleanUrl.isBlank()) {
-                restrictedOrigins.add(cleanUrl);
-            }
+            restrictedOrigins.addAll(frontendOrigins);
         }
 
         restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
@@ -348,6 +428,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/v1/user/analytics", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
+        source.registerCorsConfiguration("/api/v1/views/project/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
         source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);
@@ -356,9 +437,7 @@ public class SecurityConfig {
         CorsConfiguration publicConfig = new CorsConfiguration();
         List<String> publicOrigins = new ArrayList<>();
         publicOrigins.add("*");
-        if (cleanUrl != null && !cleanUrl.isBlank()) {
-            publicOrigins.add(cleanUrl);
-        }
+        publicOrigins.addAll(frontendOrigins);
         if (isPreview) {
             publicOrigins.add("https://*.run.app");
         }
@@ -437,9 +516,26 @@ public class SecurityConfig {
     @Bean
     public AuthenticationFailureHandler oauthFailureHandler() {
         return (request, response, exception) -> {
-            String errorParam = java.net.URLEncoder.encode(exception.getMessage(), "UTF-8");
+            String errorParam = URLEncoder.encode(exception.getMessage(), StandardCharsets.UTF_8);
             String cleanUrl = getCleanFrontendUrl();
             response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/?oauth_error=" + errorParam);
         };
+    }
+
+    private URI safeUri(String rawUri, String description) {
+        if (rawUri == null || rawUri.isBlank()) {
+            return null;
+        }
+        try {
+            return URI.create(rawUri);
+        } catch (IllegalArgumentException ex) {
+            logger.warn("Failed to parse {} '{}': {}", description, rawUri, ex.getMessage());
+            return null;
+        }
+    }
+
+    private String safeHostFromUrl(String rawUri) {
+        URI uri = safeUri(rawUri, "request origin");
+        return uri != null ? uri.getHost() : null;
     }
 }

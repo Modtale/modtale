@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ShieldAlert, X } from 'lucide-react';
+import { useScrollLock } from '@/hooks/useScrollLock';
+import { theme } from '@/styles/theme';
 
 interface ExternalLinkContextType {
     openExternalLink: (url: string) => void;
@@ -16,6 +18,8 @@ export const useExternalLink = () => {
 export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [targetUrl, setTargetUrl] = useState<string | null>(null);
     const [dontAskAgain, setDontAskAgain] = useState(false);
+
+    useScrollLock(Boolean(targetUrl));
 
     const normalizeUrl = (url: string) => {
         if (!url) return '';
@@ -96,52 +100,72 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
             {children}
 
             {targetUrl && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
-
-                        <div className="bg-amber-500/10 border-b border-amber-500/20 p-6 flex items-start gap-4">
-                            <div className="p-3 bg-amber-500/20 rounded-xl text-amber-600 dark:text-amber-500">
-                                <AlertTriangle className="w-8 h-8" />
+                <div className={`${theme.components.modalOverlay} z-[9999]`}>
+                    <div className={`${theme.components.modalContent} relative w-full max-w-2xl animate-in zoom-in-95 duration-200`}>
+                        <div className={theme.components.modalHeader}>
+                            <div className="flex items-start gap-4 pr-4">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                                    <ShieldAlert className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <span className={`${theme.components.badge} border-amber-300/60 bg-amber-500/10 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300`}>
+                                            External Link
+                                        </span>
+                                    </div>
+                                    <h2 className={`text-xl font-black ${theme.colors.textPrimary}`}>Leaving Modtale</h2>
+                                    <p className={`mt-1 text-sm ${theme.colors.textSecondary}`}>
+                                        You are about to open a site outside Modtale. Double-check the destination before continuing.
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Leaving Modtale</h2>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm mt-1 leading-relaxed">
-                                    You are about to visit an external website. We cannot verify the safety of external content.
-                                </p>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setTargetUrl(null)}
+                                className={theme.components.iconButton}
+                                aria-label="Close warning"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
 
-                        <div className="p-6">
-                            <div className="bg-slate-100 dark:bg-black/30 p-4 rounded-xl border border-slate-200 dark:border-white/5 break-all font-mono text-sm text-modtale-accent">
-                                {targetUrl}
+                        <div className={`${theme.components.modalBody} space-y-5`}>
+                            <div className={`rounded-2xl border ${theme.colors.border} ${theme.colors.bgSurface} p-4 text-sm font-medium ${theme.colors.textSecondary}`}>
+                                <div className={`mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] ${theme.colors.textMuted}`}>
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    Destination
+                                </div>
+                                <div className="break-all font-mono text-[13px] text-modtale-accent">
+                                    {targetUrl}
+                                </div>
                             </div>
 
-                            <div className="mt-6 flex items-center gap-3">
+                            <label htmlFor="dont-ask" className={`flex cursor-pointer items-center gap-3 rounded-2xl border ${theme.colors.border} ${theme.colors.bgSurface} px-4 py-3 transition-colors hover:border-modtale-accent/30 hover:bg-slate-100 dark:hover:bg-white/10`}>
                                 <input
                                     type="checkbox"
                                     id="dont-ask"
                                     checked={dontAskAgain}
                                     onChange={(e) => setDontAskAgain(e.target.checked)}
-                                    className="w-5 h-5 rounded border-slate-300 text-modtale-accent focus:ring-modtale-accent"
+                                    className="themed-checkbox shrink-0"
                                 />
-                                <label htmlFor="dont-ask" className="text-sm font-bold text-slate-600 dark:text-slate-300 select-none cursor-pointer">
-                                    Don't show this warning again
-                                </label>
-                            </div>
+                                <span className={`text-sm font-bold ${theme.colors.textPrimary}`}>
+                                    Don&apos;t show this warning again
+                                </span>
+                            </label>
                         </div>
 
-                        <div className="p-4 bg-slate-50 dark:bg-white/5 border-t border-slate-200 dark:border-white/5 flex gap-3 justify-end">
+                        <div className={`${theme.components.modalFooter} flex-col-reverse gap-3 sm:flex-row sm:justify-end`}>
                             <button
                                 onClick={() => setTargetUrl(null)}
-                                className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                                className={`${theme.components.buttonGhost} w-full justify-center sm:w-auto`}
                             >
-                                Cancel
+                                Stay Here
                             </button>
                             <button
                                 onClick={confirmNavigation}
-                                className="px-6 py-2.5 rounded-xl font-bold bg-modtale-accent hover:bg-modtale-accentHover text-white shadow-lg shadow-modtale-accent/20 flex items-center gap-2 transition-transform active:scale-95"
+                                className={`${theme.components.buttonPrimary} w-full px-6 sm:w-auto`}
                             >
-                                Continue <ArrowRight className="w-4 h-4" />
+                                Continue Anyway <ArrowRight className="w-4 h-4" />
                             </button>
                         </div>
                     </div>

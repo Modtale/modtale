@@ -3,6 +3,11 @@ import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-rea
 import { BACKEND_URL } from '@/utils/api';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { StatusModal } from '@/components/ui/StatusModal';
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
 interface SidebarSectionProps {
     title: string;
@@ -21,7 +26,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = React.memo(({
                                                                          }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
-    const MOBILE_VISIBLE_KEYWORDS = ['Downloads', 'Ratings', 'Dependencies', 'Supported Versions', 'Tags'];
+    const MOBILE_VISIBLE_KEYWORDS = ['Downloads', 'Dependencies', 'Supported Versions', 'Tags'];
     const isVisibleOnMobile = MOBILE_VISIBLE_KEYWORDS.some(keyword =>
         title.toLowerCase().includes(keyword.toLowerCase())
     );
@@ -77,7 +82,9 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                                                        }) => {
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
+    const [tempImageFile, setTempImageFile] = useState<File | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const bannerParallaxRef = useRef<HTMLDivElement>(null);
     const bannerFadeRef = useRef<HTMLDivElement>(null);
 
@@ -134,7 +141,15 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
         if (!isEditing || !e.target.files?.[0]) return;
-        setTempImage(URL.createObjectURL(e.target.files[0]));
+        const file = e.target.files[0];
+        if (isFileOverUploadLimit(file)) {
+            setUploadError(MAX_UPLOAD_ERROR_MESSAGE);
+            e.target.value = '';
+            return;
+        }
+        setUploadError(null);
+        setTempImage(URL.createObjectURL(file));
+        setTempImageFile(file);
         setCropType(type);
         setCropperOpen(true);
         e.target.value = '';
@@ -146,16 +161,26 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
         if (cropType === 'banner' && onBannerUpload) onBannerUpload(croppedFile, preview);
         setCropperOpen(false);
         setTempImage(null);
+        setTempImageFile(null);
     };
 
     const containerClasses = "max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28";
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
+            {uploadError && (
+                <StatusModal
+                    type="error"
+                    title="Upload Failed"
+                    message={uploadError}
+                    onClose={() => setUploadError(null)}
+                />
+            )}
             {cropperOpen && tempImage && (
                 <ImageCropperModal
                     imageSrc={tempImage}
+                    sourceFile={tempImageFile}
                     aspect={cropType === 'banner' ? 3 : 1}
-                    onCancel={() => { setCropperOpen(false); setTempImage(null); }}
+                    onCancel={() => { setCropperOpen(false); setTempImage(null); setTempImageFile(null); }}
                     onCropComplete={handleCropComplete}
                 />
             )}
