@@ -17,8 +17,7 @@ vi.mock('@/utils/api', () => ({
 }));
 
 vi.mock('@/modules/home/components/HeroMarquee', () => ({
-    MarqueeColumn: () => <div data-testid="marquee-column" />,
-    MarqueeRow: () => <div data-testid="marquee-row" />
+    MarqueeColumn: () => <div data-testid="marquee-column" />
 }));
 
 vi.mock('@/modules/home/components/FeaturePreviews', () => ({
@@ -93,7 +92,7 @@ describe('Home fallback requests', () => {
         vi.useRealTimers();
     });
 
-    it('renders hero marquee content immediately when SSR projects are already available', async () => {
+    it('renders the hero immediately when SSR projects are already available', async () => {
         await act(async () => {
             root.render(
                 <SSRProvider
@@ -122,7 +121,7 @@ describe('Home fallback requests', () => {
             );
         });
 
-        expect(container.querySelector('[data-testid="marquee-column"], [data-testid="marquee-row"]')).toBeTruthy();
+        expect(container.textContent).toContain('The Hytale');
     });
 
     it('fetches trending home projects via category instead of an invalid sort value', async () => {

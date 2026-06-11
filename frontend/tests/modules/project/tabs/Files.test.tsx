@@ -230,6 +230,7 @@ describe('Files upload rules for drafts', () => {
         });
 
         expect(setVersionData).toHaveBeenCalledTimes(1);
+        expect(container.textContent).not.toContain('Reuse Latest Setup');
         const updater = setVersionData.mock.calls[0][0];
         expect(updater(versionData)).toMatchObject({
             gameVersions: ['1.21'],
