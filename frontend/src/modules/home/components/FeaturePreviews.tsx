@@ -754,7 +754,7 @@ export const TrendingProjectsSection = ({
     if (projects.length === 0) return null;
     return (
         <section className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-3 gap-4 relative">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
                 <div className="space-y-1 flex-1">
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         Trending
@@ -800,7 +800,7 @@ export const NewReleasesSection = ({
     if (projects.length === 0) return null;
     return (
         <section className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-3 gap-4 relative">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
                 <div className="space-y-1 flex-1">
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         New Releases
