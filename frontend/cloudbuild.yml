@@ -1,12 +1,15 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '--build-arg'
-      - 'PUBLIC_API_URL=${_PUBLIC_API_URL}'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/modtale-frontend:${_TAG}'
-      - '.'
+      - '-c'
+      - |
+        docker pull gcr.io/$PROJECT_ID/modtale-frontend:${_TAG} || true
+        docker build \
+          --cache-from gcr.io/$PROJECT_ID/modtale-frontend:${_TAG} \
+          --build-arg PUBLIC_API_URL=${_PUBLIC_API_URL} \
+          -t gcr.io/$PROJECT_ID/modtale-frontend:${_TAG} \
+          .
 
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/modtale-frontend:${_TAG}']
