@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Send, Edit, Trash, Flag, CornerDownRight, Crown, ArrowBigUp, ArrowBigDown } from 'lucide-react';
+import { MessageSquare, Send, Edit, Trash, Flag, CornerDownRight, ArrowBigUp, ArrowBigDown } from 'lucide-react';
 import { projectClient } from '../api/projectClient';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
@@ -9,7 +9,8 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { formatTimeAgo } from '@/utils/modHelpers';
 import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
-import type { Comment, User } from '@/types';
+import type { Comment, User, Project } from '@/types';
+import { getCommentRoleBadge } from '../utils/commentRoles';
 
 interface VoteWidgetProps {
     score: number;
@@ -41,6 +42,8 @@ const VoteWidget: React.FC<VoteWidgetProps> = ({ score, userVote, onVote }) => (
 
 interface CommentSectionProps {
     projectId: string;
+    project?: Project | null;
+    authorProfile?: User | null;
     comments: Comment[];
     currentUser: User | null;
     isCreator: boolean;
@@ -53,7 +56,7 @@ interface CommentSectionProps {
 }
 
 export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
-                                                                             projectId, comments, currentUser, isCreator, commentsDisabled,
+                                                                             projectId, project, authorProfile, comments, currentUser, isCreator, commentsDisabled,
                                                                              onCommentsUpdated, onError, onSuccess, onReport, innerRef
                                                                          }) => {
     const [text, setText] = useState('');
@@ -269,6 +272,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
 
                     const score = getVoteScore(anyC);
                     const userVote = getUserVote(anyC);
+                    const authorRoleBadge = getCommentRoleBadge(authorId, project, authorProfile);
 
                     const profileLink = authorId ? SiteRoutes.creator(authorId, authorUsername) : null;
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
@@ -300,6 +304,18 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                         {profileLink ? <Link to={profileLink} className="font-bold text-sm sm:text-base text-slate-900 dark:text-white hover:text-modtale-accent transition-colors">
                                             {authorUsername}
                                         </Link> : <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">{authorUsername}</span>}
+                                        {authorRoleBadge && (
+                                            <span
+                                                className="w-fit text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border"
+                                                style={{
+                                                    color: authorRoleBadge.color,
+                                                    backgroundColor: `${authorRoleBadge.color}1A`,
+                                                    borderColor: `${authorRoleBadge.color}33`
+                                                }}
+                                            >
+                                                {authorRoleBadge.label}
+                                            </span>
+                                        )}
                                         <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                             {formatTimeAgo(comment.date)}
                                         </span>
@@ -371,6 +387,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
 
                                     const replyScore = getVoteScore(devReply);
                                     const replyUserVote = getUserVote(devReply);
+                                    const replyRoleBadge = getCommentRoleBadge(replyId, project, authorProfile);
 
                                     return (
                                         <div className="mt-3 flex gap-3 relative">
@@ -386,7 +403,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                                             {replyAvatar ? (
                                                                 <OptimizedImage src={replyAvatar} alt={`${replyUsername} Avatar`} baseWidth={32} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
+                                                                replyUsername.charAt(0).toUpperCase()
                                                             )}
                                                         </div>
                                                     </Link> : <div className="shrink-0">
@@ -394,18 +411,28 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                                             {replyAvatar ? (
                                                                 <OptimizedImage src={replyAvatar} alt={`${replyUsername} Avatar`} baseWidth={32} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <Crown className="w-4 h-4 text-modtale-accent" aria-hidden="true" />
+                                                                replyUsername.charAt(0).toUpperCase()
                                                             )}
                                                         </div>
                                                     </div>}
                                                     <div className="flex flex-col">
                                                         {replyProfileLink ? <Link to={replyProfileLink} className="font-bold text-sm text-slate-900 dark:text-white hover:text-modtale-accent transition-colors flex items-center gap-1.5">
                                                             {replyUsername}
-                                                            <span className="bg-modtale-accent/10 text-modtale-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest flex items-center gap-1"><Crown className="w-2.5 h-2.5"/> Creator</span>
                                                         </Link> : <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                                                             {replyUsername}
-                                                            <span className="bg-modtale-accent/10 text-modtale-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest flex items-center gap-1"><Crown className="w-2.5 h-2.5"/> Creator</span>
                                                         </span>}
+                                                        {replyRoleBadge && (
+                                                            <span
+                                                                className="w-fit text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border"
+                                                                style={{
+                                                                    color: replyRoleBadge.color,
+                                                                    backgroundColor: `${replyRoleBadge.color}1A`,
+                                                                    borderColor: `${replyRoleBadge.color}33`
+                                                                }}
+                                                            >
+                                                                {replyRoleBadge.label}
+                                                            </span>
+                                                        )}
                                                         <span suppressHydrationWarning className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                                             {formatTimeAgo(comment.developerReply.date)}
                                                         </span>

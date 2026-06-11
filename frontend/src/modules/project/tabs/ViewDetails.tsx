@@ -6,6 +6,7 @@ const CommentSection = lazy(() => import('../components/CommentSection').then((m
 
 interface ViewDetailsProps {
     project: Project;
+    authorProfile?: User | null;
     currentUser: User | null;
     canEdit: boolean;
     commentsRef: React.RefObject<HTMLDivElement | null>;
@@ -14,7 +15,7 @@ interface ViewDetailsProps {
     onRefresh: () => Promise<void>;
 }
 
-export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh }) => {
+export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh }) => {
     return (
         <>
             <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
@@ -23,6 +24,8 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, currentUser, 
             <Suspense fallback={<div ref={commentsRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5" />}>
                 <CommentSection
                     projectId={project.id}
+                    project={project}
+                    authorProfile={authorProfile}
                     comments={project.comments || []}
                     currentUser={currentUser}
                     isCreator={canEdit}
