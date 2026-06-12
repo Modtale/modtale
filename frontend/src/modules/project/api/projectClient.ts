@@ -1,10 +1,14 @@
 import { api } from '@/utils/api';
-import type { ManifestInspectionResult, Project, User, ProjectRole, GameVersionCatalog } from '@/types';
+import type { ManifestInspectionResult, Project, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
 
 export const projectClient = {
     getProject: async (id: string) => {
         const res = await api.get<Project>(`/projects/${id}`);
         return res.data;
+    },
+    getProjectVersionChangelogs: async (id: string) => {
+        const res = await api.get<ProjectVersionChangelog[]>(`/projects/${id}/versions/changelogs`);
+        return res.data || [];
     },
     getProjectGameVersions: async () => {
         const res = await api.get<string[]>('/meta/game-versions');

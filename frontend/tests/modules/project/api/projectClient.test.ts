@@ -18,6 +18,23 @@ describe('projectClient', () => {
         vi.clearAllMocks();
     });
 
+    it('fetches project details from the lean project endpoint', async () => {
+        mockedApi.get.mockResolvedValueOnce({ data: { id: 'project-1' } } as any);
+
+        await expect(projectClient.getProject('project-1')).resolves.toEqual({ id: 'project-1' });
+
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1');
+    });
+
+    it('fetches version changelogs separately', async () => {
+        const changelogs = [{ id: 'version-1', versionNumber: '1.0.0', changelog: 'Changed things.' }];
+        mockedApi.get.mockResolvedValueOnce({ data: changelogs } as any);
+
+        await expect(projectClient.getProjectVersionChangelogs('project-1')).resolves.toEqual(changelogs);
+
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1/versions/changelogs');
+    });
+
     it('returns project comments when present and falls back to an empty list', async () => {
         mockedApi.get.mockResolvedValueOnce({ data: { comments: [{ id: 'comment-1' }] } } as any);
         await expect(projectClient.getComments('project-1')).resolves.toEqual([{ id: 'comment-1' }]);

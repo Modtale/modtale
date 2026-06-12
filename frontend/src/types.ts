@@ -186,6 +186,12 @@ export interface ProjectVersion {
     rejectionReason?: string;
 }
 
+export interface ProjectVersionChangelog {
+    id: string;
+    versionNumber: string;
+    changelog?: string | null;
+}
+
 export interface Reply {
     userId?: string;
     user: string;

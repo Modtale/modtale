@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useMemo } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 
 const MarkdownRichRenderer = lazy(() => import('./MarkdownRichRenderer').then((module) => ({ default: module.MarkdownRichRenderer })));
 
@@ -123,8 +123,25 @@ const MarkdownFallback: React.FC<{ content: string }> = ({ content }) => {
     return <>{blocks}</>;
 };
 
-export const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
-    if (!requiresRichMarkdown(content || '')) {
+export const MarkdownRenderer: React.FC<{ content: string; deferRich?: boolean }> = ({ content, deferRich = false }) => {
+    const shouldUseRichMarkdown = requiresRichMarkdown(content || '');
+    const [richEnabled, setRichEnabled] = useState(!deferRich);
+
+    useEffect(() => {
+        if (!shouldUseRichMarkdown || !deferRich) {
+            setRichEnabled(true);
+            return;
+        }
+
+        setRichEnabled(false);
+        const scheduleIdle = window.requestIdleCallback || ((callback: IdleRequestCallback) => window.setTimeout(callback, 1200));
+        const cancelIdle = window.cancelIdleCallback || window.clearTimeout;
+        const handle = scheduleIdle(() => setRichEnabled(true), { timeout: 2500 });
+
+        return () => cancelIdle(handle as any);
+    }, [content, shouldUseRichMarkdown, deferRich]);
+
+    if (!shouldUseRichMarkdown || !richEnabled) {
         return <MarkdownFallback content={content} />;
     }
 

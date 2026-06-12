@@ -1,6 +1,7 @@
 package net.modtale.service.project;
 
 import net.modtale.model.project.Comment;
+import net.modtale.model.dto.project.ProjectVersionChangelogDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
@@ -86,6 +87,22 @@ public class ProjectViewService {
         return prepareProjectForViewer(project, viewer, privileged);
     }
 
+    public Project getProjectPageByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return getPublicProjectPageByRouteKey(routeKey);
+        }
+
+        Project project = resolveViewerProjectPageByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null) return null;
+
+        boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
+        if (!privileged && !accessControlService.canReadProject(project, viewer)) {
+            return null;
+        }
+
+        return prepareProjectForViewer(project, viewer, privileged);
+    }
+
     @Cacheable(value = "projectDetails", key = "'public:' + #id")
     public Project getPublicProjectById(String id) {
         if (id == null || id.isBlank()) return null;
@@ -99,6 +116,50 @@ public class ProjectViewService {
         Project project = resolvePublicProjectByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         return prepareProjectForViewer(project, null, false);
+    }
+
+    @Cacheable(value = "projectDetails", key = "'public-page:' + #id")
+    public Project getPublicProjectPageById(String id) {
+        if (id == null || id.isBlank()) return null;
+        Project project = projectRepository.findPublicPageDetailById(id).orElse(null);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        return prepareProjectForViewer(project, null, false);
+    }
+
+    @Cacheable(value = "projectDetails", key = "'public-page:' + #routeKey")
+    public Project getPublicProjectPageByRouteKey(String routeKey) {
+        Project project = resolvePublicProjectPageByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        return prepareProjectForViewer(project, null, false);
+    }
+
+    @Cacheable(
+            value = "projectVersionChangelogs",
+            key = "'public:' + #routeKey",
+            condition = "#viewer == null",
+            unless = "#result == null"
+    )
+    public List<ProjectVersionChangelogDTO> getVersionChangelogsByRouteKey(String routeKey, User viewer) {
+        Project project = resolveChangelogProjectByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null) return null;
+
+        boolean privileged = viewer != null && (accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer));
+        if (!privileged && !accessControlService.canReadProject(project, viewer)) {
+            return null;
+        }
+
+        if (project.getVersions() == null) {
+            return List.of();
+        }
+
+        return project.getVersions().stream()
+                .filter(version -> privileged || version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
+                .map(version -> new ProjectVersionChangelogDTO(
+                        version.getId(),
+                        version.getVersionNumber(),
+                        version.getChangelog()
+                ))
+                .collect(Collectors.toList());
     }
 
     public Project getAdminProjectDetails(String id) {
@@ -153,6 +214,26 @@ public class ProjectViewService {
         return projectRepository.findPublicDetailById(normalized).orElse(null);
     }
 
+    private Project resolvePublicProjectPageByRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = projectRepository.findPublicPageDetailById(projectId).orElse(null);
+            if (project != null) return project;
+            return projectRepository.findPublicPageDetailBySlug(normalized).orElse(null);
+        }
+
+        Project route = projectRepository.findPublicRouteBySlug(normalized).orElse(null);
+        if (route != null && route.getId() != null) {
+            Project project = projectRepository.findPublicPageDetailById(route.getId()).orElse(null);
+            if (project != null) return project;
+        }
+
+        return projectRepository.findPublicPageDetailById(normalized).orElse(null);
+    }
+
     private Project resolveViewerProjectByRouteKey(String routeKey) {
         if (routeKey == null || routeKey.isBlank()) return null;
 
@@ -168,6 +249,52 @@ public class ProjectViewService {
         if (project != null) return project;
 
         return projectRepository.findViewerDetailById(normalized).orElse(null);
+    }
+
+    private Project resolveViewerProjectPageByRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = projectRepository.findViewerPageDetailById(projectId).orElse(null);
+            if (project != null) return project;
+            return projectRepository.findViewerPageDetailBySlug(normalized).orElse(null);
+        }
+
+        Project route = projectRepository.findPublicRouteBySlug(normalized).orElse(null);
+        if (route != null && route.getId() != null) {
+            Project project = projectRepository.findViewerPageDetailById(route.getId()).orElse(null);
+            if (project != null) return project;
+        }
+
+        Project project = projectRepository.findViewerPageDetailBySlug(normalized).orElse(null);
+        if (project != null) return project;
+
+        return projectRepository.findViewerPageDetailById(normalized).orElse(null);
+    }
+
+    private Project resolveChangelogProjectByRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = projectRepository.findChangelogsById(projectId).orElse(null);
+            if (project != null) return project;
+            return projectRepository.findChangelogsBySlug(normalized).orElse(null);
+        }
+
+        Project route = projectRepository.findPublicRouteBySlug(normalized).orElse(null);
+        if (route != null && route.getId() != null) {
+            Project project = projectRepository.findChangelogsById(route.getId()).orElse(null);
+            if (project != null) return project;
+        }
+
+        Project project = projectRepository.findChangelogsBySlug(normalized).orElse(null);
+        if (project != null) return project;
+
+        return projectRepository.findChangelogsById(normalized).orElse(null);
     }
 
     private Project prepareProjectForViewer(Project project, User viewer, boolean privileged) {

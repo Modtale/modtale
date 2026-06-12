@@ -83,14 +83,14 @@ public class ProjectResponseCacheService {
 
     @Cacheable(value = "projectDetailDtos", key = "'public:' + #id", unless = "#result == null")
     public ProjectDTO getPublicProjectDto(String id) {
-        Project project = projectService.getPublicProjectById(id);
-        return project == null ? null : ProjectMapper.toDTO(project, false, null);
+        Project project = projectService.getPublicProjectPageById(id);
+        return project == null ? null : ProjectMapper.toDTO(project, false, null, false);
     }
 
     @Cacheable(value = "projectDetailDtos", key = "'public:' + #routeKey", unless = "#result == null")
     public ProjectDTO getPublicProjectDtoByRouteKey(String routeKey) {
-        Project project = projectService.getPublicProjectByRouteKey(routeKey);
-        return project == null ? null : ProjectMapper.toDTO(project, false, null);
+        Project project = projectService.getPublicProjectPageByRouteKey(routeKey);
+        return project == null ? null : ProjectMapper.toDTO(project, false, null, false);
     }
 
     @Cacheable(value = "projectMetaDtos", key = "'public:' + #id", unless = "#result == null")

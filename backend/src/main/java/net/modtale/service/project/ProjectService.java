@@ -1,6 +1,7 @@
 package net.modtale.service.project;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.dto.project.ProjectVersionChangelogDTO;
 import net.modtale.model.user.User;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,13 @@ public class ProjectService {
         return projectViewService.getProjectByRouteKey(routeKey, viewer);
     }
 
+    public Project getProjectPageByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return projectViewService.getPublicProjectPageByRouteKey(routeKey);
+        }
+        return projectViewService.getProjectPageByRouteKey(routeKey, viewer);
+    }
+
     @Cacheable(value = "projectDetails", key = "'public:' + #id")
     public Project getPublicProjectById(String id) {
         return projectViewService.getPublicProjectById(id);
@@ -65,6 +73,18 @@ public class ProjectService {
 
     public Project getPublicProjectByRouteKey(String routeKey) {
         return projectViewService.getPublicProjectByRouteKey(routeKey);
+    }
+
+    public Project getPublicProjectPageById(String id) {
+        return projectViewService.getPublicProjectPageById(id);
+    }
+
+    public Project getPublicProjectPageByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectPageByRouteKey(routeKey);
+    }
+
+    public java.util.List<ProjectVersionChangelogDTO> getVersionChangelogsByRouteKey(String routeKey, User viewer) {
+        return projectViewService.getVersionChangelogsByRouteKey(routeKey, viewer);
     }
 
     public Project getAdminProjectDetails(String id) {

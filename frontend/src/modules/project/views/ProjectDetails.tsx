@@ -28,6 +28,7 @@ import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
+import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import '../styles/downloadFx.css';
 
@@ -112,6 +113,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const prevPathnameRef = useRef(location.pathname);
     const scrollPosRef = useRef(0);
     const downloadFxTimeoutRef = useRef<number | null>(null);
+    const changelogFetchKeyRef = useRef('');
     const [galleryIndex, setGalleryIndex] = useState(0);
     const galleryImages = project?.galleryImages || [];
     const projectUrl = project ? SiteRoutes.project(project) : '';
@@ -188,6 +190,34 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             setShowExperimental(true);
         }
     }, [isHistoryOpen, hasStableBuilds]);
+
+    const needsChangelogHydration = useMemo(() => {
+        return projectNeedsChangelogHydration(project);
+    }, [project]);
+
+    useEffect(() => {
+        if (!isHistoryOpen || !project || !needsChangelogHydration) return;
+        if (changelogFetchKeyRef.current === project.id) return;
+
+        let isCancelled = false;
+        changelogFetchKeyRef.current = project.id;
+
+        projectClient.getProjectVersionChangelogs(id || project.id)
+            .then((changelogs) => {
+                if (isCancelled) return;
+                setProject((previous) => {
+                    if (!previous || previous.id !== project.id) return previous;
+                    return mergeProjectVersionChangelogs(previous, changelogs);
+                });
+            })
+            .catch(() => {
+                if (!isCancelled) changelogFetchKeyRef.current = '';
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isHistoryOpen, project?.id, needsChangelogHydration, id, setProject]);
 
     useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
