@@ -45,6 +45,7 @@ final class ProjectSocialService {
     void toggleFavorite(String projectId, String userId) {
         Project project = getProject(projectId);
         User user = getUser(userId);
+        int originalFavoriteCount = project.getFavoriteCount();
 
         List<String> likes = user.getLikedModIds();
         if (likes == null) {
@@ -60,7 +61,9 @@ final class ProjectSocialService {
             likes.add(canonicalProjectId);
             project.setFavoriteCount(project.getFavoriteCount() + 1);
         }
-        scoringService.markProjectRankingDirty(project);
+        if (project.getFavoriteCount() != originalFavoriteCount) {
+            scoringService.markProjectRankingDirty(project);
+        }
 
         userRepository.save(user);
         projectRepository.save(project);
