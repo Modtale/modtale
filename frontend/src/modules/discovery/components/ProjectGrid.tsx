@@ -1,10 +1,9 @@
 import React, { useMemo } from 'react';
 import { PackageSearch } from 'lucide-react';
-import { ProjectCard } from '@/modules/project/components/ProjectCard';
+import { ProjectCard, ProjectCardSkeletons } from '@/modules/project/components/ProjectCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SiteRoutes } from '@/utils/routes';
 import type { Project } from '@/types';
-import { BrowseSkeletons } from './BrowseSkeletons';
 
 interface ProjectGridProps {
     items: Project[];
@@ -22,7 +21,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
     const likedProjectIdSet = useMemo(() => new Set(likedProjectIds), [likedProjectIds]);
 
     if (loading && items.length === 0) {
-        return <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />;
+        return <ProjectCardSkeletons viewStyle={viewStyle} count={itemsPerPage} />;
     }
 
     if (items.length === 0) {

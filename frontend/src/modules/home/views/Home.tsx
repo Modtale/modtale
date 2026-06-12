@@ -50,7 +50,26 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
 };
 
 const dedupeProjects = (items: Project[]) => Array.from(new Map(items.map((project) => [project.id, project])).values());
+const isHeroMarqueeProject = (project: Project) => Boolean(project.bannerUrl) && Boolean(project.imageUrl) && !project.imageUrl?.includes('favicon');
 const HOME_REQUEST_TIMEOUT_MS = 1800;
+const DESKTOP_BREAKPOINT = 1024;
+const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
+const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
+const DESKTOP_HERO_MIN_HEIGHT = 720;
+const HERO_MARQUEE_PROJECT_LIMIT = 8;
+const WIDE_DESKTOP_GRID_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:grid-cols-2 [@media(min-width:1260px)_and_(min-height:720px)]:justify-items-stretch';
+const WIDE_DESKTOP_COPY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start [@media(min-width:1260px)_and_(min-height:720px)]:text-left [@media(min-width:1260px)_and_(min-height:720px)]:mx-0 [@media(min-width:1260px)_and_(min-height:720px)]:max-w-xl';
+const WIDE_DESKTOP_PRIMARY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start';
+const WIDE_DESKTOP_ACTIONS_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start [@media(min-width:1260px)_and_(min-height:720px)]:self-start';
+const WIDE_DESKTOP_MARQUEE_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:block';
+
+const getViewportSize = () => {
+    if (typeof window === 'undefined') {
+        return { width: 0, height: 0 };
+    }
+
+    return { width: window.innerWidth, height: window.innerHeight };
+};
 
 const FeatureShowcaseSection = ({
     children,
@@ -114,6 +133,43 @@ const FeatureShowcaseSection = ({
     );
 };
 
+const DesktopHeroMarqueeSkeletonCard = ({ accentClass = '' }: { accentClass?: string }) => (
+    <div className="relative flex flex-col w-full shrink-0 overflow-hidden rounded-[1.6rem] border border-slate-200/80 dark:border-white/10 bg-white/75 dark:bg-slate-900/65 shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:shadow-[0_22px_60px_rgba(2,6,23,0.45)] backdrop-blur-xl">
+        <div className={`h-[108px] w-full home-hero-marquee-skeleton-shimmer ${accentClass}`} />
+        <div className="relative flex flex-1 flex-col px-4 sm:px-6 pb-5 sm:pb-6">
+            <div className="absolute -top-6 sm:-top-8 h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl border-4 border-white dark:border-slate-900 bg-slate-200/90 dark:bg-slate-800/90 shadow-lg home-hero-marquee-skeleton-shimmer" />
+            <div className="mt-8 sm:mt-10 space-y-3">
+                <div className="h-5 w-[72%] rounded-full bg-slate-200/90 dark:bg-slate-800/90 home-hero-marquee-skeleton-shimmer" />
+                <div className="h-3 w-[46%] rounded-full bg-slate-200/80 dark:bg-slate-800/80 home-hero-marquee-skeleton-shimmer" />
+            </div>
+            <div className="mt-4 h-3 w-20 rounded-full bg-slate-200/80 dark:bg-slate-800/80 home-hero-marquee-skeleton-shimmer" />
+        </div>
+    </div>
+);
+
+const DesktopHeroMarqueeSkeleton = () => (
+    <aside
+        className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden pointer-events-none"
+        style={{
+            maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
+        }}
+        aria-label="Loading trending Hytale projects showcase"
+        data-testid="home-hero-marquee-skeleton"
+    >
+        <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0 gap-6">
+            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(59,130,246,0.24),rgba(255,255,255,0.08),rgba(148,163,184,0.18))] dark:bg-[linear-gradient(135deg,rgba(59,130,246,0.22),rgba(15,23,42,0.35),rgba(99,102,241,0.18))]" />
+            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(14,165,233,0.2),rgba(255,255,255,0.08),rgba(191,219,254,0.2))] dark:bg-[linear-gradient(135deg,rgba(14,165,233,0.18),rgba(15,23,42,0.32),rgba(59,130,246,0.16))]" />
+            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(99,102,241,0.16),rgba(255,255,255,0.08),rgba(148,163,184,0.16))] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.16),rgba(15,23,42,0.3),rgba(59,130,246,0.14))]" />
+        </div>
+        <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0 gap-6 pt-16 2xl:pt-20">
+            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(37,99,235,0.22),rgba(255,255,255,0.08),rgba(125,211,252,0.2))] dark:bg-[linear-gradient(135deg,rgba(37,99,235,0.2),rgba(15,23,42,0.35),rgba(56,189,248,0.18))]" />
+            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(59,130,246,0.18),rgba(255,255,255,0.08),rgba(196,181,253,0.16))] dark:bg-[linear-gradient(135deg,rgba(59,130,246,0.18),rgba(15,23,42,0.34),rgba(129,140,248,0.18))]" />
+            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(2,132,199,0.18),rgba(255,255,255,0.08),rgba(147,197,253,0.16))] dark:bg-[linear-gradient(135deg,rgba(2,132,199,0.18),rgba(15,23,42,0.32),rgba(59,130,246,0.16))]" />
+        </div>
+    </aside>
+);
+
 export const Home: React.FC<{
     likedProjectIds?: string[];
     onToggleFavorite?: (projectId: string) => void;
@@ -125,12 +181,6 @@ export const Home: React.FC<{
     isLoggedIn = false,
     currentUser = null,
 }) => {
-    const DESKTOP_BREAKPOINT = 1024;
-    const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
-    const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
-    const DESKTOP_HERO_MIN_HEIGHT = 720;
-    const HERO_MARQUEE_PROJECT_LIMIT = 8;
-
     const { initialData: ssrData } = useSSRData();
     const homeSeo = ROUTE_SEO['/'];
     const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
@@ -139,11 +189,24 @@ export const Home: React.FC<{
         () => dedupeProjects([...initialTrendingProjects, ...initialNewestProjects]),
         [initialNewestProjects, initialTrendingProjects]
     );
+    const shouldFetchFallbackProjects = initialProjectSeed.length === 0;
+    const shouldRefreshTrendingProjects = !initialTrendingProjects.length && initialProjectSeed.length > 0;
+    const hasInitialHeroMarqueeProjects = initialProjectSeed.some(isHeroMarqueeProject);
+    const initialProjects = initialTrendingProjects.length ? initialTrendingProjects : initialProjectSeed;
+    const initialHeroProjectsLoading = shouldFetchFallbackProjects || (shouldRefreshTrendingProjects && !hasInitialHeroMarqueeProjects);
+    const initialShouldReserveDesktopHeroMarquee = initialHeroProjectsLoading || initialProjects.some(isHeroMarqueeProject);
 
-    const [isDesktop, setIsDesktop] = useState(false);
-    const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(false);
-    const [projects, setProjects] = useState<Project[]>(initialTrendingProjects.length ? initialTrendingProjects : initialProjectSeed);
+    const [isDesktop, setIsDesktop] = useState(() => getViewportSize().width >= DESKTOP_BREAKPOINT);
+    const [viewportSize, setViewportSize] = useState(getViewportSize);
+    const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState<boolean>(() => {
+        const { width, height } = getViewportSize();
+        return initialShouldReserveDesktopHeroMarquee && width >= DESKTOP_HERO_MIN_WIDTH_ENTER && height >= DESKTOP_HERO_MIN_HEIGHT;
+    });
+    const [projects, setProjects] = useState<Project[]>(initialProjects);
     const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects.length ? initialNewestProjects : initialProjectSeed);
+    const [isHeroProjectsLoading, setIsHeroProjectsLoading] = useState(initialHeroProjectsLoading);
+    const [isTrendingProjectsLoading, setIsTrendingProjectsLoading] = useState(shouldFetchFallbackProjects);
+    const [isNewestProjectsLoading, setIsNewestProjectsLoading] = useState(!initialNewestProjects.length && initialProjectSeed.length === 0);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const heroGridRef = useRef<HTMLDivElement>(null);
     const heroTextColumnRef = useRef<HTMLDivElement>(null);
@@ -154,55 +217,105 @@ export const Home: React.FC<{
     const formatMetric = (value?: number) => (value || 0).toLocaleString();
 
     useEffect(() => {
-        const handleResize = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
+        const handleResize = () => {
+            setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
+            setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+        };
         handleResize();
         window.addEventListener('resize', handleResize, { passive: true });
 
-        const shouldFetchFallbackProjects = initialProjectSeed.length === 0;
-        const shouldRefreshTrendingProjects = !initialTrendingProjects.length && initialProjectSeed.length > 0;
         const shouldFetchFallbackNewest = !initialNewestProjects.length && initialProjectSeed.length === 0;
         const shouldRefreshNewestProjects = !initialNewestProjects.length && initialProjectSeed.length > 0;
         const shouldFetchFallbackStats = !ssrData?.stats?.totalProjects;
+        let isCancelled = false;
+        const scheduledTasks: Array<() => void> = [];
+
+        const updateHeroProjectsLoading = (nextValue: boolean) => {
+            if (!isCancelled) {
+                setIsHeroProjectsLoading(nextValue);
+            }
+        };
+
+        const runProjectRequest = async (request: () => Promise<void>, setLoading: React.Dispatch<React.SetStateAction<boolean>>, showSkeleton: boolean) => {
+            if (showSkeleton && !isCancelled) {
+                setLoading(true);
+            }
+
+            try {
+                await request();
+            } finally {
+                if (showSkeleton && !isCancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        const runHeroProjectRequest = async (request: () => Promise<void>, showSkeleton: boolean) => {
+            if (showSkeleton) {
+                updateHeroProjectsLoading(true);
+            }
+
+            try {
+                await request();
+            } finally {
+                if (showSkeleton) {
+                    updateHeroProjectsLoading(false);
+                }
+            }
+        };
+
         const scheduleBackgroundRequest = (request: () => Promise<void>) => {
             if ('requestIdleCallback' in window) {
-                (window as any).requestIdleCallback(() => {
+                const idleCallbackId = (window as any).requestIdleCallback(() => {
                     void request();
                 }, { timeout: HOME_REQUEST_TIMEOUT_MS });
+                scheduledTasks.push(() => {
+                    if ('cancelIdleCallback' in window) {
+                        (window as any).cancelIdleCallback(idleCallbackId);
+                    }
+                });
                 return;
             }
 
-            window.setTimeout(() => {
+            const timeoutId = globalThis.setTimeout(() => {
                 void request();
             }, 150);
+            scheduledTasks.push(() => globalThis.clearTimeout(timeoutId));
         };
 
         if (shouldFetchFallbackProjects) {
-            api.get('/projects', {
-                params: { size: 16, sort: 'relevance', category: 'trending' },
-                timeout: HOME_REQUEST_TIMEOUT_MS,
-            })
-                .then(res => {
-                    if (res.data?.content) setProjects(res.data.content);
-                })
-                .catch(() => {});
+            void runProjectRequest(async () => {
+                await runHeroProjectRequest(async () => {
+                    try {
+                        const res = await api.get('/projects', {
+                            params: { size: 16, sort: 'relevance', category: 'trending' },
+                            timeout: HOME_REQUEST_TIMEOUT_MS,
+                        });
+                        if (!isCancelled && res.data?.content) setProjects(res.data.content);
+                    } catch {}
+                }, true);
+            }, setIsTrendingProjectsLoading, true);
         } else if (shouldRefreshTrendingProjects) {
             scheduleBackgroundRequest(async () => {
-                try {
-                    const res = await api.get('/projects', {
-                        params: { size: 16, sort: 'relevance', category: 'trending' },
-                        timeout: HOME_REQUEST_TIMEOUT_MS,
-                    });
-                    if (res.data?.content?.length) setProjects(res.data.content);
-                } catch {}
+                await runHeroProjectRequest(async () => {
+                    try {
+                        const res = await api.get('/projects', {
+                            params: { size: 16, sort: 'relevance', category: 'trending' },
+                            timeout: HOME_REQUEST_TIMEOUT_MS,
+                        });
+                        if (!isCancelled && res.data?.content?.length) setProjects(res.data.content);
+                    } catch {}
+                }, !hasInitialHeroMarqueeProjects);
             });
         }
 
         if (shouldFetchFallbackNewest) {
-            api.get('/projects', { params: { size: 12, sort: 'newest' }, timeout: HOME_REQUEST_TIMEOUT_MS })
-                .then(res => {
-                    if (res.data?.content) setNewestProjects(res.data.content);
-                })
-                .catch(() => {});
+            void runProjectRequest(async () => {
+                try {
+                    const res = await api.get('/projects', { params: { size: 12, sort: 'newest' }, timeout: HOME_REQUEST_TIMEOUT_MS });
+                    if (!isCancelled && res.data?.content) setNewestProjects(res.data.content);
+                } catch {}
+            }, setIsNewestProjectsLoading, true);
         } else if (shouldRefreshNewestProjects) {
             scheduleBackgroundRequest(async () => {
                 try {
@@ -210,7 +323,7 @@ export const Home: React.FC<{
                         params: { size: 12, sort: 'newest' },
                         timeout: HOME_REQUEST_TIMEOUT_MS,
                     });
-                    if (res.data?.content?.length) setNewestProjects(res.data.content);
+                    if (!isCancelled && res.data?.content?.length) setNewestProjects(res.data.content);
                 } catch {}
             });
         }
@@ -222,9 +335,25 @@ export const Home: React.FC<{
         }
 
         return () => {
+            isCancelled = true;
+            scheduledTasks.forEach((cancelTask) => cancelTask());
             window.removeEventListener('resize', handleResize);
         };
-    }, [DESKTOP_BREAKPOINT, initialNewestProjects.length, initialProjectSeed.length, initialTrendingProjects.length, ssrData?.stats?.totalProjects]);
+    }, [
+        DESKTOP_BREAKPOINT,
+        hasInitialHeroMarqueeProjects,
+        initialNewestProjects.length,
+        initialProjectSeed.length,
+        shouldFetchFallbackProjects,
+        shouldRefreshTrendingProjects,
+        ssrData?.stats?.totalProjects
+    ]);
+
+    const validFeaturedProjects = useMemo(
+        () => projects.filter(isHeroMarqueeProject),
+        [projects]
+    );
+    const shouldReserveDesktopHeroMarquee = isHeroProjectsLoading || validFeaturedProjects.length > 0;
 
     useEffect(() => {
         let frameId = 0;
@@ -238,7 +367,7 @@ export const Home: React.FC<{
                 return false;
             }
 
-            if (validFeaturedProjects.length === 0) {
+            if (!shouldReserveDesktopHeroMarquee) {
                 desktopHeroRetryGridWidthRef.current = null;
                 return false;
             }
@@ -331,15 +460,11 @@ export const Home: React.FC<{
         DESKTOP_HERO_MIN_WIDTH_ENTER,
         DESKTOP_HERO_MIN_WIDTH_EXIT,
         projects.length,
+        shouldReserveDesktopHeroMarquee,
         stats.totalDownloads,
         stats.totalProjects,
         stats.totalUsers
     ]);
-
-    const validFeaturedProjects = useMemo(
-        () => projects.filter(p => Boolean(p.bannerUrl) && Boolean(p.imageUrl) && !p.imageUrl?.includes('favicon')),
-        [projects]
-    );
 
     const heroMarqueeProjects = useMemo(
         () => validFeaturedProjects.slice(0, HERO_MARQUEE_PROJECT_LIMIT),
@@ -367,9 +492,27 @@ export const Home: React.FC<{
     }, [combinedProjectPool, newestProjects]);
     const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
+    const isWideDesktopHeroViewport = viewportSize.width >= DESKTOP_HERO_MIN_WIDTH_ENTER && viewportSize.height >= DESKTOP_HERO_MIN_HEIGHT;
+    const shouldUseWideDesktopHeroLayout = isWideDesktopHeroViewport;
     const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
-    const isDesktopStackedHeroLayout = isDesktop && !isDesktopHeroLayout;
-    const shouldRenderDesktopHeroMarquee = isDesktopHeroLayout && validFeaturedProjects.length > 0;
+    const shouldUseSplitHeroLayout = isDesktopHeroLayout || shouldUseWideDesktopHeroLayout;
+    const isDesktopStackedHeroLayout = isDesktop && !shouldUseSplitHeroLayout;
+    const shouldRenderDesktopHeroMarquee = shouldUseSplitHeroLayout || isHeroProjectsLoading;
+    const heroGridLayoutClass = shouldUseSplitHeroLayout
+        ? 'lg:grid-cols-2'
+        : `lg:grid-cols-1 lg:justify-items-center ${WIDE_DESKTOP_GRID_CLASSES}`;
+    const heroCopyLayoutClass = shouldUseSplitHeroLayout
+        ? 'lg:items-start text-center lg:text-left lg:mx-0 lg:max-w-xl'
+        : `text-center items-center mx-auto max-w-2xl ${WIDE_DESKTOP_COPY_CLASSES}`;
+    const heroPrimaryLayoutClass = shouldUseSplitHeroLayout
+        ? 'lg:items-start'
+        : WIDE_DESKTOP_PRIMARY_CLASSES;
+    const heroActionsLayoutClass = shouldUseSplitHeroLayout
+        ? 'lg:items-start lg:self-start'
+        : WIDE_DESKTOP_ACTIONS_CLASSES;
+    const heroMarqueeDisplayClass = shouldUseSplitHeroLayout
+        ? 'lg:block'
+        : WIDE_DESKTOP_MARQUEE_CLASSES;
 
     return (
         <div
@@ -405,6 +548,26 @@ export const Home: React.FC<{
                     .animate-marquee-right {
                         animation: marquee-right var(--marquee-duration, 35s) linear infinite;
                         will-change: transform;
+                    }
+                    @keyframes hero-marquee-skeleton-shimmer {
+                        0% { background-position: 200% 0; opacity: 0.78; }
+                        50% { opacity: 1; }
+                        100% { background-position: -200% 0; opacity: 0.78; }
+                    }
+                    .home-hero-marquee-skeleton-shimmer {
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    .home-hero-marquee-skeleton-shimmer::after {
+                        content: '';
+                        position: absolute;
+                        inset: 0;
+                        background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.15) 38%, rgba(255, 255, 255, 0.42) 50%, rgba(255, 255, 255, 0.15) 62%, transparent 100%);
+                        background-size: 220% 100%;
+                        animation: hero-marquee-skeleton-shimmer 2.6s ease-in-out infinite;
+                    }
+                    .dark .home-hero-marquee-skeleton-shimmer::after {
+                        background-image: linear-gradient(110deg, transparent 0%, rgba(148, 163, 184, 0.08) 38%, rgba(255, 255, 255, 0.18) 50%, rgba(148, 163, 184, 0.08) 62%, transparent 100%);
                     }
                     .contain-content {
                         contain: content;
@@ -684,6 +847,29 @@ export const Home: React.FC<{
                             gap: 0.5rem !important;
                         }
                     }
+                    @media (min-width: 1260px) and (min-height: 720px) {
+                        .home-hero.home-hero-loading-state .home-hero-grid.home-hero-grid-loading-state {
+                            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+                            justify-items: stretch !important;
+                        }
+                        .home-hero.home-hero-loading-state .home-hero-copy.home-hero-copy-loading-state {
+                            align-items: flex-start !important;
+                            text-align: left !important;
+                            margin-left: 0 !important;
+                            margin-right: 0 !important;
+                            max-width: 36rem !important;
+                        }
+                        .home-hero.home-hero-loading-state .home-hero-copy-primary.home-hero-copy-primary-loading-state {
+                            align-items: flex-start !important;
+                        }
+                        .home-hero.home-hero-loading-state .home-hero-actions-loading-state {
+                            align-items: flex-start !important;
+                            align-self: flex-start !important;
+                        }
+                        .home-hero.home-hero-loading-state .home-hero-desktop-marquee.home-hero-desktop-marquee-loading-state {
+                            display: block !important;
+                        }
+                    }
                     @media (min-width: 1600px) and (max-height: 900px) {
                         .home-hero.home-hero-desktop {
                             min-height: calc(100vh - 6rem) !important;
@@ -757,7 +943,7 @@ export const Home: React.FC<{
             </Helmet>
 
             <main className="relative z-10 contain-content">
-                <section className={`home-hero home-hero-desktop lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh] ${isDesktopStackedHeroLayout ? 'home-hero-desktop-stacked lg:min-h-[calc(100dvh-6rem)] lg:pt-6 lg:pb-6' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>
+                <section className={`home-hero home-hero-desktop ${isHeroProjectsLoading ? 'home-hero-loading-state' : ''} lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh] ${isDesktopStackedHeroLayout ? 'home-hero-desktop-stacked lg:min-h-[calc(100dvh-6rem)] lg:pt-6 lg:pb-6' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>
                     <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(59,130,246,0.05)_10px,rgba(59,130,246,0.05)_11px)] dark:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_11px)] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none transform-gpu" />
 
                     <div className="absolute top-1/4 -left-1/4 w-[800px] h-[800px] bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen pointer-events-none transform-gpu" />
@@ -765,21 +951,21 @@ export const Home: React.FC<{
 
                     <div
                         ref={heroGridRef}
-                        className={`home-hero-grid home-hero-desktop-grid relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 2xl:gap-20 grid grid-cols-1 gap-6 sm:gap-12 items-stretch ${isDesktopHeroLayout ? 'lg:grid-cols-2' : 'lg:grid-cols-1 lg:justify-items-center'}`}
+                        className={`home-hero-grid home-hero-desktop-grid ${isHeroProjectsLoading ? 'home-hero-grid-loading-state' : ''} relative z-20 w-full max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 2xl:gap-20 grid grid-cols-1 gap-6 sm:gap-12 items-stretch ${heroGridLayoutClass}`}
                     >
 
                         <div
                             ref={heroTextColumnRef}
-                            className={`home-hero-copy ${isDesktopHeroLayout ? 'home-hero-copy-desktop' : ''} flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start text-center lg:text-left lg:mx-0 lg:max-w-xl' : 'text-center items-center mx-auto max-w-2xl'} w-full max-w-2xl 2xl:max-w-2xl justify-center`}
+                            className={`home-hero-copy ${shouldUseSplitHeroLayout ? 'home-hero-copy-desktop' : ''} ${isHeroProjectsLoading ? 'home-hero-copy-loading-state' : ''} flex flex-col items-center ${heroCopyLayoutClass} w-full max-w-2xl 2xl:max-w-2xl justify-center`}
                         >
-                            <div className={`home-hero-copy-primary w-full flex flex-col items-center ${isDesktopHeroLayout ? 'lg:items-start' : ''}`}>
+                            <div className={`home-hero-copy-primary ${isHeroProjectsLoading ? 'home-hero-copy-primary-loading-state' : ''} w-full flex flex-col items-center ${heroPrimaryLayoutClass}`}>
                                 <div className="shrink-0">
                                     <img
                                         src="/assets/logo.svg"
                                         alt="Modtale Logo"
                                         width={853}
                                         height={128}
-                                        className={`home-hero-logo h-12 sm:h-14 md:h-16 ${isDesktopHeroLayout ? 'lg:h-[5.25rem] 2xl:h-[6.25rem]' : ''} w-auto mb-4 sm:mb-8 object-contain drop-shadow-sm shrink-0 dark:hidden`}
+                                        className={`home-hero-logo h-12 sm:h-14 md:h-16 ${shouldUseSplitHeroLayout ? 'lg:h-[5.25rem] 2xl:h-[6.25rem]' : ''} w-auto mb-4 sm:mb-8 object-contain drop-shadow-sm shrink-0 dark:hidden`}
                                         fetchPriority="high"
                                         decoding="async"
                                     />
@@ -788,34 +974,34 @@ export const Home: React.FC<{
                                         alt="Modtale Logo"
                                         width={853}
                                         height={128}
-                                        className={`home-hero-logo hidden h-12 sm:h-14 md:h-16 ${isDesktopHeroLayout ? 'lg:h-[5.25rem] 2xl:h-[6.25rem]' : ''} w-auto mb-4 sm:mb-8 object-contain drop-shadow-sm shrink-0 dark:block`}
+                                        className={`home-hero-logo hidden h-12 sm:h-14 md:h-16 ${shouldUseSplitHeroLayout ? 'lg:h-[5.25rem] 2xl:h-[6.25rem]' : ''} w-auto mb-4 sm:mb-8 object-contain drop-shadow-sm shrink-0 dark:block`}
                                         fetchPriority="high"
                                         decoding="async"
                                     />
                                 </div>
 
-                                <h1 className={`text-4xl sm:text-5xl ${isDesktopHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 ${isDesktopHeroLayout ? 'lg:self-start' : ''}`}>
+                                <h1 className={`text-4xl sm:text-5xl ${shouldUseSplitHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 ${shouldUseSplitHeroLayout ? 'lg:self-start' : ''}`}>
                                     The Hytale<br />
                                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                         Community<br />Repository
                                     </span>
                                 </h1>
 
-                                <p className={`text-base sm:text-lg ${isDesktopHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12 lg:self-start' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-6 sm:mb-10 font-medium leading-relaxed`}>
+                                <p className={`text-base sm:text-lg ${shouldUseSplitHeroLayout ? '2xl:text-xl lg:max-w-lg 2xl:max-w-xl 2xl:mb-12 lg:self-start' : ''} text-slate-600 dark:text-slate-300 max-w-2xl mb-6 sm:mb-10 font-medium leading-relaxed`}>
                                     Discover, download, and seamlessly share Hytale projects, worlds, plugins, asset packs, and modpacks.
                                 </p>
 
-                                <nav ref={heroActionsRef} aria-label="Primary Actions" className={`flex flex-col sm:flex-row items-center ${isDesktopHeroLayout ? 'lg:items-start lg:self-start' : ''} gap-3 sm:gap-4 w-full sm:w-auto mb-6 sm:mb-10 2xl:mb-14`}>
+                                <nav ref={heroActionsRef} aria-label="Primary Actions" className={`${isHeroProjectsLoading ? 'home-hero-actions-loading-state' : ''} flex flex-col sm:flex-row items-center ${heroActionsLayoutClass} gap-3 sm:gap-4 w-full sm:w-auto mb-6 sm:mb-10 2xl:mb-14`}>
                                     <Link
                                         to={SiteRoutes.browse()}
-                                        className={`flex items-center justify-center px-6 ${isDesktopHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto ring-1 ring-blue-500 transform-gpu whitespace-nowrap`}
+                                        className={`flex items-center justify-center px-6 ${shouldUseSplitHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_8px_32px_rgba(37,99,235,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_16px_48px_rgba(37,99,235,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] hover:-translate-y-0.5 w-full sm:w-auto ring-1 ring-blue-500 transform-gpu whitespace-nowrap`}
                                     >
                                         <Search className="w-5 h-5 mr-2 sm:mr-3" aria-hidden="true" />
                                         Discover Projects
                                     </Link>
                                     <Link
                                         to={SiteRoutes.upload()}
-                                        className={`flex items-center justify-center px-6 ${isDesktopHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu whitespace-nowrap`}
+                                        className={`flex items-center justify-center px-6 ${shouldUseSplitHeroLayout ? 'sm:px-10 h-14 sm:h-16 text-base sm:text-lg' : 'sm:px-8 h-14 sm:h-16 text-base sm:text-lg'} bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu whitespace-nowrap`}
                                     >
                                         <Upload className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                         Publish Work
@@ -848,19 +1034,25 @@ export const Home: React.FC<{
                         </div>
 
                         {shouldRenderDesktopHeroMarquee && (
-                            <div className="home-hero-desktop-marquee relative hidden lg:block w-full lg:min-h-[520px] 2xl:min-h-[680px]">
-                                <aside
-                                    ref={heroMarqueeDesktopRef}
-                                    className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
-                                    style={{
-                                        maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
-                                        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
-                                    }}
-                                    aria-label="Trending Hytale Projects Showcase"
-                                >
-                                    <MarqueeColumn projects={col1Projects} duration="35s" />
-                                    <MarqueeColumn projects={col2Projects} duration="45s" />
-                                </aside>
+                            <div
+                                ref={heroMarqueeDesktopRef}
+                                className={`home-hero-desktop-marquee ${isHeroProjectsLoading ? 'home-hero-desktop-marquee-loading-state' : ''} relative hidden ${heroMarqueeDisplayClass} w-full lg:min-h-[520px] 2xl:min-h-[680px]`}
+                            >
+                                {validFeaturedProjects.length > 0 ? (
+                                    <aside
+                                        className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden"
+                                        style={{
+                                            maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
+                                            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
+                                        }}
+                                        aria-label="Trending Hytale Projects Showcase"
+                                    >
+                                        <MarqueeColumn projects={col1Projects} duration="35s" />
+                                        <MarqueeColumn projects={col2Projects} duration="45s" />
+                                    </aside>
+                                ) : (
+                                    <DesktopHeroMarqueeSkeleton />
+                                )}
                             </div>
                         )}
                     </div>
@@ -873,12 +1065,14 @@ export const Home: React.FC<{
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 items-start">
                             <TrendingProjectsSection
                                 projects={trendingSpotlightProjects}
+                                loading={isTrendingProjectsLoading}
                                 likedProjectIds={likedProjectIds}
                                 onToggleFavorite={onToggleFavorite}
                                 isLoggedIn={isLoggedIn}
                             />
                             <NewReleasesSection
                                 projects={newestSpotlightProjects}
+                                loading={isNewestProjectsLoading}
                                 likedProjectIds={likedProjectIds}
                                 onToggleFavorite={onToggleFavorite}
                                 isLoggedIn={isLoggedIn}
