@@ -23,18 +23,15 @@ import org.springframework.data.mongodb.core.mapping.Document;
         @CompoundIndex(name = "status_class_favorites_idx", def = "{'status': 1, 'classification': 1, 'favoriteCount': -1}"),
         @CompoundIndex(name = "status_class_updated_idx", def = "{'status': 1, 'classification': 1, 'updatedAt': -1}"),
         @CompoundIndex(name = "status_class_created_idx", def = "{'status': 1, 'classification': 1, 'createdAt': -1}"),
-        @CompoundIndex(name = "status_hidden_gem_idx", def = "{'status': 1, 'hiddenGemScore': -1}"),
         @CompoundIndex(name = "status_trending_rank_idx", def = "{'status': 1, 'trendingRank': 1}"),
         @CompoundIndex(name = "status_popular_rank_idx", def = "{'status': 1, 'popularRank': 1}"),
         @CompoundIndex(name = "status_relevance_rank_idx", def = "{'status': 1, 'relevanceRank': 1}"),
-        @CompoundIndex(name = "status_hidden_gem_rank_idx", def = "{'status': 1, 'hiddenGemRank': 1}"),
         @CompoundIndex(name = "status_trending_score_idx", def = "{'status': 1, 'trendScore': -1}"),
         @CompoundIndex(name = "status_popular_score_idx", def = "{'status': 1, 'popularScore': -1}"),
         @CompoundIndex(name = "status_relevance_score_idx", def = "{'status': 1, 'relevanceScore': -1}"),
         @CompoundIndex(name = "status_class_trending_rank_idx", def = "{'status': 1, 'classification': 1, 'trendingRank': 1}"),
         @CompoundIndex(name = "status_class_popular_rank_idx", def = "{'status': 1, 'classification': 1, 'popularRank': 1}"),
         @CompoundIndex(name = "status_class_relevance_rank_idx", def = "{'status': 1, 'classification': 1, 'relevanceRank': 1}"),
-        @CompoundIndex(name = "status_class_hidden_gem_rank_idx", def = "{'status': 1, 'classification': 1, 'hiddenGemRank': 1}"),
         @CompoundIndex(name = "status_downloads_7d_idx", def = "{'status': 1, 'downloads7d': -1}"),
         @CompoundIndex(name = "status_downloads_30d_idx", def = "{'status': 1, 'downloads30d': -1}"),
         @CompoundIndex(name = "status_downloads_90d_idx", def = "{'status': 1, 'downloads90d': -1}"),
@@ -154,12 +151,10 @@ public class Project {
     private int trendScore;
     private double relevanceScore;
     private double popularScore;
-    private double hiddenGemScore;
 
     private long trendingRank;
     private long popularRank;
     private long relevanceRank;
-    private long hiddenGemRank;
     private boolean rankingDirty;
 
     private String repositoryUrl;
@@ -247,16 +242,12 @@ public class Project {
     public void setRelevanceScore(double relevanceScore) { this.relevanceScore = relevanceScore; }
     public double getPopularScore() { return popularScore; }
     public void setPopularScore(double popularScore) { this.popularScore = popularScore; }
-    public double getHiddenGemScore() { return hiddenGemScore; }
-    public void setHiddenGemScore(double hiddenGemScore) { this.hiddenGemScore = hiddenGemScore; }
     public long getTrendingRank() { return trendingRank; }
     public void setTrendingRank(long trendingRank) { this.trendingRank = trendingRank; }
     public long getPopularRank() { return popularRank; }
     public void setPopularRank(long popularRank) { this.popularRank = popularRank; }
     public long getRelevanceRank() { return relevanceRank; }
     public void setRelevanceRank(long relevanceRank) { this.relevanceRank = relevanceRank; }
-    public long getHiddenGemRank() { return hiddenGemRank; }
-    public void setHiddenGemRank(long hiddenGemRank) { this.hiddenGemRank = hiddenGemRank; }
     public boolean isRankingDirty() { return rankingDirty; }
     public void setRankingDirty(boolean rankingDirty) { this.rankingDirty = rankingDirty; }
     public String getRepositoryUrl() { return repositoryUrl; }

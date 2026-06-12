@@ -1,5 +1,4 @@
 import { api } from '@/utils/api';
-import type { Project } from '@/types';
 
 export interface SearchParams {
     page: number;
@@ -12,7 +11,6 @@ export interface SearchParams {
     minDownloads?: number;
     minFavorites?: number;
     dateRange?: string;
-    category?: string;
 }
 
 export const discoveryClient = {
