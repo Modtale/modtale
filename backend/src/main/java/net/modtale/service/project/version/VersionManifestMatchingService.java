@@ -192,14 +192,20 @@ public class VersionManifestMatchingService {
             return null;
         }
 
-        String exactVersion = requestedVersion == null ? "" : requestedVersion
+        String requested = requestedVersion == null ? "" : requestedVersion.trim();
+        boolean exactRequested = !requested.isEmpty()
+                && !"*".equals(requested)
+                && !requested.contains(">")
+                && !requested.contains("<")
+                && !requested.contains("^");
+        String exactVersion = requested
                 .replace(">=", "")
                 .replace("<=", "")
                 .replace(">", "")
                 .replace("<", "")
                 .replace("=", "")
                 .trim();
-        if (!exactVersion.isEmpty() && !"*".equals(exactVersion)) {
+        if (exactRequested && !exactVersion.isEmpty()) {
             Optional<ProjectVersion> exact = project.getVersions().stream()
                     .filter(version -> version.getVersionNumber() != null && version.getVersionNumber().equalsIgnoreCase(exactVersion))
                     .findFirst();
@@ -209,7 +215,7 @@ public class VersionManifestMatchingService {
         }
 
         return project.getVersions().stream()
-                .max(Comparator.comparing(ProjectVersion::getReleaseDate, Comparator.nullsLast(String::compareTo)))
+                .max(Comparator.comparing(ProjectVersion::getReleaseDate, Comparator.nullsFirst(String::compareTo)))
                 .orElse(project.getVersions().getFirst());
     }
 

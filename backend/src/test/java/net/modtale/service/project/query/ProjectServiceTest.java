@@ -57,7 +57,7 @@ class ProjectServiceTest {
     @Test
     void getProjectByIdReturnsNullForHiddenProjectsWithoutViewerAccess() {
         Project project = project("project-1", ProjectStatus.DRAFT, ProjectClassification.PLUGIN);
-        User viewer = user("viewer-1", "Ada");
+        User viewer = user("viewer-1", "ItsNeil17");
 
         when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
@@ -69,7 +69,7 @@ class ProjectServiceTest {
     @Test
     void getProjectByIdReturnsHiddenProjectsWhenViewerHasReadPermission() {
         Project project = project("project-1", ProjectStatus.DRAFT, ProjectClassification.PLUGIN);
-        User viewer = user("viewer-1", "Ada");
+        User viewer = user("viewer-1", "ItsNeil17");
 
         when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
@@ -99,7 +99,7 @@ class ProjectServiceTest {
 
         project.setVersions(new ArrayList<>(List.of(approved, pending)));
 
-        User author = user("author-1", "SkyDev");
+        User author = user("author-1", "ItsNeil17");
         when(projectRepository.findPublicDetailById("project-1")).thenReturn(Optional.of(project));
         when(mongoTemplate.findOne(any(Query.class), eq(User.class))).thenReturn(author);
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
@@ -107,7 +107,7 @@ class ProjectServiceTest {
         Project resolved = service.getPublicProjectById("project-1");
 
         assertNotNull(resolved);
-        assertEquals("SkyDev", resolved.getAuthor());
+        assertEquals("ItsNeil17", resolved.getAuthor());
         assertEquals(1, resolved.getVersions().size());
         assertEquals("1.0.0", resolved.getVersions().getFirst().getVersionNumber());
         assertNull(resolved.getVersions().getFirst().getScanResult());
@@ -126,16 +126,17 @@ class ProjectServiceTest {
     void getProjectLinkFallsBackToGeneratedHandlesWhenSlugIsMissing() {
         Project project = project("project-1", ProjectStatus.PUBLISHED, ProjectClassification.PLUGIN);
         project.setSlug(null);
-        project.setTitle("Sky Tools Deluxe");
+        project.setTitle("Lock In LevelingCore Deluxe");
 
-        assertEquals("/mod/sky-tools-deluxe~project-1", service.getProjectLink(project));
+        assertEquals("/mod/lock-in-levelingcore-deluxe~project-1", service.getProjectLink(project));
     }
 
     private static Project project(String id, ProjectStatus status, ProjectClassification classification) {
         Project project = new Project();
         project.setId(id);
-        project.setTitle("Sky Tools");
+        project.setTitle("LevelingCore");
         project.setAuthorId("author-1");
+        project.setAuthor("ItsNeil17");
         project.setStatus(status);
         project.setClassification(classification);
         project.setVersions(new ArrayList<>());

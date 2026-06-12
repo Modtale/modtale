@@ -17,6 +17,44 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class GameVersionServiceTest {
 
+    private static final String HYTALE_RELEASE_METADATA = """
+            <metadata>
+            <groupId>com.hypixel.hytale</groupId>
+            <artifactId>Server</artifactId>
+            <versioning>
+            <latest>0.5.4</latest>
+            <release>0.5.4</release>
+            <versions>
+            <version>0.5.0</version>
+            <version>0.5.1</version>
+            <version>0.5.2</version>
+            <version>0.5.3</version>
+            <version>0.5.4</version>
+            </versions>
+            <lastUpdated>20260605155755</lastUpdated>
+            </versioning>
+            </metadata>
+            """;
+
+    private static final String HYTALE_PRE_RELEASE_METADATA = """
+            <metadata>
+            <groupId>com.hypixel.hytale</groupId>
+            <artifactId>Server</artifactId>
+            <versioning>
+            <latest>0.6.0-pre.3</latest>
+            <release>0.6.0-pre.3</release>
+            <versions>
+            <version>0.5.0-pre.9.2</version>
+            <version>0.6.0-pre.1</version>
+            <version>0.6.0-pre.1.1</version>
+            <version>0.6.0-pre.2</version>
+            <version>0.6.0-pre.3</version>
+            </versions>
+            <lastUpdated>20260611141621</lastUpdated>
+            </versioning>
+            </metadata>
+            """;
+
     @Test
     void initialRefreshSurfacesDownloadFailures() {
         RestTemplate restTemplate = new RestTemplate();
@@ -38,13 +76,9 @@ class GameVersionServiceTest {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
         server.expect(requestTo("https://versions.example/release.xml"))
-                .andRespond(withSuccess("""
-                        <metadata><versioning><versions><version>1.2.0</version></versions></versioning></metadata>
-                        """, MediaType.APPLICATION_XML));
+                .andRespond(withSuccess(HYTALE_RELEASE_METADATA, MediaType.APPLICATION_XML));
         server.expect(requestTo("https://versions.example/pre.xml"))
-                .andRespond(withSuccess("""
-                        <metadata><versioning><versions><version>1.2.0-pre.1</version></versions></versioning></metadata>
-                        """, MediaType.APPLICATION_XML));
+                .andRespond(withSuccess(HYTALE_PRE_RELEASE_METADATA, MediaType.APPLICATION_XML));
 
         GameVersionService service = new GameVersionService(
                 mockMongoTemplate(),
@@ -53,14 +87,39 @@ class GameVersionServiceTest {
         );
 
         service.initialRefresh();
-        assertEquals(List.of("1.2.0"), service.getCatalog().releaseVersions());
+        assertEquals(
+                List.of("0.5.4", "0.5.3", "0.5.2", "0.5.1", "0.5.0"),
+                service.getCatalog().releaseVersions()
+        );
+        assertEquals(
+                List.of("0.6.0-pre.3", "0.6.0-pre.2", "0.6.0-pre.1.1", "0.6.0-pre.1", "0.5.0-pre.9.2"),
+                service.getCatalog().preReleaseVersions()
+        );
+        assertEquals(
+                List.of(
+                        "0.6.0-pre.3",
+                        "0.6.0-pre.2",
+                        "0.6.0-pre.1.1",
+                        "0.6.0-pre.1",
+                        "0.5.4",
+                        "0.5.3",
+                        "0.5.2",
+                        "0.5.1",
+                        "0.5.0",
+                        "0.5.0-pre.9.2"
+                ),
+                service.getCatalog().allVersions()
+        );
 
         server.reset();
         server.expect(requestTo("https://versions.example/release.xml")).andRespond(withServerError());
 
         service.pollCatalog();
 
-        assertEquals(List.of("1.2.0"), service.getCatalog().releaseVersions());
+        assertEquals(
+                List.of("0.5.4", "0.5.3", "0.5.2", "0.5.1", "0.5.0"),
+                service.getCatalog().releaseVersions()
+        );
     }
 
     private static MongoTemplate mockMongoTemplate() {

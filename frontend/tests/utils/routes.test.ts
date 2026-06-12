@@ -33,43 +33,43 @@ describe('SiteRoutes', () => {
     it('generates project routes from title and classification when slug is blank', () => {
         expect(SiteRoutes.project({
             id: 'abc123',
-            title: 'Amazing Plugin',
+            title: 'LevelingCore',
             slug: '   ',
             classification: 'PLUGIN'
-        })).toBe('/mod/amazing-plugin~abc123');
+        })).toBe('/mod/levelingcore~abc123');
         expect(SiteRoutes.project({
             id: 'abc123',
-            title: 'World Save',
+            title: 'Ev0s Smokable Herbs',
             classification: 'SAVE'
-        })).toBe('/world/world-save~abc123');
+        })).toBe('/world/ev0s-smokable-herbs~abc123');
     });
 
     it('builds sub-routes for project pages', () => {
         const project = {
             id: 'abc123',
-            title: 'Amazing Plugin',
+            title: 'LevelingCore',
             classification: 'PLUGIN',
-            slug: 'amazing-plugin'
+            slug: 'levelingcore'
         };
 
-        expect(SiteRoutes.projectDownload(project)).toBe('/mod/amazing-plugin/download');
-        expect(SiteRoutes.projectChangelog(project)).toBe('/mod/amazing-plugin/changelog');
-        expect(SiteRoutes.projectGallery(project)).toBe('/mod/amazing-plugin/gallery');
-        expect(SiteRoutes.projectWiki(project)).toBe('/mod/amazing-plugin/wiki');
-        expect(SiteRoutes.projectWiki(project, 'docs/install')).toBe('/mod/amazing-plugin/wiki/docs/install');
-        expect(SiteRoutes.projectEdit(project)).toBe('/mod/amazing-plugin/edit');
+        expect(SiteRoutes.projectDownload(project)).toBe('/mod/levelingcore/download');
+        expect(SiteRoutes.projectChangelog(project)).toBe('/mod/levelingcore/changelog');
+        expect(SiteRoutes.projectGallery(project)).toBe('/mod/levelingcore/gallery');
+        expect(SiteRoutes.projectWiki(project)).toBe('/mod/levelingcore/wiki');
+        expect(SiteRoutes.projectWiki(project, 'docs/install')).toBe('/mod/levelingcore/wiki/docs/install');
+        expect(SiteRoutes.projectEdit(project)).toBe('/mod/levelingcore/edit');
     });
 
     it('matches canonical slug routes and legacy id-suffixed routes', () => {
         const project = {
             id: 'abc123',
-            title: 'Amazing Plugin',
-            slug: 'custom-slug'
+            title: 'Ev0s Smokable Herbs',
+            slug: 'ev0s-smokable-herbs'
         };
 
-        expect(SiteRoutes.matchesProjectRoute(project, 'custom-slug')).toBe(true);
-        expect(SiteRoutes.matchesProjectRoute(project, 'custom-slug~abc123')).toBe(true);
-        expect(SiteRoutes.matchesProjectRoute(project, 'custom-slug-abc123')).toBe(false);
+        expect(SiteRoutes.matchesProjectRoute(project, 'ev0s-smokable-herbs')).toBe(true);
+        expect(SiteRoutes.matchesProjectRoute(project, 'ev0s-smokable-herbs~abc123')).toBe(true);
+        expect(SiteRoutes.matchesProjectRoute(project, 'ev0s-smokable-herbs-abc123')).toBe(false);
         expect(SiteRoutes.matchesProjectRoute(project, 'abc123')).toBe(true);
     });
 

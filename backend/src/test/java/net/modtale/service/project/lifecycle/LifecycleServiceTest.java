@@ -115,13 +115,13 @@ class LifecycleServiceTest {
 
     @Test
     void createDraftUsesOrganizationOwnerAndSanitizesSavedFields() {
-        User creator = user("user-1", "Ada", User.AccountType.USER, true);
-        User organization = user("org-1", "SkyOrg", User.AccountType.ORGANIZATION, true);
+        User creator = user("user-1", "ItsNeil17", User.AccountType.USER, true);
+        User organization = user("org-1", "ItsNeil17", User.AccountType.ORGANIZATION, true);
         organization.setOrganizationMembers(List.of(new User.OrganizationMember("user-1", "owner-role")));
 
         when(projectRepository.existsByTitleIgnoreCase("Raw Title")).thenReturn(false);
         when(projectRepository.countByAuthorId("org-1")).thenReturn(0L);
-        when(projectRepository.existsBySlug("Sky-Ship")).thenReturn(false);
+        when(projectRepository.existsBySlug("Lock-In")).thenReturn(false);
         when(userRepository.findById("org-1")).thenReturn(java.util.Optional.of(organization));
         when(sanitizationService.sanitizePlainText("Raw Title")).thenReturn("Clean Title");
         when(sanitizationService.sanitizePlainText("Raw Description")).thenReturn("Clean Description");
@@ -133,27 +133,27 @@ class LifecycleServiceTest {
                 ProjectClassification.MODPACK,
                 creator,
                 "org-1",
-                "Sky-Ship"
+                "Lock-In"
         );
 
         assertEquals(ProjectStatus.DRAFT, draft.getStatus());
         assertEquals("org-1", draft.getAuthorId());
-        assertEquals("SkyOrg", draft.getAuthor());
+        assertEquals("ItsNeil17", draft.getAuthor());
         assertEquals("Clean Title", draft.getTitle());
         assertEquals("Clean Description", draft.getDescription());
-        assertEquals("sky-ship", draft.getSlug());
+        assertEquals("lock-in", draft.getSlug());
         assertTrue(draft.isAllowComments());
         assertTrue(draft.isAllowModpacks());
         assertEquals(2, draft.getProjectRoles().size());
         assertEquals(List.of(), draft.getTeamMembers());
         assertEquals(List.of(), draft.getTeamInvites());
 
-        verify(validationService).validateSlug("Sky-Ship");
+        verify(validationService).validateSlug("Lock-In");
     }
 
     @Test
     void submitProjectMarksVersionsPendingAndTriggersAdminWebhookWhenNoScanIsRunning() {
-        User user = user("user-1", "Ada", User.AccountType.USER, true);
+        User user = user("user-1", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DRAFT);
         project.setDescription("Detailed description");
         project.setTags(new ArrayList<>(List.of("magic")));
@@ -189,7 +189,7 @@ class LifecycleServiceTest {
 
     @Test
     void submitProjectQueuesInitialScanForDraftArtifactsBeforeReview() {
-        User user = user("user-1", "Ada", User.AccountType.USER, true);
+        User user = user("user-1", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DRAFT);
         project.setDescription("Detailed description");
         project.setTags(new ArrayList<>(List.of("magic")));
@@ -226,7 +226,7 @@ class LifecycleServiceTest {
 
     @Test
     void submitProjectSkipsAdminWebhookWhileAnyVersionIsStillScanning() {
-        User user = user("user-1", "Ada", User.AccountType.USER, true);
+        User user = user("user-1", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DRAFT);
         project.setDescription("Detailed description");
         project.setTags(new ArrayList<>(List.of("magic")));
@@ -248,7 +248,7 @@ class LifecycleServiceTest {
 
     @Test
     void publishProjectApprovesVersionsAndBroadcastsFirstPublication() {
-        User admin = user("user-1", "Ada", User.AccountType.USER, true);
+        User admin = user("user-1", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PENDING);
         project.setCreatedAt(null);
         project.setImageUrl("");
@@ -269,7 +269,7 @@ class LifecycleServiceTest {
         assertEquals(ProjectStatus.PUBLISHED, project.getStatus());
         assertNotNull(project.getCreatedAt());
         assertNotNull(project.getUpdatedAt());
-        assertEquals("Ada", project.getApprovedBy());
+        assertEquals("ItsNeil17", project.getApprovedBy());
         assertEquals("https://modtale.net/assets/favicon.svg", project.getImageUrl());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, scheduled.getReviewStatus());
         assertNull(scheduled.getScheduledPublishDate());
@@ -285,7 +285,7 @@ class LifecycleServiceTest {
 
     @Test
     void publishProjectRestorationUsesProjectPermissionWithoutBroadcastingNewProjectEvents() {
-        User maintainer = user("user-2", "Bea", User.AccountType.USER, true);
+        User maintainer = user("user-2", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.ARCHIVED);
         project.setCreatedAt("2025-01-01T00:00:00");
         project.setImageUrl("https://cdn.modtale.net/icon.png");
@@ -313,10 +313,10 @@ class LifecycleServiceTest {
         Project project = new Project();
         project.setId(id);
         project.setSlug("sky-tools");
-        project.setTitle("Sky Tools");
+        project.setTitle("LevelingCore");
         project.setClassification(classification);
         project.setAuthorId("author-1");
-        project.setAuthor("Ada");
+        project.setAuthor("ItsNeil17");
         project.setStatus(status);
         project.setVersions(new ArrayList<>());
         project.setTags(new ArrayList<>());
