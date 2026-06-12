@@ -231,6 +231,12 @@ const PreviewSummaryCard = ({ title, value, subValue, trend, icon: Icon, color, 
     </div>
 );
 
+const FeatureBodyText = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl [text-wrap:balance]">
+        {children}
+    </p>
+);
+
 
 
 const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
@@ -697,9 +703,9 @@ export const DirectDownloadsSection = () => {
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-400 dark:to-pink-400">
                     Versioned builds & changelogs.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Finding the right file shouldn't be a puzzle. Modtale makes it easy to find projects for your game version and review changelogs before you hit download.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-pink-500/5 dark:from-purple-500/10 dark:via-transparent dark:to-pink-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -719,9 +725,9 @@ export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Pr
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
                     Automated library resolution.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Forget hunting down core libraries or confusing projectpacks. Modtale allows you to seamlessly download all required projects in one swift action.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 via-transparent to-teal-500/5 dark:from-emerald-500/10 dark:via-transparent dark:to-teal-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -741,9 +747,9 @@ export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showCon
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
                     Track growth, downloads, and views over time.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Keep tabs on how your Hytale uploads perform in real-time. Review clean graphs, growth percentages, and historical metrics in your developer hub.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-indigo-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -763,9 +769,9 @@ export const CommunityThreadsSection = ({ project, currentUser }: { project?: Pr
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500 dark:from-violet-400 dark:to-purple-400">
                     Engage and share feedback.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Provide direct feedback, report immediate bugs, or collaborate with the creator team through nested, upvotable community comment sections.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-2xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 via-transparent to-purple-500/5 dark:from-indigo-500/10 dark:via-transparent dark:to-purple-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -785,9 +791,9 @@ export const RealTimeAlertsSection = () => {
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400">
                     Real-time updates on activity.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Never miss a crucial patch or follow-up reply. Real-time platform notifications let you track your favorite projects and active discussions instantly.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/5 via-transparent to-orange-500/5 dark:from-amber-500/10 dark:via-transparent dark:to-orange-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -807,9 +813,9 @@ export const AccountPreferencesSection = () => {
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500">
                     Tailored settings for alerts.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Adjust toggles to choose exactly which events trigger notifications.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-slate-500/5 via-transparent to-slate-400/5 dark:from-slate-500/10 dark:via-transparent dark:to-slate-400/10 rounded-3xl blur-2xl pointer-events-none" />
