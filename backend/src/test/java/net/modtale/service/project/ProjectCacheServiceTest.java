@@ -31,7 +31,7 @@ class ProjectCacheServiceTest {
         project.setClassification(ProjectClassification.PLUGIN);
 
         cacheManager.getCache("projectDetails").put("public:project-1", project);
-        cacheManager.getCache("projectDetails").put("public:sky-tools~project-1", project);
+        cacheManager.getCache("projectDetails").put("public:sky-tools", project);
         cacheManager.getCache("projectDetailDtos").put("public:project-1", "detail-dto");
         cacheManager.getCache("projectMetaDtos").put("public:project-1", "meta-dto");
         cacheManager.getCache("projectPermissionSnapshots").put("project-1", "permission");
@@ -41,7 +41,7 @@ class ProjectCacheServiceTest {
         cacheManager.getCache("platformStats").put("public", "cached");
 
         assertNotNull(cacheManager.getCache("projectDetails").get("public:project-1"));
-        assertNotNull(cacheManager.getCache("projectDetails").get("public:sky-tools~project-1"));
+        assertNotNull(cacheManager.getCache("projectDetails").get("public:sky-tools"));
         assertNotNull(cacheManager.getCache("projectDetailDtos").get("public:project-1"));
         assertNotNull(cacheManager.getCache("projectMetaDtos").get("public:project-1"));
         assertNotNull(cacheManager.getCache("projectPermissionSnapshots").get("project-1"));
@@ -53,7 +53,7 @@ class ProjectCacheServiceTest {
         cacheService.evictProjectCache(project);
 
         assertNull(cacheManager.getCache("projectDetails").get("public:project-1"));
-        assertNull(cacheManager.getCache("projectDetails").get("public:sky-tools~project-1"));
+        assertNull(cacheManager.getCache("projectDetails").get("public:sky-tools"));
         assertNull(cacheManager.getCache("projectDetailDtos").get("public:project-1"));
         assertNull(cacheManager.getCache("projectMetaDtos").get("public:project-1"));
         assertNull(cacheManager.getCache("projectPermissionSnapshots").get("project-1"));

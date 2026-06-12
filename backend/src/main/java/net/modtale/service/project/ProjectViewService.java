@@ -28,22 +28,29 @@ public class ProjectViewService {
     private final UserRepository userRepository;
     private final MongoTemplate mongoTemplate;
     private final AccessControlService accessControlService;
+    private final ProjectRouteService projectRouteService;
 
     public ProjectViewService(
             ProjectRepository projectRepository,
             UserRepository userRepository,
             MongoTemplate mongoTemplate,
-            AccessControlService accessControlService
+            AccessControlService accessControlService,
+            ProjectRouteService projectRouteService
     ) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.mongoTemplate = mongoTemplate;
         this.accessControlService = accessControlService;
+        this.projectRouteService = projectRouteService;
     }
 
     public Project getRawProjectById(String id) {
         if (id == null || id.isBlank()) return null;
         return projectRepository.findById(id).orElse(null);
+    }
+
+    public Project getRawProjectByRouteKey(String routeKey) {
+        return resolveProjectByRouteKey(routeKey);
     }
 
     public Project getProjectById(String id, User viewer) {
@@ -62,9 +69,32 @@ public class ProjectViewService {
         return prepareProjectForViewer(project, viewer, privileged);
     }
 
+    public Project getProjectByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return getPublicProjectByRouteKey(routeKey);
+        }
+
+        Project project = resolveProjectByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null) return null;
+
+        boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
+        if (!privileged && !accessControlService.canReadProject(project, viewer)) {
+            return null;
+        }
+
+        return prepareProjectForViewer(project, viewer, privileged);
+    }
+
     @Cacheable(value = "projectDetails", key = "'public:' + #id")
     public Project getPublicProjectById(String id) {
         Project project = getRawProjectById(id);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        return prepareProjectForViewer(project, null, false);
+    }
+
+    @Cacheable(value = "projectDetails", key = "'public:' + #routeKey")
+    public Project getPublicProjectByRouteKey(String routeKey) {
+        Project project = resolveProjectByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         return prepareProjectForViewer(project, null, false);
     }
@@ -76,6 +106,32 @@ public class ProjectViewService {
             userRepository.findById(project.getAuthorId()).ifPresent(u -> project.setAuthor(u.getUsername()));
         }
         return project;
+    }
+
+    public Project getAdminProjectDetailsByRouteKey(String routeKey) {
+        Project project = resolveProjectByRouteKey(routeKey);
+        if (project == null) return null;
+        if (project.getAuthorId() != null) {
+            userRepository.findById(project.getAuthorId()).ifPresent(u -> project.setAuthor(u.getUsername()));
+        }
+        return project;
+    }
+
+    private Project resolveProjectByRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = projectRepository.findById(projectId).orElse(null);
+            if (project != null) return project;
+            return projectRepository.findBySlug(normalized).orElse(null);
+        }
+
+        Project project = projectRepository.findBySlug(normalized).orElse(null);
+        if (project != null) return project;
+
+        return projectRepository.findById(normalized).orElse(null);
     }
 
     private Project prepareProjectForViewer(Project project, User viewer, boolean privileged) {

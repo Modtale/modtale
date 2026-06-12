@@ -26,6 +26,7 @@ class ProjectViewServiceTest {
     private UserRepository userRepository;
     private MongoTemplate mongoTemplate;
     private AccessControlService accessControlService;
+    private ProjectRouteService projectRouteService;
     private ProjectViewService service;
 
     @BeforeEach
@@ -34,7 +35,8 @@ class ProjectViewServiceTest {
         userRepository = mock(UserRepository.class);
         mongoTemplate = mock(MongoTemplate.class);
         accessControlService = mock(AccessControlService.class);
-        service = new ProjectViewService(projectRepository, userRepository, mongoTemplate, accessControlService);
+        projectRouteService = new ProjectRouteService();
+        service = new ProjectViewService(projectRepository, userRepository, mongoTemplate, accessControlService, projectRouteService);
     }
 
     @Test
@@ -67,6 +69,39 @@ class ProjectViewServiceTest {
 
         assertNotNull(result);
         assertNotNull(result.getVersions().getFirst().getScanResult());
+    }
+
+    @Test
+    void getPublicProjectByRouteKeyResolvesCanonicalSlugRoutes() {
+        Project project = projectWithScanResult();
+        project.setSlug("levelingcore");
+        project.setStatus(ProjectStatus.PUBLISHED);
+
+        when(projectRepository.findBySlug("levelingcore")).thenReturn(Optional.of(project));
+        when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "author")));
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
+
+        Project result = service.getPublicProjectByRouteKey("levelingcore");
+
+        assertNotNull(result);
+    }
+
+    @Test
+    void getProjectByRouteKeyPrefersExplicitLegacyIdHandles() {
+        Project project = projectWithScanResult();
+        project.setSlug("levelingcore");
+        project.setStatus(ProjectStatus.PUBLISHED);
+        User viewer = user("viewer-1", "viewer");
+
+        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
+        when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "author")));
+        when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
+        when(accessControlService.isAdmin(viewer)).thenReturn(false);
+        when(accessControlService.canReadProject(project, viewer)).thenReturn(true);
+
+        Project result = service.getProjectByRouteKey("levelingcore~project-1", viewer);
+
+        assertNotNull(result);
     }
 
     private static Project projectWithScanResult() {

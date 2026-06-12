@@ -68,9 +68,21 @@ public class ProjectResponseCacheService {
         return project == null ? null : ProjectMapper.toDTO(project, false, null);
     }
 
+    @Cacheable(value = "projectDetailDtos", key = "'public:' + #routeKey", unless = "#result == null")
+    public ProjectDTO getPublicProjectDtoByRouteKey(String routeKey) {
+        Project project = projectService.getPublicProjectByRouteKey(routeKey);
+        return project == null ? null : ProjectMapper.toDTO(project, false, null);
+    }
+
     @Cacheable(value = "projectMetaDtos", key = "'public:' + #id", unless = "#result == null")
     public ProjectMetaDTO getPublicProjectMeta(String id) {
         Project project = projectService.getPublicProjectById(id);
+        return project == null ? null : ProjectMapper.toMetaDTO(project);
+    }
+
+    @Cacheable(value = "projectMetaDtos", key = "'public:' + #routeKey", unless = "#result == null")
+    public ProjectMetaDTO getPublicProjectMetaByRouteKey(String routeKey) {
+        Project project = projectService.getPublicProjectByRouteKey(routeKey);
         return project == null ? null : ProjectMapper.toMetaDTO(project);
     }
 }

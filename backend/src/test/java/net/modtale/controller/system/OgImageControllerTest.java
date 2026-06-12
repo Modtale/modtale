@@ -23,6 +23,7 @@ class OgImageControllerTest {
     void generateOgImageReturnsNotFoundWhenTheProjectDoesNotExist() {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/og/project/project-1.png");
 
+        org.mockito.Mockito.when(projectService.getPublicProjectByRouteKey("project-1")).thenReturn(null);
         var response = controller.generateOgImage("project-1", null, request);
 
         assertEquals(404, response.getStatusCode().value());
