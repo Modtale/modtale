@@ -172,7 +172,7 @@ describe('critical page render budgets', () => {
                     )}
                 />
             </Routes>,
-            '/mod/skyforge-1~project-1',
+            '/mod/skyforge-1',
             project
         ));
 

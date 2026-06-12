@@ -142,7 +142,7 @@ public class OgImageController {
             String formatName = isJpg ? "jpg" : "png";
             MediaType mediaType = isJpg ? MediaType.IMAGE_JPEG : MediaType.IMAGE_PNG;
 
-            Project project = ProjectService.getProjectById(id);
+            Project project = ProjectService.getPublicProjectByRouteKey(id);
             if (project == null) return ResponseEntity.notFound().build();
 
             String versionKey = generateEtag(project);

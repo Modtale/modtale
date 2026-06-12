@@ -128,6 +128,45 @@ describe('useProjectDetail', () => {
         expect(window.__MODTALE_PROJECT_BOOTSTRAP).toBeUndefined();
     });
 
+    it('accepts canonical slug routes when bootstrapped data already matches the slug', async () => {
+        const project = {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            slug: 'levelingcore',
+            authorId: 'author-1',
+            author: 'Ada',
+            versions: []
+        } as any satisfies Project;
+
+        window.__MODTALE_PROJECT_BOOTSTRAP = Promise.resolve(project);
+        mockedProjectClient.getUserProfile.mockResolvedValue({
+            id: 'author-1',
+            username: 'Ada',
+            avatarUrl: '',
+            likedProjectIds: [],
+            accountType: 'USER'
+        } as User);
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    rawId="levelingcore"
+                    initialData={null}
+                    currentUser={null}
+                    onRender={snapshot => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getProject).not.toHaveBeenCalled();
+        expect(mockedProjectClient.trackView).toHaveBeenCalledWith(project.id);
+        expect(latestSnapshot.project?.id).toBe(project.id);
+        expect(latestSnapshot.loading).toBe(false);
+        expect(window.__MODTALE_PROJECT_BOOTSTRAP).toBeUndefined();
+    });
+
     it('loads related author, contributor, dependency, and analytics data from the fetched project', async () => {
         const projectId = '123e4567-e89b-12d3-a456-426614174000';
         const rawId = `sky-tools-${projectId}`;
@@ -197,7 +236,7 @@ describe('useProjectDetail', () => {
         expect(probe.dataset.dependencyTitle).toBe('Dependency One');
         expect(probe.dataset.incompatibleTitle).toBe('Bad Mod');
 
-        expect(mockedProjectClient.getProject).toHaveBeenCalledWith(projectId);
+        expect(mockedProjectClient.getProject).toHaveBeenCalledWith(rawId);
         expect(mockedProjectClient.trackView).toHaveBeenCalledTimes(1);
         expect(mockedProjectClient.trackView).toHaveBeenCalledWith(projectId);
         expect(mockedProjectClient.getUserProfile).toHaveBeenCalledWith('org-1');

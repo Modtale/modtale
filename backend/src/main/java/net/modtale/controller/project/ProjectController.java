@@ -180,7 +180,7 @@ public class ProjectController {
     public ResponseEntity<ProjectDTO> getProject(@PathVariable String id, Authentication authentication) {
         User currentUser = accountService.getCurrentUser(authentication);
         if (currentUser == null) {
-            ProjectDTO project = projectResponseCacheService.getPublicProjectDto(id);
+            ProjectDTO project = projectResponseCacheService.getPublicProjectDtoByRouteKey(id);
             if (project == null) {
                 throw new ResourceNotFoundException("We couldn't find a project with that ID.");
             }
@@ -189,7 +189,7 @@ public class ProjectController {
                     .body(project);
         }
 
-        Project project = projectService.getProjectById(id, currentUser);
+        Project project = projectService.getProjectByRouteKey(id, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }
@@ -209,7 +209,7 @@ public class ProjectController {
     public ResponseEntity<ProjectMetaDTO> getProjectMeta(@PathVariable String id, Authentication authentication) {
         User currentUser = accountService.getCurrentUser(authentication);
         if (currentUser == null) {
-            ProjectMetaDTO meta = projectResponseCacheService.getPublicProjectMeta(id);
+            ProjectMetaDTO meta = projectResponseCacheService.getPublicProjectMetaByRouteKey(id);
             if (meta == null) {
                 throw new ResourceNotFoundException("We couldn't find a project with that ID.");
             }
@@ -218,7 +218,7 @@ public class ProjectController {
                     .body(meta);
         }
 
-        Project project = projectService.getProjectById(id, currentUser);
+        Project project = projectService.getProjectByRouteKey(id, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }

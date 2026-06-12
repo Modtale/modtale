@@ -254,7 +254,7 @@ class ProjectControllerTest {
     void getProjectThrowsWhenViewerCannotResolveVisibleProject() {
         User currentUser = user("user-1", "ada");
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
-        when(projectService.getProjectById("project-1", currentUser)).thenReturn(null);
+        when(projectService.getProjectByRouteKey("project-1", currentUser)).thenReturn(null);
 
         assertThrows(ResourceNotFoundException.class, () -> controller.getProject("project-1", null));
     }
@@ -265,7 +265,7 @@ class ProjectControllerTest {
         User currentUser = user("user-1", "ada");
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
-        when(projectService.getProjectById("project-1", currentUser)).thenReturn(project);
+        when(projectService.getProjectByRouteKey("project-1", currentUser)).thenReturn(project);
         when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(true);
         when(accessControlService.isOwner(project, currentUser)).thenReturn(false);
 
@@ -284,13 +284,30 @@ class ProjectControllerTest {
         Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(null);
-        when(projectResponseCacheService.getPublicProjectDto("project-1")).thenReturn(ProjectMapper.toDTO(project, false));
+        when(projectResponseCacheService.getPublicProjectDtoByRouteKey("project-1")).thenReturn(ProjectMapper.toDTO(project, false));
 
         var response = controller.getProject("project-1", null);
 
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
         assertTrue(response.getHeaders().getCacheControl().contains("public"));
+    }
+
+    @Test
+    void getProjectUsesCanonicalSlugRoutesForAnonymousProjects() {
+        Project project = project("project-1", "LevelingCore", ProjectStatus.PUBLISHED);
+        project.setSlug("levelingcore");
+
+        when(accountService.getCurrentUser((Authentication) null)).thenReturn(null);
+        when(projectResponseCacheService.getPublicProjectDtoByRouteKey("levelingcore")).thenReturn(ProjectMapper.toDTO(project, false));
+
+        var response = controller.getProject("levelingcore", null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
+        assertTrue(response.getHeaders().getCacheControl().contains("public"));
+        ProjectDTO dto = assertInstanceOf(ProjectDTO.class, response.getBody());
+        assertEquals("levelingcore", dto.getSlug());
     }
 
     @Test

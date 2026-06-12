@@ -66,6 +66,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     }, [onReady, project.id]);
 
     useEffect(() => {
+        if (!isVisible || !priority) return;
+        prefetchProject(project.id);
+    }, [isVisible, priority, project.id]);
+
+    useEffect(() => {
         hasReportedReady.current = false;
     }, [project.id]);
 
@@ -104,9 +109,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm transform-gpu hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-xl ring-0 group-hover:ring-2 group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
-                <Link to={canonicalPath} className="absolute inset-0 z-10" />
+                <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />
 
-                <Link to={canonicalPath} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
+                <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
                     <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
                 </Link>
                 <div className="flex-1 min-w-0 relative z-20 pointer-events-none">
@@ -143,9 +148,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 p-4 sm:p-5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
-                <Link to={canonicalPath} className="absolute inset-0 z-10" />
+                <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />
 
-                <Link to={canonicalPath} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
+                <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
                     <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} priority={priority} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" initialQuality="standard" onFirstLoad={reportReady} />
                 </Link>
 
@@ -211,6 +216,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 
             <Link
                 to={canonicalPath}
+                state={{ project }}
                 className="absolute inset-0 z-10 focus:outline-none"
                 aria-hidden="true"
                 tabIndex={-1}

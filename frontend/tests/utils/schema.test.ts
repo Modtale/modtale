@@ -58,7 +58,7 @@ describe('schema utils', () => {
                 {
                     '@type': 'ListItem',
                     position: 2,
-                    url: 'https://modtale.net/world/world-builder~p2',
+                    url: 'https://modtale.net/world/world-builder-p2',
                     name: 'World Builder',
                     description: 'Shape a world',
                     image: 'https://cdn.modtale.net/world.png',

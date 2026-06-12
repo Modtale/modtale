@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { projectClient } from '../api/projectClient';
 import { SiteRoutes } from '@/utils/routes';
+import { consumePrefetchedProject } from '@/utils/prefetch';
 import type { Project, User } from '@/types';
 
-const consumeProjectBootstrap = async (realId: string) => {
+const consumeProjectBootstrap = async (routeKey: string) => {
+    const prefetched = await consumePrefetchedProject(routeKey);
+    if (prefetched && SiteRoutes.matchesProjectRoute(prefetched, routeKey)) {
+        return prefetched;
+    }
+
     if (typeof window === 'undefined' || !window.__MODTALE_PROJECT_BOOTSTRAP) return null;
 
     const bootstrap = window.__MODTALE_PROJECT_BOOTSTRAP;
@@ -11,7 +17,7 @@ const consumeProjectBootstrap = async (realId: string) => {
 
     try {
         const data = await bootstrap;
-        if (data && SiteRoutes.extractId(data.id) === realId) {
+        if (data && SiteRoutes.matchesProjectRoute(data, routeKey)) {
             return data as Project;
         }
     } catch {
@@ -21,10 +27,20 @@ const consumeProjectBootstrap = async (realId: string) => {
     return null;
 };
 
-export const useProjectDetail = (rawId: string | undefined, initialData: Project | null, currentUser: User | null) => {
-    const realId = rawId ? SiteRoutes.extractId(rawId) : '';
+interface UseProjectDetailOptions {
+    backgroundRefresh?: boolean;
+}
 
-    const isInitialDataValid = initialData && SiteRoutes.extractId(initialData.id) === realId;
+export const useProjectDetail = (
+    rawId: string | undefined,
+    initialData: Project | null,
+    currentUser: User | null,
+    options: UseProjectDetailOptions = {}
+) => {
+    const { backgroundRefresh = false } = options;
+    const routeKey = rawId?.trim() || '';
+
+    const isInitialDataValid = initialData && SiteRoutes.matchesProjectRoute(initialData, routeKey);
 
     const [project, setProject] = useState<Project | null>(isInitialDataValid ? initialData : null);
     const [loading, setLoading] = useState(!isInitialDataValid);
@@ -47,15 +63,17 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
             setContributors([]);
             analyticsFired.current = false;
         }
-    }, [realId]);
+    }, [routeKey, isInitialDataValid]);
 
     useEffect(() => {
-        if (!realId) {
+        if (!routeKey) {
             setIsNotFound(true);
             setLoading(false);
             return;
         }
-        if (project && SiteRoutes.extractId(project.id) === realId) {
+
+        const projectMatchesRoute = project && SiteRoutes.matchesProjectRoute(project, routeKey);
+        if (projectMatchesRoute && !backgroundRefresh) {
             setLoading(false);
             return;
         }
@@ -64,11 +82,15 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
 
         const loadProject = async () => {
             try {
-                const bootstrapped = await consumeProjectBootstrap(realId);
-                const data = bootstrapped || await projectClient.getProject(realId);
+                if (projectMatchesRoute && backgroundRefresh) {
+                    setLoading(false);
+                }
+
+                const bootstrapped = await consumeProjectBootstrap(routeKey);
+                const data = bootstrapped || await projectClient.getProject(routeKey);
                 if (isMounted) setProject(data);
             } catch {
-                if (isMounted) setIsNotFound(true);
+                if (isMounted && !projectMatchesRoute) setIsNotFound(true);
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -77,7 +99,7 @@ export const useProjectDetail = (rawId: string | undefined, initialData: Project
         loadProject();
 
         return () => { isMounted = false; };
-    }, [realId, project?.id]);
+    }, [routeKey, project?.id, backgroundRefresh]);
 
     useEffect(() => {
         if (project?.id && !analyticsFired.current) {
