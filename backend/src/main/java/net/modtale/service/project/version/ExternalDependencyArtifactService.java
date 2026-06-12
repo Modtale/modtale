@@ -22,6 +22,7 @@ import net.modtale.exception.StorageDownloadException;
 import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.service.storage.StorageService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -41,6 +42,7 @@ public class ExternalDependencyArtifactService {
     private final StorageService storageService;
     private final HttpClient httpClient;
 
+    @Autowired
     public ExternalDependencyArtifactService(StorageService storageService) {
         this(
                 storageService,
