@@ -6,6 +6,7 @@ import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.ApiKey;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.storage.StorageService;
@@ -38,6 +39,7 @@ class ProjectDeletionServiceTest {
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private TrackingService trackingService;
+    private ScoringService scoringService;
     private StorageService storageService;
     private MongoTemplate mongoTemplate;
 
@@ -46,6 +48,7 @@ class ProjectDeletionServiceTest {
         projectRepository = mock(ProjectRepository.class);
         projectService = mock(ProjectService.class);
         trackingService = mock(TrackingService.class);
+        scoringService = mock(ScoringService.class);
         storageService = mock(StorageService.class);
         mongoTemplate = mock(MongoTemplate.class);
         ProjectArtifactDeletionService projectArtifactDeletionService = new ProjectArtifactDeletionService(storageService);
@@ -53,6 +56,7 @@ class ProjectDeletionServiceTest {
                 projectRepository,
                 projectService,
                 trackingService,
+                scoringService,
                 projectArtifactDeletionService,
                 mongoTemplate
         );

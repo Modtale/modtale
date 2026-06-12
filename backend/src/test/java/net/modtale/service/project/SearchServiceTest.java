@@ -107,7 +107,7 @@ class SearchServiceTest {
                 any(LocalDate.class),
                 eq("author-1")
         )).thenReturn(page);
-        when(userRepository.findById("author-1")).thenReturn(Optional.of(author));
+        when(userRepository.findAllById(any(Iterable.class))).thenReturn(List.of(author));
 
         Page<Project> result = searchService.searchProjects(
                 List.of("magic"),
@@ -142,7 +142,7 @@ class SearchServiceTest {
                 eq("author-1")
         );
 
-        assertEquals(PageRequest.of(1, 25, Sort.by("downloadCount").descending()), pageableCaptor.getValue());
+        assertEquals(PageRequest.of(1, 25), pageableCaptor.getValue());
         assertEquals(LocalDate.now().minusDays(30), cutoffCaptor.getValue());
         assertEquals("Ada", result.getContent().getFirst().getAuthor());
         assertNull(result.getContent().getFirst().getVersions().getFirst().getScanResult());
@@ -209,7 +209,7 @@ class SearchServiceTest {
 
         when(mongoTemplate.count(any(Query.class), eq(Project.class))).thenReturn(1L);
         when(mongoTemplate.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
-        when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "Ada")));
+        when(userRepository.findAllById(any(Iterable.class))).thenReturn(List.of(user("author-1", "Ada")));
 
         Page<Project> result = searchService.getContributedProjects("contrib-1", PageRequest.of(0, 5));
 

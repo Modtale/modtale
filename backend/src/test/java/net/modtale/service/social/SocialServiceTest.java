@@ -4,6 +4,7 @@ import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.security.SanitizationService;
@@ -32,7 +33,8 @@ class SocialServiceTest {
                 mock(ProjectService.class),
                 mock(NotificationService.class),
                 mock(SanitizationService.class),
-                mock(MongoTemplate.class)
+                mock(MongoTemplate.class),
+                mock(ScoringService.class)
         );
     }
 
