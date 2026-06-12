@@ -12,6 +12,9 @@ export const isEmbeddedDependency = (dependency?: Pick<ProjectDependency, 'depen
 export const isExternalDependency = (dependency?: Pick<ProjectDependency, 'source'>): boolean =>
     (dependency?.source || 'MODTALE') !== 'MODTALE';
 
+export const getExternalDependencies = (dependencies?: ProjectDependency[] | null): ProjectDependency[] =>
+    (dependencies || []).filter(dependency => isExternalDependency(dependency) && !isEmbeddedDependency(dependency));
+
 export const normalizeDependencyReference = (dependency: ProjectDependency): ProjectDependency => ({
     ...dependency,
     dependencyType: dependency.dependencyType || 'REQUIRED',
