@@ -41,27 +41,30 @@ class ProjectMapperTest {
         assertNull(publicSummary.canEdit());
         assertNull(publicSummary.isOwner());
         assertNull(publicSummary.versions());
+        assertEquals("ItsNeil17", publicSummary.author());
 
         assertEquals(ProjectStatus.PENDING, managementSummary.status());
         assertEquals(Boolean.TRUE, managementSummary.canEdit());
         assertEquals(Boolean.TRUE, managementSummary.isOwner());
         assertEquals(1, managementSummary.versions().size());
+        assertEquals("ItsNeil17", managementSummary.author());
     }
 
     @Test
     void toMetaDTOUsesSafeFallbacksForNullableFields() {
         Project project = new Project();
         project.setId("project-1");
-        project.setTitle("Sky Tools");
-        project.setAuthor("Ada");
+        project.setTitle("LevelingCore");
+        project.setAuthor("ItsNeil17");
         project.setClassification(ProjectClassification.PLUGIN);
         project.setDownloadCount(42);
 
         ProjectMetaDTO dto = ProjectMapper.toMetaDTO(project);
 
-        assertEquals("Sky Tools", dto.title());
+        assertEquals("LevelingCore", dto.title());
         assertEquals("", dto.description());
         assertEquals("", dto.icon());
+        assertEquals("ItsNeil17", dto.author());
         assertEquals("", dto.repositoryUrl());
         assertEquals("project-1", dto.slug());
     }
@@ -91,8 +94,10 @@ class ProjectMapperTest {
         assertEquals(1, dto.getTeamInvites().size());
 
         ProjectCommentDTO comment = dto.getComments().getFirst();
+        assertEquals("Lock in, this one ships.", comment.content());
         assertEquals("up", comment.userVote());
         assertNotNull(comment.developerReply());
+        assertEquals("ItsNeil17 says thanks.", comment.developerReply().content());
         assertEquals("down", comment.developerReply().userVote());
     }
 
@@ -123,17 +128,18 @@ class ProjectMapperTest {
         assertEquals("modtale:core", ProjectMapper.toDependencyDTO(dependency).projectId());
         assertTrue(ProjectMapper.toDependencyDTO(dependency).isOptional());
         assertTrue(ProjectMapper.toDependencyDTO(dependency).isEmbedded());
+        assertEquals("Lock in complete", ProjectMapper.toVersionDTO(version).getChangelog());
         assertEquals(List.of("modtale:legacy"), ProjectMapper.toVersionDTO(version).getIncompatibleProjectIds());
     }
 
     private static Project baseProject() {
         Project project = new Project();
         project.setId("project-1");
-        project.setSlug("sky-tools");
-        project.setTitle("Sky Tools");
+        project.setSlug("levelingcore");
+        project.setTitle("LevelingCore");
         project.setDescription("Automation helpers");
         project.setAuthorId("author-1");
-        project.setAuthor("Ada");
+        project.setAuthor("ItsNeil17");
         project.setImageUrl("https://example.com/icon.png");
         project.setBannerUrl("https://example.com/banner.png");
         project.setClassification(ProjectClassification.PLUGIN);
@@ -144,7 +150,7 @@ class ProjectMapperTest {
         project.setTrendScore(5);
         project.setRelevanceScore(10.5);
         project.setPopularScore(88.0);
-        project.setRepositoryUrl("https://github.com/modtale/sky-tools");
+        project.setRepositoryUrl("https://github.com/modtale/levelingcore");
         project.setUpdatedAt("2026-01-01");
         project.setCreatedAt("2025-12-01");
         project.setLicense("MIT");
@@ -154,7 +160,7 @@ class ProjectMapperTest {
         project.setAllowModpacks(true);
         project.setAllowComments(true);
         project.setHmWikiEnabled(true);
-        project.setHmWikiSlug("sky-tools");
+        project.setHmWikiSlug("levelingcore");
         project.setStatus(ProjectStatus.PENDING);
         project.setExpiresAt("2026-02-01");
         return project;
@@ -164,7 +170,7 @@ class ProjectMapperTest {
         Comment comment = new Comment();
         comment.setId("comment-1");
         comment.setUserId("user-1");
-        comment.setContent("Love this project");
+        comment.setContent("Lock in, this one ships.");
         comment.setDate("2026-01-03T10:00:00");
         comment.setUpdatedAt("2026-01-04T10:00:00");
         comment.setUpvotes(Set.of("user-1", "user-2"));
@@ -172,7 +178,7 @@ class ProjectMapperTest {
 
         Comment.Reply reply = new Comment.Reply();
         reply.setUserId("author-1");
-        reply.setContent("Thanks!");
+        reply.setContent("ItsNeil17 says thanks.");
         reply.setDate("2026-01-05T10:00:00");
         reply.setUpvotes(Set.of("user-2"));
         reply.setDownvotes(Set.of("user-1"));
@@ -189,7 +195,7 @@ class ProjectMapperTest {
         version.setFileUrl("https://example.com/file.jar");
         version.setDownloadCount(12);
         version.setReleaseDate("2026-01-01T10:00:00");
-        version.setChangelog("Added features");
+        version.setChangelog("Lock in complete");
         version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0", false, false)));
         version.setIncompatibleProjectIds(List.of("modtale:legacy"));
         version.setChannel(ProjectVersion.Channel.RELEASE);

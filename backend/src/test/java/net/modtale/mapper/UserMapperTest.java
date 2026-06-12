@@ -24,7 +24,8 @@ class UserMapperTest {
         UserSummaryDTO dto = UserMapper.toSummaryDTO(user);
 
         assertEquals("user-1", dto.id());
-        assertEquals("ada", dto.username());
+        assertEquals("ItsNeil17", dto.username());
+        assertEquals("Always lock in", dto.bio());
         assertEquals(ApiKey.Tier.ENTERPRISE, dto.tier());
         assertEquals(User.AccountType.ORGANIZATION, dto.accountType());
     }
@@ -35,7 +36,9 @@ class UserMapperTest {
 
         UserDTO dto = UserMapper.toDTO(user, false);
 
-        assertEquals("ada@example.com", user.getEmail());
+        assertEquals("itsneil17@example.com", user.getEmail());
+        assertEquals("ItsNeil17", dto.getUsername());
+        assertEquals("Always lock in", dto.getBio());
         assertNull(dto.getEmail());
         assertNull(dto.getPendingOrgInvites());
         assertNull(dto.getLikedModIds());
@@ -52,7 +55,9 @@ class UserMapperTest {
 
         UserDTO dto = UserMapper.toDTO(user, true);
 
-        assertEquals("ada@example.com", dto.getEmail());
+        assertEquals("itsneil17@example.com", dto.getEmail());
+        assertEquals("ItsNeil17", dto.getUsername());
+        assertEquals("Always lock in", dto.getBio());
         assertTrue(dto.getEmailVerified());
         assertTrue(dto.getMfaEnabled());
         assertNotNull(dto.getPendingOrgInvites());
@@ -64,13 +69,13 @@ class UserMapperTest {
     private static User baseUser() {
         User user = new User();
         user.setId("user-1");
-        user.setUsername("ada");
-        user.setEmail("ada@example.com");
+        user.setUsername("ItsNeil17");
+        user.setEmail("itsneil17@example.com");
         user.setEmailVerified(true);
         user.setMfaEnabled(true);
         user.setAvatarUrl("https://example.com/avatar.png");
         user.setBannerUrl("https://example.com/banner.png");
-        user.setBio("Computes things");
+        user.setBio("Always lock in");
         user.setCreatedAt("2026-01-01");
         user.setTier(ApiKey.Tier.ENTERPRISE);
         user.setRoles(List.of("USER", "ADMIN"));

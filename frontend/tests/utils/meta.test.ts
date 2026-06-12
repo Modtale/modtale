@@ -9,32 +9,32 @@ describe('meta utils', () => {
 
     it('builds plugin metadata from markdown-heavy about text', () => {
         const result = generateProjectMeta({
-            title: 'Sky Tools',
-            author: 'Ada',
+            title: 'LevelingCore',
+            author: 'AzureDoom',
             downloadCount: 1234,
             classification: 'PLUGIN',
             about: '# Heading\n**Bold** text with [docs](https://example.com) and `code`\n- bullet\n![hero](https://example.com/hero.png)',
         });
 
         expect(result).toEqual({
-            title: 'Sky Tools | Hytale Plugin | Modtale',
-            author: 'Ada',
-            description: 'Download Sky Tools, a Hytale server plugin by Ada, on Modtale. Heading Bold text with docs and code bullet 1,234 downloads.',
+            title: 'LevelingCore | Hytale Plugin | Modtale',
+            author: 'AzureDoom',
+            description: 'Download LevelingCore, a Hytale server plugin by AzureDoom, on Modtale. Heading Bold text with docs and code bullet 1,234 downloads.',
         });
     });
 
     it('uses category-aware labels for non-plugin projects', () => {
         const result = generateProjectMeta({
-            title: 'World Builder',
+            title: 'Ev0s Smokable Herbs',
             description: 'Craft *bigger* builds with #style',
             downloadCount: 0,
             classification: 'SAVE',
         });
 
         expect(result).toEqual({
-            title: 'World Builder | Hytale World | Modtale',
+            title: 'Ev0s Smokable Herbs | Hytale World | Modtale',
             author: 'Unknown',
-            description: 'Download World Builder, a Hytale world save by Unknown, on Modtale. Craft bigger builds with style 0 downloads.',
+            description: 'Download Ev0s Smokable Herbs, a Hytale world save by Unknown, on Modtale. Craft bigger builds with style 0 downloads.',
         });
     });
 
@@ -56,11 +56,11 @@ describe('meta utils', () => {
 
     it('uses creator wording for user metadata', () => {
         expect(generateUserMeta({
-            username: 'ada',
-            displayName: 'Ada Lovelace',
+            username: 'azuredoom',
+            displayName: 'AzureDoom',
             followerIds: ['u1'],
         })).toEqual({
-            title: 'Ada Lovelace | Modtale Creator',
+            title: 'AzureDoom | Modtale Creator',
             description: 'Creator profile on Modtale with 1 follower.',
         });
 
