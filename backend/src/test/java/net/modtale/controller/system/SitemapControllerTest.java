@@ -1,21 +1,20 @@
 package net.modtale.controller.system;
 
+import java.util.List;
+import java.util.Optional;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.ProjectCacheService;
-import net.modtale.service.project.ProjectRouteService;
-import net.modtale.service.project.ProjectViewService;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectCacheService;
+import net.modtale.service.project.query.ProjectRouteService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.project.query.ProjectViewService;
 import net.modtale.service.system.SitemapService;
-import net.modtale.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;

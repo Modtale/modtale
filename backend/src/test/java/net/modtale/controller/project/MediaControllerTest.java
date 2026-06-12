@@ -1,20 +1,19 @@
 package net.modtale.controller.project;
 
+import java.io.IOException;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.InvalidProjectRequestException;
-import net.modtale.exception.ProjectOperationForbiddenException;
 import net.modtale.exception.ProjectMediaOperationException;
+import net.modtale.exception.ProjectOperationForbiddenException;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
 import net.modtale.model.user.User;
-import net.modtale.service.project.ProjectMediaService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.project.media.ProjectMediaService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.Authentication;
-
-import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

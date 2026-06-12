@@ -1,10 +1,9 @@
 package net.modtale.model.dto.user;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import net.modtale.model.user.NotificationType;
-
 import java.time.LocalDateTime;
 import java.util.Map;
+import net.modtale.model.user.NotificationType;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NotificationDTO(

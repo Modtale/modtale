@@ -1,11 +1,14 @@
 package net.modtale.mapper;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.project.ProjectVersionSummaryDTO;
-import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
 import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
@@ -15,10 +18,6 @@ import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.user.ApiKey;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

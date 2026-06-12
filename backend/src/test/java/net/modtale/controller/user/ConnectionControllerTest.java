@@ -1,22 +1,21 @@
 package net.modtale.controller.user;
 
+import java.util.List;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.user.GitRepositoryDTO;
 import net.modtale.model.user.GitRepository;
 import net.modtale.model.user.User;
-import net.modtale.service.user.AccountService;
-import net.modtale.service.user.ConnectionSessionService;
-import net.modtale.service.user.GithubService;
-import net.modtale.service.user.GitlabService;
-import net.modtale.service.user.OrganizationService;
+import net.modtale.service.user.account.AccountService;
+import net.modtale.service.user.connection.ConnectionSessionService;
+import net.modtale.service.user.connection.GithubService;
+import net.modtale.service.user.connection.GitlabService;
+import net.modtale.service.user.organization.OrganizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

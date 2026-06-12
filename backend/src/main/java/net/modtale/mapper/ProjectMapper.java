@@ -1,23 +1,22 @@
 package net.modtale.mapper;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
-import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
 import net.modtale.model.dto.project.ProjectCommentReplyDTO;
+import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectDependencyDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.project.ProjectVersionDTO;
 import net.modtale.model.dto.project.ProjectVersionSummaryDTO;
 import net.modtale.model.project.Comment;
-import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
 
 public class ProjectMapper {
 

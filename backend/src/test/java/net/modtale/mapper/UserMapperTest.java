@@ -1,13 +1,12 @@
 package net.modtale.mapper;
 
+import java.util.List;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

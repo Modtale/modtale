@@ -1,7 +1,8 @@
 package net.modtale.controller.user;
 
-import net.modtale.exception.ApiKeyOperationForbiddenException;
 import jakarta.validation.Valid;
+import java.util.List;
+import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.mapper.AdminMapper;
 import net.modtale.model.dto.admin.ReportDTO;
 import net.modtale.model.dto.request.user.CreateReportRequest;
@@ -9,16 +10,14 @@ import net.modtale.model.dto.request.user.ResolveReportRequest;
 import net.modtale.model.dto.response.common.IdResponse;
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
-import net.modtale.service.user.ReportService;
-import net.modtale.service.user.AccountService;
-import net.modtale.service.security.AccessControlService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.user.account.AccountService;
+import net.modtale.service.user.reporting.ReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @Validated

@@ -1,5 +1,6 @@
 package net.modtale.service.analytics;
 
+import java.util.List;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.analytics.ProjectAnalyticsDetail;
@@ -8,8 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class QueryService {

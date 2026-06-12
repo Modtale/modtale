@@ -7,7 +7,7 @@ import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationMutationService;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.TwoFactorService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;

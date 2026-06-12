@@ -1,5 +1,11 @@
 package net.modtale.service.auth;
 
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.OAuthProvider;
@@ -7,18 +13,11 @@ import net.modtale.model.user.User;
 import net.modtale.repository.admin.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.TrackingService;
-import net.modtale.service.user.ConnectedAccountMutationService;
+import net.modtale.service.user.connection.ConnectedAccountMutationService;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class OAuthUserLoginService {

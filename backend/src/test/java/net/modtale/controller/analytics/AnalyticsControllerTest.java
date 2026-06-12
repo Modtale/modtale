@@ -1,5 +1,7 @@
 package net.modtale.controller.analytics;
 
+import java.util.List;
+import java.util.Map;
 import net.modtale.model.analytics.AnalyticsDataPoint;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.analytics.ProjectAnalyticsDetail;
@@ -10,13 +12,10 @@ import net.modtale.service.analytics.AnalyticsAccessService;
 import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.QueryService;
 import net.modtale.service.analytics.TrackingService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;

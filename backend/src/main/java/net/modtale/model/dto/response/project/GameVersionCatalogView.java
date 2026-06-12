@@ -1,8 +1,7 @@
 package net.modtale.model.dto.response.project;
 
-import net.modtale.service.project.GameVersionService;
-
 import java.util.List;
+import net.modtale.service.project.catalog.GameVersionService;
 
 public record GameVersionCatalogView(
         List<String> releaseVersions,

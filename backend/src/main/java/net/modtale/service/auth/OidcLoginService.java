@@ -1,6 +1,7 @@
 package net.modtale.service.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Map;
 import net.modtale.exception.AuthenticationOperationException;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.InvalidAuthenticationRequestException;
@@ -8,7 +9,7 @@ import net.modtale.exception.OAuthAccountCollisionException;
 import net.modtale.exception.OrganizationNotFoundException;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.User;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
@@ -20,8 +21,6 @@ import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.stereotype.Service;
-
-import java.util.Map;
 
 @Service
 public class OidcLoginService extends OidcUserService {

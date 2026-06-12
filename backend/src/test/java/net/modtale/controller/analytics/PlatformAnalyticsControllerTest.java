@@ -1,5 +1,6 @@
 package net.modtale.controller.analytics;
 
+import java.util.List;
 import net.modtale.model.analytics.AnalyticsDataPoint;
 import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.dto.response.analytics.PlatformStatsView;
@@ -14,8 +15,6 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Query;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;

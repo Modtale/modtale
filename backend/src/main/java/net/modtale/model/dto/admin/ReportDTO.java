@@ -1,9 +1,8 @@
 package net.modtale.model.dto.admin;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import net.modtale.model.user.Report;
-
 import java.time.LocalDateTime;
+import net.modtale.model.user.Report;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ReportDTO(

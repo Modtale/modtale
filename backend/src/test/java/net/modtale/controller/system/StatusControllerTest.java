@@ -1,5 +1,7 @@
 package net.modtale.controller.system;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import net.modtale.model.dto.response.system.SystemStatusView;
 import net.modtale.model.system.StatusHistory;
 import net.modtale.repository.system.StatusHistoryRepository;
@@ -9,9 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import software.amazon.awssdk.services.s3.S3Client;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

@@ -1,10 +1,9 @@
 package net.modtale.service.analytics;
 
+import java.util.List;
 import net.modtale.model.project.Project;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
-
-import java.util.List;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;

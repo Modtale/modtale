@@ -1,9 +1,8 @@
 package net.modtale.model.dto.response.analytics;
 
+import java.util.List;
 import net.modtale.model.analytics.AnalyticsDataPoint;
 import net.modtale.model.analytics.PlatformAnalyticsSummary;
-
-import java.util.List;
 
 public record PlatformAnalyticsSummaryView(
         long totalDownloads,

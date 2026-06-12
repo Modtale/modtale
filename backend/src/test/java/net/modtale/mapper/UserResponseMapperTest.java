@@ -1,14 +1,13 @@
 package net.modtale.mapper;
 
+import java.time.LocalDateTime;
+import java.util.Map;
 import net.modtale.model.dto.user.GitRepositoryDTO;
 import net.modtale.model.dto.user.NotificationDTO;
 import net.modtale.model.user.GitRepository;
 import net.modtale.model.user.Notification;
 import net.modtale.model.user.NotificationType;
 import org.junit.jupiter.api.Test;
-
-import java.time.LocalDateTime;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

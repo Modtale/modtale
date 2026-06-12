@@ -1,20 +1,19 @@
 package net.modtale.service.auth;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import net.modtale.exception.InvalidAuthenticationRequestException;
 import net.modtale.exception.OAuthAccountCollisionException;
 import net.modtale.exception.OrganizationNotFoundException;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.user.ConnectedAccountMutationService;
+import net.modtale.service.user.connection.ConnectedAccountMutationService;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class OAuthAccountLinkingService {

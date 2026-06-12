@@ -1,5 +1,6 @@
 package net.modtale.config.r2;
 
+import java.net.URI;
 import net.modtale.config.properties.AppR2Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,8 +11,6 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
-
-import java.net.URI;
 
 @Configuration
 public class R2Config {

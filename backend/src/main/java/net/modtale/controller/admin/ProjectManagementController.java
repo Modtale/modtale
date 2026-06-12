@@ -1,6 +1,7 @@
 package net.modtale.controller.admin;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
@@ -8,9 +9,9 @@ import net.modtale.model.dto.request.admin.RejectReasonRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.User;
-import net.modtale.service.admin.ProjectAdminOperationsService;
-import net.modtale.service.admin.ProjectReviewAdminService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.admin.project.ProjectAdminOperationsService;
+import net.modtale.service.admin.review.ProjectReviewAdminService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,8 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")

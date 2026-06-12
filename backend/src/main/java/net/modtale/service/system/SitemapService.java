@@ -1,19 +1,18 @@
 package net.modtale.service.system;
 
-import net.modtale.config.properties.AppFrontendProperties;
-import net.modtale.model.project.Project;
-import net.modtale.repository.project.ProjectRepository;
-import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.ProjectService;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.project.Project;
+import net.modtale.repository.project.ProjectRepository;
+import net.modtale.repository.user.UserRepository;
+import net.modtale.service.project.query.ProjectService;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
 
 @Service
 public class SitemapService {

@@ -1,9 +1,8 @@
 package net.modtale.model.dto.response.analytics;
 
-import net.modtale.model.project.ProjectMeta;
-
 import java.util.Map;
 import java.util.stream.Collectors;
+import net.modtale.model.project.ProjectMeta;
 
 public record ProjectAnalyticsMetaView(
         String id,
