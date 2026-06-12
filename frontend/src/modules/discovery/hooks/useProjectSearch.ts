@@ -5,16 +5,20 @@ import { captureError } from '@/utils/errorTracking';
 import type { Project } from '@/types';
 import type { Classification } from '@/data/categories';
 
-export type SortOption = 'relevance' | 'downloads' | 'favorites' | 'newest' | 'updated';
+export type SortOption = 'relevance' | 'popular' | 'trending' | 'downloads' | 'favorites' | 'newest' | 'updated';
 const BROWSE_CACHE_PREFIX = 'modtale.browse-cache:';
 
 const normalizeSort = (sort: string | null): SortOption => {
     switch (sort) {
+        case 'popular':
+        case 'trending':
         case 'downloads':
         case 'favorites':
         case 'newest':
         case 'updated':
             return sort;
+        case 'new':
+            return 'newest';
         default:
             return 'relevance';
     }
@@ -26,7 +30,6 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     const parsedPage = parseInt(searchParams.get('page') || '0', 10);
     const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 0;
     const sortBy = normalizeSort(searchParams.get('sort'));
-    const activeViewId = searchParams.get('view') || 'all';
     const selectedVersion = searchParams.get('version') || 'Any';
     const minDownloads = parseInt(searchParams.get('minDl') || '0');
     const minFavorites = parseInt(searchParams.get('minFav') || '0');
@@ -58,8 +61,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         minDownloads,
         minFavorites,
         filterDate,
-        activeViewId,
-    })}`, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
+    })}`, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate]);
     const queryKey = useMemo(() => JSON.stringify({
         page,
         itemsPerPage,
@@ -71,8 +73,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         minDownloads,
         minFavorites,
         filterDate,
-        activeViewId,
-    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId]);
+    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate]);
 
     useEffect(() => {
         if (urlSearchTerm !== searchTerm) {
@@ -157,12 +158,6 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         setLoading(true);
 
         try {
-            let categoryParam: string | undefined = undefined;
-            if (activeViewId === 'favorites') categoryParam = 'Favorites';
-            else if (activeViewId === 'hidden_gems') categoryParam = 'hidden_gems';
-            else if (activeViewId === 'popular') categoryParam = 'popular';
-            else if (activeViewId === 'trending') categoryParam = 'trending';
-
             const data = await discoveryClient.searchProjects({
                 page,
                 size: itemsPerPage,
@@ -174,7 +169,6 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 minDownloads: minDownloads > 0 ? minDownloads : undefined,
                 minFavorites: minFavorites > 0 ? minFavorites : undefined,
                 dateRange: filterDate || 'all',
-                category: categoryParam,
             }, controller.signal);
 
             const nextTotalPages = data?.totalPages || 0;
@@ -215,7 +209,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 setIsPending(false);
             }
         }
-    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, activeViewId, useSSRData, setSearchParams]);
+    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, useSSRData, setSearchParams]);
 
     useEffect(() => {
         fetchData();
@@ -234,7 +228,6 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                     value === null ||
                     (key === 'page' && value === '0') ||
                     (key === 'sort' && value === 'relevance') ||
-                    (key === 'view' && value === 'all') ||
                     (key === 'version' && value === 'Any') ||
                     (key === 'minDl' && value === '0') ||
                     (key === 'minFav' && value === '0')
@@ -252,7 +245,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     }, [setSearchParams]);
 
     return {
-        page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
+        page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
         searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items, setItems,
         itemsPerPage, setItemsPerPage, updateParams, searchParams, setSearchParams
     };

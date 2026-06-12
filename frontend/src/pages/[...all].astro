@@ -111,16 +111,15 @@ const pageParamStr = searchParams.get('page') || '0';
 const pageNum = parseInt(pageParamStr, 10);
 const styleParam = searchParams.get('style') || 'grid';
 const sortParam = searchParams.get('sort') || '';
-const viewParam = searchParams.get('view') || '';
 const qParam = searchParams.get('q') || '';
 const normalizeSort = (sort: string) => (
-    sort === 'downloads' || sort === 'favorites' || sort === 'newest' || sort === 'updated'
+    sort === 'popular' || sort === 'trending' || sort === 'downloads' || sort === 'favorites' || sort === 'newest' || sort === 'updated'
         ? sort
         : 'relevance'
 );
 
 if (classification && !isHome) {
-    const dynamicMeta = generateDynamicSEO(baseSEO, pageNum, sortParam, viewParam, qParam);
+    const dynamicMeta = generateDynamicSEO(baseSEO, pageNum, sortParam, qParam);
     title = dynamicMeta.title;
     description = dynamicMeta.description;
 
@@ -140,7 +139,6 @@ const isComplex =
     || searchParams.has('date')
     || pageNum > 0
     || styleParam !== 'grid'
-    || searchParams.has('view')
     || searchParams.has('sort');
 
 const isBrowseRoute = !!classification && !isHome;
@@ -153,7 +151,7 @@ if (classification) {
                 headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
             };
             const [trending, newest, stats] = await Promise.all([
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=relevance&category=trending`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=trending`, 1200, homeRequestInit),
                 fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=newest`, 1200, homeRequestInit),
                 fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`, 1200, homeRequestInit),
             ]);
@@ -180,14 +178,7 @@ if (classification) {
     } else if (isBot && !isComplex) {
         try {
                 const sort = normalizeSort(searchParams.get('sort') || '');
-                const view = searchParams.get('view');
                 const page = searchParams.get('page') || '0';
-
-                let categoryParam = '';
-                if (view === 'favorites') categoryParam = '&category=Favorites';
-                else if (view === 'hidden_gems') categoryParam = '&category=hidden_gems';
-                else if (view === 'popular') categoryParam = '&category=popular';
-                else if (view === 'trending') categoryParam = '&category=trending';
 
                 const searchParamStr = qParam ? `&search=${encodeURIComponent(qParam)}` : '';
 
@@ -195,7 +186,7 @@ if (classification) {
                 const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
 
                 const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
-                const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${categoryParam}${searchParamStr}${tagsParamStr}`;
+                const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${searchParamStr}${tagsParamStr}`;
 
                 const data = await fetchJsonWithTimeout(endpoint, 2000, {
                     headers: { 'Cache-Control': 'public, s-maxage=300' },

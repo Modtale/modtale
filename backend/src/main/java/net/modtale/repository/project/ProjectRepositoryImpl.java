@@ -95,7 +95,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
     }
 
     private Sort resolveSort(ProjectSort sortBy, ProjectViewCategory viewCategory, LocalDate dateCutoff, Pageable pageable) {
-        if (viewCategory == ProjectViewCategory.TRENDING || sortBy == ProjectSort.TRENDING) {
+        if (sortBy == ProjectSort.TRENDING) {
             return Sort.by(
                     Sort.Order.asc("trendingRank"),
                     Sort.Order.desc("trendScore"),
@@ -105,20 +105,11 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             );
         }
 
-        if (viewCategory == ProjectViewCategory.POPULAR || sortBy == ProjectSort.POPULAR) {
+        if (sortBy == ProjectSort.POPULAR) {
             return Sort.by(
                     Sort.Order.asc("popularRank"),
                     Sort.Order.desc("popularScore"),
                     Sort.Order.desc("downloadCount"),
-                    Sort.Order.desc("favoriteCount"),
-                    Sort.Order.desc("updatedAt")
-            );
-        }
-
-        if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {
-            return Sort.by(
-                    Sort.Order.asc("hiddenGemRank"),
-                    Sort.Order.desc("hiddenGemScore"),
                     Sort.Order.desc("favoriteCount"),
                     Sort.Order.desc("updatedAt")
             );

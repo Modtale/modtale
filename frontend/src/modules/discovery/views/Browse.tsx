@@ -7,7 +7,7 @@ import { useMobile } from '@/context/MobileContext';
 import { useSSRData } from '@/context/SSRContext';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '@/utils/schema';
 import { getCategorySEO, generateDynamicSEO } from '@/data/seo-constants';
-import { BROWSE_VIEWS, PROJECT_TYPES } from '@/data/categories';
+import { BROWSE_SORTS, PROJECT_TYPES } from '@/data/categories';
 import type { Classification } from '@/data/categories';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -37,7 +37,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
 
     const {
-        page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
+        page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
         searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
@@ -150,14 +150,13 @@ export const Browse: React.FC<BrowseViewProps> = ({
 
     const getPageTitle = useCallback(() => {
         if (selectedTags.length > 0) return `Tagged: ${selectedTags[0]}${selectedTags.length > 1 ? ` (+${selectedTags.length - 1})` : ''}`;
-        if (activeViewId === 'all') return selectedClassification === 'All' ? 'All Projects' : getCategorySEO(selectedClassification).h1 || `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
-        const view = BROWSE_VIEWS.find(v => v.id === activeViewId);
-        if (view) return view.label;
-        return 'Projects';
-    }, [selectedTags, activeViewId, selectedClassification]);
+        const sort = BROWSE_SORTS.find(v => v.id === sortBy);
+        if (sort && sort.id !== 'relevance') return sort.label;
+        return selectedClassification === 'All' ? 'All Projects' : getCategorySEO(selectedClassification).h1 || `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
+    }, [selectedTags, sortBy, selectedClassification]);
 
     const seoContent = getCategorySEO(selectedClassification);
-    const dynamicSEO = generateDynamicSEO({ title: seoContent.title, description: seoContent.description }, page, sortBy, activeViewId, urlSearchTerm);
+    const dynamicSEO = generateDynamicSEO({ title: seoContent.title, description: seoContent.description }, page, sortBy, urlSearchTerm);
 
     const getPageUrl = (targetPage: number) => {
         const s = new URLSearchParams(searchParams);
@@ -192,16 +191,15 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
                             <span className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-3 tracking-widest px-2 drop-shadow-sm">Browse</span>
                             <div className="space-y-1.5">
-                                {BROWSE_VIEWS.map(v => {
+                                {BROWSE_SORTS.filter(v => !['downloads', 'favorites'].includes(v.id)).map(v => {
                                     const s = new URLSearchParams(searchParams);
-                                    if (v.id === 'all') s.delete('view'); else s.set('view', v.id);
-                                    if (v.defaultSort === 'relevance') s.delete('sort');
-                                    else s.set('sort', v.defaultSort);
+                                    if (v.id === 'relevance') s.delete('sort');
+                                    else s.set('sort', v.id);
                                     s.delete('page');
                                     const query = s.toString() ? `?${s.toString()}` : '?';
 
                                     return (
-                                        <Link key={v.id} to={query} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeViewId === v.id ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                        <Link key={v.id} to={query} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${sortBy === v.id ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
                                             <span className="pointer-events-none">{v.label}</span>
                                         </Link>
                                     );

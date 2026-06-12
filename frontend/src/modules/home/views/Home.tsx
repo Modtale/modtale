@@ -275,7 +275,7 @@ export const Home: React.FC<{
                 await runHeroProjectRequest(async () => {
                     try {
                         const res = await api.get('/projects', {
-                            params: { size: 16, sort: 'relevance', category: 'trending' },
+                            params: { size: 16, sort: 'trending' },
                             timeout: HOME_REQUEST_TIMEOUT_MS,
                         });
                         if (!isCancelled && res.data?.content) setProjects(res.data.content);
@@ -287,7 +287,7 @@ export const Home: React.FC<{
                 await runHeroProjectRequest(async () => {
                     try {
                         const res = await api.get('/projects', {
-                            params: { size: 16, sort: 'relevance', category: 'trending' },
+                            params: { size: 16, sort: 'trending' },
                             timeout: HOME_REQUEST_TIMEOUT_MS,
                         });
                         if (!isCancelled && res.data?.content?.length) setProjects(res.data.content);
