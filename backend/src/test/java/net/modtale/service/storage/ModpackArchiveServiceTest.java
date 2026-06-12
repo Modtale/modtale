@@ -52,12 +52,22 @@ class ModpackArchiveServiceTest {
     }
 
     @Test
-    void generateModpackZipRebuildsCachesAndOrganizesDependencyFilesByClassification() throws Exception {
+    void generateModpackZipRebuildsCachesAndWritesDependencyFilesAtArchiveRoot() throws Exception {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", "modpacks/missing.zip");
+        ProjectDependency externalDependency = ProjectDependency.curseForge(
+                "1450386",
+                "External Mod",
+                "1.0.0",
+                "https://www.curseforge.com/hytale/mods/external-mod/files/8227810",
+                ProjectDependency.DependencyType.REQUIRED
+        );
+        externalDependency.setExternalFileName("External-Mod-1.0.0.jar");
+        externalDependency.setCachedFileUrl("external-dependencies/curseforge/1450386/8227810/External-Mod-1.0.0.jar");
         version.setDependencies(List.of(
                 new ProjectDependency("plugin", "Plugin", "2.0.0"),
-                new ProjectDependency("data", "Data", "3.0.0")
+                new ProjectDependency("data", "Data", "3.0.0"),
+                externalDependency
         ));
         Project plugin = dependencyProject("plugin", ProjectClassification.PLUGIN);
         Project data = dependencyProject("data", ProjectClassification.DATA);
@@ -72,6 +82,7 @@ class ModpackArchiveServiceTest {
                 .thenReturn(new DownloadArchiveSupport.ResolvedDependency(data, dataVersion));
         when(archiveSupport.download("files/plugin.jar")).thenReturn(bytes("plugin-binary"));
         when(archiveSupport.download("files/data.zip")).thenReturn(bytes("data-binary"));
+        when(archiveSupport.download("external-dependencies/curseforge/1450386/8227810/External-Mod-1.0.0.jar")).thenReturn(bytes("external-binary"));
         when(archiveSupport.extractOriginalFilename("files/plugin.jar")).thenReturn("plugin.jar");
         when(archiveSupport.extractOriginalFilename("files/data.zip")).thenReturn("data.zip");
         when(archiveSupport.newZipMultipartFile(eq("sky-pack-1.0.0.zip"), any())).thenAnswer(invocation -> mock(MultipartFile.class));
@@ -80,9 +91,11 @@ class ModpackArchiveServiceTest {
         Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
 
         assertEquals("modpacks/generated.zip", version.getFileUrl());
-        assertEquals("plugin-binary", entries.get("plugins/plugin.jar"));
-        assertEquals("data-binary", entries.get("asset-packs/data.zip"));
+        assertEquals("plugin-binary", entries.get("plugin.jar"));
+        assertEquals("data-binary", entries.get("data.zip"));
+        assertEquals("external-binary", entries.get("External-Mod-1.0.0.jar"));
         assertEquals(true, entries.get("modpack.json").contains("\"id\": \"plugin\""));
+        assertEquals(true, entries.get("modpack.json").contains("\"externalId\": \"1450386\""));
         verify(projectRepository).save(pack);
     }
 

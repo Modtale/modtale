@@ -3,7 +3,9 @@ package net.modtale.service.storage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
@@ -56,8 +58,10 @@ final class ModpackArchiveService {
     private byte[] buildArchive(Project pack, ProjectVersion version) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            Set<String> archiveEntries = new HashSet<>();
             writeManifest(zos, pack, version);
-            writeDependencyFiles(zos, version);
+            archiveEntries.add("modpack.json");
+            writeDependencyFiles(zos, version, archiveEntries);
         }
         return baos.toByteArray();
     }
@@ -102,14 +106,14 @@ final class ModpackArchiveService {
         zos.closeEntry();
     }
 
-    private void writeDependencyFiles(ZipOutputStream zos, ProjectVersion version) throws IOException {
+    private void writeDependencyFiles(ZipOutputStream zos, ProjectVersion version, Set<String> archiveEntries) throws IOException {
         if (version.getDependencies() == null) {
             return;
         }
 
         for (ProjectDependency dependency : version.getDependencies()) {
             if (dependency.isExternal()) {
-                writeExternalDependencyFile(zos, dependency);
+                writeExternalDependencyFile(zos, dependency, archiveEntries);
                 continue;
             }
 
@@ -119,19 +123,13 @@ final class ModpackArchiveService {
             }
 
             byte[] fileData = archiveSupport.download(resolvedDependency.version().getFileUrl());
-            String folder = resolvedDependency.project().getClassification() != null
-                    && "PLUGIN".equals(resolvedDependency.project().getClassification().name())
-                    ? "plugins/"
-                    : "asset-packs/";
             String originalFilename = archiveSupport.extractOriginalFilename(resolvedDependency.version().getFileUrl());
 
-            zos.putNextEntry(new ZipEntry(folder + originalFilename));
-            zos.write(fileData);
-            zos.closeEntry();
+            writeArchiveEntry(zos, archiveEntries, originalFilename, fileData);
         }
     }
 
-    private void writeExternalDependencyFile(ZipOutputStream zos, ProjectDependency dependency) throws IOException {
+    private void writeExternalDependencyFile(ZipOutputStream zos, ProjectDependency dependency, Set<String> archiveEntries) throws IOException {
         String cachedFileUrl = trimToNull(dependency.getCachedFileUrl());
         if (cachedFileUrl == null) {
             return;
@@ -143,20 +141,33 @@ final class ModpackArchiveService {
                 return;
             }
 
-            zos.putNextEntry(new ZipEntry("external/" + externalSourceFolder(dependency) + "/" + externalFilename(dependency)));
-            zos.write(fileData);
-            zos.closeEntry();
+            writeArchiveEntry(zos, archiveEntries, externalFilename(dependency), fileData);
         } catch (StorageDownloadException ex) {
             logger.warn("Unable to include cached external dependency {} from {} in generated modpack archive.",
                     dependency.getProjectTitle(), cachedFileUrl, ex);
         }
     }
 
-    private String externalSourceFolder(ProjectDependency dependency) {
-        return dependency.getSource().name().toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9._-]+", "-")
-                .replaceAll("-+", "-")
-                .replaceAll("(^-|-$)", "");
+    private void writeArchiveEntry(ZipOutputStream zos, Set<String> archiveEntries, String filename, byte[] fileData) throws IOException {
+        String entryName = uniqueArchiveEntryName(archiveEntries, sanitizeArchiveFilename(filename));
+        zos.putNextEntry(new ZipEntry(entryName));
+        zos.write(fileData);
+        zos.closeEntry();
+    }
+
+    private String uniqueArchiveEntryName(Set<String> archiveEntries, String filename) {
+        String candidate = filename;
+        int counter = 2;
+        while (!archiveEntries.add(candidate)) {
+            int extensionStart = filename.lastIndexOf('.');
+            if (extensionStart > 0) {
+                candidate = filename.substring(0, extensionStart) + "-" + counter + filename.substring(extensionStart);
+            } else {
+                candidate = filename + "-" + counter;
+            }
+            counter++;
+        }
+        return candidate;
     }
 
     private String externalFilename(ProjectDependency dependency) {
