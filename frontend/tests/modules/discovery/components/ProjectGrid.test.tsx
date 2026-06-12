@@ -8,7 +8,8 @@ vi.mock('@/modules/project/components/ProjectCard', () => ({
         <div data-testid="project-card" data-path={path} data-project-id={project.id}>
             {project.title}
         </div>
-    )
+    ),
+    ProjectCardSkeletons: () => <div data-testid="project-card-skeletons" />
 }));
 
 describe('ProjectGrid project links', () => {
