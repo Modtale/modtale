@@ -8,6 +8,7 @@ import { ROUTE_SEO } from '@/data/seo-constants';
 import type { Project, User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
+import { ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
 
 import { MarqueeColumn } from '../components/HeroMarquee';
 import {
@@ -133,20 +134,6 @@ const FeatureShowcaseSection = ({
     );
 };
 
-const DesktopHeroMarqueeSkeletonCard = ({ accentClass = '' }: { accentClass?: string }) => (
-    <div className="relative flex flex-col w-full shrink-0 overflow-hidden rounded-[1.6rem] border border-slate-200/80 dark:border-white/10 bg-white/75 dark:bg-slate-900/65 shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:shadow-[0_22px_60px_rgba(2,6,23,0.45)] backdrop-blur-xl">
-        <div className={`h-[108px] w-full home-hero-marquee-skeleton-shimmer ${accentClass}`} />
-        <div className="relative flex flex-1 flex-col px-4 sm:px-6 pb-5 sm:pb-6">
-            <div className="absolute -top-6 sm:-top-8 h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl border-4 border-white dark:border-slate-900 bg-slate-200/90 dark:bg-slate-800/90 shadow-lg home-hero-marquee-skeleton-shimmer" />
-            <div className="mt-8 sm:mt-10 space-y-3">
-                <div className="h-5 w-[72%] rounded-full bg-slate-200/90 dark:bg-slate-800/90 home-hero-marquee-skeleton-shimmer" />
-                <div className="h-3 w-[46%] rounded-full bg-slate-200/80 dark:bg-slate-800/80 home-hero-marquee-skeleton-shimmer" />
-            </div>
-            <div className="mt-4 h-3 w-20 rounded-full bg-slate-200/80 dark:bg-slate-800/80 home-hero-marquee-skeleton-shimmer" />
-        </div>
-    </div>
-);
-
 const DesktopHeroMarqueeSkeleton = () => (
     <aside
         className="absolute -inset-x-4 xl:-inset-x-8 -inset-y-4 px-4 xl:px-8 py-4 flex gap-6 2xl:gap-10 justify-end overflow-hidden pointer-events-none"
@@ -158,14 +145,14 @@ const DesktopHeroMarqueeSkeleton = () => (
         data-testid="home-hero-marquee-skeleton"
     >
         <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0 gap-6">
-            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(59,130,246,0.24),rgba(255,255,255,0.08),rgba(148,163,184,0.18))] dark:bg-[linear-gradient(135deg,rgba(59,130,246,0.22),rgba(15,23,42,0.35),rgba(99,102,241,0.18))]" />
-            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(14,165,233,0.2),rgba(255,255,255,0.08),rgba(191,219,254,0.2))] dark:bg-[linear-gradient(135deg,rgba(14,165,233,0.18),rgba(15,23,42,0.32),rgba(59,130,246,0.16))]" />
-            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(99,102,241,0.16),rgba(255,255,255,0.08),rgba(148,163,184,0.16))] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.16),rgba(15,23,42,0.3),rgba(59,130,246,0.14))]" />
+            <ProjectCardSkeleton />
+            <ProjectCardSkeleton />
+            <ProjectCardSkeleton />
         </div>
         <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0 gap-6 pt-16 2xl:pt-20">
-            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(37,99,235,0.22),rgba(255,255,255,0.08),rgba(125,211,252,0.2))] dark:bg-[linear-gradient(135deg,rgba(37,99,235,0.2),rgba(15,23,42,0.35),rgba(56,189,248,0.18))]" />
-            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(59,130,246,0.18),rgba(255,255,255,0.08),rgba(196,181,253,0.16))] dark:bg-[linear-gradient(135deg,rgba(59,130,246,0.18),rgba(15,23,42,0.34),rgba(129,140,248,0.18))]" />
-            <DesktopHeroMarqueeSkeletonCard accentClass="bg-[linear-gradient(135deg,rgba(2,132,199,0.18),rgba(255,255,255,0.08),rgba(147,197,253,0.16))] dark:bg-[linear-gradient(135deg,rgba(2,132,199,0.18),rgba(15,23,42,0.32),rgba(59,130,246,0.16))]" />
+            <ProjectCardSkeleton />
+            <ProjectCardSkeleton />
+            <ProjectCardSkeleton />
         </div>
     </aside>
 );
@@ -548,26 +535,6 @@ export const Home: React.FC<{
                     .animate-marquee-right {
                         animation: marquee-right var(--marquee-duration, 35s) linear infinite;
                         will-change: transform;
-                    }
-                    @keyframes hero-marquee-skeleton-shimmer {
-                        0% { background-position: 200% 0; opacity: 0.78; }
-                        50% { opacity: 1; }
-                        100% { background-position: -200% 0; opacity: 0.78; }
-                    }
-                    .home-hero-marquee-skeleton-shimmer {
-                        position: relative;
-                        overflow: hidden;
-                    }
-                    .home-hero-marquee-skeleton-shimmer::after {
-                        content: '';
-                        position: absolute;
-                        inset: 0;
-                        background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.15) 38%, rgba(255, 255, 255, 0.42) 50%, rgba(255, 255, 255, 0.15) 62%, transparent 100%);
-                        background-size: 220% 100%;
-                        animation: hero-marquee-skeleton-shimmer 2.6s ease-in-out infinite;
-                    }
-                    .dark .home-hero-marquee-skeleton-shimmer::after {
-                        background-image: linear-gradient(110deg, transparent 0%, rgba(148, 163, 184, 0.08) 38%, rgba(255, 255, 255, 0.18) 50%, rgba(148, 163, 184, 0.08) 62%, transparent 100%);
                     }
                     .contain-content {
                         contain: content;
