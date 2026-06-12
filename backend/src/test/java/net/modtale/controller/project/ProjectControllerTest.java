@@ -9,6 +9,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.model.user.User;
 import net.modtale.service.project.GameVersionService;
@@ -259,7 +260,7 @@ class ProjectControllerTest {
         User currentUser = user("user-1", "ada");
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
         when(permissionProjectLookupService.findProject("project-1")).thenReturn(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED));
-        when(projectService.getProjectByRouteKey("project-1", currentUser)).thenReturn(null);
+        when(projectService.getProjectPageByRouteKey("project-1", currentUser)).thenReturn(null);
 
         assertThrows(ResourceNotFoundException.class, () -> controller.getProject("project-1", null));
     }
@@ -284,7 +285,7 @@ class ProjectControllerTest {
         assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
         assertTrue(response.getHeaders().getCacheControl().contains("public"));
         verify(projectResponseCacheService).getPublicProjectDtoByRouteKey("project-1");
-        verify(projectService, never()).getProjectByRouteKey("project-1", currentUser);
+        verify(projectService, never()).getProjectPageByRouteKey("project-1", currentUser);
     }
 
     @Test
@@ -313,13 +314,18 @@ class ProjectControllerTest {
     @Test
     void getProjectDecoratesReturnedDtoWithEditFlagsForCurrentUser() {
         Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
+        ProjectVersion version = new ProjectVersion();
+        version.setId("version-1");
+        version.setVersionNumber("1.0.0");
+        version.setChangelog("Huge changelog body that should not ride on page load.");
+        project.setVersions(List.of(version));
         User currentUser = user("user-1", "ada");
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
         when(permissionProjectLookupService.findProject("project-1")).thenReturn(project);
         when(accessControlService.isAdmin(currentUser)).thenReturn(false);
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
-        when(projectService.getProjectByRouteKey("project-1", currentUser)).thenReturn(project);
+        when(projectService.getProjectPageByRouteKey("project-1", currentUser)).thenReturn(project);
         when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(true);
         when(accessControlService.isOwner(project, currentUser)).thenReturn(false);
 
@@ -330,6 +336,9 @@ class ProjectControllerTest {
         assertEquals("project-1", dto.getId());
         assertTrue(dto.isCanEdit());
         assertFalse(dto.isOwner());
+        assertEquals(1, dto.getVersions().size());
+        assertEquals("version-1", dto.getVersions().getFirst().getId());
+        assertEquals(null, dto.getVersions().getFirst().getChangelog());
         assertEquals("no-cache", response.getHeaders().getCacheControl());
     }
 

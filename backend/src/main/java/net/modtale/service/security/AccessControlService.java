@@ -105,12 +105,12 @@ public class AccessControlService {
     }
 
     public boolean hasProjectPerm(String projectId, String permStr, Authentication authentication) {
-        Project project = permissionProjectLookupService.findProject(projectId);
-        if (project == null) return true;
-
-        if (isProjectReadPermission(permStr) && isPubliclyReadable(project)) {
+        if (isProjectReadPermission(permStr)) {
             return true;
         }
+
+        Project project = permissionProjectLookupService.findProject(projectId);
+        if (project == null) return true;
 
         User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;

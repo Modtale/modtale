@@ -3,6 +3,7 @@ import { projectClient } from '../api/projectClient';
 import { SiteRoutes } from '@/utils/routes';
 import { consumePrefetchedProject } from '@/utils/prefetch';
 import type { Project, User } from '@/types';
+import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
 
 const consumeProjectBootstrap = async (routeKey: string) => {
     const prefetched = await consumePrefetchedProject(routeKey);
@@ -29,6 +30,7 @@ const consumeProjectBootstrap = async (routeKey: string) => {
 
 interface UseProjectDetailOptions {
     backgroundRefresh?: boolean;
+    hydrateChangelogs?: boolean;
 }
 
 export const useProjectDetail = (
@@ -37,7 +39,7 @@ export const useProjectDetail = (
     currentUser: User | null,
     options: UseProjectDetailOptions = {}
 ) => {
-    const { backgroundRefresh = false } = options;
+    const { backgroundRefresh = false, hydrateChangelogs = false } = options;
     const routeKey = rawId?.trim() || '';
 
     const isInitialDataValid = initialData && SiteRoutes.matchesProjectRoute(initialData, routeKey);
@@ -54,6 +56,7 @@ export const useProjectDetail = (
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
     const fetchedTeamDataKey = useRef('');
+    const fetchedChangelogKey = useRef('');
 
     useEffect(() => {
         if (!isInitialDataValid) {
@@ -64,6 +67,7 @@ export const useProjectDetail = (
             setContributors([]);
             analyticsFired.current = false;
             fetchedTeamDataKey.current = '';
+            fetchedChangelogKey.current = '';
         }
     }, [routeKey, isInitialDataValid]);
 
@@ -109,6 +113,35 @@ export const useProjectDetail = (
             projectClient.trackView(project.id).catch(() => {});
         }
     }, [project?.id]);
+
+    const changelogHydrationKey = useMemo(() => {
+        if (!project?.id || !project.versions?.length) return '';
+        return `${project.id}:${project.versions.map(version => `${version.id}:${version.versionNumber}:${version.changelog == null ? 'missing' : 'present'}`).join('|')}`;
+    }, [project?.id, project?.versions]);
+
+    useEffect(() => {
+        if (!hydrateChangelogs || !project?.id || !projectNeedsChangelogHydration(project)) return;
+        if (!changelogHydrationKey || fetchedChangelogKey.current === changelogHydrationKey) return;
+
+        let isMounted = true;
+        fetchedChangelogKey.current = changelogHydrationKey;
+
+        projectClient.getProjectVersionChangelogs(routeKey || project.id)
+            .then((changelogs) => {
+                if (!isMounted) return;
+                setProject((previous) => {
+                    if (!previous || previous.id !== project.id) return previous;
+                    return mergeProjectVersionChangelogs(previous, changelogs);
+                });
+            })
+            .catch(() => {
+                if (isMounted) fetchedChangelogKey.current = '';
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [hydrateChangelogs, project, routeKey, changelogHydrationKey]);
 
     useEffect(() => {
         if (!project) return;

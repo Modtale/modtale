@@ -49,7 +49,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [activeTab, setActiveTab] = useState<string>('details');
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
 
-    const { project: projectData, setProject: setProjectData, loading, contributors } = useProjectDetail(id, null, currentUser);
+    const { project: projectData, setProject: setProjectData, loading, contributors } = useProjectDetail(id, null, currentUser, { hydrateChangelogs: true });
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
         title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''

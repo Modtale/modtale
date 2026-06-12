@@ -10,6 +10,7 @@ import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
+import net.modtale.model.dto.project.ProjectVersionChangelogDTO;
 import net.modtale.model.dto.request.project.CreateProjectRequest;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
 import net.modtale.model.dto.response.project.GameVersionCatalogView;
@@ -213,7 +214,7 @@ public class ProjectController {
                     .body(project);
         }
 
-        Project project = projectService.getProjectByRouteKey(id, currentUser);
+        Project project = projectService.getProjectPageByRouteKey(id, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }
@@ -225,7 +226,28 @@ public class ProjectController {
 
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noCache())
-                .body(ProjectMapper.toDTO(project, false, currentUser != null ? currentUser.getId() : null));
+                .body(ProjectMapper.toDTO(project, false, currentUser != null ? currentUser.getId() : null, false));
+    }
+
+    @GetMapping("/projects/{id}/versions/changelogs")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
+    public ResponseEntity<List<ProjectVersionChangelogDTO>> getProjectVersionChangelogs(
+            @PathVariable String id,
+            Authentication authentication
+    ) {
+        User currentUser = accountService.getCurrentUser(authentication);
+        List<ProjectVersionChangelogDTO> changelogs = projectService.getVersionChangelogsByRouteKey(id, currentUser);
+        if (changelogs == null) {
+            throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+        }
+
+        CacheControl cacheControl = currentUser == null
+                ? CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic()
+                : CacheControl.noCache();
+
+        return ResponseEntity.ok()
+                .cacheControl(cacheControl)
+                .body(changelogs);
     }
 
     @GetMapping("/projects/{id}/meta")

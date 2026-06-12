@@ -105,6 +105,10 @@ public class ProjectMapper {
     }
 
     public static ProjectDTO toDTO(Project project, boolean isSummary, String currentUserId) {
+        return toDTO(project, isSummary, currentUserId, true);
+    }
+
+    public static ProjectDTO toDTO(Project project, boolean isSummary, String currentUserId, boolean includeVersionChangelogs) {
         if (project == null) return null;
         ProjectDTO dto = new ProjectDTO();
 
@@ -157,7 +161,7 @@ public class ProjectMapper {
 
             if (project.getVersions() != null) {
                 dto.setVersions(project.getVersions().stream()
-                        .map(ProjectMapper::toVersionDTO)
+                        .map(version -> toVersionDTO(version, includeVersionChangelogs))
                         .collect(Collectors.toList()));
             } else {
                 dto.setVersions(new ArrayList<>());
@@ -202,6 +206,10 @@ public class ProjectMapper {
     }
 
     public static ProjectVersionDTO toVersionDTO(ProjectVersion version) {
+        return toVersionDTO(version, true);
+    }
+
+    public static ProjectVersionDTO toVersionDTO(ProjectVersion version, boolean includeChangelog) {
         if (version == null) return null;
         ProjectVersionDTO dto = new ProjectVersionDTO();
         dto.setId(version.getId());
@@ -210,7 +218,9 @@ public class ProjectMapper {
         dto.setFileUrl(version.getFileUrl());
         dto.setDownloadCount(version.getDownloadCount());
         dto.setReleaseDate(version.getReleaseDate());
-        dto.setChangelog(version.getChangelog());
+        if (includeChangelog) {
+            dto.setChangelog(version.getChangelog());
+        }
         dto.setDependencies(version.getDependencies());
         dto.setIncompatibleProjectIds(version.getIncompatibleProjectIds());
         dto.setChannel(version.getChannel());

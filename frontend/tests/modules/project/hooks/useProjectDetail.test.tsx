@@ -8,6 +8,7 @@ import type { Project, User } from '@/types';
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
         getProject: vi.fn(),
+        getProjectVersionChangelogs: vi.fn(),
         trackView: vi.fn(),
         getUserProfile: vi.fn(),
         getOrgMembers: vi.fn(),

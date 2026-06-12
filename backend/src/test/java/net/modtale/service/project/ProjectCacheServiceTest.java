@@ -15,6 +15,7 @@ class ProjectCacheServiceTest {
         ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager(
                 "projectDetails",
                 "projectDetailDtos",
+                "projectVersionChangelogs",
                 "projectMetaDtos",
                 "projectPermissionSnapshots",
                 "projectSearch",
@@ -33,6 +34,8 @@ class ProjectCacheServiceTest {
         cacheManager.getCache("projectDetails").put("public:project-1", project);
         cacheManager.getCache("projectDetails").put("public:sky-tools", project);
         cacheManager.getCache("projectDetailDtos").put("public:project-1", "detail-dto");
+        cacheManager.getCache("projectVersionChangelogs").put("public:project-1", "changelogs");
+        cacheManager.getCache("projectVersionChangelogs").put("public:sky-tools", "changelogs");
         cacheManager.getCache("projectMetaDtos").put("public:project-1", "meta-dto");
         cacheManager.getCache("projectPermissionSnapshots").put("project-1", "permission");
         cacheManager.getCache("projectSearch").put("search-page", "cached");
@@ -43,6 +46,8 @@ class ProjectCacheServiceTest {
         assertNotNull(cacheManager.getCache("projectDetails").get("public:project-1"));
         assertNotNull(cacheManager.getCache("projectDetails").get("public:sky-tools"));
         assertNotNull(cacheManager.getCache("projectDetailDtos").get("public:project-1"));
+        assertNotNull(cacheManager.getCache("projectVersionChangelogs").get("public:project-1"));
+        assertNotNull(cacheManager.getCache("projectVersionChangelogs").get("public:sky-tools"));
         assertNotNull(cacheManager.getCache("projectMetaDtos").get("public:project-1"));
         assertNotNull(cacheManager.getCache("projectPermissionSnapshots").get("project-1"));
         assertNotNull(cacheManager.getCache("projectSearch").get("search-page"));
@@ -55,6 +60,8 @@ class ProjectCacheServiceTest {
         assertNull(cacheManager.getCache("projectDetails").get("public:project-1"));
         assertNull(cacheManager.getCache("projectDetails").get("public:sky-tools"));
         assertNull(cacheManager.getCache("projectDetailDtos").get("public:project-1"));
+        assertNull(cacheManager.getCache("projectVersionChangelogs").get("public:project-1"));
+        assertNull(cacheManager.getCache("projectVersionChangelogs").get("public:sky-tools"));
         assertNull(cacheManager.getCache("projectMetaDtos").get("public:project-1"));
         assertNull(cacheManager.getCache("projectPermissionSnapshots").get("project-1"));
         assertNull(cacheManager.getCache("projectSearch").get("search-page"));
@@ -68,6 +75,7 @@ class ProjectCacheServiceTest {
         ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager(
                 "projectDetails",
                 "projectDetailDtos",
+                "projectVersionChangelogs",
                 "projectMetaDtos",
                 "projectPermissionSnapshots",
                 "projectSearch",
@@ -79,6 +87,7 @@ class ProjectCacheServiceTest {
 
         cacheManager.getCache("projectDetails").put("public:missing-project", "cached");
         cacheManager.getCache("projectDetailDtos").put("public:missing-project", "cached");
+        cacheManager.getCache("projectVersionChangelogs").put("public:missing-project", "cached");
         cacheManager.getCache("projectMetaDtos").put("public:missing-project", "cached");
         cacheManager.getCache("projectPermissionSnapshots").put("missing-project", "cached");
         cacheManager.getCache("projectSearch").put("search-page", "cached");
@@ -88,6 +97,7 @@ class ProjectCacheServiceTest {
 
         assertNull(cacheManager.getCache("projectDetails").get("public:missing-project"));
         assertNull(cacheManager.getCache("projectDetailDtos").get("public:missing-project"));
+        assertNull(cacheManager.getCache("projectVersionChangelogs").get("public:missing-project"));
         assertNull(cacheManager.getCache("projectMetaDtos").get("public:missing-project"));
         assertNull(cacheManager.getCache("projectPermissionSnapshots").get("missing-project"));
         assertNull(cacheManager.getCache("projectSearch").get("search-page"));

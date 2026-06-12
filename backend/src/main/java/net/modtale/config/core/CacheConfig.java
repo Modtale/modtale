@@ -19,6 +19,7 @@ public class CacheConfig {
                 "modTags",
                 "projectDetails",
                 "projectDetailDtos",
+                "projectVersionChangelogs",
                 "projectMetaDtos",
                 "projectPermissionSnapshots",
                 "modpackZips",

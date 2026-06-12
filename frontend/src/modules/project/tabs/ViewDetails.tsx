@@ -24,7 +24,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile
     return (
         <>
             <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
-                <MarkdownRenderer content={project.about || "*No description.*"} />
+                <MarkdownRenderer content={project.about || "*No description.*"} deferRich />
             </div>
             {showMetaSections && (
                 <div className="mt-8 pt-8 border-t border-slate-200 dark:border-white/5">
