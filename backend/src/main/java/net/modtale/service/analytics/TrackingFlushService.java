@@ -64,7 +64,9 @@ public class TrackingFlushService {
         for (Map.Entry<String, Integer> entry : batch.downloads().entrySet()) {
             bulkOps.updateOne(
                     new Query(Criteria.where("_id").is(entry.getKey())),
-                    new Update().inc("downloadCount", entry.getValue())
+                    new Update()
+                            .inc("downloadCount", entry.getValue())
+                            .set("rankingDirty", true)
             );
         }
 

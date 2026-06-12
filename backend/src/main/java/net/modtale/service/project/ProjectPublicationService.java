@@ -7,6 +7,7 @@ import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.communication.ProjectNotificationService;
 import net.modtale.service.communication.WebhookService;
@@ -24,6 +25,7 @@ public class ProjectPublicationService {
     private final ProjectNotificationService projectNotificationService;
     private final WebhookService webhookService;
     private final TrackingService trackingService;
+    private final ScoringService scoringService;
     private final AccessControlService accessControlService;
     private final ProjectAccessService projectAccessService;
     private final SecurityIssueAnalysisService securityIssueAnalysisService;
@@ -34,6 +36,7 @@ public class ProjectPublicationService {
             ProjectNotificationService projectNotificationService,
             WebhookService webhookService,
             TrackingService trackingService,
+            ScoringService scoringService,
             AccessControlService accessControlService,
             ProjectAccessService projectAccessService,
             SecurityIssueAnalysisService securityIssueAnalysisService
@@ -43,6 +46,7 @@ public class ProjectPublicationService {
         this.projectNotificationService = projectNotificationService;
         this.webhookService = webhookService;
         this.trackingService = trackingService;
+        this.scoringService = scoringService;
         this.accessControlService = accessControlService;
         this.projectAccessService = projectAccessService;
         this.securityIssueAnalysisService = securityIssueAnalysisService;
@@ -56,6 +60,7 @@ public class ProjectPublicationService {
                     "Only projects that are pending review can be reverted to draft.");
         }
         project.setStatus(ProjectStatus.DRAFT);
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
@@ -70,6 +75,7 @@ public class ProjectPublicationService {
         }
         project.setStatus(ProjectStatus.ARCHIVED);
         project.setExpiresAt(null);
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
@@ -82,6 +88,7 @@ public class ProjectPublicationService {
         }
         project.setStatus(ProjectStatus.UNLISTED);
         project.setExpiresAt(null);
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
@@ -94,6 +101,7 @@ public class ProjectPublicationService {
         }
         project.setStatus(ProjectStatus.PRIVATE);
         project.setExpiresAt(null);
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
@@ -116,6 +124,7 @@ public class ProjectPublicationService {
         project.setStatus(ProjectStatus.PUBLISHED);
         project.setExpiresAt(null);
         project.setUpdatedAt(LocalDateTime.now().toString());
+        scoringService.markProjectRankingDirty(project);
 
         if (project.getVersions() != null) {
             project.getVersions().forEach(version -> {
@@ -156,6 +165,7 @@ public class ProjectPublicationService {
                 "You do not have permission to update this project.");
         project.setStatus(status);
         project.setExpiresAt(null);
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
     }

@@ -4,6 +4,7 @@ import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.ProjectDeletionService;
 import net.modtale.service.project.ProjectRetentionService;
@@ -22,6 +23,7 @@ public class ProjectModerationService {
     private final ProjectService projectService;
     private final ProjectRetentionService projectRetentionService;
     private final ProjectDeletionService projectDeletionService;
+    private final ScoringService scoringService;
     private final NotificationService notificationService;
     private final ScanService scanService;
     private final ProjectVersionAccessService projectVersionAccessService;
@@ -32,6 +34,7 @@ public class ProjectModerationService {
             ProjectService projectService,
             ProjectRetentionService projectRetentionService,
             ProjectDeletionService projectDeletionService,
+            ScoringService scoringService,
             NotificationService notificationService,
             ScanService scanService,
             ProjectVersionAccessService projectVersionAccessService,
@@ -41,6 +44,7 @@ public class ProjectModerationService {
         this.projectService = projectService;
         this.projectRetentionService = projectRetentionService;
         this.projectDeletionService = projectDeletionService;
+        this.scoringService = scoringService;
         this.notificationService = notificationService;
         this.scanService = scanService;
         this.projectVersionAccessService = projectVersionAccessService;
@@ -83,6 +87,7 @@ public class ProjectModerationService {
         Project targetProject = requireProject(id);
         targetProject.setStatus(ProjectStatus.UNLISTED);
         targetProject.setExpiresAt(null);
+        scoringService.markProjectRankingDirty(targetProject);
         projectRepository.save(targetProject);
         projectService.evictProjectCache(targetProject);
 

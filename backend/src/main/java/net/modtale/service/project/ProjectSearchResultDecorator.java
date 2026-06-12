@@ -6,7 +6,12 @@ import net.modtale.repository.user.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ProjectSearchResultDecorator {
@@ -19,7 +24,8 @@ public class ProjectSearchResultDecorator {
 
     public Page<Project> decorateCatalogResults(Page<Project> results) {
         if (results.hasContent()) {
-            results.getContent().forEach(this::sanitizeAndPopulateAuthor);
+            hydrateAuthors(results.getContent());
+            results.getContent().forEach(this::sanitizeVersionResults);
         }
         return results;
     }
@@ -37,15 +43,32 @@ public class ProjectSearchResultDecorator {
     }
 
     public List<Project> decorateContributedProjects(List<Project> projects) {
-        projects.forEach(this::sanitizeAndPopulateAuthor);
+        hydrateAuthors(projects);
+        projects.forEach(this::sanitizeVersionResults);
         return projects;
     }
 
-    private void sanitizeAndPopulateAuthor(Project project) {
-        sanitizeVersionResults(project);
-        if (project.getAuthor() == null && project.getAuthorId() != null) {
-            userRepository.findById(project.getAuthorId()).ifPresent(user -> project.setAuthor(user.getUsername()));
+    private void hydrateAuthors(List<Project> projects) {
+        Set<String> authorIds = projects.stream()
+                .map(Project::getAuthorId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+
+        if (authorIds.isEmpty()) {
+            return;
         }
+
+        Map<String, String> usernamesById = new HashMap<>();
+        userRepository.findAllById(authorIds).forEach(user -> usernamesById.put(user.getId(), user.getUsername()));
+
+        projects.forEach(project -> {
+            if (project.getAuthor() == null && project.getAuthorId() != null) {
+                String username = usernamesById.get(project.getAuthorId());
+                if (username != null) {
+                    project.setAuthor(username);
+                }
+            }
+        });
     }
 
     private void sanitizeVersionResults(Project project) {

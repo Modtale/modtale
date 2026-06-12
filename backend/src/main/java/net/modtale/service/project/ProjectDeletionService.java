@@ -4,6 +4,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.analytics.TrackingService;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -22,6 +23,7 @@ public class ProjectDeletionService {
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final TrackingService trackingService;
+    private final ScoringService scoringService;
     private final ProjectArtifactDeletionService projectArtifactDeletionService;
     private final MongoTemplate mongoTemplate;
 
@@ -29,12 +31,14 @@ public class ProjectDeletionService {
             ProjectRepository projectRepository,
             ProjectService projectService,
             TrackingService trackingService,
+            ScoringService scoringService,
             ProjectArtifactDeletionService projectArtifactDeletionService,
             MongoTemplate mongoTemplate
     ) {
         this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.trackingService = trackingService;
+        this.scoringService = scoringService;
         this.projectArtifactDeletionService = projectArtifactDeletionService;
         this.mongoTemplate = mongoTemplate;
     }
@@ -43,6 +47,7 @@ public class ProjectDeletionService {
         ProjectStatus oldStatus = project.getStatus();
         project.setStatus(ProjectStatus.DELETED);
         project.setDeletedAt(LocalDateTime.now());
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
         if (oldStatus == ProjectStatus.PUBLISHED || oldStatus == ProjectStatus.UNLISTED || oldStatus == ProjectStatus.ARCHIVED) {
@@ -53,6 +58,7 @@ public class ProjectDeletionService {
     public void restore(Project project, ProjectStatus targetStatus) {
         project.setStatus(targetStatus);
         project.setDeletedAt(null);
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
@@ -82,6 +88,7 @@ public class ProjectDeletionService {
         projectArtifactDeletionService.deleteProjectMedia(project);
 
         mongoTemplate.updateMulti(new Query(Criteria.where("likedProjectIds").is(project.getId())), new Update().pull("likedProjectIds", project.getId()), net.modtale.model.user.User.class);
+        scoringService.markProjectRankingDirty(project.getId());
         projectRepository.delete(project);
         projectService.evictProjectCache(project);
         dependencyIds.forEach(this::cleanupOrphanedDependency);

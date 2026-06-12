@@ -10,6 +10,7 @@ import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.communication.ProjectNotificationService;
 import net.modtale.service.communication.WebhookService;
@@ -95,6 +96,7 @@ class LifecycleServiceTest {
                 projectNotificationService,
                 webhookService,
                 trackingService,
+                mock(ScoringService.class),
                 accessControlService,
                 projectAccessService,
                 securityIssueAnalysisService

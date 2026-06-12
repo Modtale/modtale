@@ -57,7 +57,6 @@ public class ProjectCatalogSearchService {
             );
         }
 
-        Sort sort = resolveSort(sortBy);
         LocalDate dateCutoff = resolveDateCutoff(dateRange);
 
         Page<Project> results = projectRepository.searchProjects(
@@ -67,7 +66,7 @@ public class ProjectCatalogSearchService {
                 contentType,
                 minDownloads,
                 minFavorites,
-                PageRequest.of(page, size, sort),
+                PageRequest.of(page, size),
                 currentUser != null ? currentUser.getId() : null,
                 sortBy,
                 viewCategory,
@@ -84,19 +83,6 @@ public class ProjectCatalogSearchService {
 
     public List<Project> getPublishedProjects() {
         return projectRepository.findAllPublished();
-    }
-
-    private Sort resolveSort(ProjectSort sortBy) {
-        ProjectSort effectiveSort = sortBy != null ? sortBy : ProjectSort.RELEVANCE;
-        return switch (effectiveSort) {
-            case DOWNLOADS -> Sort.by("downloadCount").descending();
-            case UPDATED -> Sort.by("updatedAt").descending();
-            case NEWEST -> Sort.by("createdAt").descending();
-            case FAVORITES -> Sort.by("favoriteCount").descending();
-            case POPULAR -> Sort.by("popularScore").descending();
-            case TRENDING -> Sort.by("trendScore").descending();
-            default -> Sort.unsorted();
-        };
     }
 
     private LocalDate resolveDateCutoff(String dateRange) {

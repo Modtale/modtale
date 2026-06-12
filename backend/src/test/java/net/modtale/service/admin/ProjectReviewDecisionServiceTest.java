@@ -6,6 +6,7 @@ import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.communication.ProjectNotificationService;
 import net.modtale.service.project.LifecycleService;
@@ -57,6 +58,7 @@ class ProjectReviewDecisionServiceTest {
                 projectRepository,
                 projectService,
                 lifecycleService,
+                mock(ScoringService.class),
                 securityIssueAnalysisService,
                 projectVersionAccessService
         );

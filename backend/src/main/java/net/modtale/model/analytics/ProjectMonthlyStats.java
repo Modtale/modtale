@@ -11,7 +11,8 @@ import java.util.Map;
 @Document(collection = "project_monthly_stats")
 @CompoundIndexes({
         @CompoundIndex(def = "{'projectId': 1, 'year': 1, 'month': 1}", unique = true),
-        @CompoundIndex(def = "{'authorId': 1, 'year': 1, 'month': 1}")
+        @CompoundIndex(def = "{'authorId': 1, 'year': 1, 'month': 1}"),
+        @CompoundIndex(name = "year_month_idx", def = "{'year': 1, 'month': 1}")
 })
 public class ProjectMonthlyStats {
     @Id

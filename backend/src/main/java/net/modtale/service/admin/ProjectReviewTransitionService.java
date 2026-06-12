@@ -6,6 +6,7 @@ import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.project.LifecycleService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.ProjectVersionAccessService;
@@ -20,6 +21,7 @@ public class ProjectReviewTransitionService {
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final LifecycleService lifecycleService;
+    private final ScoringService scoringService;
     private final SecurityIssueAnalysisService securityIssueAnalysisService;
     private final ProjectVersionAccessService projectVersionAccessService;
 
@@ -27,12 +29,14 @@ public class ProjectReviewTransitionService {
             ProjectRepository projectRepository,
             ProjectService projectService,
             LifecycleService lifecycleService,
+            ScoringService scoringService,
             SecurityIssueAnalysisService securityIssueAnalysisService,
             ProjectVersionAccessService projectVersionAccessService
     ) {
         this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.lifecycleService = lifecycleService;
+        this.scoringService = scoringService;
         this.securityIssueAnalysisService = securityIssueAnalysisService;
         this.projectVersionAccessService = projectVersionAccessService;
     }
@@ -70,6 +74,7 @@ public class ProjectReviewTransitionService {
     public ProjectRejectionDecision rejectProject(String id, String reason) {
         Project project = requireProject(id);
         project.setStatus(ProjectStatus.DRAFT);
+        scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
         return new ProjectRejectionDecision(project, reason);
