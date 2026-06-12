@@ -244,12 +244,52 @@ describe('Home fallback requests', () => {
         });
 
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
-            params: { size: 16, sort: 'relevance', category: 'trending' }
+            params: { size: 16, sort: 'relevance', category: 'trending' },
+            timeout: 1800,
         });
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
-            params: { size: 12, sort: 'newest' }
+            params: { size: 12, sort: 'newest' },
+            timeout: 1800,
         });
-        expect(mockedApi.get).toHaveBeenCalledWith('/analytics/platform/stats');
+        expect(mockedApi.get).toHaveBeenCalledWith('/analytics/platform/stats', { timeout: 1800 });
+    });
+
+    it('uses newest SSR projects as the initial marquee seed instead of immediately refetching trending data', async () => {
+        await act(async () => {
+            root.render(
+                <SSRProvider
+                    data={{
+                        homeProjects: [],
+                        homeTrendingProjects: [],
+                        homeNewestProjects: [
+                            {
+                                id: 'project-1',
+                                title: 'Skyforge Utilities',
+                                authorId: 'user-1',
+                                author: 'Ada',
+                                imageUrl: '/images/skyforge-icon.png',
+                                bannerUrl: '/images/skyforge-banner.png',
+                                downloadCount: 1200
+                            }
+                        ],
+                        stats: { totalProjects: 2842, totalDownloads: 92841653, totalUsers: 49713 }
+                    }}
+                    initialPath="/"
+                >
+                    <HelmetProvider>
+                        <MemoryRouter initialEntries={['/']}>
+                            <Home />
+                        </MemoryRouter>
+                    </HelmetProvider>
+                </SSRProvider>
+            );
+        });
+
+        expect(mockedApi.get).not.toHaveBeenCalledWith('/projects', expect.objectContaining({
+            params: expect.objectContaining({ category: 'trending' }),
+            timeout: 1800,
+        }));
+        expect(mockedApi.get).not.toHaveBeenCalled();
     });
 
     it('does not bounce back into the desktop hero layout after a same-width desktop fit failure', async () => {

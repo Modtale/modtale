@@ -50,6 +50,7 @@ const LazySection = ({ children, minHeight }: { children: React.ReactNode, minHe
 };
 
 const dedupeProjects = (items: Project[]) => Array.from(new Map(items.map((project) => [project.id, project])).values());
+const HOME_REQUEST_TIMEOUT_MS = 1800;
 
 const FeatureShowcaseSection = ({
     children,
@@ -134,11 +135,15 @@ export const Home: React.FC<{
     const homeSeo = ROUTE_SEO['/'];
     const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
     const initialNewestProjects = ssrData?.homeNewestProjects || [];
+    const initialProjectSeed = useMemo(
+        () => dedupeProjects([...initialTrendingProjects, ...initialNewestProjects]),
+        [initialNewestProjects, initialTrendingProjects]
+    );
 
     const [isDesktop, setIsDesktop] = useState(false);
     const [useDesktopHeroLayout, setUseDesktopHeroLayout] = useState(false);
-    const [projects, setProjects] = useState<Project[]>(initialTrendingProjects);
-    const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects);
+    const [projects, setProjects] = useState<Project[]>(initialTrendingProjects.length ? initialTrendingProjects : initialProjectSeed);
+    const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects.length ? initialNewestProjects : initialProjectSeed);
     const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const heroGridRef = useRef<HTMLDivElement>(null);
     const heroTextColumnRef = useRef<HTMLDivElement>(null);
@@ -153,28 +158,65 @@ export const Home: React.FC<{
         handleResize();
         window.addEventListener('resize', handleResize, { passive: true });
 
-        const shouldFetchFallbackProjects = !initialTrendingProjects.length;
-        const shouldFetchFallbackNewest = !initialNewestProjects.length;
+        const shouldFetchFallbackProjects = initialProjectSeed.length === 0;
+        const shouldRefreshTrendingProjects = !initialTrendingProjects.length && initialProjectSeed.length > 0;
+        const shouldFetchFallbackNewest = !initialNewestProjects.length && initialProjectSeed.length === 0;
+        const shouldRefreshNewestProjects = !initialNewestProjects.length && initialProjectSeed.length > 0;
         const shouldFetchFallbackStats = !ssrData?.stats?.totalProjects;
+        const scheduleBackgroundRequest = (request: () => Promise<void>) => {
+            if ('requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(() => {
+                    void request();
+                }, { timeout: HOME_REQUEST_TIMEOUT_MS });
+                return;
+            }
+
+            window.setTimeout(() => {
+                void request();
+            }, 150);
+        };
 
         if (shouldFetchFallbackProjects) {
-            api.get('/projects', { params: { size: 16, sort: 'relevance', category: 'trending' } })
+            api.get('/projects', {
+                params: { size: 16, sort: 'relevance', category: 'trending' },
+                timeout: HOME_REQUEST_TIMEOUT_MS,
+            })
                 .then(res => {
                     if (res.data?.content) setProjects(res.data.content);
                 })
                 .catch(() => {});
+        } else if (shouldRefreshTrendingProjects) {
+            scheduleBackgroundRequest(async () => {
+                try {
+                    const res = await api.get('/projects', {
+                        params: { size: 16, sort: 'relevance', category: 'trending' },
+                        timeout: HOME_REQUEST_TIMEOUT_MS,
+                    });
+                    if (res.data?.content?.length) setProjects(res.data.content);
+                } catch {}
+            });
         }
 
         if (shouldFetchFallbackNewest) {
-            api.get('/projects', { params: { size: 12, sort: 'newest' } })
+            api.get('/projects', { params: { size: 12, sort: 'newest' }, timeout: HOME_REQUEST_TIMEOUT_MS })
                 .then(res => {
                     if (res.data?.content) setNewestProjects(res.data.content);
                 })
                 .catch(() => {});
+        } else if (shouldRefreshNewestProjects) {
+            scheduleBackgroundRequest(async () => {
+                try {
+                    const res = await api.get('/projects', {
+                        params: { size: 12, sort: 'newest' },
+                        timeout: HOME_REQUEST_TIMEOUT_MS,
+                    });
+                    if (res.data?.content?.length) setNewestProjects(res.data.content);
+                } catch {}
+            });
         }
 
         if (shouldFetchFallbackStats) {
-            api.get('/analytics/platform/stats')
+            api.get('/analytics/platform/stats', { timeout: HOME_REQUEST_TIMEOUT_MS })
                 .then(res => setStats(res.data))
                 .catch(() => {});
         }
@@ -182,7 +224,7 @@ export const Home: React.FC<{
         return () => {
             window.removeEventListener('resize', handleResize);
         };
-    }, [DESKTOP_BREAKPOINT, initialNewestProjects.length, initialTrendingProjects.length, ssrData?.stats?.totalProjects]);
+    }, [DESKTOP_BREAKPOINT, initialNewestProjects.length, initialProjectSeed.length, initialTrendingProjects.length, ssrData?.stats?.totalProjects]);
 
     useEffect(() => {
         let frameId = 0;

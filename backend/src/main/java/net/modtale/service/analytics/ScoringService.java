@@ -4,8 +4,6 @@ import net.modtale.model.analytics.ProjectMonthlyStats;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import org.bson.Document;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
@@ -22,7 +20,7 @@ import java.util.*;
 @Service
 public class ScoringService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ScoringService.class);
+    private static final int MIN_DOWNLOADS_FOR_SCORED_RANKING = 10;
 
     private final MongoTemplate mongoTemplate;
 
@@ -30,7 +28,7 @@ public class ScoringService {
         this.mongoTemplate = mongoTemplate;
     }
 
-    @Scheduled(cron = "0 30 0 * * ?")
+    @Scheduled(cron = "${app.analytics.score-refresh.cron:0 30 0 * * ?}")
     public void updateProjectScores() {
         LocalDate today = LocalDate.now();
         Date todayStart = Date.from(today.atStartOfDay(ZoneId.systemDefault()).toInstant());
@@ -39,7 +37,7 @@ public class ScoringService {
         Date monthStart = Date.from(today.minusDays(30).atStartOfDay(ZoneId.systemDefault()).toInstant());
         Date quarterStart = Date.from(today.minusDays(90).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
-        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is(ProjectStatus.PUBLISHED).and("downloadCount").gte(10)), Project.class);
+        long totalPublished = mongoTemplate.count(new Query(Criteria.where("status").is(ProjectStatus.PUBLISHED).and("downloadCount").gte(MIN_DOWNLOADS_FOR_SCORED_RANKING)), Project.class);
         double medianDownloads = calculatePercentileDownloads(totalPublished, 0.50);
         double noiseFloor = calculatePercentileDownloads(totalPublished, 0.01);
         double logMedian = Math.log10(Math.max(10, medianDownloads));
@@ -86,7 +84,7 @@ public class ScoringService {
 
             int trendScore = 0; double popularScore = 0.0; double relevanceScore = 0.0;
 
-            if (totalDownloads >= 10) {
+            if (totalDownloads >= MIN_DOWNLOADS_FOR_SCORED_RANKING) {
                 if (currentWeek > previousWeek) {
                     double dynamicGrowthRatio = (double) (currentWeek + dampeningK) / (previousWeek + dampeningK);
                     double growthDelta = Math.sqrt(currentWeek - previousWeek);
@@ -101,7 +99,6 @@ public class ScoringService {
             bulkOps.updateOne(new Query(Criteria.where("_id").is(projectId)), new Update().set("trendScore", trendScore).set("relevanceScore", relevanceScore).set("popularScore", popularScore).set("downloads7d", currentWeek).set("downloads30d", recent).set("downloads90d", quarter));
             if (++counter >= 1000) { bulkOps.execute(); bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Project.class); counter = 0; }
         }
-
         Query decayQuery = new Query(new Criteria().orOperator(
                 Criteria.where("trendScore").ne(0),
                 Criteria.where("relevanceScore").gt(0.0),
@@ -122,13 +119,12 @@ public class ScoringService {
 
     private double calculatePercentileDownloads(long totalCount, double percentile) {
         if (totalCount == 0) return 10.0;
-        Project p = mongoTemplate.findOne(new Query(Criteria.where("status").is(ProjectStatus.PUBLISHED).and("downloadCount").gte(10)).with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "downloadCount")).skip((long) (totalCount * percentile)).limit(1), Project.class);
+        Project p = mongoTemplate.findOne(new Query(Criteria.where("status").is(ProjectStatus.PUBLISHED).and("downloadCount").gte(MIN_DOWNLOADS_FOR_SCORED_RANKING)).with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "downloadCount")).skip((long) (totalCount * percentile)).limit(1), Project.class);
         return p != null ? p.getDownloadCount() : 10.0;
     }
 
     public void ensureScores(List<Project> projects) {
-        if (projects == null || projects.isEmpty()) return;
-        List<Project> missing = projects.stream().filter(p -> p.getDownloadCount() > 0 && (p.getPopularScore() == 0.0 || p.getRelevanceScore() == 0.0 || p.getTrendScore() == 0)).toList();
-        if (!missing.isEmpty()) updateProjectScores();
+        // Score refreshes are scheduled daily so read requests never trigger
+        // ad-hoc recalculations while analytics are only bucketed by day.
     }
 }
