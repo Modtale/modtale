@@ -6,10 +6,8 @@ import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.analytics.ScoringService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -35,12 +33,10 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
     private final MongoTemplate mongoTemplate;
     private final UserRepository userRepository;
-    private final ScoringService scoringService;
 
-    public ProjectRepositoryImpl(MongoTemplate mongoTemplate, UserRepository userRepository, @Lazy ScoringService scoringService) {
+    public ProjectRepositoryImpl(MongoTemplate mongoTemplate, UserRepository userRepository) {
         this.mongoTemplate = mongoTemplate;
         this.userRepository = userRepository;
-        this.scoringService = scoringService;
     }
 
     @Override
@@ -155,9 +151,55 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         if (sortBy == ProjectSort.TRENDING || viewCategory == ProjectViewCategory.TRENDING) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "trendScore"));
         } else if (sortBy == ProjectSort.POPULAR || viewCategory == ProjectViewCategory.POPULAR) {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
+            pipeline.add(Aggregation.addFields()
+                    .addField("effectivePopularScore")
+                    .withValue(ConditionalOperators.when(new Criteria().andOperator(
+                                    Criteria.where("popularScore").lte(0.0),
+                                    Criteria.where("downloadCount").gte(10)
+                            ))
+                            .thenValueOf(
+                                    ArithmeticOperators.Add.valueOf("downloadCount")
+                                            .add(ArithmeticOperators.Multiply.valueOf("favoriteCount").multiplyBy(10))
+                            )
+                            .otherwise("$popularScore"))
+                    .build());
+            pipeline.add(Aggregation.sort(Sort.by(
+                    Sort.Order.desc("effectivePopularScore"),
+                    Sort.Order.desc("downloadCount"),
+                    Sort.Order.desc("favoriteCount")
+            )));
         } else if (sortBy == ProjectSort.RELEVANCE) {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
+            pipeline.add(Aggregation.addFields()
+                    .addField("effectiveRelevanceScore")
+                    .withValue(ConditionalOperators.when(new Criteria().andOperator(
+                                    Criteria.where("relevanceScore").lte(0.0),
+                                    Criteria.where("downloadCount").gte(10),
+                                    Criteria.where("downloads30d").gt(0)
+                            ))
+                            .thenValueOf(
+                                    ArithmeticOperators.Multiply.valueOf("downloads30d")
+                                            .multiplyBy(
+                                                    ArithmeticOperators.Add.valueOf(1)
+                                                            .add(
+                                                                    ArithmeticOperators.Multiply.valueOf(
+                                                                                    ArithmeticOperators.Divide.valueOf("favoriteCount")
+                                                                                            .divideBy(
+                                                                                                    ConditionalOperators.when(Criteria.where("downloadCount").gt(0))
+                                                                                                            .then("$downloadCount")
+                                                                                                            .otherwise(1)
+                                                                                            )
+                                                                            )
+                                                                            .multiplyBy(5)
+                                                            )
+                                            )
+                            )
+                            .otherwise("$relevanceScore"))
+                    .build());
+            pipeline.add(Aggregation.sort(Sort.by(
+                    Sort.Order.desc("effectiveRelevanceScore"),
+                    Sort.Order.desc("downloads30d"),
+                    Sort.Order.desc("favoriteCount")
+            )));
         } else if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {
             pipeline.add(Aggregation.sort(Sort.Direction.DESC, "gemRatio"));
         } else if (sortBy == ProjectSort.DOWNLOADS && dateCutoff != null) {
@@ -183,8 +225,6 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         @SuppressWarnings("deprecation")
         Aggregation mainAgg = Aggregation.newAggregation(Project.class, pipeline);
         List<Project> results = mongoTemplate.aggregate(mainAgg, Project.class, Project.class).getMappedResults();
-
-        scoringService.ensureScores(results);
 
         long total;
         if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {

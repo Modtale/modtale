@@ -149,13 +149,16 @@ const isStaticBrowseRequest = isBrowseRoute && !isComplex;
 if (classification) {
     if (isHome) {
         try {
+            const homeRequestInit = {
+                headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
+            };
             const [trending, newest, stats] = await Promise.all([
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=24&sort=relevance&category=trending`),
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=newest`),
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`),
+                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=relevance&category=trending`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=newest`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`, 1200, homeRequestInit),
             ]);
 
-            const unique = trending?.content || [];
+            const unique = trending?.content || newest?.content || [];
             const newestProjects = newest?.content || [];
 
             initialData = {
