@@ -16,7 +16,8 @@ vi.mock('@/modules/discovery/api/discoveryClient', () => ({
 }));
 
 vi.mock('@/modules/project/components/ProjectCard', () => ({
-    ProjectCard: ({ project }: any) => <div data-project-id={project.id}>{project.title}</div>
+    ProjectCard: ({ project }: any) => <div data-project-id={project.id}>{project.title}</div>,
+    ProjectCardSkeletons: () => <div data-testid="project-card-skeletons" />
 }));
 
 const mockedDiscoveryClient = vi.mocked(discoveryClient);
