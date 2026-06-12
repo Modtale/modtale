@@ -3,6 +3,7 @@ package net.modtale.controller.system;
 import net.modtale.model.dto.response.system.SystemStatusView;
 import net.modtale.model.system.StatusHistory;
 import net.modtale.repository.system.StatusHistoryRepository;
+import net.modtale.service.system.StatusSnapshotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -25,13 +26,15 @@ class StatusControllerTest {
     private MongoTemplate mongoTemplate;
     private S3Client s3Client;
     private StatusHistoryRepository historyRepository;
+    private StatusSnapshotService statusSnapshotService;
 
     @BeforeEach
     void setUp() {
         mongoTemplate = mock(MongoTemplate.class);
         s3Client = mock(S3Client.class);
         historyRepository = mock(StatusHistoryRepository.class);
-        controller = new StatusController(mongoTemplate, s3Client, historyRepository);
+        statusSnapshotService = new StatusSnapshotService(mongoTemplate, s3Client, historyRepository);
+        controller = new StatusController(statusSnapshotService);
     }
 
     @Test

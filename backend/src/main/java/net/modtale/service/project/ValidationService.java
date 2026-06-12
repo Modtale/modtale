@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +27,8 @@ public class ValidationService {
 
     private static final Map<String, String> CANONICAL_TAG_MAP = ALLOWED_TAGS.stream()
             .collect(Collectors.toMap(String::toLowerCase, Function.identity()));
+    private static final List<String> SORTED_ALLOWED_TAGS = ALLOWED_TAGS.stream().sorted().toList();
+    private static final List<ProjectClassification> ALLOWED_CLASSIFICATIONS = List.of(ProjectClassification.values());
 
     private static final Pattern STRICT_VERSION_PATTERN = Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
     private static final Pattern REPO_URL_PATTERN = Pattern.compile("^https:\\/\\/(github\\.com|gitlab\\.com|codeberg\\.org)\\/[\\w.-]+\\/[\\w.-]+$");
@@ -70,7 +71,7 @@ public class ValidationService {
     }
 
     public List<String> getAllowedTags() {
-        return ALLOWED_TAGS.stream().sorted().collect(Collectors.toList());
+        return SORTED_ALLOWED_TAGS;
     }
 
     public List<String> getAllowedGameVersions() {
@@ -86,6 +87,6 @@ public class ValidationService {
     }
 
     public List<ProjectClassification> getAllowedClassifications() {
-        return Arrays.asList(ProjectClassification.values());
+        return ALLOWED_CLASSIFICATIONS;
     }
 }

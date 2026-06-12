@@ -41,6 +41,9 @@ public class ProjectService {
     }
 
     public Project getProjectById(String id, User viewer) {
+        if (viewer == null) {
+            return projectViewService.getPublicProjectById(id);
+        }
         return projectViewService.getProjectById(id, viewer);
     }
 

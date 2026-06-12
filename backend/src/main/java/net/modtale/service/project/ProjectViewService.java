@@ -8,6 +8,7 @@ import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.security.AccessControlService;
 import net.modtale.util.MongoIdUtils;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -61,6 +62,7 @@ public class ProjectViewService {
         return prepareProjectForViewer(project, viewer, privileged);
     }
 
+    @Cacheable(value = "projectDetails", key = "'public:' + #id")
     public Project getPublicProjectById(String id) {
         Project project = getRawProjectById(id);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;

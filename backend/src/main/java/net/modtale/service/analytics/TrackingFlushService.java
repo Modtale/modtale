@@ -6,6 +6,9 @@ import net.modtale.model.project.Project;
 import net.modtale.service.project.ProjectService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -28,31 +31,46 @@ public class TrackingFlushService {
     private final MongoTemplate mongoTemplate;
     private final ProjectService projectService;
     private final TrackingBufferService trackingBufferService;
+    private final CacheManager cacheManager;
+
+    @Autowired
+    public TrackingFlushService(
+            MongoTemplate mongoTemplate,
+            ProjectService projectService,
+            TrackingBufferService trackingBufferService,
+            CacheManager cacheManager
+    ) {
+        this.mongoTemplate = mongoTemplate;
+        this.projectService = projectService;
+        this.trackingBufferService = trackingBufferService;
+        this.cacheManager = cacheManager;
+    }
 
     public TrackingFlushService(
             MongoTemplate mongoTemplate,
             ProjectService projectService,
             TrackingBufferService trackingBufferService
     ) {
-        this.mongoTemplate = mongoTemplate;
-        this.projectService = projectService;
-        this.trackingBufferService = trackingBufferService;
+        this(mongoTemplate, projectService, trackingBufferService, null);
     }
 
     public void flushAnalyticsBuffer() {
-        flushBaseProjectMetrics();
-        flushMonthlyStats();
-        flushPlatformEntityStats();
+        boolean flushedBaseMetrics = flushBaseProjectMetrics();
+        boolean flushedMonthlyStats = flushMonthlyStats();
+        boolean flushedPlatformEntityStats = flushPlatformEntityStats();
+        if (flushedBaseMetrics || flushedMonthlyStats || flushedPlatformEntityStats) {
+            evictAnalyticsCaches();
+        }
     }
 
     public void deleteProjectAnalytics(String projectId) {
         mongoTemplate.remove(Query.query(Criteria.where("projectId").is(projectId)), ProjectMonthlyStats.class);
     }
 
-    private void flushBaseProjectMetrics() {
+    private boolean flushBaseProjectMetrics() {
         TrackingBufferService.MetricsBatch batch = trackingBufferService.drainMetricIncrements();
         if (batch.isEmpty()) {
-            return;
+            return false;
         }
 
         BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Project.class);
@@ -79,9 +97,11 @@ public class TrackingFlushService {
         try {
             bulkOps.execute();
             evictUpdatedProjectCaches(allIdsToEvict);
+            return true;
         } catch (Exception e) {
             logger.error("Failed to bulk flush metrics", e);
             trackingBufferService.restoreMetricIncrements(batch);
+            return false;
         }
     }
 
@@ -109,10 +129,10 @@ public class TrackingFlushService {
         projectService.evictProjectDetailsCaches(projects, missingIds);
     }
 
-    private void flushMonthlyStats() {
+    private boolean flushMonthlyStats() {
         TrackingBufferService.MonthlyAnalyticsBatch batch = trackingBufferService.drainMonthlyAnalytics();
         if (batch.isEmpty()) {
-            return;
+            return false;
         }
 
         LocalDate now = LocalDate.now();
@@ -205,12 +225,13 @@ public class TrackingFlushService {
                     PlatformMonthlyStats.class
             );
         }
+        return true;
     }
 
-    private void flushPlatformEntityStats() {
+    private boolean flushPlatformEntityStats() {
         TrackingBufferService.PlatformEntityBatch batch = trackingBufferService.drainPlatformEntities();
         if (!batch.hasUpdates()) {
-            return;
+            return false;
         }
 
         LocalDate now = LocalDate.now();
@@ -228,6 +249,24 @@ public class TrackingFlushService {
         }
 
         mongoTemplate.upsert(query, update, PlatformMonthlyStats.class);
+        return true;
+    }
+
+    private void evictAnalyticsCaches() {
+        if (cacheManager == null) {
+            return;
+        }
+        clearCache("platformStats");
+        clearCache("platformAnalytics");
+        clearCache("creatorAnalytics");
+        clearCache("projectAnalytics");
+    }
+
+    private void clearCache(String cacheName) {
+        Cache cache = cacheManager.getCache(cacheName);
+        if (cache != null) {
+            cache.clear();
+        }
     }
 
     private static class ProjectAgg {

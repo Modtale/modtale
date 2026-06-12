@@ -4,6 +4,7 @@ import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.dto.response.analytics.PlatformStatsView;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
+import net.modtale.service.analytics.PlatformStatsService;
 import net.modtale.service.analytics.QueryService;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,12 +28,14 @@ class PlatformAnalyticsControllerTest {
     private PlatformAnalyticsController controller;
     private QueryService queryService;
     private MongoTemplate mongoTemplate;
+    private PlatformStatsService platformStatsService;
 
     @BeforeEach
     void setUp() {
         queryService = mock(QueryService.class);
         mongoTemplate = mock(MongoTemplate.class);
-        controller = new PlatformAnalyticsController(queryService, mongoTemplate);
+        platformStatsService = new PlatformStatsService(mongoTemplate);
+        controller = new PlatformAnalyticsController(queryService, platformStatsService);
     }
 
     @Test

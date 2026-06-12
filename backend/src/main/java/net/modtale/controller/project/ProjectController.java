@@ -21,6 +21,7 @@ import net.modtale.service.project.GameVersionService;
 import net.modtale.service.project.LifecycleService;
 import net.modtale.service.project.MetadataService;
 import net.modtale.service.project.ProjectRetentionService;
+import net.modtale.service.project.ProjectResponseCacheService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
 import net.modtale.service.project.ValidationService;
@@ -60,6 +61,7 @@ public class ProjectController {
     private final MetadataService metadataService;
     private final ValidationService validationService;
     private final GameVersionService gameVersionService;
+    private final ProjectResponseCacheService projectResponseCacheService;
     private final AccessControlService accessControlService;
     private final AccountService accountService;
 
@@ -71,6 +73,7 @@ public class ProjectController {
             MetadataService metadataService,
             ValidationService validationService,
             GameVersionService gameVersionService,
+            ProjectResponseCacheService projectResponseCacheService,
             AccessControlService accessControlService,
             AccountService accountService
     ) {
@@ -81,6 +84,7 @@ public class ProjectController {
         this.metadataService = metadataService;
         this.validationService = validationService;
         this.gameVersionService = gameVersionService;
+        this.projectResponseCacheService = projectResponseCacheService;
         this.accessControlService = accessControlService;
         this.accountService = accountService;
     }
@@ -131,21 +135,36 @@ public class ProjectController {
                 ? accountService.getCurrentUser(authentication)
                 : null;
 
-        Page<Project> data = searchService.searchProjects(
-                tagList,
-                search,
-                page,
-                size,
-                sortEnum,
-                gameVersion,
-                classificationEnum,
-                minDownloads,
-                minFavorites,
-                effectiveCategory,
-                dateRange,
-                authorId,
-                currentUser
-        );
+        Page<ProjectSummaryDTO> responsePage = currentUser == null && !effectiveCategory.isPersonalView()
+                ? projectResponseCacheService.searchPublicProjectSummaries(
+                        tagList,
+                        search,
+                        page,
+                        size,
+                        sortEnum,
+                        gameVersion,
+                        classificationEnum,
+                        minDownloads,
+                        minFavorites,
+                        effectiveCategory,
+                        dateRange,
+                        authorId
+                )
+                : searchService.searchProjects(
+                        tagList,
+                        search,
+                        page,
+                        size,
+                        sortEnum,
+                        gameVersion,
+                        classificationEnum,
+                        minDownloads,
+                        minFavorites,
+                        effectiveCategory,
+                        dateRange,
+                        authorId,
+                        currentUser
+                ).map(ProjectMapper::toSummaryDTO);
 
         CacheControl cacheControl = effectiveCategory.isPersonalView()
                 ? CacheControl.noCache()
@@ -153,13 +172,23 @@ public class ProjectController {
 
         return ResponseEntity.ok()
                 .cacheControl(cacheControl)
-                .body(data.map(ProjectMapper::toSummaryDTO));
+                .body(responsePage);
     }
 
     @GetMapping("/projects/{id}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<ProjectDTO> getProject(@PathVariable String id, Authentication authentication) {
         User currentUser = accountService.getCurrentUser(authentication);
+        if (currentUser == null) {
+            ProjectDTO project = projectResponseCacheService.getPublicProjectDto(id);
+            if (project == null) {
+                throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+            }
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                    .body(project);
+        }
+
         Project project = projectService.getProjectById(id, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
@@ -170,20 +199,26 @@ public class ProjectController {
             project.setIsOwner(accessControlService.isOwner(project, currentUser));
         }
 
-        boolean publicProject = accessControlService.isPubliclyReadable(project);
-        CacheControl cacheControl = currentUser == null && publicProject
-                ? CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic()
-                : CacheControl.noCache();
-
         return ResponseEntity.ok()
-                .cacheControl(cacheControl)
+                .cacheControl(CacheControl.noCache())
                 .body(ProjectMapper.toDTO(project, false, currentUser != null ? currentUser.getId() : null));
     }
 
     @GetMapping("/projects/{id}/meta")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<ProjectMetaDTO> getProjectMeta(@PathVariable String id, Authentication authentication) {
-        Project project = projectService.getProjectById(id, accountService.getCurrentUser(authentication));
+        User currentUser = accountService.getCurrentUser(authentication);
+        if (currentUser == null) {
+            ProjectMetaDTO meta = projectResponseCacheService.getPublicProjectMeta(id);
+            if (meta == null) {
+                throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+            }
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                    .body(meta);
+        }
+
+        Project project = projectService.getProjectById(id, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }
