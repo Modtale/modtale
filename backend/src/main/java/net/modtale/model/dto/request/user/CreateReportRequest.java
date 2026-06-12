@@ -10,7 +10,6 @@ public class CreateReportRequest {
     @NotBlank(message = "A report target is required.")
     private String targetId;
 
-    @NotBlank(message = "A report target type is required.")
     @NotNull(message = "A report target type is required.")
     private Report.TargetType targetType;
 
