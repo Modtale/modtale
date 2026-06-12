@@ -4,7 +4,7 @@ import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkI
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
-import { ProjectCard } from '@/modules/project/components/ProjectCard';
+import { ProjectCard, ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
 import type { Project, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { GLASS_CARD, GLASS_HEADER } from '../styles';
@@ -573,18 +573,30 @@ const ScrollContainer = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
+const ProjectScrollSkeletons = ({ count = 3 }: { count?: number }) => (
+    <ScrollContainer>
+        {[...Array(count)].map((_, index) => (
+            <div key={index} className="w-[280px] sm:w-[320px] shrink-0 snap-start" aria-hidden="true">
+                <ProjectCardSkeleton />
+            </div>
+        ))}
+    </ScrollContainer>
+);
+
 export const TrendingProjectsSection = ({
     projects,
+    loading = false,
     likedProjectIds = [],
     onToggleFavorite = () => {},
     isLoggedIn = false
 }: {
     projects: Project[];
+    loading?: boolean;
     likedProjectIds?: string[];
     onToggleFavorite?: (projectId: string) => void;
     isLoggedIn?: boolean;
 }) => {
-    if (projects.length === 0) return null;
+    if (!loading && projects.length === 0) return null;
     return (
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
@@ -602,35 +614,41 @@ export const TrendingProjectsSection = ({
                 </Link>
             </div>
             
-            <ScrollContainer>
-                {projects.map((project) => (
-                    <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
-                        <ProjectCard
-                            project={project}
-                            isFavorite={likedProjectIds.includes(project.id)}
-                            onToggleFavorite={onToggleFavorite}
-                            isLoggedIn={isLoggedIn}
-                            viewStyle="grid"
-                        />
-                    </div>
-                ))}
-            </ScrollContainer>
+            {loading && projects.length === 0 ? (
+                <ProjectScrollSkeletons />
+            ) : (
+                <ScrollContainer>
+                    {projects.map((project) => (
+                        <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
+                            <ProjectCard
+                                project={project}
+                                isFavorite={likedProjectIds.includes(project.id)}
+                                onToggleFavorite={onToggleFavorite}
+                                isLoggedIn={isLoggedIn}
+                                viewStyle="grid"
+                            />
+                        </div>
+                    ))}
+                </ScrollContainer>
+            )}
         </section>
     );
 };
 
 export const NewReleasesSection = ({
     projects,
+    loading = false,
     likedProjectIds = [],
     onToggleFavorite = () => {},
     isLoggedIn = false
 }: {
     projects: Project[];
+    loading?: boolean;
     likedProjectIds?: string[];
     onToggleFavorite?: (projectId: string) => void;
     isLoggedIn?: boolean;
 }) => {
-    if (projects.length === 0) return null;
+    if (!loading && projects.length === 0) return null;
     return (
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
@@ -648,19 +666,23 @@ export const NewReleasesSection = ({
                 </Link>
             </div>
             
-            <ScrollContainer>
-                {projects.map((project) => (
-                    <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
-                        <ProjectCard
-                            project={project}
-                            isFavorite={likedProjectIds.includes(project.id)}
-                            onToggleFavorite={onToggleFavorite}
-                            isLoggedIn={isLoggedIn}
-                            viewStyle="grid"
-                        />
-                    </div>
-                ))}
-            </ScrollContainer>
+            {loading && projects.length === 0 ? (
+                <ProjectScrollSkeletons />
+            ) : (
+                <ScrollContainer>
+                    {projects.map((project) => (
+                        <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
+                            <ProjectCard
+                                project={project}
+                                isFavorite={likedProjectIds.includes(project.id)}
+                                onToggleFavorite={onToggleFavorite}
+                                isLoggedIn={isLoggedIn}
+                                viewStyle="grid"
+                            />
+                        </div>
+                    ))}
+                </ScrollContainer>
+            )}
         </section>
     );
 };

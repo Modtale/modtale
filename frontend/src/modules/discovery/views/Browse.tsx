@@ -15,7 +15,7 @@ import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
 import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
-import { BrowseSkeletons } from '../components/BrowseSkeletons';
+import { ProjectCardSkeletons } from '@/modules/project/components/ProjectCard';
 
 interface BrowseViewProps {
     likedProjectIds: string[];
@@ -250,7 +250,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         {items.length > 0 ? (
                             <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
                         ) : isPending || loading ? (
-                            <BrowseSkeletons viewStyle={viewStyle} count={Math.min(itemsPerPage, 12)} />
+                            <ProjectCardSkeletons viewStyle={viewStyle} count={Math.min(itemsPerPage, 12)} />
                         ) : (
                             <div className="mt-8 animate-in fade-in zoom-in-95 duration-500">
                                 <EmptyState icon={PackageSearch} title="No matches found" message="Try adjusting your search terms or filters to find what you're looking for." />
